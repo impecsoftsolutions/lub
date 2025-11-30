@@ -1,0 +1,52 @@
+@@ .. @@
+-/*
+-  # Add foreign key constraint for user_roles.user_id
+-
+-  1. Foreign Key Constraint
+-    - Links user_roles.user_id to auth.users.id
+-    - Enables proper API expansion queries
+-    - ON DELETE CASCADE for data integrity
+-
+-  2. Verification
+-    - Confirms constraint creation
+-    - Enables user_roles?select=*,users:user_id(email) queries
+-*/
+-
+--- Check if constraint exists and create only if missing
+-DO $$
+-BEGIN
+-  -- Check if the constraint already exists
+-  IF NOT EXISTS (
+-    SELECT 1 
+-    FROM pg_constraint 
+-    WHERE conrelid = 'public.user_roles'::regclass 
+-    AND conname = 'user_roles_user_id_fkey'
+-  ) THEN
+-    -- Create the foreign key constraint
+-    ALTER TABLE public.user_roles
+-    ADD CONSTRAINT user_roles_user_id_fkey
+-    FOREIGN KEY (user_id) REFERENCES auth.users(id)
+-    ON DELETE CASCADE;
+-    
+-    RAISE NOTICE 'Created foreign key constraint user_roles_user_id_fkey';
+-  ELSE
+-    RAISE NOTICE 'Foreign key constraint user_roles_user_id_fkey already exists, skipping';
+-  END IF;
+-END $$;
+-
+--- Verify the constraint was created
+-DO $$
+-DECLARE
+-  constraint_count INTEGER;
+-BEGIN
+-  SELECT COUNT(*) INTO constraint_count
+-  FROM pg_constraint 
+-  WHERE conrelid = 'public.user_roles'::regclass 
+-  AND conname = 'user_roles_user_id_fkey';
+-  
+-  IF constraint_count > 0 THEN
+-    RAISE NOTICE 'Verification: user_roles_user_id_fkey constraint is present';
+-  ELSE
+-    RAISE WARNING 'Verification failed: user_roles_user_id_fkey constraint not found';
+-  END IF;
+-END $$;

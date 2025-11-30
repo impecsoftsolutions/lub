@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Normalization Edge Function</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .result h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .result-item {
+            margin-bottom: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        .result-label {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .result-value {
+            color: #333;
+            font-size: 15px;
+        }
+        .error {
+            background: #fee;
+            border-left-color: #f44336;
+        }
+        .error .result-label {
+            color: #f44336;
+        }
+        .error .result-value {
+            color: #d32f2f;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Normalization Function</h1>
+        <p class="subtitle">Enter member details to test the normalization edge function</p>
+
+        <form id="normalizationForm">
+            <div class="form-group">
+                <label for="full_name">Full Name</label>
+                <input type="text" id="full_name" name="full_name" placeholder="e.g., john doe" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="e.g., JOHN.DOE@EXAMPLE.COM" required>
+            </div>
+
+            <div class="form-group">
+                <label for="company_name">Company Name</label>
+                <input type="text" id="company_name" name="company_name" placeholder="e.g., acme corp" required>
+            </div>
+
+            <button type="submit" id="submitBtn">
+                Normalize Data
+            </button>
+        </form>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('normalizationForm');
+        const resultDiv = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+
+        const EDGE_FUNCTION_URL = 'https://qskziirjtzoomrtckpzas.supabase.co/functions/v1/normalize-member';
+        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFza3ppaXJqdHpvb21ydGNrcHphcyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzI2OTQxNTY3LCJleHAiOjIwNDI1MTc1Njd9.GX33btJr44Q7PcmrBSy82fQ-UeKUQJUn_1tjUQI0i7Q';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                full_name: document.getElementById('full_name').value,
+                email: document.getElementById('email').value,
+                company_name: document.getElementById('company_name').value
+            };
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Normalizing<span class="loading"></span>';
+            resultDiv.classList.remove('show');
+
+            try {
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${ANON_KEY}`,
+                        'apikey': ANON_KEY
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                displayResult(data, formData);
+
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Normalize Data';
+            }
+        });
+
+        function displayResult(normalizedData, originalData) {
+            resultDiv.innerHTML = `
+                <h2>✓ Normalization Result</h2>
+
+                <div class="result-item">
+                    <div class="result-label">Original Full Name</div>
+                    <div class="result-value">${escapeHtml(originalData.full_name)}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Normalized Full Name</div>
+                    <div class="result-value">${escapeHtml(normalizedData.full_name)}</div>
+                </div>
+
+                <div class="result-item">
+                    <div class="result-label">Original Email</div>
+                    <div class="result-value">${escapeHtml(originalData.email)}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Normalized Email</div>
+                    <div class="result-value">${escapeHtml(normalizedData.email)}</div>
+                </div>
+
+                <div class="result-item">
+                    <div class="result-label">Original Company Name</div>
+                    <div class="result-value">${escapeHtml(originalData.company_name)}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Normalized Company Name</div>
+                    <div class="result-value">${escapeHtml(normalizedData.company_name)}</div>
+                </div>
+            `;
+            resultDiv.classList.add('show');
+        }
+
+        function displayError(errorMessage) {
+            resultDiv.innerHTML = `
+                <div class="result-item error">
+                    <div class="result-label">Error</div>
+                    <div class="result-value">${escapeHtml(errorMessage)}</div>
+                </div>
+            `;
+            resultDiv.classList.add('show');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
