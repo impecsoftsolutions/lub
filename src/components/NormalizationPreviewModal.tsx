@@ -29,9 +29,18 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
     if (!isOpen || !original || !normalized) return;
 
     const fieldsToCheck = [
-      'full_name', 'email', 'mobile_number', 'company_name',
-      'company_address', 'alternate_contact_name', 'alternate_mobile', 'referred_by'
-    ];
+  { key: 'full_name', label: 'Full Name' },
+  { key: 'email', label: 'Email' },
+  { key: 'mobile_number', label: 'Mobile Number' },
+  { key: 'company_name', label: 'Company Name' },
+  { key: 'company_address', label: 'Company Address' },
+  { key: 'products_services', label: 'Products & Services' }, // ⬅ NEW
+  { key: 'alternate_contact_name', label: 'Alternate Contact Name' },
+  { key: 'alternate_mobile', label: 'Alternate Mobile' },
+  { key: 'referred_by', label: 'Referred By' },
+];
+
+
 
     const hasChanges = fieldsToCheck.some(
       key => original[key] && original[key] !== normalized[key]

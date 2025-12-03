@@ -8,6 +8,7 @@ export interface NormalizationResult {
     mobile_number: string;
     company_name: string;
     company_address: string;
+    products_services: string;         // ⬅ NEW
     alternate_contact_name: string;
     alternate_mobile: string;
     referred_by: string;
