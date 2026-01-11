@@ -18,85 +18,34 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
 }) => {
   const [editedData, setEditedData] = useState(normalized || {});
 
-  // UPDATE editedData whenever normalized prop changes
   useEffect(() => {
-    console.log('🔄 Normalized prop changed, updating editedData:', normalized);
     setEditedData(normalized || {});
   }, [normalized]);
 
-  // Auto-accept if no changes were made by normalization
-  useEffect(() => {
-    if (!isOpen || !original || !normalized) return;
-
-    const fieldsToCheck = [
-  { key: 'full_name', label: 'Full Name' },
-  { key: 'email', label: 'Email' },
-  { key: 'mobile_number', label: 'Mobile Number' },
-  { key: 'company_name', label: 'Company Name' },
-  { key: 'company_address', label: 'Company Address' },
-  { key: 'products_services', label: 'Products & Services' }, // ⬅ NEW
-  { key: 'alternate_contact_name', label: 'Alternate Contact Name' },
-  { key: 'alternate_mobile', label: 'Alternate Mobile' },
-  { key: 'referred_by', label: 'Referred By' },
-];
-
-
-
-    const hasChanges = fieldsToCheck.some(
-      key => original[key] && original[key] !== normalized[key]
-    );
-
-    if (!hasChanges) {
-      console.log('✅ No normalization changes detected, auto-accepting data');
-      onAccept({ ...original, ...normalized });
-    }
-  }, [isOpen, original, normalized, onAccept]);
-
-  // Safety check - don't render if data isn't ready
-  if (!original || !normalized) {
-    return null;
-  }
-
-  // DEBUG LOGS
-  console.log('🔍 Modal received - original:', original);
-  console.log('🔍 Modal received - normalized:', normalized);
-  console.log('🔍 Modal editedData state:', editedData);
-
   if (!isOpen) return null;
+  if (!original || !normalized) return null;
 
-  // Additional safety check - ensure editedData is initialized
-  if (!editedData || typeof editedData !== 'object') {
-    console.warn('⚠️ editedData is not properly initialized:', editedData);
-    return null;
-  }
-
-  // Fields to compare
+  // FULL list including Products & Services
   const fieldsToCheck = [
     { key: 'full_name', label: 'Full Name' },
     { key: 'email', label: 'Email' },
     { key: 'mobile_number', label: 'Mobile Number' },
     { key: 'company_name', label: 'Company Name' },
     { key: 'company_address', label: 'Company Address' },
+    { key: 'products_services', label: 'Products & Services' },
     { key: 'alternate_contact_name', label: 'Alternate Contact Name' },
     { key: 'alternate_mobile', label: 'Alternate Mobile' },
     { key: 'referred_by', label: 'Referred By' }
   ];
 
-  // Find fields that were changed
   const changedFields = fieldsToCheck.filter(
-    field => original[field.key] && original[field.key] !== normalized[field.key]
+    field => original[field.key] !== normalized[field.key]
   );
-
-  console.log('🔍 Changed fields:', changedFields.map(f => f.key));
-
-  if (changedFields.length === 0) {
-    // No changes, don't show modal
-    return null;
-  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center">
@@ -104,14 +53,13 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
             <div>
               <h2 className="text-xl font-bold text-gray-900">Review Normalized Data</h2>
               <p className="text-sm text-gray-600">
-                We've automatically corrected {changedFields.length} field(s). Please review:
+                {changedFields.length === 0
+                  ? 'No automatic corrections were made. You may still review and confirm.'
+                  : `We've suggested ${changedFields.length} improvement(s). Please review:`}
               </p>
             </div>
           </div>
-          <button
-            onClick={onReject}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onReject} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -119,18 +67,18 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-4">
-            {changedFields.map(field => (
+            {fieldsToCheck.map(field => (
               <div key={field.key} className="border rounded-lg p-4 bg-gray-50">
                 <label className="block font-semibold text-gray-900 mb-3">
                   {field.label}
                 </label>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                   {/* Original */}
                   <div>
                     <p className="text-xs text-gray-500 mb-2 flex items-center">
-                      <X className="w-4 h-4 text-red-500 mr-1" />
-                      Original
+                      <X className="w-4 h-4 text-red-500 mr-1" /> Original
                     </p>
                     <div className="bg-red-50 border border-red-200 rounded p-3 text-sm">
                       {original[field.key] || '(empty)'}
@@ -141,18 +89,18 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
                   <div>
                     <p className="text-xs text-gray-500 mb-2 flex items-center">
                       <CheckCircle className="w-4 h-4 text-green-500 mr-1" />
-                      Normalized (You can edit)
+                      Normalized (Editable)
                     </p>
                     <input
                       type="text"
                       value={editedData?.[field.key] || ''}
-                      onChange={(e) => setEditedData({
-                        ...(editedData || {}),
-                        [field.key]: e.target.value
-                      })}
+                      onChange={(e) =>
+                        setEditedData({ ...(editedData || {}), [field.key]: e.target.value })
+                      }
                       className="w-full bg-green-50 border border-green-200 rounded p-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
+
                 </div>
               </div>
             ))}
@@ -175,6 +123,7 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
             Accept Normalized
           </button>
         </div>
+
       </div>
     </div>
   );
