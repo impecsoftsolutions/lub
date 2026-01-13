@@ -5,16 +5,18 @@ interface NormalizationPreviewModalProps {
   isOpen: boolean;
   original: any;
   normalized: any;
-  onAccept: (data: any) => void;
-  onReject: () => void;
+  onAcceptNormalized: (data: any) => void;
+  onSubmitOriginal: () => void;
+  onClose: () => void;
 }
 
 const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
   isOpen,
   original,
   normalized,
-  onAccept,
-  onReject
+  onAcceptNormalized,
+  onSubmitOriginal,
+  onClose
 }) => {
   const [editedData, setEditedData] = useState(normalized || {});
 
@@ -28,13 +30,10 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
   // FULL list including Products & Services
   const fieldsToCheck = [
     { key: 'full_name', label: 'Full Name' },
-    { key: 'email', label: 'Email' },
-    { key: 'mobile_number', label: 'Mobile Number' },
     { key: 'company_name', label: 'Company Name' },
     { key: 'company_address', label: 'Company Address' },
     { key: 'products_services', label: 'Products & Services' },
     { key: 'alternate_contact_name', label: 'Alternate Contact Name' },
-    { key: 'alternate_mobile', label: 'Alternate Mobile' },
     { key: 'referred_by', label: 'Referred By' }
   ];
 
@@ -59,7 +58,7 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
               </p>
             </div>
           </div>
-          <button onClick={onReject} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -110,13 +109,19 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button
-            onClick={onReject}
+            onClick={onClose}
             className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Keep Original
+            Close
           </button>
           <button
-            onClick={() => onAccept({ ...original, ...editedData })}
+            onClick={onSubmitOriginal}
+            className="px-6 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            Submit Original
+          </button>
+          <button
+            onClick={() => onAcceptNormalized({ ...original, ...editedData })}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
           >
             <CheckCircle className="w-5 h-5 mr-2" />

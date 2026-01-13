@@ -56,7 +56,7 @@ const Join: React.FC = () => {
   const { validateField: validateFieldByRule, isLoading: isLoadingValidation } = useValidation();
 
   // Authentication and existing registration state
-  const { member, isAuthenticated, isLoading: isLoadingAuth } = useMember();
+  const { member, isAuthenticated, isLoading: isLoadingAuth, refreshMember } = useMember();
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
   const [existingRegistration, setExistingRegistration] = useState<ExistingRegistration | null>(null);
 
@@ -139,6 +139,7 @@ const Join: React.FC = () => {
   // Normalization state
   const [showNormalizationModal, setShowNormalizationModal] = useState(false);
   const [normalizationResult, setNormalizationResult] = useState<any>(null);
+  const [normalizationOriginalSnapshot, setNormalizationOriginalSnapshot] = useState<any>(null);
 
   // Validation and UI state
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -924,9 +925,15 @@ const Join: React.FC = () => {
         console.log('[Join.tsx] Registration submitted successfully');
         showToast('success', 'Registration submitted successfully! You will receive a confirmation email once approved.');
 
+        try {
+          await refreshMember();
+        } catch (error) {
+          console.error('[Join.tsx] Failed to refresh member data after registration:', error);
+        }
+
         // Navigate to success page or home after a delay
         setTimeout(() => {
-          navigate('/');
+          navigate('/dashboard/profile');
         }, 3000);
       } else {
         console.log('[Join.tsx] Registration submission failed:', result.error);
@@ -991,9 +998,18 @@ const Join: React.FC = () => {
       setIsSubmitting(true);
       console.log('[Join.tsx] Normalizing member data...');
 
-      const raw = await normalizeMemberData(formData);
+      const { email, mobile_number, alternate_mobile, ...normalizationPayload } = formData;
+      const raw = await normalizeMemberData(normalizationPayload);
       const adapted = normalizeResultAdapter(raw, formData);
 
+      adapted.original.email = formData.email;
+      adapted.original.mobile_number = formData.mobile_number;
+      adapted.original.alternate_mobile = formData.alternate_mobile;
+      adapted.normalized.email = formData.email;
+      adapted.normalized.mobile_number = formData.mobile_number;
+      adapted.normalized.alternate_mobile = formData.alternate_mobile;
+
+      setNormalizationOriginalSnapshot(formData);
       setNormalizationResult(adapted);
       setShowNormalizationModal(true);
       setIsSubmitting(false);
@@ -1001,6 +1017,7 @@ const Join: React.FC = () => {
       console.error('[Join.tsx] Normalization failed:', error);
       // If normalization fails, allow user to review and confirm before submitting
       showToast('error', 'Data normalization failed. Please review and confirm before submitting.');
+      setNormalizationOriginalSnapshot(formData);
       setNormalizationResult({ original: formData, normalized: formData });
       setShowNormalizationModal(true);
       setIsSubmitting(false);
@@ -1008,19 +1025,27 @@ const Join: React.FC = () => {
     }
   };
 
-  const handleAcceptNormalization = async (acceptedData: any) => {
-    console.log('[Join.tsx] User accepted normalized data');
-    setFormData(acceptedData);
+  const handleCloseNormalizationModal = () => {
     setShowNormalizationModal(false);
-    // Submit with normalized data directly
-    await submitFormData(acceptedData);
   };
 
-  const handleRejectNormalization = async () => {
-    console.log('[Join.tsx] User rejected normalization, using original data');
+  const handleSubmitOriginalFromModal = async () => {
     setShowNormalizationModal(false);
-    // Submit with original form data directly
-    await submitFormData(formData);
+    await submitFormData(normalizationOriginalSnapshot ?? formData);
+  };
+
+  const handleAcceptNormalizedFromModal = async (acceptedData: any) => {
+    console.log('[Join.tsx] User accepted normalized data');
+    const dataToSubmit = {
+      ...acceptedData,
+      email: formData.email,
+      mobile_number: formData.mobile_number,
+      alternate_mobile: formData.alternate_mobile
+    };
+    setFormData(dataToSubmit);
+    setShowNormalizationModal(false);
+    // Submit with normalized data directly
+    await submitFormData(dataToSubmit);
   };
 
   // Show loading state while checking authentication or existing registration
@@ -2066,8 +2091,9 @@ const Join: React.FC = () => {
           isOpen={showNormalizationModal}
           original={normalizationResult?.original || {}}
           normalized={normalizationResult?.normalized || {}}
-          onAccept={handleAcceptNormalization}
-          onReject={handleRejectNormalization}
+          onClose={handleCloseNormalizationModal}
+          onSubmitOriginal={handleSubmitOriginalFromModal}
+          onAcceptNormalized={handleAcceptNormalizedFromModal}
         />
       </div>
     </div>

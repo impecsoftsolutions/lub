@@ -979,6 +979,10 @@ const MemberEditProfile: React.FC = () => {
     await saveProfileData(acceptedData);
   };
 
+  const handleCloseNormalizationModal = () => {
+    setShowNormalizationModal(false);
+  };
+
   const handleRejectNormalization = async () => {
     console.log('[MemberEditProfile] User rejected normalization, using original data');
     setShowNormalizationModal(false);
@@ -1945,8 +1949,9 @@ const MemberEditProfile: React.FC = () => {
         isOpen={showNormalizationModal}
         original={normalizationResult?.original}
         normalized={normalizationResult?.normalized}
-        onAccept={handleAcceptNormalization}
-        onReject={handleRejectNormalization}
+        onClose={handleCloseNormalizationModal}
+        onSubmitOriginal={handleRejectNormalization}
+        onAcceptNormalized={handleAcceptNormalization}
       />
     </div>
   );
