@@ -963,6 +963,20 @@ const Join: React.FC = () => {
     }
   };
 
+  const normalizeResultAdapter = (raw: any, fallbackOriginal: any) => {
+    if (raw && typeof raw === 'object') {
+      if (raw.original && typeof raw.original === 'object' && raw.normalized && typeof raw.normalized === 'object') {
+        return raw;
+      }
+
+      if (raw.data && raw.data.original && typeof raw.data.original === 'object' && raw.data.normalized && typeof raw.data.normalized === 'object') {
+        return raw.data;
+      }
+    }
+
+    return { original: fallbackOriginal, normalized: fallbackOriginal };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('[Join.tsx] Form submission started');
@@ -977,18 +991,20 @@ const Join: React.FC = () => {
       setIsSubmitting(true);
       console.log('[Join.tsx] Normalizing member data...');
 
-      const result = await normalizeMemberData(formData);
+      const raw = await normalizeMemberData(formData);
+      const adapted = normalizeResultAdapter(raw, formData);
 
-      setNormalizationResult(result);
+      setNormalizationResult(adapted);
       setShowNormalizationModal(true);
       setIsSubmitting(false);
     } catch (error) {
       console.error('[Join.tsx] Normalization failed:', error);
-      // If normalization fails, proceed with original data
-      showToast('error', 'Data normalization failed. Proceeding with original data.');
+      // If normalization fails, allow user to review and confirm before submitting
+      showToast('error', 'Data normalization failed. Please review and confirm before submitting.');
+      setNormalizationResult({ original: formData, normalized: formData });
+      setShowNormalizationModal(true);
       setIsSubmitting(false);
-      // Submit with original data if normalization fails
-      await submitFormData(formData);
+      return;
     }
   };
 

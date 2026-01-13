@@ -33,6 +33,9 @@ export const normalizeMemberData = async (formData: any): Promise<NormalizationR
     console.log('📥 Edge Function returned - data:', data);
     console.log('📥 Edge Function returned - error:', error);
 
+    console.log('[normalizeMemberData] Response keys:', Object.keys(data || {}));
+    console.log('[normalizeMemberData] Has original/normalized:', !!data?.original, !!data?.normalized);
+
     if (error) {
       console.error('❌ Normalization error:', error);
       throw new Error(`Failed to normalize data: ${error.message}`);
