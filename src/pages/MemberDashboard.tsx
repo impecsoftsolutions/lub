@@ -35,19 +35,25 @@ const MemberDashboard: React.FC = () => {
   // Check if user has a member_registrations record
   useEffect(() => {
     const checkMemberRegistration = async () => {
-      if (!member || !member.user_id) {
+      setCheckingRegistration(true);
+      const effectiveUserId = await getEffectiveUserId();
+
+      if (!effectiveUserId) {
+        setRegistrationLookupError('Missing user id for registration lookup');
+        setHasRegistrationRecord(false);
+        setRegistrationStatus(null);
         setCheckingRegistration(false);
         return;
       }
 
       try {
         setRegistrationLookupError(null);
-        console.log('[MemberDashboard] Checking for member_registrations record for:', member.user_id);
+        console.log('[MemberDashboard] Checking for member_registrations record for:', effectiveUserId);
 
         const { data, error } = await supabase
           .from('member_registrations')
           .select('id,status,approval_date,member_id,updated_at,created_at')
-          .eq('user_id', member.user_id)
+          .eq('user_id', effectiveUserId)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -91,6 +97,11 @@ const MemberDashboard: React.FC = () => {
     setRegistrationRetryCounter(prev => prev + 1);
   };
 
+  const getEffectiveUserId = async () => {
+    const authUserResult = await supabase.auth.getUser();
+    return member?.user_id || member?.id || authUserResult.data.user?.id || null;
+  };
+
   const handleSignOut = async () => {
     try {
       showToast('success', 'Logging out...');
@@ -112,7 +123,7 @@ const MemberDashboard: React.FC = () => {
     });
   };
 
-  if (isLoading || checkingRegistration) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -142,9 +153,10 @@ const MemberDashboard: React.FC = () => {
   }
 
   const effectiveStatus = registrationStatus ?? member.status;
+  const statusForDisplay = registrationStatus ?? member.status;
 
   const getStatusBadge = () => {
-    switch (effectiveStatus) {
+    switch (statusForDisplay) {
       case 'pending':
         return (
           <div className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg">
@@ -227,10 +239,14 @@ const MemberDashboard: React.FC = () => {
 
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">
-              {registrationLookupError || hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
+              {checkingRegistration || registrationLookupError || hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
             </h2>
 
-            {registrationLookupError ? (
+            {checkingRegistration ? (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+                Checking registration status...
+              </div>
+            ) : registrationLookupError ? (
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start justify-between gap-4">
                 <p className="text-sm text-yellow-800">
                   Could not load your registration status. Please try again.
@@ -277,12 +293,12 @@ const MemberDashboard: React.FC = () => {
                       className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <RefreshCw className="w-5 h-5 mr-2" />
-                      Re-apply for Membership
+                      Reapply
                     </Link>
                   </div>
                 )}
               </>
-            ) : (
+            ) : hasRegistrationRecord === false ? (
               <div className="space-y-6">
                 <p className="text-gray-600 mb-6">
                   Complete these two simple steps to become a LUB member:
@@ -338,7 +354,7 @@ const MemberDashboard: React.FC = () => {
                   </p>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">

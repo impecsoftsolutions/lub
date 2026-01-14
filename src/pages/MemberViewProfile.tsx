@@ -202,27 +202,6 @@ const MemberViewProfile: React.FC = () => {
                     </div>
                   )}
                   <div className="space-y-4">
-                    <div>
-                      <label className="text-sm text-gray-600">Status</label>
-                      <div className="mt-1">
-                        {effectiveStatus === 'approved' && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                            Approved
-                          </span>
-                        )}
-                        {effectiveStatus === 'pending' && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                            Pending Review
-                          </span>
-                        )}
-                        {effectiveStatus === 'rejected' && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                            Rejected
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
                     {member.member_id && (
                       <div>
                         <label className="text-sm text-gray-600">Member ID</label>
