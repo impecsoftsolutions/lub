@@ -19,7 +19,10 @@ const MemberDashboard: React.FC = () => {
     isVisible: false
   });
   const [hasRegistrationRecord, setHasRegistrationRecord] = useState<boolean | null>(null);
+  const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
+  const [registrationLookupError, setRegistrationLookupError] = useState<string | null>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
+  const [registrationRetryCounter, setRegistrationRetryCounter] = useState(0);
 
   useEffect(() => {
     // Only redirect if loading is complete AND not authenticated
@@ -32,31 +35,39 @@ const MemberDashboard: React.FC = () => {
   // Check if user has a member_registrations record
   useEffect(() => {
     const checkMemberRegistration = async () => {
-      if (!member || !member.email) {
+      if (!member || !member.user_id) {
         setCheckingRegistration(false);
         return;
       }
 
       try {
-        console.log('[MemberDashboard] Checking for member_registrations record for:', member.email);
+        setRegistrationLookupError(null);
+        console.log('[MemberDashboard] Checking for member_registrations record for:', member.user_id);
 
         const { data, error } = await supabase
           .from('member_registrations')
-          .select('id')
-          .eq('email', member.email)
+          .select('id,status,approval_date,member_id,updated_at,created_at')
+          .eq('user_id', member.user_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         if (error) {
           console.error('[MemberDashboard] Error checking registration:', error);
           setHasRegistrationRecord(false);
+          setRegistrationStatus(null);
+          setRegistrationLookupError(error.message || 'Unknown error');
         } else {
           const hasRecord = !!data;
           console.log('[MemberDashboard] Has registration record:', hasRecord);
           setHasRegistrationRecord(hasRecord);
+          setRegistrationStatus(data?.status ?? null);
         }
       } catch (error) {
         console.error('[MemberDashboard] Unexpected error checking registration:', error);
         setHasRegistrationRecord(false);
+        setRegistrationStatus(null);
+        setRegistrationLookupError('Unknown error');
       } finally {
         setCheckingRegistration(false);
       }
@@ -65,7 +76,7 @@ const MemberDashboard: React.FC = () => {
     if (member) {
       checkMemberRegistration();
     }
-  }, [member]);
+  }, [member, registrationRetryCounter]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });
@@ -73,6 +84,11 @@ const MemberDashboard: React.FC = () => {
 
   const hideToast = () => {
     setToast(prev => ({ ...prev, isVisible: false }));
+  };
+
+  const handleRetryRegistrationLookup = () => {
+    setCheckingRegistration(true);
+    setRegistrationRetryCounter(prev => prev + 1);
   };
 
   const handleSignOut = async () => {
@@ -125,8 +141,10 @@ const MemberDashboard: React.FC = () => {
     );
   }
 
+  const effectiveStatus = registrationStatus ?? member.status;
+
   const getStatusBadge = () => {
-    switch (member.status) {
+    switch (effectiveStatus) {
       case 'pending':
         return (
           <div className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg">
@@ -154,7 +172,7 @@ const MemberDashboard: React.FC = () => {
   };
 
   const getStatusMessage = () => {
-    switch (member.status) {
+    switch (effectiveStatus) {
       case 'pending':
         return {
           title: 'Your application is under review',
@@ -209,10 +227,62 @@ const MemberDashboard: React.FC = () => {
 
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">
-              {hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
+              {registrationLookupError || hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
             </h2>
 
-            {!hasRegistrationRecord ? (
+            {registrationLookupError ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start justify-between gap-4">
+                <p className="text-sm text-yellow-800">
+                  Could not load your registration status. Please try again.
+                </p>
+                <button
+                  onClick={handleRetryRegistrationLookup}
+                  className="px-4 py-2 text-sm font-medium text-yellow-800 border border-yellow-300 rounded-lg hover:bg-yellow-100 transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : hasRegistrationRecord ? (
+              <>
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    {getStatusBadge()}
+                  </div>
+                </div>
+
+                {statusInfo && (
+                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-shrink-0">{statusInfo.icon}</div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">{statusInfo.title}</h3>
+                      <p className="text-gray-600 mb-3">{statusInfo.description}</p>
+                      {statusInfo.approvalDate && (
+                        <p className="text-sm text-gray-500">
+                          Approved on: {formatDate(statusInfo.approvalDate)}
+                        </p>
+                      )}
+                      {member.reapplication_count > 0 && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Application attempts: {member.reapplication_count + 1}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {effectiveStatus === 'rejected' && (
+                  <div className="mt-6">
+                    <Link
+                      to="/dashboard/reapply"
+                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <RefreshCw className="w-5 h-5 mr-2" />
+                      Re-apply for Membership
+                    </Link>
+                  </div>
+                )}
+              </>
+            ) : (
               <div className="space-y-6">
                 <p className="text-gray-600 mb-6">
                   Complete these two simple steps to become a LUB member:
@@ -268,46 +338,6 @@ const MemberDashboard: React.FC = () => {
                   </p>
                 </div>
               </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    {getStatusBadge()}
-                  </div>
-                </div>
-
-                {statusInfo && (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-shrink-0">{statusInfo.icon}</div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">{statusInfo.title}</h3>
-                      <p className="text-gray-600 mb-3">{statusInfo.description}</p>
-                      {statusInfo.approvalDate && (
-                        <p className="text-sm text-gray-500">
-                          Approved on: {formatDate(statusInfo.approvalDate)}
-                        </p>
-                      )}
-                      {member.reapplication_count > 0 && (
-                        <p className="text-sm text-gray-500 mt-2">
-                          Application attempts: {member.reapplication_count + 1}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {member.status === 'rejected' && (
-                  <div className="mt-6">
-                    <Link
-                      to="/dashboard/reapply"
-                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <RefreshCw className="w-5 h-5 mr-2" />
-                      Re-apply for Membership
-                    </Link>
-                  </div>
-                )}
-              </>
             )}
           </div>
 
