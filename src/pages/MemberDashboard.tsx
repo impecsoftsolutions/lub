@@ -4,7 +4,8 @@ import { User, FileText, Edit, Key, LogOut, AlertCircle, CheckCircle, Clock, Loa
 import { useMember } from '../contexts/MemberContext';
 import Toast from '../components/Toast';
 import { logoutService } from '../lib/logoutService';
-import { supabase } from '../lib/supabase';
+import { memberRegistrationService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 
 const MemberDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const MemberDashboard: React.FC = () => {
   });
   const [hasRegistrationRecord, setHasRegistrationRecord] = useState<boolean | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
+  const [registrationRow, setRegistrationRow] = useState<any | null>(null);
   const [registrationLookupError, setRegistrationLookupError] = useState<string | null>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [registrationRetryCounter, setRegistrationRetryCounter] = useState(0);
@@ -36,43 +38,41 @@ const MemberDashboard: React.FC = () => {
   useEffect(() => {
     const checkMemberRegistration = async () => {
       setCheckingRegistration(true);
-      const effectiveUserId = await getEffectiveUserId();
+      const sessionToken = sessionManager.getSessionToken();
 
-      if (!effectiveUserId) {
-        setRegistrationLookupError('Missing user id for registration lookup');
-        setHasRegistrationRecord(false);
+      if (!sessionToken || sessionManager.isSessionExpired()) {
+        setRegistrationLookupError('User session not found. Please log in again.');
+        setHasRegistrationRecord(null);
         setRegistrationStatus(null);
+        setRegistrationRow(null);
         setCheckingRegistration(false);
         return;
       }
 
       try {
         setRegistrationLookupError(null);
-        console.log('[MemberDashboard] Checking for member_registrations record for:', effectiveUserId);
+        console.log('[MemberDashboard] Checking for member_registrations record via session token');
 
-        const { data, error } = await supabase
-          .from('member_registrations')
-          .select('id,status,approval_date,member_id,updated_at,created_at')
-          .eq('user_id', effectiveUserId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const { data, error } = await memberRegistrationService.getMyMemberRegistrationByToken(sessionToken);
 
         if (error) {
           console.error('[MemberDashboard] Error checking registration:', error);
-          setHasRegistrationRecord(false);
+          setHasRegistrationRecord(null);
           setRegistrationStatus(null);
-          setRegistrationLookupError(error.message || 'Unknown error');
+          setRegistrationRow(null);
+          setRegistrationLookupError(error);
         } else {
           const hasRecord = !!data;
           console.log('[MemberDashboard] Has registration record:', hasRecord);
           setHasRegistrationRecord(hasRecord);
           setRegistrationStatus(data?.status ?? null);
+          setRegistrationRow(data ?? null);
         }
       } catch (error) {
         console.error('[MemberDashboard] Unexpected error checking registration:', error);
-        setHasRegistrationRecord(false);
+        setHasRegistrationRecord(null);
         setRegistrationStatus(null);
+        setRegistrationRow(null);
         setRegistrationLookupError('Unknown error');
       } finally {
         setCheckingRegistration(false);
@@ -92,14 +92,15 @@ const MemberDashboard: React.FC = () => {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
 
+  const getFirstTwoWords = (name: string | null | undefined): string => {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).join(' ');
+  };
+
   const handleRetryRegistrationLookup = () => {
     setCheckingRegistration(true);
     setRegistrationRetryCounter(prev => prev + 1);
-  };
-
-  const getEffectiveUserId = async () => {
-    const authUserResult = await supabase.auth.getUser();
-    return member?.user_id || member?.id || authUserResult.data.user?.id || null;
   };
 
   const handleSignOut = async () => {
@@ -210,6 +211,9 @@ const MemberDashboard: React.FC = () => {
   };
 
   const statusInfo = getStatusMessage();
+  const displayNameRaw = registrationRow?.full_name || member?.full_name || '';
+  const displayName = getFirstTwoWords(displayNameRaw);
+  const companyName = registrationRow?.company_name || member?.company_name || '';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -225,7 +229,7 @@ const MemberDashboard: React.FC = () => {
           <div className="mb-8 flex justify-between items-start">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Member Dashboard</h1>
-              <p className="mt-1 text-gray-600">Welcome back, {member.full_name}!</p>
+              <p className="mt-1 text-gray-600">Welcome back, {displayName}!</p>
             </div>
             <button
               onClick={refreshMember}
@@ -289,11 +293,11 @@ const MemberDashboard: React.FC = () => {
                 {effectiveStatus === 'rejected' && (
                   <div className="mt-6">
                     <Link
-                      to="/dashboard/reapply"
+                      to="/dashboard/edit"
                       className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <RefreshCw className="w-5 h-5 mr-2" />
-                      Reapply
+                      Edit Profile
                     </Link>
                   </div>
                 )}
@@ -370,7 +374,7 @@ const MemberDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Company</p>
-                <p className="font-medium text-gray-900">{member.company_name}</p>
+                <p className="font-medium text-gray-900">{companyName}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Member Since</p>

@@ -30,8 +30,10 @@ import { normalizeMemberData } from '../lib/normalization';
 import { useValidation } from '../hooks/useValidation';
 import { useFormFieldConfig } from '../hooks/useFormFieldConfig';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
+import { sessionManager } from '../lib/sessionManager';
 import {
   supabase,
+  memberRegistrationService,
   statesService,
   locationsService,
   companyDesignationsService,
@@ -214,73 +216,81 @@ const MemberEditProfile: React.FC = () => {
 
     console.log('[MemberEditProfile] Loading complete profile for member:', member.id);
     try {
-      const { data, error } = await supabase
-        .from('member_registrations')
-        .select('*')
-        .eq('user_id', member.id)
-        .maybeSingle();
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken || sessionManager.isSessionExpired()) {
+        showToast('error', 'User session not found. Please log in again.');
+        return;
+      }
 
-      if (error) throw error;
+      const { data, error } = await memberRegistrationService.getMyMemberRegistrationByToken(sessionToken);
 
-      if (data) {
-        console.log('[MemberEditProfile] Profile data loaded:', data);
+      if (error) {
+        showToast('error', error);
+        return;
+      }
 
-        // Store the member_registrations.id
-        setMemberRegistrationId(data.id);
+      if (!data) {
+        showToast('error', 'Failed to load profile data');
+        return;
+      }
 
-        const initialFormData = {
-          full_name: data.full_name || '',
-          email: data.email || '',
-          mobile_number: data.mobile_number || '',
-          gender: data.gender || '',
-          date_of_birth: data.date_of_birth || '',
-          company_name: data.company_name || '',
-          company_designation_id: data.company_designation_id || '',
-          company_address: data.company_address || '',
-          state: data.state || '',
-          district: data.district || '',
-          city: data.city || '',
-          is_custom_city: data.is_custom_city || false,
-          other_city_name: data.other_city_name || '',
-          pin_code: data.pin_code || '',
-          industry: data.industry || '',
-          activity_type: data.activity_type || '',
-          constitution: data.constitution || '',
-          annual_turnover: data.annual_turnover || '',
-          number_of_employees: data.number_of_employees || '',
-          products_services: data.products_services || '',
-          brand_names: data.brand_names || '',
-          website: data.website || '',
-          gst_registered: data.gst_registered || '',
-          gst_number: data.gst_number || '',
-          pan_company: data.pan_company || '',
-          esic_registered: data.esic_registered || '',
-          epf_registered: data.epf_registered || '',
-          member_id: data.member_id || '',
-          referred_by: data.referred_by || '',
-          amount_paid: data.amount_paid || '',
-          payment_date: data.payment_date || '',
-          payment_mode: data.payment_mode || '',
-          transaction_id: data.transaction_id || '',
-          bank_reference: data.bank_reference || '',
-          alternate_contact_name: data.alternate_contact_name || '',
-          alternate_mobile: data.alternate_mobile || '',
-          profile_photo_url: data.profile_photo_url || ''
-        };
+      console.log('[MemberEditProfile] Profile data loaded:', data);
 
-        setFormData(initialFormData);
-        setOriginalData(initialFormData);
+      // Store the member_registrations.id
+      setMemberRegistrationId(data.id);
 
-        // Handle "Other" city display
-        if (data.is_custom_city || data.city === 'Other') {
-          setShowOtherCity(true);
-        }
+      const initialFormData = {
+        full_name: data.full_name || '',
+        email: data.email || '',
+        mobile_number: data.mobile_number || '',
+        gender: data.gender || '',
+        date_of_birth: data.date_of_birth || '',
+        company_name: data.company_name || '',
+        company_designation_id: data.company_designation_id || '',
+        company_address: data.company_address || '',
+        state: data.state || '',
+        district: data.district || '',
+        city: data.city || '',
+        is_custom_city: data.is_custom_city || false,
+        other_city_name: data.other_city_name || '',
+        pin_code: data.pin_code || '',
+        industry: data.industry || '',
+        activity_type: data.activity_type || '',
+        constitution: data.constitution || '',
+        annual_turnover: data.annual_turnover || '',
+        number_of_employees: data.number_of_employees || '',
+        products_services: data.products_services || '',
+        brand_names: data.brand_names || '',
+        website: data.website || '',
+        gst_registered: data.gst_registered || '',
+        gst_number: data.gst_number || '',
+        pan_company: data.pan_company || '',
+        esic_registered: data.esic_registered || '',
+        epf_registered: data.epf_registered || '',
+        member_id: data.member_id || '',
+        referred_by: data.referred_by || '',
+        amount_paid: data.amount_paid || '',
+        payment_date: data.payment_date || '',
+        payment_mode: data.payment_mode || '',
+        transaction_id: data.transaction_id || '',
+        bank_reference: data.bank_reference || '',
+        alternate_contact_name: data.alternate_contact_name || '',
+        alternate_mobile: data.alternate_mobile || '',
+        profile_photo_url: data.profile_photo_url || ''
+      };
 
-        // Load existing profile photo if it exists
-        if (data.profile_photo_url) {
-          setProfilePhotoPreview(data.profile_photo_url);
-          console.log('[MemberEditProfile] Loaded existing photo:', data.profile_photo_url);
-        }
+      setFormData(initialFormData);
+      setOriginalData(initialFormData);
+
+      // Handle "Other" city display
+      if (data.is_custom_city || data.city === 'Other') {
+        setShowOtherCity(true);
+      }
+
+      // Load existing profile photo if it exists
+      if (data.profile_photo_url) {
+        setProfilePhotoPreview(data.profile_photo_url);
+        console.log('[MemberEditProfile] Loaded existing photo:', data.profile_photo_url);
       }
     } catch (error) {
       console.error('[MemberEditProfile] Error loading member profile:', error);
@@ -840,6 +850,12 @@ const MemberEditProfile: React.FC = () => {
         // Shouldn't happen, but handle edge case where __NEW_PHOTO__ is set but no blob exists
         console.warn('[saveProfileData] __NEW_PHOTO__ flag set but no photo blob found');
         finalPhotoUrl = originalData.profile_photo_url || null;
+      }
+
+      if (!memberRegistrationId) {
+        showToast('error', 'Failed to load profile data');
+        setIsSaving(false);
+        return;
       }
 
       console.log('[saveProfileData] Calling update_member_profile RPC...');

@@ -70,7 +70,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
       });
 
       const { data, error: rpcError } = await supabase
-        .rpc('admin_delete_user_and_purge_deleted_members', {
+        .rpc('admin_delete_user_by_id', {
           p_user_id: user.id,
           p_requesting_user_id: userData.id
         });

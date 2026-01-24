@@ -982,6 +982,35 @@ export const memberRegistrationService = {
     }
   },
 
+  async getMyMemberRegistrationByToken(sessionToken: string): Promise<{ data: any | null; error: string | null }> {
+    try {
+      if (!sessionToken) {
+        return { data: null, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('get_my_member_registration_by_token', {
+        p_session_token: sessionToken
+      });
+
+      if (error) {
+        console.error('[getMyMemberRegistrationByToken] RPC error:', error);
+        return { data: null, error: error.message };
+      }
+
+      let row: any | null = null;
+      if (Array.isArray(data)) {
+        row = data.length > 0 ? data[0] : null;
+      } else if (data && typeof data === 'object') {
+        row = data;
+      }
+
+      return { data: row, error: null };
+    } catch (error) {
+      console.error('[getMyMemberRegistrationByToken] Unexpected error:', error);
+      return { data: null, error: 'An unexpected error occurred' };
+    }
+  },
+
   async submitRegistration(
     registrationData: any,
     files: {

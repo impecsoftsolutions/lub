@@ -2,13 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, Building, MapPin, Calendar, CreditCard, Edit, Loader2, AlertCircle } from 'lucide-react';
 import { useMember } from '../contexts/MemberContext';
-import { supabase } from '../lib/supabase';
+import { memberRegistrationService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 
 const MemberViewProfile: React.FC = () => {
   const navigate = useNavigate();
   const { member, isAuthenticated, isLoading, refreshMember } = useMember();
   const [registration, setRegistration] = useState<any | null>(null);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const getFirstTwoWords = (name: string | null | undefined): string => {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).join(' ');
+  };
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -18,27 +24,28 @@ const MemberViewProfile: React.FC = () => {
 
   useEffect(() => {
     const fetchRegistration = async () => {
-      if (!isAuthenticated || !member?.user_id) {
+      if (!isAuthenticated) {
         return;
       }
 
       try {
         setRegistrationError(null);
 
-        const { data, error } = await supabase
-          .from('member_registrations')
-          .select('status,approval_date,member_id,updated_at,created_at,rejection_reason')
-          .eq('user_id', member.user_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const sessionToken = sessionManager.getSessionToken();
+        if (!sessionToken || sessionManager.isSessionExpired()) {
+          setRegistrationError('User session not found. Please log in again.');
+          return;
+        }
+
+        const { data, error } = await memberRegistrationService.getMyMemberRegistrationByToken(sessionToken);
 
         if (error) {
-          setRegistrationError(error.message || 'Unknown error');
+          setRegistrationError(error);
           return;
         }
 
         setRegistration(data);
+        setRegistrationError(null);
       } catch (error) {
         setRegistrationError('Unknown error');
       }
@@ -89,8 +96,17 @@ const MemberViewProfile: React.FC = () => {
     );
   }
 
-  const effectiveStatus = registration?.status ?? member.status;
-  const effectiveRejectionReason = registration?.rejection_reason ?? member.rejection_reason;
+  const effectiveStatus = registration?.status ?? null;
+  const effectiveRejectionReason = registration?.rejection_reason ?? null;
+  const statusLabel = effectiveStatus === 'pending'
+    ? 'Pending Review'
+    : effectiveStatus === 'approved'
+      ? 'Approved'
+      : effectiveStatus === 'rejected'
+        ? 'Rejected'
+        : '';
+  const displayNameRaw = registration?.full_name || member.full_name || '';
+  const displayName = getFirstTwoWords(displayNameRaw);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -121,8 +137,8 @@ const MemberViewProfile: React.FC = () => {
                   )}
                 </div>
                 <div className="text-white">
-                  <h1 className="text-2xl font-bold">{member.full_name}</h1>
-                  <p className="text-blue-100">{member.company_name}</p>
+                  <h1 className="text-2xl font-bold">{displayName}</h1>
+                  <p className="text-blue-100">{''}</p>
                 </div>
               </div>
               <Link
@@ -169,7 +185,7 @@ const MemberViewProfile: React.FC = () => {
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm text-gray-600">Company Name</label>
-                      <p className="mt-1 text-gray-900 font-medium">{member.company_name}</p>
+                      <p className="mt-1 text-gray-900 font-medium">{registration?.company_name}</p>
                     </div>
                   </div>
                 </div>
@@ -183,17 +199,17 @@ const MemberViewProfile: React.FC = () => {
                   </h2>
                   {effectiveStatus === 'pending' && (
                     <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                      Your membership application is pending review.
+                      {statusLabel}
                     </div>
                   )}
                   {effectiveStatus === 'approved' && (
                     <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                      Your membership has been approved.
+                      {statusLabel}
                     </div>
                   )}
                   {effectiveStatus === 'rejected' && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-                      {effectiveRejectionReason || 'Your membership application was rejected.'}
+                      {statusLabel}
                     </div>
                   )}
                   {registrationError && (
@@ -233,16 +249,10 @@ const MemberViewProfile: React.FC = () => {
                   </div>
                 </div>
 
-                {member.status === 'rejected' && member.rejection_reason && (
+                {effectiveStatus === 'rejected' && effectiveRejectionReason && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-red-900 mb-2">Rejection Reason</h3>
-                    <p className="text-sm text-red-700">{member.rejection_reason}</p>
-                    <Link
-                      to="/dashboard/reapply"
-                      className="mt-4 inline-flex items-center text-sm font-medium text-red-800 hover:text-red-900"
-                    >
-                      Re-apply for membership →
-                    </Link>
+                    <p className="text-sm text-red-700">{effectiveRejectionReason}</p>
                   </div>
                 )}
               </div>
