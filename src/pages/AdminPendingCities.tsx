@@ -1,198 +1,117 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { Check, X, CreditCard as Edit2, GitMerge, AlertCircle, MapPin, ArrowLeft, Lock } from 'lucide-react';
+import { GitMerge, AlertCircle, MapPin, Lock } from 'lucide-react';
+import { adminCitiesService, locationsService, CityOption } from '../lib/supabase';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
-interface PendingCity {
-  id: string;
-  city_name: string;
-  district_id: string;
-  state_id: string;
-  status: 'pending' | 'approved' | 'rejected';
-  submission_source: string;
-  submitted_by: string | null;
-  notes: string | null;
-  created_at: string;
-  district?: {
-    district_name: string;
-  };
-  state?: {
-    state_name: string;
-  };
-}
-
-interface City {
-  id: string;
-  city_name: string;
-  district_id: string;
-  district?: {
-    district_name: string;
-  };
+interface PendingCustomCity {
+  key: string;
+  other_city_name_normalized: string;
+  other_city_name_display: string;
+  state_name: string;
+  district_name: string;
+  state_id: string | null;
+  district_id: string | null;
+  registrations_count: number;
+  latest_created_at: string | null;
 }
 
 export default function AdminPendingCities() {
-  const canViewCities = useHasPermission('locations.cities.view');
   const canApprovePending = useHasPermission('locations.cities.approve_pending');
-  const navigate = useNavigate();
-  const [pendingCities, setPendingCities] = useState<PendingCity[]>([]);
-  const [approvedCities, setApprovedCities] = useState<City[]>([]);
+  const [pendingCities, setPendingCities] = useState<PendingCustomCity[]>([]);
+  const [approvedCities, setApprovedCities] = useState<CityOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMergeModal, setShowMergeModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedCity, setSelectedCity] = useState<PendingCity | null>(null);
-  const [mergeTargetId, setMergeTargetId] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [editedCityName, setEditedCityName] = useState('');
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedPending, setSelectedPending] = useState<PendingCustomCity | null>(null);
+  const [selectedApprovedCityId, setSelectedApprovedCityId] = useState('');
+  const [isLoadingApprovedCities, setIsLoadingApprovedCities] = useState(false);
+  const [pendingError, setPendingError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  const getRequestingUserId = (): string | null => {
+    try {
+      const userDataStr = localStorage.getItem('lub_session_token_user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      return userData?.id || null;
+    } catch (error) {
+      console.error('[AdminPendingCities] Failed to read user session:', error);
+      return null;
+    }
+  };
+
   async function fetchData() {
     setLoading(true);
+    setPendingError(null);
     try {
-      const [pendingRes, approvedRes] = await Promise.all([
-        supabase
-          .from('pending_cities_master')
-          .select(`
-            *,
-            district:districts_master(district_name),
-            state:states_master(state_name)
-          `)
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('pending_cities_master')
-          .select(`
-            id,
-            city_name,
-            district_id,
-            district:districts_master(district_name)
-          `)
-          .eq('status', 'approved')
-          .order('city_name')
-      ]);
+      const userId = getRequestingUserId();
+      if (!userId) {
+        setPendingError('User session not found. Please log in again.');
+        setPendingCities([]);
+        return;
+      }
 
-      if (pendingRes.data) setPendingCities(pendingRes.data);
-      if (approvedRes.data) setApprovedCities(approvedRes.data);
+      const result = await adminCitiesService.listPendingCustomCities(userId);
+      if (!result.success) {
+        setPendingError(result.error || 'Failed to load pending cities');
+        setPendingCities([]);
+        return;
+      }
+
+      setPendingCities(result.items || []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      setPendingError('Failed to load pending cities');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleApprove(cityId: string) {
-    const { error } = await supabase
-      .from('pending_cities_master')
-      .update({
-        status: 'approved',
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', cityId);
-
-    if (error) {
-      console.error('Error approving city:', error);
-      alert('Error approving city: ' + error.message);
-      return;
+  async function loadApprovedCities(districtId: string) {
+    try {
+      setIsLoadingApprovedCities(true);
+      const cities = await locationsService.getActiveCitiesByDistrictId(districtId);
+      setApprovedCities(cities);
+    } catch (error) {
+      console.error('Error loading approved cities:', error);
+      setApprovedCities([]);
+    } finally {
+      setIsLoadingApprovedCities(false);
     }
-
-    fetchData();
   }
 
-  async function handleReject() {
-    if (!selectedCity || !rejectionReason.trim()) {
-      alert('Please provide a rejection reason');
+  async function handleAssign() {
+    if (!selectedPending || !selectedApprovedCityId) {
+      alert('Please select an approved city');
       return;
     }
 
-    const { error } = await supabase
-      .from('pending_cities_master')
-      .update({
-        status: 'rejected',
-        rejection_reason: rejectionReason,
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', selectedCity.id);
-
-    if (error) {
-      console.error('Error rejecting city:', error);
-      alert('Error rejecting city: ' + error.message);
+    const userId = getRequestingUserId();
+    if (!userId) {
+      alert('User session not found. Please log in again.');
       return;
     }
 
-    setShowRejectModal(false);
-    setSelectedCity(null);
-    setRejectionReason('');
-    fetchData();
-  }
-
-  async function handleMerge() {
-    if (!selectedCity || !mergeTargetId) {
-      alert('Please select a city to merge into');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('pending_cities_master')
-      .update({
-        status: 'rejected',
-        merged_into_city_id: mergeTargetId,
-        rejection_reason: 'Merged into existing city',
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', selectedCity.id);
-
-    if (error) {
-      console.error('Error merging city:', error);
-      alert('Error merging city: ' + error.message);
-      return;
-    }
-
-    setShowMergeModal(false);
-    setSelectedCity(null);
-    setMergeTargetId('');
-    fetchData();
-  }
-
-  async function handleEdit() {
-    if (!selectedCity || !editedCityName.trim()) {
-      alert('Please provide a city name');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('pending_cities_master')
-      .update({
-        city_name: editedCityName.trim(),
-        status: 'approved',
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', selectedCity.id);
-
-    if (error) {
-      console.error('Error updating city:', error);
-      alert('Error updating city: ' + error.message);
-      return;
-    }
-
-    setShowEditModal(false);
-    setSelectedCity(null);
-    setEditedCityName('');
-    fetchData();
-  }
-
-  const getSimilarCities = (cityName: string, districtId: string) => {
-    return approvedCities.filter(
-      city =>
-        city.district_id === districtId &&
-        (city.city_name.toLowerCase().includes(cityName.toLowerCase()) ||
-          cityName.toLowerCase().includes(city.city_name.toLowerCase()))
+    const result = await adminCitiesService.assignCustomCity(
+      userId,
+      selectedPending.state_name,
+      selectedPending.district_name,
+      selectedPending.other_city_name_normalized,
+      selectedApprovedCityId
     );
-  };
+
+    if (!result.success) {
+      alert('Error assigning city: ' + (result.error || 'Unknown error'));
+      return;
+    }
+
+    setShowAssignModal(false);
+    setSelectedPending(null);
+    setSelectedApprovedCityId('');
+    await fetchData();
+  }
 
   return (
     <PermissionGate
@@ -221,6 +140,11 @@ export default function AdminPendingCities() {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Loading pending cities...</p>
           </div>
+        ) : pendingError ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <AlertCircle className="w-10 h-10 text-amber-600 mx-auto mb-3" />
+            <p className="text-gray-700">{pendingError}</p>
+          </div>
         ) : pendingCities.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -232,18 +156,21 @@ export default function AdminPendingCities() {
         ) : (
           <div className="space-y-4">
             {pendingCities.map((city) => {
-              const similarCities = getSimilarCities(city.city_name, city.district_id);
+              const latestDate = city.latest_created_at
+                ? new Date(city.latest_created_at).toLocaleDateString()
+                : 'N/A';
+              const canAssign = !!city.district_id;
 
               return (
                 <div
-                  key={city.id}
+                  key={city.key}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {city.city_name}
+                          {city.other_city_name_display}
                         </h3>
                         <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
                           Pending Review
@@ -253,47 +180,29 @@ export default function AdminPendingCities() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
                         <div>
                           <span className="font-medium">District:</span>{' '}
-                          {city.district?.district_name || 'N/A'}
+                          {city.district_name || 'N/A'}
                         </div>
                         <div>
                           <span className="font-medium">State:</span>{' '}
-                          {city.state?.state_name || 'N/A'}
+                          {city.state_name || 'N/A'}
                         </div>
                         <div>
-                          <span className="font-medium">Source:</span>{' '}
-                          {city.submission_source.replace('_', ' ')}
+                          <span className="font-medium">Registrations:</span>{' '}
+                          {city.registrations_count}
                         </div>
                         <div>
-                          <span className="font-medium">Submitted:</span>{' '}
-                          {new Date(city.created_at).toLocaleDateString()}
+                          <span className="font-medium">Latest:</span>{' '}
+                          {latestDate}
                         </div>
                       </div>
 
-                      {city.notes && (
-                        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-700">
-                            <span className="font-medium">Notes:</span> {city.notes}
-                          </p>
-                        </div>
-                      )}
-
-                      {similarCities.length > 0 && (
+                      {!city.district_id && (
                         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                           <div className="flex items-start gap-2">
                             <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium text-amber-900 mb-1">
-                                Similar cities found in {city.district?.district_name}:
-                              </p>
-                              <ul className="text-sm text-amber-800 space-y-1">
-                                {similarCities.map((similar) => (
-                                  <li key={similar.id}>• {similar.city_name}</li>
-                                ))}
-                              </ul>
-                              <p className="text-xs text-amber-700 mt-2">
-                                Consider merging if this is a duplicate
-                              </p>
-                            </div>
+                            <p className="text-sm text-amber-900">
+                              District not resolved. Assignment is disabled for this item.
+                            </p>
                           </div>
                         </div>
                       )}
@@ -303,47 +212,25 @@ export default function AdminPendingCities() {
                   {canApprovePending && (
                     <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
                       <button
-                        onClick={() => handleApprove(city.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                      >
-                        <Check className="w-4 h-4" />
-                        Approve
-                      </button>
-
-                      <button
                         onClick={() => {
-                          setSelectedCity(city);
-                          setEditedCityName(city.city_name);
-                          setShowEditModal(true);
+                          setSelectedPending(city);
+                          setSelectedApprovedCityId('');
+                          setShowAssignModal(true);
+                          if (city.district_id) {
+                            loadApprovedCities(city.district_id);
+                          } else {
+                            setApprovedCities([]);
+                          }
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        disabled={!canAssign}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                          canAssign
+                            ? 'bg-amber-600 text-white hover:bg-amber-700'
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
-                        <Edit2 className="w-4 h-4" />
-                        Edit & Approve
-                      </button>
-
-                      {similarCities.length > 0 && (
-                        <button
-                          onClick={() => {
-                            setSelectedCity(city);
-                            setShowMergeModal(true);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
-                        >
-                          <GitMerge className="w-4 h-4" />
-                          Merge
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => {
-                          setSelectedCity(city);
-                          setShowRejectModal(true);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                      >
-                        <X className="w-4 h-4" />
-                        Reject
+                        <GitMerge className="w-4 h-4" />
+                        Assign Approved City
                       </button>
                     </div>
                   )}
@@ -352,152 +239,58 @@ export default function AdminPendingCities() {
             })}
           </div>
         )}
-
-        {showEditModal && selectedCity && canApprovePending && (
+        {showAssignModal && selectedPending && canApprovePending && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Edit & Approve City</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Assign Approved City</h3>
               </div>
               <div className="px-6 py-4 space-y-4">
+                <p className="text-sm text-gray-600">
+                  Assign an approved city for "{selectedPending.other_city_name_display}":
+                </p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City Name *
+                    Select Approved City *
                   </label>
-                  <input
-                    type="text"
-                    value={editedCityName}
-                    onChange={(e) => setEditedCityName(e.target.value)}
+                  <select
+                    value={selectedApprovedCityId}
+                    onChange={(e) => setSelectedApprovedCityId(e.target.value)}
+                    disabled={isLoadingApprovedCities}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter corrected city name"
-                  />
+                  >
+                    <option value="">{isLoadingApprovedCities ? 'Loading...' : 'Choose a city...'}</option>
+                    {approvedCities.map((city) => (
+                      <option key={city.city_id} value={city.city_id}>
+                        {city.city_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
                     <span className="font-medium">District:</span>{' '}
-                    {selectedCity.district?.district_name}
+                    {selectedPending.district_name}
                   </p>
                 </div>
               </div>
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
                 <button
                   onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedCity(null);
-                    setEditedCityName('');
+                    setShowAssignModal(false);
+                    setSelectedPending(null);
+                    setSelectedApprovedCityId('');
                   }}
                   className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleEdit}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  onClick={handleAssign}
+                  disabled={!selectedApprovedCityId}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Save & Approve
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showMergeModal && selectedCity && canApprovePending && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Merge City</h3>
-              </div>
-              <div className="px-6 py-4 space-y-4">
-                <p className="text-sm text-gray-600">
-                  Merge "{selectedCity.city_name}" into an existing approved city:
-                </p>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Target City *
-                  </label>
-                  <select
-                    value={mergeTargetId}
-                    onChange={(e) => setMergeTargetId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Choose a city...</option>
-                    {getSimilarCities(selectedCity.city_name, selectedCity.district_id).map(
-                      (city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.city_name} ({city.district?.district_name})
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-                <div className="p-3 bg-amber-50 rounded-lg">
-                  <p className="text-xs text-amber-800">
-                    The pending city will be marked as rejected and linked to the selected
-                    approved city.
-                  </p>
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
-                <button
-                  onClick={() => {
-                    setShowMergeModal(false);
-                    setSelectedCity(null);
-                    setMergeTargetId('');
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleMerge}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
-                >
-                  Merge Cities
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showRejectModal && selectedCity && canApprovePending && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Reject City</h3>
-              </div>
-              <div className="px-6 py-4 space-y-4">
-                <p className="text-sm text-gray-600">
-                  Rejecting "{selectedCity.city_name}"
-                </p>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Rejection Reason *
-                  </label>
-                  <textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Explain why this city is being rejected..."
-                  />
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
-                <button
-                  onClick={() => {
-                    setShowRejectModal(false);
-                    setSelectedCity(null);
-                    setRejectionReason('');
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleReject}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  Reject City
+                  Assign City
                 </button>
               </div>
             </div>

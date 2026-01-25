@@ -167,7 +167,7 @@ const AdminLocationManagement: React.FC = () => {
 
   const handleAddCity = async () => {
     console.log('[AdminLocationManagement] Adding new city:', newCityName, 'to district:', selectedDistrictId);
-    if (!newCityName.trim() || !selectedDistrictId) {
+    if (!newCityName.trim() || !selectedDistrictId || !currentStateId) {
       console.log('[AdminLocationManagement] Validation failed - missing name or district ID');
       showToast('error', 'Please enter a city name');
       return;
@@ -181,7 +181,7 @@ const AdminLocationManagement: React.FC = () => {
 
     try {
       setIsAddingCity(true);
-      const result = await locationsService.addCity(selectedDistrictId, newCityName, newCityIsPopular, newCityIsActive);
+      const result = await locationsService.addCity(currentStateId, selectedDistrictId, newCityName, newCityIsPopular, newCityIsActive);
 
       if (result.success) {
         console.log('[AdminLocationManagement] City added successfully');
@@ -192,7 +192,7 @@ const AdminLocationManagement: React.FC = () => {
         setNewCityIsActive(true);
         await loadCities(selectedDistrictId);
       } else {
-        console.log('[AdminLocationManagement] Failed to add city:', result.error);
+        console.error('[AdminLocationManagement] Failed to add city:', result.error);
         showToast('error', result.error || 'Failed to add city');
       }
     } catch (error) {

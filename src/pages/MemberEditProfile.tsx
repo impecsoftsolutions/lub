@@ -239,6 +239,8 @@ const MemberEditProfile: React.FC = () => {
       // Store the member_registrations.id
       setMemberRegistrationId(data.id);
 
+      const isCustomCity = data.is_custom_city || data.city === 'Other';
+
       const initialFormData = {
         full_name: data.full_name || '',
         email: data.email || '',
@@ -250,8 +252,8 @@ const MemberEditProfile: React.FC = () => {
         company_address: data.company_address || '',
         state: data.state || '',
         district: data.district || '',
-        city: data.city || '',
-        is_custom_city: data.is_custom_city || false,
+        city: isCustomCity ? 'Other' : (data.city || ''),
+        is_custom_city: isCustomCity,
         other_city_name: data.other_city_name || '',
         pin_code: data.pin_code || '',
         industry: data.industry || '',
@@ -283,7 +285,7 @@ const MemberEditProfile: React.FC = () => {
       setOriginalData(initialFormData);
 
       // Handle "Other" city display
-      if (data.is_custom_city || data.city === 'Other') {
+      if (isCustomCity) {
         setShowOtherCity(true);
       }
 

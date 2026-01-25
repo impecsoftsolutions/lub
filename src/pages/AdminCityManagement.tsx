@@ -122,7 +122,7 @@ export default function AdminCityManagement() {
       districtFilter: districtFilter || 'all'
     });
     let query = supabase
-      .from('pending_cities_master')
+      .from('cities_master')
       .select(`
         *,
         district:districts_master(district_name),
@@ -158,7 +158,7 @@ export default function AdminCityManagement() {
     }
 
     const { error } = await supabase
-      .from('pending_cities_master')
+      .from('cities_master')
       .insert([{
         city_name: newCity.city_name.trim(),
         district_id: newCity.district_id,
@@ -169,8 +169,9 @@ export default function AdminCityManagement() {
       }]);
 
     if (error) {
-      console.error('[AdminCityManagement] Error adding city:', error);
-      alert('Error adding city: ' + error.message);
+      const errorMessage = error.message || 'Unknown error';
+      console.error('[AdminCityManagement] Error adding city:', errorMessage);
+      alert('Error adding city: ' + errorMessage);
       return;
     }
 
@@ -193,7 +194,7 @@ export default function AdminCityManagement() {
     };
 
     const { data, error } = await supabase
-      .from('pending_cities_master')
+      .from('cities_master')
       .update(updateData)
       .eq('id', editingCity.id)
       .select();
@@ -226,7 +227,7 @@ export default function AdminCityManagement() {
     }
 
     const { error } = await supabase
-      .from('pending_cities_master')
+      .from('cities_master')
       .delete()
       .eq('id', cityId);
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, adminCitiesService } from '../lib/supabase';
 
 interface AdminContextValue {
   isSuperAdmin: boolean;
@@ -47,13 +47,16 @@ export const AdminContextProvider: React.FC<AdminContextProviderProps> = ({
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      const { count: citiesCount } = await supabase
-        .from('pending_cities_master')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+      const userDataStr = localStorage.getItem('lub_session_token_user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      const requestingUserId = userData?.id || null;
+
+      const pendingCitiesResult = requestingUserId
+        ? await adminCitiesService.listPendingCustomCities(requestingUserId)
+        : { success: false, items: [] };
 
       setPendingRegistrationsCount(registrationsCount || 0);
-      setPendingCitiesCount(citiesCount || 0);
+      setPendingCitiesCount(pendingCitiesResult.success ? (pendingCitiesResult.items?.length || 0) : 0);
     } catch (error) {
       console.error('Error loading counts:', error);
     }

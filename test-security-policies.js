@@ -181,10 +181,10 @@ async function runSecurityTests() {
 
   // Test 7: Anonymous can read approved cities
   await runTest(
-    'Anonymous can read approved cities from pending_cities_master',
+    'Anonymous can read approved cities from cities_master',
     async () => {
       const { data, error } = await anonClient
-        .from('pending_cities_master')
+        .from('cities_master')
         .select('id, city_name')
         .eq('status', 'approved')
         .limit(1);

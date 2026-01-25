@@ -33,10 +33,10 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function getApprovedCities() {
-  console.log('Fetching approved cities from pending_cities_master...');
+  console.log('Fetching approved cities from cities_master...');
 
   const { data, error } = await supabase
-    .from('pending_cities_master')
+    .from('cities_master')
     .select('city_name')
     .eq('status', 'approved');
 

@@ -492,7 +492,7 @@ export const locationsService = {
   async getActiveCitiesByDistrictId(districtId: string): Promise<CityOption[]> {
     try {
       const { data, error } = await supabase
-        .from('pending_cities_master')
+        .from('cities_master')
         .select('id, city_name')
         .eq('district_id', districtId)
         .eq('status', 'approved')
@@ -536,15 +536,24 @@ export const locationsService = {
     }
   },
 
-  async addCity(districtId: string, cityName: string, isPopular: boolean, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+  async addCity(
+    stateId: string,
+    districtId: string,
+    cityName: string,
+    isPopular: boolean,
+    isActive: boolean
+  ): Promise<{ success: boolean; error?: string }> {
     try {
+      void isPopular;
+      void isActive;
       const { error } = await supabase
         .from('cities_master')
         .insert({
-          district_id: districtId,
           city_name: cityName,
-          is_popular: isPopular,
-          is_active: isActive
+          district_id: districtId,
+          state_id: stateId,
+          status: 'approved',
+          submission_source: 'admin_entry'
         });
 
       if (error) {
@@ -634,6 +643,66 @@ export const locationsService = {
       return { success: true };
     } catch (error) {
       console.error('Error toggling district status:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+export const adminCitiesService = {
+  async listPendingCustomCities(requestingUserId: string): Promise<{ success: boolean; items?: any[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('admin_list_custom_city_pending', {
+        p_requesting_user_id: requestingUserId
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; items?: any[]; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to load pending cities' };
+      }
+
+      return { success: true, items: result.items || [] };
+    } catch (error) {
+      console.error('Error listing pending custom cities:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async assignCustomCity(
+    requestingUserId: string,
+    stateName: string,
+    districtName: string,
+    otherCityNameNormalized: string,
+    approvedCityId: string
+  ): Promise<{ success: boolean; updatedCount?: number; assignedCityName?: string; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('admin_assign_custom_city', {
+        p_requesting_user_id: requestingUserId,
+        p_state_name: stateName,
+        p_district_name: districtName,
+        p_other_city_name_normalized: otherCityNameNormalized,
+        p_approved_city_id: approvedCityId
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; updated_count?: number; assigned_city_name?: string; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to assign custom city' };
+      }
+
+      return {
+        success: true,
+        updatedCount: result.updated_count || 0,
+        assignedCityName: result.assigned_city_name
+      };
+    } catch (error) {
+      console.error('Error assigning custom city:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }

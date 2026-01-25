@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, adminCitiesService } from '../lib/supabase';
 
 export interface DashboardMetrics {
   approvedMembers: number;
@@ -44,6 +44,10 @@ export const useDashboardData = (): DashboardData => {
       setIsLoading(true);
       setError(null);
 
+      const userDataStr = localStorage.getItem('lub_session_token_user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      const requestingUserId = userData?.id || null;
+
       const [
         approvedMembersResult,
         pendingRegistrationsResult,
@@ -62,10 +66,9 @@ export const useDashboardData = (): DashboardData => {
           .from('member_registrations')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending'),
-        supabase
-          .from('pending_cities_master')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending'),
+        requestingUserId
+          ? adminCitiesService.listPendingCustomCities(requestingUserId)
+          : Promise.resolve({ success: false, items: [] }),
         supabase
           .from('user_roles')
           .select('user_id'),
@@ -93,7 +96,7 @@ export const useDashboardData = (): DashboardData => {
       setMetrics({
         approvedMembers: approvedMembersResult.count || 0,
         pendingRegistrations: pendingRegistrationsResult.count || 0,
-        pendingCities: pendingCitiesResult.count || 0,
+        pendingCities: pendingCitiesResult.success ? (pendingCitiesResult.items?.length || 0) : 0,
         activeAdminUsers: uniqueAdminUsers
       });
 
