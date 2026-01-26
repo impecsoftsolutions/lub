@@ -537,30 +537,35 @@ export const locationsService = {
   },
 
   async addCity(
+    requestingUserId: string,
     stateId: string,
     districtId: string,
     cityName: string,
     isPopular: boolean,
-    isActive: boolean
-  ): Promise<{ success: boolean; error?: string }> {
+    isActive: boolean,
+    notes?: string | null
+  ): Promise<{ success: boolean; error?: string; city_id?: string; city_name?: string }> {
     try {
-      void isPopular;
       void isActive;
-      const { error } = await supabase
-        .from('cities_master')
-        .insert({
-          city_name: cityName,
-          district_id: districtId,
-          state_id: stateId,
-          status: 'approved',
-          submission_source: 'admin_entry'
-        });
+      const { data, error } = await supabase.rpc('admin_add_city_approved', {
+        p_requesting_user_id: requestingUserId,
+        p_city_name: cityName,
+        p_state_id: stateId,
+        p_district_id: districtId,
+        p_notes: notes ?? null,
+        p_is_popular: isPopular ?? false
+      });
 
       if (error) {
         return { success: false, error: error.message };
       }
 
-      return { success: true };
+      const result = data as { success: boolean; error?: string; city_id?: string; city_name?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to add city' };
+      }
+
+      return { success: true, city_id: result.city_id, city_name: result.city_name };
     } catch (error) {
       console.error('Error adding city:', error);
       return { success: false, error: 'An unexpected error occurred' };
@@ -703,6 +708,34 @@ export const adminCitiesService = {
       };
     } catch (error) {
       console.error('Error assigning custom city:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+export const citiesService = {
+  async adminDeleteCity(
+    cityId: string,
+    requestingUserId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('admin_delete_city', {
+        p_requesting_user_id: requestingUserId,
+        p_city_id: cityId
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete city' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting city:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }

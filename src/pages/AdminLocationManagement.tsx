@@ -70,6 +70,17 @@ const AdminLocationManagement: React.FC = () => {
     }
   }, [stateName]);
 
+  const getRequestingUserId = (): string | null => {
+    try {
+      const userDataStr = localStorage.getItem('lub_session_token_user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      return userData?.id || null;
+    } catch (error) {
+      console.error('[AdminLocationManagement] Failed to read user session:', error);
+      return null;
+    }
+  };
+
   const loadStateId = async (state: string) => {
     console.log('[AdminLocationManagement] Loading state ID for:', state);
     try {
@@ -181,7 +192,21 @@ const AdminLocationManagement: React.FC = () => {
 
     try {
       setIsAddingCity(true);
-      const result = await locationsService.addCity(currentStateId, selectedDistrictId, newCityName, newCityIsPopular, newCityIsActive);
+      const requestingUserId = getRequestingUserId();
+      if (!requestingUserId) {
+        console.error('[AdminLocationManagement] User session not found');
+        showToast('error', 'User session not found. Please log in again.');
+        return;
+      }
+
+      const result = await locationsService.addCity(
+        requestingUserId,
+        currentStateId,
+        selectedDistrictId,
+        newCityName,
+        newCityIsPopular,
+        newCityIsActive
+      );
 
       if (result.success) {
         console.log('[AdminLocationManagement] City added successfully');

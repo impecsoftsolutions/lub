@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, locationsService, citiesService } from '../lib/supabase';
 import { Search, Plus, CreditCard as Edit2, Trash2, Eye, MapPin, Building2, Check, X, ArrowLeft, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -62,6 +62,17 @@ export default function AdminCityManagement() {
     fetchData();
     checkUserRole();
   }, [statusFilter, districtFilter]);
+
+  const getRequestingUserId = (): string | null => {
+    try {
+      const userDataStr = localStorage.getItem('lub_session_token_user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      return userData?.id || null;
+    } catch (error) {
+      console.error('[AdminCityManagement] Failed to read user session:', error);
+      return null;
+    }
+  };
 
   async function checkUserRole() {
     console.log('[AdminCityManagement] Checking user role and RLS policies...');
@@ -157,19 +168,25 @@ export default function AdminCityManagement() {
       return;
     }
 
-    const { error } = await supabase
-      .from('cities_master')
-      .insert([{
-        city_name: newCity.city_name.trim(),
-        district_id: newCity.district_id,
-        state_id: newCity.state_id,
-        status: 'approved',
-        submission_source: 'admin_entry',
-        notes: newCity.notes || null
-      }]);
+    const requestingUserId = getRequestingUserId();
+    if (!requestingUserId) {
+      console.error('[AdminCityManagement] User session not found');
+      alert('User session not found. Please log in again.');
+      return;
+    }
 
-    if (error) {
-      const errorMessage = error.message || 'Unknown error';
+    const result = await locationsService.addCity(
+      requestingUserId,
+      newCity.state_id,
+      newCity.district_id,
+      newCity.city_name.trim(),
+      false,
+      false,
+      newCity.notes || null
+    );
+
+    if (!result.success) {
+      const errorMessage = result.error || 'Unknown error';
       console.error('[AdminCityManagement] Error adding city:', errorMessage);
       alert('Error adding city: ' + errorMessage);
       return;
@@ -226,18 +243,23 @@ export default function AdminCityManagement() {
       return;
     }
 
-    const { error } = await supabase
-      .from('cities_master')
-      .delete()
-      .eq('id', cityId);
+    const requestingUserId = getRequestingUserId();
+    if (!requestingUserId) {
+      console.error('[AdminCityManagement] User session not found');
+      alert('User session not found. Please log in again.');
+      return;
+    }
 
-    if (error) {
-      console.error('[AdminCityManagement] Error deleting city:', error);
-      alert('Error deleting city: ' + error.message);
+    const result = await citiesService.adminDeleteCity(cityId, requestingUserId);
+
+    if (!result.success) {
+      console.error('[AdminCityManagement] Error deleting city:', result.error);
+      alert('Error deleting city: ' + (result.error || 'Unknown error'));
       return;
     }
 
     console.log('[AdminCityManagement] City deleted successfully');
+    alert('City deleted successfully');
     fetchData();
   }
 
