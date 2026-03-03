@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { GitMerge, AlertCircle, MapPin, Lock } from 'lucide-react';
 import { adminCitiesService, locationsService, CityOption } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
@@ -31,29 +32,20 @@ export default function AdminPendingCities() {
     fetchData();
   }, []);
 
-  const getRequestingUserId = (): string | null => {
-    try {
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      return userData?.id || null;
-    } catch (error) {
-      console.error('[AdminPendingCities] Failed to read user session:', error);
-      return null;
-    }
-  };
+  const getSessionToken = (): string | null => sessionManager.getSessionToken();
 
   async function fetchData() {
     setLoading(true);
     setPendingError(null);
     try {
-      const userId = getRequestingUserId();
-      if (!userId) {
+      const sessionToken = getSessionToken();
+      if (!sessionToken) {
         setPendingError('User session not found. Please log in again.');
         setPendingCities([]);
         return;
       }
 
-      const result = await adminCitiesService.listPendingCustomCities(userId);
+      const result = await adminCitiesService.listPendingCustomCities(sessionToken);
       if (!result.success) {
         setPendingError(result.error || 'Failed to load pending cities');
         setPendingCities([]);
@@ -88,14 +80,14 @@ export default function AdminPendingCities() {
       return;
     }
 
-    const userId = getRequestingUserId();
-    if (!userId) {
+    const sessionToken = getSessionToken();
+    if (!sessionToken) {
       alert('User session not found. Please log in again.');
       return;
     }
 
     const result = await adminCitiesService.assignCustomCity(
-      userId,
+      sessionToken,
       selectedPending.state_name,
       selectedPending.district_name,
       selectedPending.other_city_name_normalized,

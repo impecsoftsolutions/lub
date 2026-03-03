@@ -114,16 +114,15 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
     try {
       setIsSubmitting(true);
 
-      // Get current user ID from session
-      const userData = sessionManager.getUserData();
-      if (!userData?.id) {
-        throw new Error('Unable to get current user ID');
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('Unable to get current session');
       }
 
       const { data, error: updateError } = await supabase
         .rpc('admin_update_user_details', {
+          p_session_token: sessionToken,
           p_user_id: user.id,
-          p_requesting_user_id: userData.id,
           p_email: formData.email?.trim() || null,
           p_mobile_number: formData.mobile_number?.trim() || null,
           p_new_password: null

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { 
+import { useParams, Link } from 'react-router-dom';
+import {
   ArrowLeft, 
   Building2, 
   MapPin, 
@@ -15,7 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { authService } from '../lib/auth';
+import { customAuth } from '../lib/customAuth';
 
 interface MemberData {
   id: string;
@@ -48,7 +48,6 @@ interface UserRole {
 
 const MemberProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [member, setMember] = useState<MemberData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -67,11 +66,12 @@ const MemberProfile: React.FC = () => {
 
   const checkUserRole = async () => {
     try {
-      const { user } = await authService.getCurrentUser();
+      const user = await customAuth.getCurrentUserFromSession();
       if (user) {
+        const isAdmin = user.account_type === 'admin' || user.account_type === 'both';
         setUserRole({
           isLoggedIn: true,
-          isAdmin: user.email?.includes('admin') || false,
+          isAdmin,
           isMember: true
         });
       } else {

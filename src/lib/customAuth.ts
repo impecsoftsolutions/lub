@@ -122,6 +122,14 @@ export const customAuth = {
         };
       }
 
+      if (user.member_can_login === false) {
+        return {
+          success: false,
+          error: user.member_login_reason || 'Your LUB member account is deactivated. Please contact admin.',
+          errorCode: AuthErrorCode.ACCOUNT_FROZEN,
+        };
+      }
+
       if (normalizeMobileNumber(user.mobile_number || '') !== normalizedMobile) {
         const { data: failedAttemptData, error: failedAttemptError } = await supabase.rpc(
           'record_failed_login_attempt',
@@ -151,22 +159,6 @@ export const customAuth = {
           error: 'Invalid credentials',
           errorCode: AuthErrorCode.INVALID_CREDENTIALS,
         };
-      }
-
-      try {
-        const { data: loginStatus, error: loginCheckError } = await supabase.rpc('get_member_login_status', {
-          p_user_id: user.id,
-        });
-
-        if (!loginCheckError && loginStatus && loginStatus.can_login === false) {
-          return {
-            success: false,
-            error: loginStatus.reason || 'Your LUB member account is deactivated. Please contact admin.',
-            errorCode: AuthErrorCode.ACCOUNT_FROZEN,
-          };
-        }
-      } catch (e) {
-        console.error('[customAuth] get_member_login_status failed:', e);
       }
 
       const sessionData = await this.createSession(user.id, ipAddress, userAgent);
@@ -371,21 +363,8 @@ export const customAuth = {
   },
 
   async setUserContext(userId: string): Promise<boolean> {
-    try {
-      const { error } = await supabase.rpc('set_session_user', {
-        session_user_id: userId,
-      });
-
-      if (error) {
-        console.error('[customAuth] Set user context error:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('[customAuth] Set user context error:', error);
-      return false;
-    }
+    console.warn('[customAuth] setUserContext is deprecated and no longer used', userId);
+    return true;
   },
 
   async getCurrentUserFromSession(): Promise<User | null> {

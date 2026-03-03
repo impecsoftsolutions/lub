@@ -20,8 +20,17 @@ export interface MemberData {
   created_at: string;
 }
 
+interface SignUpResult {
+  success: boolean;
+  error: string | null;
+  data: User | null;
+  user?: User;
+  sessionToken?: string;
+  expiresAt?: string;
+}
+
 export const memberAuthService = {
-  async signUpMember(email: string, mobile_number: string) {
+  async signUpMember(email: string, mobile_number: string): Promise<SignUpResult> {
     try {
       const normalizedEmail = normalizeEmail(email);
       const normalizedMobile = normalizeMobileNumber(mobile_number);
@@ -43,44 +52,42 @@ export const memberAuthService = {
         };
       }
 
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          email: normalizedEmail,
-          mobile_number: normalizedMobile,
-          account_type: 'general_user',
-          account_status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+      const { data, error: rpcError } = await supabase.rpc('create_portal_user_with_session', {
+        p_email: normalizedEmail,
+        p_mobile_number: normalizedMobile,
+        p_ip_address: null,
+        p_user_agent: userAgent
+      });
 
-      if (insertError) {
-        console.error('[memberAuthService] User creation error:', insertError);
-
-        const duplicateField = `${insertError.details || ''} ${insertError.message || ''}`.toLowerCase();
-        let errorMessage = 'Failed to create account. Please try again.';
-
-        if (insertError.code === '23505') {
-          if (duplicateField.includes('email')) {
-            errorMessage = 'This email address is already registered. You can either sign in to your account or register with a different email address.';
-          } else if (duplicateField.includes('mobile')) {
-            errorMessage = 'This mobile number is already registered. You can either sign in to your account or register with a different mobile number.';
-          } else {
-            errorMessage = 'This email address or mobile number is already registered.';
-          }
-        }
-
+      if (rpcError) {
+        console.error('[memberAuthService] User creation RPC error:', rpcError);
         return {
           success: false,
-          error: errorMessage,
+          error: 'Failed to create account. Please try again.',
           data: null
         };
       }
 
-      console.log('[memberAuthService] User created successfully:', newUser.id);
-      return { success: true, data: newUser, error: null };
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!result?.success || !result?.user || !result?.sessionToken || !result?.expiresAt) {
+        return {
+          success: false,
+          error: result?.error || 'Failed to create account. Please try again.',
+          data: null
+        };
+      }
+
+      console.log('[memberAuthService] User created successfully:', result.user.id);
+      return {
+        success: true,
+        data: result.user as User,
+        user: result.user as User,
+        sessionToken: result.sessionToken as string,
+        expiresAt: result.expiresAt as string,
+        error: null
+      };
     } catch (error) {
       console.error('[memberAuthService] Sign up error:', error);
       return {
@@ -111,14 +118,13 @@ export const memberAuthService = {
 
   async signOutMember() {
     try {
-      // Clear custom auth session (includes user data)
-      sessionManager.clearSession();
-      
-      // Also clear Supabase session if exists
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.warn('Supabase sign out error (may be expected):', error.message);
+      const sessionToken = sessionManager.getSessionToken();
+
+      if (sessionToken) {
+        await customAuth.signOut(sessionToken);
       }
+
+      sessionManager.clearSession();
       return { success: true, error: null };
     } catch (error) {
       console.error('Sign out error:', error);
@@ -132,13 +138,14 @@ export const memberAuthService = {
 
       if (!sessionToken || sessionManager.isSessionExpired()) {
         console.log('[memberAuthService] No valid session token found');
+        sessionManager.clearSession();
         return null;
       }
 
       // Get user data from localStorage cache (INSTANT - no database call!)
       const cachedUser = sessionManager.getUserData();
 
-      if (cachedUser && !bypassCache) {
+      if (false && cachedUser && !bypassCache) {
         console.log('[memberAuthService] Returning cached user data from localStorage');
 
         // Map to MemberData format
@@ -166,15 +173,18 @@ export const memberAuthService = {
       if (bypassCache) {
         console.log('[memberAuthService] Bypassing cache, fetching fresh data from database...');
       } else {
-        console.log('[memberAuthService] No cached user, fetching from database...');
+        console.log('[memberAuthService] Validating session before using cached user data...');
       }
 
-      const user = await customAuth.getCurrentUserFromSession();
+      const validation = await customAuth.validateSession(sessionToken);
 
-      if (!user) {
+      if (!validation.isValid || !validation.user) {
         console.log('[memberAuthService] No user found for session token');
+        sessionManager.clearSession();
         return null;
       }
+
+      const user = validation.user;
 
       console.log('[memberAuthService] User fetched from database:', user.email);
       const extendedUser = user as User & Partial<MemberData>;
@@ -251,21 +261,8 @@ export const memberAuthService = {
 
   async isMemberAuthenticated(): Promise<boolean> {
     try {
-      const sessionToken = sessionManager.getSessionToken();
-      
-      if (!sessionToken || sessionManager.isSessionExpired()) {
-        return false;
-      }
-
-      // Check if we have cached user data (fast check)
-      const cachedUser = sessionManager.getUserData();
-      if (cachedUser) {
-        return true;
-      }
-
-      // Fallback to database check
-      const user = await customAuth.getCurrentUserFromSession();
-      return user !== null;
+      const member = await this.getCurrentMember();
+      return member !== null;
     } catch (error) {
       console.error('Check authentication error:', error);
       return false;
@@ -274,9 +271,9 @@ export const memberAuthService = {
 
   async updateMemberProfile(memberId: string, updates: Partial<MemberData>) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const cachedUser = sessionManager.getUserData();
 
-      if (!user) {
+      if (!cachedUser?.id) {
         return { success: false, error: 'Not authenticated' };
       }
 
@@ -285,23 +282,23 @@ export const memberAuthService = {
 
       protectedFields.forEach(field => delete updateData[field]);
 
-      updateData.last_modified_by = user.id;
+      updateData.last_modified_by = cachedUser.id;
       updateData.last_modified_at = new Date().toISOString();
 
       const { error } = await supabase
         .from('member_registrations')
         .update(updateData)
         .eq('id', memberId)
-        .eq('user_id', user.id);
+        .eq('user_id', cachedUser.id);
 
       if (error) {
         return { success: false, error: error.message };
       }
 
       // Update cached user data after profile update
-      const cachedUser = sessionManager.getUserData();
-      if (cachedUser) {
-        const updatedUser = { ...cachedUser, ...updates };
+      const cachedUserData = sessionManager.getUserData();
+      if (cachedUserData) {
+        const updatedUser = { ...cachedUserData, ...updates };
         sessionManager.saveUserData(updatedUser);
       }
 

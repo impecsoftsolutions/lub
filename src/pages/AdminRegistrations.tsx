@@ -4,6 +4,7 @@ import { Users, Search, Filter, FileText, CheckCircle, XCircle, Clock, ExternalL
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { supabase, memberRegistrationService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 import { emailService, WelcomeEmailData } from '../lib/emailService';
 import { vCardGenerator, VCardData } from '../lib/vCardGenerator';
 import Toast from '../components/Toast';
@@ -105,23 +106,20 @@ const AdminRegistrations: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Get current user ID from localStorage
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const userId = userData?.id;
+      const sessionToken = sessionManager.getSessionToken();
 
-      if (!userId) {
-        console.error('[AdminRegistrations] User ID not found in session');
+      if (!sessionToken) {
+        console.error('[AdminRegistrations] Session token not found');
         showToast('error', 'User session not found. Please log in again.');
         setIsLoading(false);
         return;
       }
 
-      console.log('[AdminRegistrations] Fetching registrations for user:', userId);
+      console.log('[AdminRegistrations] Fetching registrations with session token');
 
       // Call RPC function instead of direct query
-      const { data, error } = await supabase.rpc('get_admin_member_registrations', {
-        p_requesting_user_id: userId,
+      const { data, error } = await supabase.rpc('get_admin_member_registrations_with_session', {
+        p_session_token: sessionToken,
         p_status_filter: null, // Get all statuses
         p_search_query: null,  // No search filter at load time
         p_state_filter: null,  // Get all states
@@ -193,23 +191,20 @@ const AdminRegistrations: React.FC = () => {
         return;
       }
 
-      // Get current user ID from localStorage (custom auth system)
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const userId = userData?.id;
+      const sessionToken = sessionManager.getSessionToken();
 
-      if (!userId) {
-        console.error('[handleStatusUpdate] User ID not found in session');
+      if (!sessionToken) {
+        console.error('[handleStatusUpdate] Session token not found');
         showToast('error', 'User session not found. Please log in again.');
         setActionLoading(null);
         return;
       }
 
-      console.log('[handleStatusUpdate] User ID:', userId);
+      console.log('[handleStatusUpdate] Session token present:', !!sessionToken);
       console.log('[handleStatusUpdate] Fetching registration data via RPC');
 
       // Fetch registration data using RPC to bypass RLS
-      const registrationResult = await memberRegistrationService.getApplicationDetails(registrationId);
+      const registrationResult = await memberRegistrationService.getApplicationDetails(registrationId, sessionToken);
 
       if (!registrationResult.success || !registrationResult.data) {
         throw new Error(registrationResult.error || 'Failed to fetch registration');
@@ -223,7 +218,7 @@ const AdminRegistrations: React.FC = () => {
       const result = await memberRegistrationService.updateStatusWithReason(
         registrationId,
         newStatus,
-        userId,
+        sessionToken,
         newStatus === 'rejected' ? rejectionReason : undefined
       );
 
@@ -281,21 +276,7 @@ const AdminRegistrations: React.FC = () => {
 
   const handleToggleActive = async (memberId: string, currentActive: boolean) => {
     try {
-      // Get current user ID from localStorage (custom auth system)
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const userId = userData?.id;
-
-      if (!userId) {
-        showToast('error', 'User session not found. Please log in again.');
-        return;
-      }
-
-      const result = await memberRegistrationService.toggleMemberActive(
-        memberId,
-        !currentActive,
-        userId
-      );
+      const result = await memberRegistrationService.toggleMemberActive(memberId, !currentActive);
 
       if (result.success) {
         setRegistrations(prev =>
@@ -360,12 +341,9 @@ const AdminRegistrations: React.FC = () => {
     }
 
     try {
-      // Get current user ID from localStorage (custom auth system)
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const userId = userData?.id;
+      const sessionToken = sessionManager.getSessionToken();
 
-      if (!userId) {
+      if (!sessionToken) {
         showToast('error', 'User session not found. Please log in again.');
         return;
       }
@@ -373,7 +351,7 @@ const AdminRegistrations: React.FC = () => {
       const result = await memberRegistrationService.softDeleteMember(
         deleteDialog.memberId,
         deletionReason,
-        userId
+        sessionToken
       );
 
       if (result.success) {

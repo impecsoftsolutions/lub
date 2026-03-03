@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, adminCitiesService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 
 interface AdminContextValue {
   isSuperAdmin: boolean;
@@ -47,12 +48,10 @@ export const AdminContextProvider: React.FC<AdminContextProviderProps> = ({
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const requestingUserId = userData?.id || null;
+      const sessionToken = sessionManager.getSessionToken();
 
-      const pendingCitiesResult = requestingUserId
-        ? await adminCitiesService.listPendingCustomCities(requestingUserId)
+      const pendingCitiesResult = sessionToken
+        ? await adminCitiesService.listPendingCustomCities(sessionToken)
         : { success: false, items: [] };
 
       setPendingRegistrationsCount(registrationsCount || 0);

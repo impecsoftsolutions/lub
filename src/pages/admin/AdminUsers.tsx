@@ -64,7 +64,7 @@ const AdminUsers: React.FC = () => {
 
   const canEdit = useHasPermission('users.edit');
   const canDelete = useHasPermission('users.delete');
-  const canBlock = useHasPermission('users.block');
+  const canBlock = useHasPermission('users.edit');
 
   const loadUsers = async () => {
     try {

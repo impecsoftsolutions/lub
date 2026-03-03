@@ -15,21 +15,19 @@ import {
   Shield,
   Lock
 } from 'lucide-react';
-import { formFieldConfigService, FormFieldConfiguration, validationRulesService, ValidationRule, supabase } from '../lib/supabase';
+import { formFieldConfigService, FormFieldConfiguration, validationRulesService, ValidationRule } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
 const AdminFormFieldConfiguration: React.FC = () => {
-  const canViewFormConfig = useHasPermission('forms.configuration.view');
-  const canManageFormConfig = useHasPermission('forms.configuration.manage');
+  const canManageFormConfig = useHasPermission('settings.forms.configure');
   const navigate = useNavigate();
   const [fieldConfigs, setFieldConfigs] = useState<Record<string, FormFieldConfiguration[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [availableValidationRules, setAvailableValidationRules] = useState<ValidationRule[]>([]);
   const [isLoadingRules, setIsLoadingRules] = useState(true);
   const [toast, setToast] = useState<{
@@ -44,20 +42,8 @@ const AdminFormFieldConfiguration: React.FC = () => {
 
   useEffect(() => {
     loadFieldConfigurations();
-    getCurrentUser();
     loadValidationRules();
   }, []);
-
-  const getCurrentUser = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-      }
-    } catch (error) {
-      console.error('Error getting current user:', error);
-    }
-  };
 
   const loadValidationRules = async () => {
     try {
@@ -188,8 +174,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
             is_visible: field.is_visible,
             is_required: field.is_required,
             validation_rule_id: field.validation_rule_id
-          },
-          currentUserId || undefined
+          }
         );
         console.log('[handleSaveChanges] Result for', field.field_name, ':', result);
       }
@@ -212,7 +197,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
 
     try {
       setIsSaving(true);
-      const result = await formFieldConfigService.resetToDefaults(currentUserId || undefined);
+      const result = await formFieldConfigService.resetToDefaults();
 
       if (result.success) {
         showToast('success', 'Configuration reset to defaults');
@@ -260,7 +245,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
 
   return (
     <PermissionGate
-      permission="forms.configuration.view"
+      permission="settings.forms.view"
       fallback={
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">

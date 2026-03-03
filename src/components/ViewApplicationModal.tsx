@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard as Edit, CheckCircle, XCircle, FileText, ExternalLink, User, Building2, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { memberRegistrationService } from '../lib/supabase';
-import { authService } from '../lib/auth';
+import { sessionManager } from '../lib/sessionManager';
 
 interface ViewApplicationModalProps {
   applicationId: string;
@@ -42,7 +42,8 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
       setIsLoading(true);
       setError('');
 
-      const result = await memberRegistrationService.getApplicationDetails(applicationId);
+      const sessionToken = sessionManager.getSessionToken();
+      const result = await memberRegistrationService.getApplicationDetails(applicationId, sessionToken || '');
 
       if (!result.success || !result.data) {
         setError(result.error || 'Failed to load application details');
@@ -52,9 +53,8 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
       setApplicationData(result.data);
 
       // Mark application as viewed
-      const { user } = await authService.getCurrentUser();
-      if (user) {
-        await memberRegistrationService.markApplicationAsViewed(applicationId, user.id);
+      if (sessionToken) {
+        await memberRegistrationService.markApplicationAsViewed(applicationId, sessionToken);
       }
     } catch (err) {
       console.error('Error loading application:', err);

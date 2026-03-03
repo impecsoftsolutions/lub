@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { MapPin, Plus, Search, ArrowLeft, Building2, CreditCard as Edit3, Trash2, Users, AlertCircle, Loader2, X, Lock } from 'lucide-react';
 import { locationsService, DistrictOption, CityOption, statesService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -70,16 +71,7 @@ const AdminLocationManagement: React.FC = () => {
     }
   }, [stateName]);
 
-  const getRequestingUserId = (): string | null => {
-    try {
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      return userData?.id || null;
-    } catch (error) {
-      console.error('[AdminLocationManagement] Failed to read user session:', error);
-      return null;
-    }
-  };
+  const getSessionToken = (): string | null => sessionManager.getSessionToken();
 
   const loadStateId = async (state: string) => {
     console.log('[AdminLocationManagement] Loading state ID for:', state);
@@ -192,15 +184,15 @@ const AdminLocationManagement: React.FC = () => {
 
     try {
       setIsAddingCity(true);
-      const requestingUserId = getRequestingUserId();
-      if (!requestingUserId) {
+      const sessionToken = getSessionToken();
+      if (!sessionToken) {
         console.error('[AdminLocationManagement] User session not found');
         showToast('error', 'User session not found. Please log in again.');
         return;
       }
 
       const result = await locationsService.addCity(
-        requestingUserId,
+        sessionToken,
         currentStateId,
         selectedDistrictId,
         newCityName,

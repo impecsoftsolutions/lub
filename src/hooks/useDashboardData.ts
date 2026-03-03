@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, adminCitiesService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 
 export interface DashboardMetrics {
   approvedMembers: number;
@@ -44,9 +45,7 @@ export const useDashboardData = (): DashboardData => {
       setIsLoading(true);
       setError(null);
 
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const requestingUserId = userData?.id || null;
+      const sessionToken = sessionManager.getSessionToken();
 
       const [
         approvedMembersResult,
@@ -66,8 +65,8 @@ export const useDashboardData = (): DashboardData => {
           .from('member_registrations')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending'),
-        requestingUserId
-          ? adminCitiesService.listPendingCustomCities(requestingUserId)
+        sessionToken
+          ? adminCitiesService.listPendingCustomCities(sessionToken)
           : Promise.resolve({ success: false, items: [] }),
         supabase
           .from('user_roles')

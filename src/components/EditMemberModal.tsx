@@ -877,9 +877,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
       const result = await memberRegistrationService.updateMemberRegistration(
         member.id,
-        sanitizedData,
-        user.id,
-        isSuperAdmin
+        sanitizedData
       );
 
       if (result.success) {

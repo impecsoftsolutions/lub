@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sessionManager } from './sessionManager';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -517,16 +518,25 @@ export const locationsService = {
 
   async addDistrict(stateId: string, districtName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('districts_master')
-        .insert({
-          state_id: stateId,
-          district_name: districtName,
-          is_active: isActive
-        });
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('add_district_with_session', {
+        p_session_token: sessionToken,
+        p_state_id: stateId,
+        p_district_name: districtName,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to add district' };
       }
 
       return { success: true };
@@ -537,7 +547,7 @@ export const locationsService = {
   },
 
   async addCity(
-    requestingUserId: string,
+    sessionToken: string,
     stateId: string,
     districtId: string,
     cityName: string,
@@ -547,8 +557,12 @@ export const locationsService = {
   ): Promise<{ success: boolean; error?: string; city_id?: string; city_name?: string }> {
     try {
       void isActive;
-      const { data, error } = await supabase.rpc('admin_add_city_approved', {
-        p_requesting_user_id: requestingUserId,
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_add_city_approved_with_session', {
+        p_session_token: sessionToken,
         p_city_name: cityName,
         p_state_id: stateId,
         p_district_id: districtId,
@@ -574,16 +588,25 @@ export const locationsService = {
 
   async updateDistrict(districtId: string, districtName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('districts_master')
-        .update({
-          district_name: districtName,
-          is_active: isActive
-        })
-        .eq('id', districtId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_district_with_session', {
+        p_session_token: sessionToken,
+        p_district_id: districtId,
+        p_district_name: districtName,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update district' };
       }
 
       return { success: true };
@@ -618,13 +641,23 @@ export const locationsService = {
 
   async deleteDistrictHard(districtId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('districts_master')
-        .delete()
-        .eq('id', districtId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('delete_district_hard_with_session', {
+        p_session_token: sessionToken,
+        p_district_id: districtId
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete district' };
       }
 
       return { success: true };
@@ -636,13 +669,24 @@ export const locationsService = {
 
   async toggleDistrictActive(districtId: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('districts_master')
-        .update({ is_active: isActive })
-        .eq('id', districtId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('toggle_district_active_with_session', {
+        p_session_token: sessionToken,
+        p_district_id: districtId,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update district status' };
       }
 
       return { success: true };
@@ -654,10 +698,14 @@ export const locationsService = {
 };
 
 export const adminCitiesService = {
-  async listPendingCustomCities(requestingUserId: string): Promise<{ success: boolean; items?: any[]; error?: string }> {
+  async listPendingCustomCities(sessionToken: string): Promise<{ success: boolean; items?: any[]; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('admin_list_custom_city_pending', {
-        p_requesting_user_id: requestingUserId
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_list_custom_city_pending_with_session', {
+        p_session_token: sessionToken
       });
 
       if (error) {
@@ -677,15 +725,19 @@ export const adminCitiesService = {
   },
 
   async assignCustomCity(
-    requestingUserId: string,
+    sessionToken: string,
     stateName: string,
     districtName: string,
     otherCityNameNormalized: string,
     approvedCityId: string
   ): Promise<{ success: boolean; updatedCount?: number; assignedCityName?: string; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('admin_assign_custom_city', {
-        p_requesting_user_id: requestingUserId,
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_assign_custom_city_with_session', {
+        p_session_token: sessionToken,
         p_state_name: stateName,
         p_district_name: districtName,
         p_other_city_name_normalized: otherCityNameNormalized,
@@ -716,11 +768,15 @@ export const adminCitiesService = {
 export const citiesService = {
   async adminDeleteCity(
     cityId: string,
-    requestingUserId: string
+    sessionToken: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('admin_delete_city', {
-        p_requesting_user_id: requestingUserId,
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_delete_city_with_session', {
+        p_session_token: sessionToken,
         p_city_id: cityId
       });
 
@@ -1245,14 +1301,16 @@ export const memberRegistrationService = {
   async updateMemberRegistration(
     memberId: string,
     updates: any,
-    userId: string,
-    isSuperAdmin: boolean
+    sessionToken?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      const token = sessionToken || sessionManager.getSessionToken();
+      if (!token) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
       console.log('[updateMemberRegistration] Calling RPC function with:', {
         memberId,
-        userId,
-        isSuperAdmin,
         updateFields: Object.keys(updates)
       });
 
@@ -1268,11 +1326,10 @@ export const memberRegistrationService = {
 
       // Call SECURITY DEFINER RPC function
       // This bypasses RLS and validates permissions internally
-      const { data, error } = await supabase.rpc('update_member_registration', {
+      const { data, error } = await supabase.rpc('update_member_registration_with_session', {
         p_member_id: memberId,
-        p_requesting_user_id: userId,
-        p_updates: updateData,
-        p_is_super_admin: isSuperAdmin
+        p_session_token: token,
+        p_updates: updateData
       });
 
       if (error) {
@@ -1301,38 +1358,28 @@ export const memberRegistrationService = {
   async toggleMemberActive(
     memberId: string,
     isActive: boolean,
-    userId: string
+    sessionToken?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const updateData: any = {
-        is_active: isActive,
-        last_modified_by: userId,
-        last_modified_at: new Date().toISOString()
-      };
-
-      if (!isActive) {
-        updateData.deactivated_at = new Date().toISOString();
-        updateData.deactivated_by = userId;
-      } else {
-        updateData.deactivated_at = null;
-        updateData.deactivated_by = null;
+      const token = sessionToken || sessionManager.getSessionToken();
+      if (!token) {
+        return { success: false, error: 'User session not found. Please log in again.' };
       }
 
-      const { error } = await supabase
-        .from('member_registrations')
-        .update(updateData)
-        .eq('id', memberId);
+      const { data, error } = await supabase.rpc('toggle_member_registration_active_with_session', {
+        p_member_id: memberId,
+        p_session_token: token,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
       }
 
-      await memberAuditService.logAction(
-        memberId,
-        isActive ? 'activate' : 'deactivate',
-        userId,
-        `Member ${isActive ? 'activated' : 'deactivated'}`
-      );
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update member status' };
+      }
 
       return { success: true };
     } catch (error) {
@@ -1344,12 +1391,16 @@ export const memberRegistrationService = {
   async softDeleteMember(
     memberId: string,
     deletionReason: string,
-    userId: string
+    sessionToken: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data, error } = await supabase.rpc('admin_soft_delete_member', {
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_soft_delete_member_with_session', {
         p_registration_id: memberId,
-        p_requesting_user_id: userId,
+        p_session_token: sessionToken,
         p_reason: deletionReason || null,
       });
 
@@ -1370,16 +1421,20 @@ export const memberRegistrationService = {
   async updateStatusWithReason(
     memberId: string,
     status: 'approved' | 'rejected',
-    userId: string,
+    sessionToken: string,
     rejectionReason?: string
   ): Promise<{ success: boolean; error?: string; data?: any }> {
     try {
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
       // ALWAYS pass all 4 parameters to avoid PostgREST function overload ambiguity
       // PostgREST/Supabase does not properly support function overloading
       // Conditionally including/excluding parameters causes "cannot pass more than 100 arguments" error
       const rpcParams = {
         p_registration_id: memberId,
-        p_requesting_user_id: userId,
+        p_session_token: sessionToken,
         p_new_status: status,
         p_rejection_reason: rejectionReason || null
       };
@@ -1388,9 +1443,8 @@ export const memberRegistrationService = {
 
       // Call SECURITY DEFINER RPC function
       // This bypasses RLS and validates permissions internally
-      // NOTE: Using update_member_registration_status (simpler name without admin_ prefix)
-      // as workaround for PostgREST caching issue with admin-prefixed function names
-      const { data, error } = await supabase.rpc('update_member_registration_status', rpcParams);
+      // NOTE: This uses the session-token wrapper to keep browser callers off the legacy UUID-based signature
+      const { data, error } = await supabase.rpc('update_member_registration_status_with_session', rpcParams);
 
       if (error) {
         console.error('[updateStatusWithReason] RPC error:', error);
@@ -1414,23 +1468,18 @@ export const memberRegistrationService = {
     }
   },
 
-  async getApplicationDetails(applicationId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  async getApplicationDetails(applicationId: string, sessionToken: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      // Get current user ID from localStorage
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      const userId = userData?.id;
-
-      if (!userId) {
-        console.error('[getApplicationDetails] User ID not found in session');
+      if (!sessionToken) {
+        console.error('[getApplicationDetails] Session token not found');
         return { success: false, error: 'User session not found. Please log in again.' };
       }
 
-      console.log('[getApplicationDetails] Fetching registration:', applicationId, 'for user:', userId);
+      console.log('[getApplicationDetails] Fetching registration:', applicationId);
 
       // Call RPC function to bypass RLS
-      const { data, error } = await supabase.rpc('get_admin_member_registration_by_id', {
-        p_requesting_user_id: userId,
+      const { data, error } = await supabase.rpc('get_admin_member_registration_by_id_with_session', {
+        p_session_token: sessionToken,
         p_registration_id: applicationId
       });
 
@@ -1464,46 +1513,26 @@ export const memberRegistrationService = {
 
   async markApplicationAsViewed(
     applicationId: string,
-    userId: string
+    sessionToken: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // First check if this is the first view
-      const { data: currentData, error: fetchError } = await supabase
-        .from('member_registrations')
-        .select('first_viewed_at, reviewed_count')
-        .eq('id', applicationId)
-        .maybeSingle();
-
-      if (fetchError || !currentData) {
-        return { success: false, error: 'Failed to fetch application data' };
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
       }
 
-      const updateData: any = {
-        reviewed_count: (currentData.reviewed_count || 0) + 1
-      };
-
-      // Set first_viewed_at and first_viewed_by only if not already set
-      if (!currentData.first_viewed_at) {
-        updateData.first_viewed_at = new Date().toISOString();
-        updateData.first_viewed_by = userId;
-      }
-
-      const { error } = await supabase
-        .from('member_registrations')
-        .update(updateData)
-        .eq('id', applicationId);
+      const { data, error } = await supabase.rpc('admin_mark_member_registration_viewed_with_session', {
+        p_application_id: applicationId,
+        p_session_token: sessionToken
+      });
 
       if (error) {
         return { success: false, error: error.message };
       }
 
-      // Log the view action in audit history
-      await memberAuditService.logAction(
-        applicationId,
-        'application_viewed',
-        userId,
-        'Admin viewed the application'
-      );
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to mark application as viewed' };
+      }
 
       return { success: true };
     } catch (error) {
@@ -2200,32 +2229,18 @@ export const formFieldConfigService = {
   async updateFieldConfiguration(
     fieldName: string,
     updates: Partial<FormFieldConfiguration>,
-    userId?: string
+    sessionToken?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       console.log('[updateFieldConfiguration] Starting update for field:', fieldName);
       console.log('[updateFieldConfiguration] Updates:', updates);
 
-      // Get current user ID from userId parameter or localStorage
-      let requestingUserId = userId;
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
 
-      if (!requestingUserId) {
-        // Use the correct localStorage key from the custom auth system
-        const userData = localStorage.getItem('lub_session_token_user');
-        if (userData) {
-          try {
-            const user = JSON.parse(userData);
-            requestingUserId = user.id;
-          } catch (e) {
-            console.error('Error parsing user data:', e);
-          }
-        }
-      }
+      console.log('[updateFieldConfiguration] Session token present:', !!resolvedSessionToken);
 
-      console.log('[updateFieldConfiguration] Requesting user ID:', requestingUserId);
-
-      if (!requestingUserId) {
-        console.error('[updateFieldConfiguration] No user ID found');
+      if (!resolvedSessionToken) {
+        console.error('[updateFieldConfiguration] No session token found');
         return { success: false, error: 'User not authenticated' };
       }
 
@@ -2238,16 +2253,16 @@ export const formFieldConfigService = {
         p_field_name: fieldName,
         p_is_visible: isVisible,
         p_is_required: isRequired,
-        p_requesting_user_id: requestingUserId
+        p_session_token: resolvedSessionToken
       });
 
       // Call RPC function instead of direct update
       const { data, error } = await supabase
-        .rpc('update_form_field_configuration', {
+        .rpc('update_form_field_configuration_with_session', {
           p_field_name: fieldName,
           p_is_visible: isVisible,
           p_is_required: isRequired,
-          p_requesting_user_id: requestingUserId
+          p_session_token: resolvedSessionToken
         });
 
       if (error) {
@@ -2308,24 +2323,25 @@ export const formFieldConfigService = {
     }
   },
 
-  async resetToDefaults(userId?: string): Promise<{ success: boolean; error?: string }> {
+  async resetToDefaults(sessionToken?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const updateData: any = {
-        is_visible: true,
-        updated_at: new Date().toISOString()
-      };
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
 
-      if (userId) {
-        updateData.updated_by = userId;
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User not authenticated' };
       }
 
-      const { error } = await supabase
-        .from('form_field_configurations')
-        .update(updateData)
-        .eq('is_system_field', false);
+      const { data, error } = await supabase.rpc('reset_form_field_configuration_defaults_with_session', {
+        p_session_token: resolvedSessionToken
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to reset configuration' };
       }
 
       return { success: true };
@@ -2463,12 +2479,16 @@ export interface DeletedMember {
 
 export const deletedMembersService = {
   async getAllDeletedMembers(
-    requestingUserId: string,
+    sessionToken: string,
     search?: string
   ): Promise<DeletedMember[]> {
     try {
-      const { data, error } = await supabase.rpc('get_deleted_members', {
-        p_requesting_user_id: requestingUserId,
+      if (!sessionToken) {
+        throw new Error('User session not found. Please log in again.');
+      }
+
+      const { data, error } = await supabase.rpc('get_deleted_members_with_session', {
+        p_session_token: sessionToken,
         p_search: search || null
       });
 
@@ -2500,15 +2520,15 @@ export const deletedMembersService = {
     }
   },
 
-  async restoreDeletedMember(deletedMemberId: string, requestingUserId: string) {
+  async restoreDeletedMember(deletedMemberId: string, sessionToken: string) {
     if (!deletedMemberId) throw new Error("restoreDeletedMember: deletedMemberId is required");
-    if (!requestingUserId) throw new Error("restoreDeletedMember: requestingUserId is required");
+    if (!sessionToken) throw new Error("restoreDeletedMember: sessionToken is required");
 
-    console.debug("[restoreDeletedMember] starting", { deletedMemberId, requestingUserId });
+    console.debug("[restoreDeletedMember] starting", { deletedMemberId });
 
-    const { data, error } = await supabase.rpc("admin_restore_deleted_member", {
+    const { data, error } = await supabase.rpc("admin_restore_deleted_member_with_session", {
       p_deleted_member_id: deletedMemberId,
-      p_requesting_user_id: requestingUserId,
+      p_session_token: sessionToken,
     });
 
     if (error) {
@@ -2604,13 +2624,25 @@ export const validationRulesService = {
     updates: { validation_pattern?: string; error_message?: string; is_active?: boolean }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('validation_rules')
-        .update(updates)
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_validation_rule_with_session', {
+        p_session_token: sessionToken,
+        p_rule_id: id,
+        p_validation_pattern: updates.validation_pattern ?? null,
+        p_error_message: updates.error_message ?? null
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update validation rule' };
       }
 
       return { success: true };
@@ -2622,13 +2654,24 @@ export const validationRulesService = {
 
   async toggleValidationRuleActive(id: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('validation_rules')
-        .update({ is_active: isActive })
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('toggle_validation_rule_active_with_session', {
+        p_session_token: sessionToken,
+        p_rule_id: id,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update validation rule status' };
       }
 
       return { success: true };
@@ -2745,26 +2788,32 @@ export const validationRulesService = {
     display_order: number;
   }): Promise<{ success: boolean; error?: string; data?: ValidationRule }> {
     try {
-      const { data, error } = await supabase
-        .from('validation_rules')
-        .insert({
-          rule_name: rule.rule_name.toLowerCase(),
-          rule_type: rule.rule_type,
-          category: rule.category,
-          validation_pattern: rule.validation_pattern,
-          error_message: rule.error_message,
-          description: rule.description,
-          display_order: rule.display_order,
-          is_active: true
-        })
-        .select()
-        .single();
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('create_validation_rule_with_session', {
+        p_session_token: sessionToken,
+        p_rule_name: rule.rule_name,
+        p_rule_type: rule.rule_type,
+        p_category: rule.category,
+        p_validation_pattern: rule.validation_pattern,
+        p_error_message: rule.error_message,
+        p_description: rule.description,
+        p_display_order: rule.display_order
+      });
 
       if (error) {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data };
+      const result = data as { success: boolean; error?: string; data?: ValidationRule };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to create validation rule' };
+      }
+
+      return { success: true, data: result.data };
     } catch (error) {
       console.error('Error creating validation rule:', error);
       return { success: false, error: 'An unexpected error occurred' };
@@ -2773,13 +2822,24 @@ export const validationRulesService = {
 
   async updateRuleCategory(ruleId: string, newCategory: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('validation_rules')
-        .update({ category: newCategory })
-        .eq('id', ruleId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_validation_rule_category_with_session', {
+        p_session_token: sessionToken,
+        p_rule_id: ruleId,
+        p_new_category: newCategory
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update rule category' };
       }
 
       return { success: true };

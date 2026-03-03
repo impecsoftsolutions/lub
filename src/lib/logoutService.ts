@@ -4,9 +4,6 @@
  */
 
 import { memberAuthService } from './memberAuth';
-import { customAuth } from './customAuth';
-import { sessionManager } from './sessionManager';
-import { supabase } from './supabase';
 
 export const logoutService = {
   /**
@@ -17,27 +14,13 @@ export const logoutService = {
     try {
       console.log('[logoutService] Starting member logout...');
 
-      // Clear member authentication
       await memberAuthService.signOutMember();
 
-      // Get session token before clearing
-      const sessionToken = sessionManager.getSessionToken();
-
-      // Clear custom auth session from database
-      if (sessionToken) {
-        await customAuth.signOut(sessionToken);
-      }
-
-      // Clear all local storage
       localStorage.clear();
       sessionStorage.clear();
 
-      // Clear Supabase session
-      await supabase.auth.signOut();
-
       console.log('[logoutService] Member logout complete');
 
-      // Force full page reload to reinitialize all contexts
       window.location.href = '/signin';
     } catch (error) {
       console.error('[logoutService] Error during member logout:', error);
@@ -54,27 +37,13 @@ export const logoutService = {
     try {
       console.log('[logoutService] Starting admin logout...');
 
-      // Clear member authentication (admins may have member access too)
       await memberAuthService.signOutMember();
 
-      // Get session token before clearing
-      const sessionToken = sessionManager.getSessionToken();
-
-      // Clear custom auth session from database
-      if (sessionToken) {
-        await customAuth.signOut(sessionToken);
-      }
-
-      // Clear all local storage
       localStorage.clear();
       sessionStorage.clear();
 
-      // Clear Supabase session
-      await supabase.auth.signOut();
-
       console.log('[logoutService] Admin logout complete');
 
-      // Force full page reload to reinitialize all contexts
       window.location.href = '/admin/login';
     } catch (error) {
       console.error('[logoutService] Error during admin logout:', error);

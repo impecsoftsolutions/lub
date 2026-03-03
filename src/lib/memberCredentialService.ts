@@ -43,9 +43,10 @@ export async function changeEmail(newEmail: string): Promise<{ success: boolean;
 
     // STEP 2: Get current user from session
     const cachedUser = sessionManager.getUserData();
+    const sessionToken = sessionManager.getSessionToken();
 
-    if (!cachedUser || !cachedUser.id) {
-      console.error('[memberCredentialService.changeEmail] No cached user found or missing user ID');
+    if (!cachedUser || !cachedUser.id || !sessionToken) {
+      console.error('[memberCredentialService.changeEmail] No valid authenticated session found');
       return { success: false, error: 'Not authenticated' };
     }
 
@@ -55,12 +56,12 @@ export async function changeEmail(newEmail: string): Promise<{ success: boolean;
 
     // STEP 3: Call the RPC function to change email
     console.log('[memberCredentialService.changeEmail] Calling change_user_email function...');
-    console.log('[memberCredentialService.changeEmail] Parameters: user_id =', cachedUser.id, ', new_email =', trimmedEmail);
+    console.log('[memberCredentialService.changeEmail] Parameters: session token present = true, new_email =', trimmedEmail);
 
     const { data: changeResult, error: rpcError } = await supabase.rpc(
       'change_user_email',
       {
-        p_user_id: cachedUser.id,
+        p_session_token: sessionToken,
         p_new_email: trimmedEmail
       }
     );
@@ -136,9 +137,10 @@ export async function changeMobile(newMobile: string): Promise<{ success: boolea
 
     // STEP 2: Get current user from session
     const cachedUser = sessionManager.getUserData();
+    const sessionToken = sessionManager.getSessionToken();
 
-    if (!cachedUser || !cachedUser.id) {
-      console.error('[memberCredentialService.changeMobile] No cached user found or missing user ID');
+    if (!cachedUser || !cachedUser.id || !sessionToken) {
+      console.error('[memberCredentialService.changeMobile] No valid authenticated session found');
       return { success: false, error: 'Not authenticated' };
     }
 
@@ -148,12 +150,12 @@ export async function changeMobile(newMobile: string): Promise<{ success: boolea
 
     // STEP 3: Call the RPC function to change mobile
     console.log('[memberCredentialService.changeMobile] Calling change_user_mobile function...');
-    console.log('[memberCredentialService.changeMobile] Parameters: user_id =', cachedUser.id, ', new_mobile =', trimmedMobile);
+    console.log('[memberCredentialService.changeMobile] Parameters: session token present = true, new_mobile =', trimmedMobile);
 
     const { data: changeResult, error: rpcError } = await supabase.rpc(
       'change_user_mobile',
       {
-        p_user_id: cachedUser.id,
+        p_session_token: sessionToken,
         p_new_mobile: trimmedMobile
       }
     );

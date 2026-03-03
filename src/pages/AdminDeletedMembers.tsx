@@ -11,8 +11,8 @@ import {
   Lock
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
-import { customAuth } from '../lib/customAuth';
 import { deletedMembersService, DeletedMember } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
 
 const AdminDeletedMembers: React.FC = () => {
@@ -52,16 +52,16 @@ const AdminDeletedMembers: React.FC = () => {
   const loadDeletedMembers = async () => {
     try {
       setIsLoading(true);
-      const user = await customAuth.getCurrentUserFromSession();
-      if (!user) {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
         showToast('error', 'User not authenticated');
         setIsLoading(false);
         return;
       }
 
-      console.debug('[AdminDeletedMembers] loading deleted members', { userId: user.id });
+      console.debug('[AdminDeletedMembers] loading deleted members');
 
-      const data = await deletedMembersService.getAllDeletedMembers(user.id, searchTerm || undefined);
+      const data = await deletedMembersService.getAllDeletedMembers(sessionToken, searchTerm || undefined);
       setDeletedMembers(data);
 
       console.debug('[AdminDeletedMembers] loaded', { count: Array.isArray(data) ? data.length : 0 });
@@ -110,21 +110,20 @@ const AdminDeletedMembers: React.FC = () => {
 
   const handleRestore = async () => {
     try {
-      const user = await customAuth.getCurrentUserFromSession();
-      if (!user) {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
         showToast('error', 'User not authenticated');
         return;
       }
 
       console.log('[AdminDeletedMembers] Restoring member:', {
         memberId: restoreDialog.memberId,
-        memberName: restoreDialog.memberName,
-        userId: user.id
+        memberName: restoreDialog.memberName
       });
 
       const result = await deletedMembersService.restoreDeletedMember(
         restoreDialog.memberId,
-        user.id
+        sessionToken
       );
 
       console.log('[AdminDeletedMembers] Restore result:', result);

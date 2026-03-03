@@ -19,15 +19,9 @@ export const normalizeMemberData = async (formData: any): Promise<NormalizationR
   try {
     console.log('🚀 Calling Edge Function with:', formData);
     
-    // Get the session token for authentication
-    const { data: { session } } = await supabase.auth.getSession();
-    
     // Call your Supabase Edge Function
     const { data, error } = await supabase.functions.invoke('normalize-member', {
-      body: formData,
-      headers: session ? {
-        Authorization: `Bearer ${session.access_token}`
-      } : {}
+      body: formData
     });
 
     console.log('📥 Edge Function returned - data:', data);

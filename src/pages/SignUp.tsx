@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Phone, AlertCircle, Loader2 } from 'lucide-react';
 import { memberAuthService } from '../lib/memberAuth';
 import { isEmail, isMobileNumber, normalizeEmail, normalizeMobileNumber } from '../lib/customAuth';
+import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
 
 const SignUp: React.FC = () => {
@@ -107,10 +108,17 @@ const SignUp: React.FC = () => {
         return;
       }
 
-      showToast('success', 'Account created successfully! Redirecting to registration form...');
+      if (!result.user || !result.sessionToken || !result.expiresAt) {
+        showToast('error', 'Account created but session setup failed. Please sign in.');
+        return;
+      }
+
+      sessionManager.saveSession(result.sessionToken, result.expiresAt, result.user);
+
+      showToast('success', 'Account created successfully! Redirecting to dashboard...');
 
       setTimeout(() => {
-        navigate('/join');
+        window.location.href = '/dashboard';
       }, 1500);
     } catch (error) {
       console.error('Signup error:', error);

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, locationsService, citiesService } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 import { Search, Plus, CreditCard as Edit2, Trash2, Eye, MapPin, Building2, Check, X, ArrowLeft, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -63,28 +64,19 @@ export default function AdminCityManagement() {
     checkUserRole();
   }, [statusFilter, districtFilter]);
 
-  const getRequestingUserId = (): string | null => {
-    try {
-      const userDataStr = localStorage.getItem('lub_session_token_user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      return userData?.id || null;
-    } catch (error) {
-      console.error('[AdminCityManagement] Failed to read user session:', error);
-      return null;
-    }
-  };
+  const getSessionToken = (): string | null => sessionManager.getSessionToken();
 
   async function checkUserRole() {
     console.log('[AdminCityManagement] Checking user role and RLS policies...');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const requestingUserId = sessionManager.getUserData()?.id;
 
-      if (user) {
-        console.log('[AdminCityManagement] User authenticated:', user.id);
+      if (requestingUserId) {
+        console.log('[AdminCityManagement] User authenticated:', requestingUserId);
         const { data: roles, error } = await supabase
           .from('user_roles')
           .select('*')
-          .eq('user_id', user.id);
+          .eq('user_id', requestingUserId);
 
         if (error) {
           console.error('[AdminCityManagement] Error fetching user roles:', error);
@@ -168,15 +160,15 @@ export default function AdminCityManagement() {
       return;
     }
 
-    const requestingUserId = getRequestingUserId();
-    if (!requestingUserId) {
+    const sessionToken = getSessionToken();
+    if (!sessionToken) {
       console.error('[AdminCityManagement] User session not found');
       alert('User session not found. Please log in again.');
       return;
     }
 
     const result = await locationsService.addCity(
-      requestingUserId,
+      sessionToken,
       newCity.state_id,
       newCity.district_id,
       newCity.city_name.trim(),
@@ -243,14 +235,14 @@ export default function AdminCityManagement() {
       return;
     }
 
-    const requestingUserId = getRequestingUserId();
-    if (!requestingUserId) {
+    const sessionToken = getSessionToken();
+    if (!sessionToken) {
       console.error('[AdminCityManagement] User session not found');
       alert('User session not found. Please log in again.');
       return;
     }
 
-    const result = await citiesService.adminDeleteCity(cityId, requestingUserId);
+    const result = await citiesService.adminDeleteCity(cityId, sessionToken);
 
     if (!result.success) {
       console.error('[AdminCityManagement] Error deleting city:', result.error);

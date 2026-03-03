@@ -58,21 +58,20 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
 
       console.log('[DeleteUserModal] Executing delete query');
 
-      // Get current user ID from session
-      const userData = sessionManager.getUserData();
-      if (!userData?.id) {
-        throw new Error('Unable to get current user ID');
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('Unable to get current session token');
       }
 
       console.debug('[DeleteUserModal] calling admin_delete_user_and_purge_deleted_members', {
         targetUserId: user.id,
-        byUserId: userData.id,
+        hasSessionToken: true,
       });
 
       const { data, error: rpcError } = await supabase
-        .rpc('admin_delete_user_by_id', {
+        .rpc('admin_delete_user_by_id_with_session', {
           p_user_id: user.id,
-          p_requesting_user_id: userData.id
+          p_session_token: sessionToken
         });
 
       console.log('[DeleteUserModal] Delete result:', { error: rpcError, data });

@@ -1,6 +1,8 @@
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { sessionManager } from '../../lib/sessionManager';
+import { customAuth } from '../../lib/customAuth';
+import { logoutService } from '../../lib/logoutService';
 import {
   LayoutDashboard,
   Users,
@@ -34,11 +36,14 @@ export function AdminLayout() {
   const { sidebarCollapsed, toggleSidebar, pendingRegistrationsCount, pendingCitiesCount } = useAdmin();
 
   useEffect(() => {
-    const checkAuth = () => {
-      try {
-        const userData = sessionManager.getUserData();
+    let isMounted = true;
 
-        if (!userData) {
+    const checkAuth = async () => {
+      try {
+        const sessionToken = sessionManager.getSessionToken();
+
+        if (!sessionToken) {
+          if (!isMounted) return;
           setIsAuthenticated(false);
           setIsLoading(false);
           return;
@@ -46,6 +51,17 @@ export function AdminLayout() {
 
         if (sessionManager.isSessionExpired()) {
           sessionManager.clearSession();
+          if (!isMounted) return;
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          return;
+        }
+
+        const userData = await customAuth.getCurrentUserFromSession();
+
+        if (!isMounted) return;
+
+        if (!userData) {
           setIsAuthenticated(false);
           setIsLoading(false);
           return;
@@ -65,7 +81,11 @@ export function AdminLayout() {
       }
     };
 
-    checkAuth();
+    void checkAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const menuItems: MenuItem[] = [
@@ -144,9 +164,8 @@ export function AdminLayout() {
     );
   };
 
-  const handleSignOut = () => {
-    sessionManager.clearSession();
-    window.location.href = '/signin';
+  const handleSignOut = async () => {
+    await logoutService.logoutAdmin();
   };
 
   if (isLoading) {

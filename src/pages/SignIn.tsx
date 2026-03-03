@@ -135,25 +135,11 @@ const SignIn: React.FC = () => {
       expiresAt.setDate(expiresAt.getDate() + 7);
       sessionManager.saveSession(result.sessionToken, expiresAt.toISOString(), result.user);
 
-      console.log('[SignIn] Setting user context for RLS policies...');
-      try {
-        const contextSet = await customAuth.setUserContext(result.user.id);
-        if (!contextSet) {
-          console.warn('[SignIn] Failed to set user context, but proceeding with login');
-        }
-      } catch (contextError) {
-        console.warn('[SignIn] Error setting user context:', contextError);
-      }
-
       console.log('[SignIn] Login successful, user data saved to localStorage');
       showToast('success', 'Login successful! Redirecting...');
 
       setTimeout(() => {
-        if (result.user!.account_type === 'admin' || result.user!.account_type === 'both') {
-          window.location.href = '/admin';
-        } else {
-          window.location.href = '/dashboard';
-        }
+        window.location.href = '/dashboard';
       }, 1000);
     } catch (error) {
       console.error('Login error:', error);

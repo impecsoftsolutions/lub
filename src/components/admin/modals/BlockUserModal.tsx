@@ -86,15 +86,15 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
       setError('');
 
       // Get current user ID from session
-      const userData = sessionManager.getUserData();
-      if (!userData?.id) {
-        throw new Error('Unable to get current user ID');
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('Unable to get current session token');
       }
 
       const { data, error: updateError } = await supabase
-        .rpc('admin_block_unblock_user', {
+        .rpc('admin_block_unblock_user_with_session', {
           p_user_id: user.id,
-          p_requesting_user_id: userData.id,
+          p_session_token: sessionToken,
           p_is_frozen: action === 'block'
         });
 

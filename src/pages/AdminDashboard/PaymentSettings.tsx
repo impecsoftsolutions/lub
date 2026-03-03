@@ -4,6 +4,7 @@ import { Plus, CreditCard as Edit3, Save, X, Upload, Eye, MapPin, Building2, Cre
 import { PermissionGate } from '../../components/permissions/PermissionGate';
 import { useHasPermission } from '../../hooks/usePermissions';
 import { supabase, fileUploadService, statesService, StateMaster } from '../../lib/supabase';
+import { sessionManager } from '../../lib/sessionManager';
 import Toast from '../../components/Toast';
 
 interface StatePaymentSettings {
@@ -173,6 +174,11 @@ const PaymentSettings: React.FC = () => {
 
     try {
       setIsSaving(true);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('User session not found. Please log in again.');
+      }
+
       let updatedSettings = { ...editForm };
 
       // Upload new QR code if selected
@@ -187,13 +193,19 @@ const PaymentSettings: React.FC = () => {
         }
       }
 
-      const { error } = await supabase
-        .from('payment_settings')
-        .update(updatedSettings)
-        .eq('state', editingState);
+      const { data, error } = await supabase.rpc('update_payment_settings_with_session', {
+        p_session_token: sessionToken,
+        p_state: editingState,
+        p_updates: updatedSettings
+      });
 
       if (error) {
         throw error;
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to update payment settings');
       }
 
       showToast('success', `Payment settings for ${editingState} updated successfully`);
@@ -224,6 +236,11 @@ const PaymentSettings: React.FC = () => {
 
     try {
       setIsSaving(true);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('User session not found. Please log in again.');
+      }
+
       let newSettings = { ...addForm };
 
       // Upload QR code if selected
@@ -236,12 +253,18 @@ const PaymentSettings: React.FC = () => {
         }
       }
 
-      const { error } = await supabase
-        .from('payment_settings')
-        .insert([newSettings]);
+      const { data, error } = await supabase.rpc('create_payment_settings_with_session', {
+        p_session_token: sessionToken,
+        p_payload: newSettings
+      });
 
       if (error) {
         throw error;
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to add payment settings');
       }
 
       showToast('success', `Payment settings for ${addForm.state} added successfully`);
