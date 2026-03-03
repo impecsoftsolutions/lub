@@ -1,41 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Key, Loader2, AlertCircle, Settings as SettingsIcon, User, Bell, Shield } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, Settings as SettingsIcon, User, Bell, Shield } from 'lucide-react';
 import { useMember } from '../contexts/MemberContext';
-import ChangePasswordModal from '../components/ChangePasswordModal';
-import Toast from '../components/Toast';
 
 const MemberSettings: React.FC = () => {
   const navigate = useNavigate();
   const { member, isAuthenticated, isLoading } = useMember();
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [toast, setToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-    isVisible: boolean;
-  }>({
-    type: 'success',
-    message: '',
-    isVisible: false
-  });
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate('/signin');
     }
   }, [isAuthenticated, isLoading, navigate]);
-
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
-
-  const handlePasswordChangeSuccess = () => {
-    showToast('success', 'Password changed successfully!');
-  };
 
   if (isLoading) {
     return (
@@ -68,19 +44,6 @@ const MemberSettings: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <Toast
-        type={toast.type}
-        message={toast.message}
-        isVisible={toast.isVisible}
-        onClose={hideToast}
-      />
-
-      <ChangePasswordModal
-        isOpen={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-        onSuccess={handlePasswordChangeSuccess}
-      />
-
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <button
@@ -98,7 +61,7 @@ const MemberSettings: React.FC = () => {
               <SettingsIcon className="w-6 h-6" />
               Settings
             </h1>
-            <p className="text-blue-100 mt-1">Manage your account preferences and security</p>
+            <p className="text-blue-100 mt-1">Manage your account preferences</p>
           </div>
 
           <div className="p-6 space-y-6">
@@ -121,24 +84,6 @@ const MemberSettings: React.FC = () => {
                   >
                     Edit Profile
                   </Link>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Key className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Password</h3>
-                      <p className="text-sm text-gray-600">Change your account password</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setIsPasswordModalOpen(true)}
-                    className="px-4 py-2 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-                  >
-                    Change Password
-                  </button>
                 </div>
               </div>
             </div>
@@ -168,11 +113,11 @@ const MemberSettings: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-gray-900">Privacy & Security</h3>
-                      <p className="text-sm text-gray-600">Control your data and security settings</p>
+                      <p className="text-sm text-gray-600">Password-based authentication is no longer supported</p>
                     </div>
                   </div>
                   <span className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-200 rounded-full">
-                    Coming Soon
+                    Info
                   </span>
                 </div>
               </div>
@@ -181,7 +126,7 @@ const MemberSettings: React.FC = () => {
             <div className="border-t border-gray-200 pt-6">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  <strong>Need Help?</strong> If you have any questions about your account settings or need assistance, please contact our support team.
+                  <strong>Need Help?</strong> Sign in with your email address and 10-digit mobile number. Contact support if your contact details need to be corrected.
                 </p>
               </div>
             </div>

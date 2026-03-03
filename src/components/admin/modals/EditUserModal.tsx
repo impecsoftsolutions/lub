@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Phone, Loader2, CheckCircle, AlertCircle, Lock } from 'lucide-react';
+import { X, Mail, Phone, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useValidation } from '../../../hooks/useValidation';
 import { sessionManager } from '../../../lib/sessionManager';
@@ -23,8 +23,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     email: '',
-    mobile_number: '',
-    password: ''
+    mobile_number: ''
   });
 
   const [validationErrors, setValidationErrors] = useState({
@@ -42,8 +41,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
     if (user) {
       setFormData({
         email: user.email || '',
-        mobile_number: user.mobile_number || '',
-        password: ''
+        mobile_number: user.mobile_number || ''
       });
     }
   }, [user]);
@@ -128,7 +126,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
           p_requesting_user_id: userData.id,
           p_email: formData.email?.trim() || null,
           p_mobile_number: formData.mobile_number?.trim() || null,
-          p_new_password: formData.password ? formData.password : null
+          p_new_password: null
         });
 
       if (updateError) {
@@ -149,9 +147,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
         onClose();
       }, 1500);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Update user error:', error);
-      setError(error.message || 'Failed to update user');
+      setError(error instanceof Error ? error.message : 'Failed to update user');
     } finally {
       setIsSubmitting(false);
     }
@@ -161,8 +159,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
     if (!isSubmitting) {
       setFormData({
         email: user.email || '',
-        mobile_number: user.mobile_number || '',
-        password: ''
+        mobile_number: user.mobile_number || ''
       });
       setValidationErrors({ email: '', mobile_number: '' });
       setError('');
@@ -275,26 +272,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                 {validationErrors.mobile_number && (
                   <p className="mt-1 text-xs text-red-600">{validationErrors.mobile_number}</p>
                 )}
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password (optional)
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Leave empty to keep current password"
-                    disabled={isSubmitting || success}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">No rules. Admin override.</p>
               </div>
 
             </form>

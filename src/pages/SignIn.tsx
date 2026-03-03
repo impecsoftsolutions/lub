@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, LogIn } from 'lucide-react';
-import { customAuth, isEmail, isMobileNumber } from '../lib/customAuth';
+import { Mail, Phone, AlertCircle, Loader2, LogIn } from 'lucide-react';
+import { customAuth, isEmail, isMobileNumber, normalizeEmail, normalizeMobileNumber } from '../lib/customAuth';
 import { sessionManager } from '../lib/sessionManager';
 import { AuthErrorCode } from '../types/auth.types';
 import Toast from '../components/Toast';
 
 const SignIn: React.FC = () => {
   const [formData, setFormData] = useState({
-    emailOrMobile: '',
-    password: ''
+    email: '',
+    mobile_number: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{
@@ -34,7 +33,17 @@ const SignIn: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let processedValue = value;
+
+    if (name === 'email') {
+      processedValue = value.toLowerCase();
+    }
+
+    if (name === 'mobile_number') {
+      processedValue = normalizeMobileNumber(value).slice(0, 10);
+    }
+
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
 
     if (errors[name]) {
       setErrors(prev => {
@@ -59,11 +68,11 @@ const SignIn: React.FC = () => {
       case AuthErrorCode.ACCOUNT_SUSPENDED:
         return 'Your account has been suspended. Please contact support at support@lub.org.in.';
 
-      case AuthErrorCode.PASSWORD_PENDING:
-        return 'Please use "Forgot Password" below to set your password for the first time.';
+      case AuthErrorCode.ACCOUNT_FROZEN:
+        return 'Your account is unavailable. Please contact support.';
 
       case AuthErrorCode.INVALID_CREDENTIALS:
-        return error || 'Invalid email/mobile number or password.';
+        return 'Invalid credentials';
 
       default:
         return error || 'An unexpected error occurred. Please try again.';
@@ -73,14 +82,16 @@ const SignIn: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.emailOrMobile) {
-      newErrors.emailOrMobile = 'Email or mobile number is required';
-    } else if (!isEmail(formData.emailOrMobile) && !isMobileNumber(formData.emailOrMobile)) {
-      newErrors.emailOrMobile = 'Please enter a valid email address or 10-digit mobile number';
+    if (!formData.email) {
+      newErrors.email = 'Email address is required';
+    } else if (!isEmail(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
+    if (!formData.mobile_number) {
+      newErrors.mobile_number = 'Mobile number is required';
+    } else if (!isMobileNumber(formData.mobile_number)) {
+      newErrors.mobile_number = 'Please enter a valid 10-digit mobile number';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -104,8 +115,8 @@ const SignIn: React.FC = () => {
 
       const userAgent = navigator.userAgent;
       const result = await customAuth.signIn(
-        formData.emailOrMobile.toLowerCase().trim(),
-        formData.password,
+        normalizeEmail(formData.email),
+        normalizeMobileNumber(formData.mobile_number),
         undefined,
         userAgent
       );
@@ -120,12 +131,10 @@ const SignIn: React.FC = () => {
         return;
       }
 
-      // Save session token AND user data
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
       sessionManager.saveSession(result.sessionToken, expiresAt.toISOString(), result.user);
 
-      // Set user context for RLS policies
       console.log('[SignIn] Setting user context for RLS policies...');
       try {
         const contextSet = await customAuth.setUserContext(result.user.id);
@@ -134,16 +143,13 @@ const SignIn: React.FC = () => {
         }
       } catch (contextError) {
         console.warn('[SignIn] Error setting user context:', contextError);
-        // Continue with login even if context setting fails
       }
 
       console.log('[SignIn] Login successful, user data saved to localStorage');
-
       showToast('success', 'Login successful! Redirecting...');
 
-      // Force full page reload to reinitialize MemberContext with new session
       setTimeout(() => {
-        if (result.user!.account_type === 'admin') {
+        if (result.user!.account_type === 'admin' || result.user!.account_type === 'both') {
           window.location.href = '/admin';
         } else {
           window.location.href = '/dashboard';
@@ -171,82 +177,64 @@ const SignIn: React.FC = () => {
           <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <LogIn className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Member Login</h2>
-          <p className="mt-2 text-gray-600">Sign in to access your dashboard</p>
+          <h2 className="text-3xl font-bold text-gray-900">Portal Sign In</h2>
+          <p className="mt-2 text-gray-600">Sign in with your email address and mobile number</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="emailOrMobile" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address or Mobile Number <span className="text-red-500">*</span>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
-                  id="emailOrMobile"
-                  name="emailOrMobile"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   required
-                  value={formData.emailOrMobile}
+                  value={formData.email}
                   onChange={handleInputChange}
                   className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.emailOrMobile ? 'border-red-500' : 'border-gray-300'
+                    errors.email ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="your.email@example.com or mobile number"
+                  placeholder="your.email@example.com"
                 />
               </div>
-              {errors.emailOrMobile && (
+              {errors.email && (
                 <p className="mt-1 text-sm text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.emailOrMobile}
+                  {errors.email}
                 </p>
               )}
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password <span className="text-red-500">*</span>
+              <label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700 mb-2">
+                Mobile Number <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Phone className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
+                  id="mobile_number"
+                  name="mobile_number"
+                  type="tel"
                   required
-                  value={formData.password}
+                  value={formData.mobile_number}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    errors.mobile_number ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Enter your password"
+                  placeholder="10-digit mobile number"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
               </div>
-              {errors.password && (
+              {errors.mobile_number && (
                 <p className="mt-1 text-sm text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.password}
+                  {errors.mobile_number}
                 </p>
               )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <Link
-                  to="/forgot-password"
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Forgot your password?
-                </Link>
-              </div>
             </div>
 
             <button

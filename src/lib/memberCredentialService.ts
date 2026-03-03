@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { sessionManager } from './sessionManager';
+import { normalizeEmail, normalizeMobileNumber } from './customAuth';
 
 /**
  * Service for handling immediate member credential changes (email and mobile)
@@ -33,7 +34,7 @@ export async function changeEmail(newEmail: string): Promise<{ success: boolean;
       return { success: false, error: 'Email address is required' };
     }
 
-    const trimmedEmail = newEmail.trim().toLowerCase();
+    const trimmedEmail = normalizeEmail(newEmail);
 
     if (!isValidEmail(trimmedEmail)) {
       console.error('[memberCredentialService.changeEmail] Invalid email format');
@@ -126,7 +127,7 @@ export async function changeMobile(newMobile: string): Promise<{ success: boolea
       return { success: false, error: 'Mobile number is required' };
     }
 
-    const trimmedMobile = newMobile.trim();
+    const trimmedMobile = normalizeMobileNumber(newMobile);
 
     if (!isValidMobile(trimmedMobile)) {
       console.error('[memberCredentialService.changeMobile] Invalid mobile format');

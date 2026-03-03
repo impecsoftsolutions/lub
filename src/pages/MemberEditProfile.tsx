@@ -20,12 +20,11 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useMember } from '../contexts/MemberContext';
-import { memberAuthService } from '../lib/memberAuth';
-import { customAuth } from '../lib/customAuth';
 import Toast from '../components/Toast';
 import ChangeCredentialModal from '../components/member/ChangeCredentialModal';
 import ImageCropModal from '../components/ImageCropModal';
 import NormalizationPreviewModal from '../components/NormalizationPreviewModal';
+import { changeEmail, changeMobile } from '../lib/memberCredentialService';
 import { normalizeMemberData } from '../lib/normalization';
 import { useValidation } from '../hooks/useValidation';
 import { useFormFieldConfig } from '../hooks/useFormFieldConfig';
@@ -754,38 +753,6 @@ const MemberEditProfile: React.FC = () => {
     try {
       setIsSaving(true);
 
-      // Check email/mobile uniqueness if changed
-      const emailChanged = changedFields.includes('email');
-      const mobileChanged = changedFields.includes('mobile_number');
-
-      if (emailChanged || mobileChanged) {
-        const uniquenessCheck = await memberAuthService.checkEmailMobileUniqueness(
-          emailChanged ? formData.email : null,
-          mobileChanged ? formData.mobile_number : null,
-          member.id
-        );
-
-        if (!uniquenessCheck.success) {
-          showToast('error', uniquenessCheck.error || 'Failed to verify uniqueness');
-          setIsSaving(false);
-          return;
-        }
-
-        if (uniquenessCheck.emailExists) {
-          showToast('error', 'This email is already in use by another member');
-          setErrors(prev => ({ ...prev, email: 'Email already in use' }));
-          setIsSaving(false);
-          return;
-        }
-
-        if (uniquenessCheck.mobileExists) {
-          showToast('error', 'This mobile number is already in use by another member');
-          setErrors(prev => ({ ...prev, mobile_number: 'Mobile number already in use' }));
-          setIsSaving(false);
-          return;
-        }
-      }
-
       // Call normalization service
       console.log('[MemberEditProfile] Normalizing member data...');
       const result = await normalizeMemberData(formData);
@@ -867,14 +834,17 @@ const MemberEditProfile: React.FC = () => {
         finalPhotoUrl
       });
 
+      const emailChanged = dataToSave.email !== originalData.email;
+      const mobileChanged = dataToSave.mobile_number !== originalData.mobile_number;
+
       // Step 2: Call RPC function to update profile data
       const { data: rpcResult, error: rpcError } = await supabase.rpc('update_member_profile', {
         p_member_registration_id: memberRegistrationId,
         p_user_id: member!.id,
         p_data: {
           full_name: dataToSave.full_name?.trim(),
-          email: dataToSave.email?.trim(),
-          mobile_number: dataToSave.mobile_number?.trim(),
+          email: emailChanged ? originalData.email?.trim() : dataToSave.email?.trim(),
+          mobile_number: mobileChanged ? originalData.mobile_number?.trim() : dataToSave.mobile_number?.trim(),
           gender: dataToSave.gender || null,
           date_of_birth: dataToSave.date_of_birth || null,
           company_name: dataToSave.company_name?.trim(),
@@ -936,29 +906,23 @@ const MemberEditProfile: React.FC = () => {
         }
       }
 
-      // Step 4: Check if email or mobile changed
-      const emailChanged = dataToSave.email !== originalData.email;
-      const mobileChanged = dataToSave.mobile_number !== originalData.mobile_number;
-
-      // Step 5: Update users table if email/mobile changed
+      // Step 4: Update login credentials through credential RPCs if needed
       if (emailChanged || mobileChanged) {
-        console.log('[saveProfileData] Updating users table...');
+        console.log('[saveProfileData] Updating login credentials through RPCs...');
 
-        const userUpdates: any = {};
-        if (emailChanged) userUpdates.email = dataToSave.email.trim();
-        if (mobileChanged) userUpdates.mobile_number = dataToSave.mobile_number.trim();
-
-        const { error: userError } = await supabase
-          .from('users')
-          .update(userUpdates)
-          .eq('id', member.id);
-
-        if (userError) {
-          console.error('[saveProfileData] Error updating users:', userError);
-          throw userError;
+        if (emailChanged) {
+          const emailResult = await changeEmail(dataToSave.email.trim());
+          if (!emailResult.success) {
+            throw new Error(emailResult.error || 'Failed to update email address');
+          }
         }
 
-        console.log('[saveProfileData] users table updated successfully');
+        if (mobileChanged) {
+          const mobileResult = await changeMobile(dataToSave.mobile_number.trim());
+          if (!mobileResult.success) {
+            throw new Error(mobileResult.error || 'Failed to update mobile number');
+          }
+        }
       }
 
       // Step 6: Success - update originalData and display the new photo

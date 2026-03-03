@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
-import { customAuth } from './customAuth';
+import { customAuth, normalizeEmail, normalizeMobileNumber } from './customAuth';
 import { sessionManager } from './sessionManager';
+import type { User } from '../types/auth.types';
 
 export interface MemberData {
   id: string;
@@ -15,37 +16,38 @@ export interface MemberData {
   reapplication_count: number;
   member_id: string | null;
   profile_photo_url: string | null;
-  account_type?: 'admin' | 'member' | 'both'; // ✅ ADDED: To check admin access
+  account_type?: 'admin' | 'member' | 'both' | 'general_user';
   created_at: string;
 }
 
 export const memberAuthService = {
-  async signUpMember(email: string, mobile_number: string, password: string) {
+  async signUpMember(email: string, mobile_number: string) {
     try {
-      console.log('[memberAuthService] Sign up attempt for:', email);
+      const normalizedEmail = normalizeEmail(email);
+      const normalizedMobile = normalizeMobileNumber(mobile_number);
+      console.log('[memberAuthService] Sign up attempt for:', normalizedEmail);
 
-      // Hash the password using the same function that login uses
-      const { data: passwordHash, error: hashError } = await supabase.rpc(
-        'hash_password',
-        { password }
-      );
-
-      if (hashError || !passwordHash) {
-        console.error('[memberAuthService] Password hashing error:', hashError);
+      if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
         return {
           success: false,
-          error: 'Failed to process password. Please try again.',
+          error: 'Please enter a valid email address.',
           data: null
         };
       }
 
-      // Insert user directly into users table
+      if (!/^[1-9][0-9]{9}$/.test(normalizedMobile)) {
+        return {
+          success: false,
+          error: 'Mobile number must be exactly 10 digits.',
+          data: null
+        };
+      }
+
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
-          email: email.toLowerCase(),
-          mobile_number: mobile_number,
-          password_hash: passwordHash,
+          email: normalizedEmail,
+          mobile_number: normalizedMobile,
           account_type: 'general_user',
           account_status: 'active',
           created_at: new Date().toISOString(),
@@ -56,9 +58,23 @@ export const memberAuthService = {
 
       if (insertError) {
         console.error('[memberAuthService] User creation error:', insertError);
+
+        const duplicateField = `${insertError.details || ''} ${insertError.message || ''}`.toLowerCase();
+        let errorMessage = 'Failed to create account. Please try again.';
+
+        if (insertError.code === '23505') {
+          if (duplicateField.includes('email')) {
+            errorMessage = 'This email address is already registered. You can either sign in to your account or register with a different email address.';
+          } else if (duplicateField.includes('mobile')) {
+            errorMessage = 'This mobile number is already registered. You can either sign in to your account or register with a different mobile number.';
+          } else {
+            errorMessage = 'This email address or mobile number is already registered.';
+          }
+        }
+
         return {
           success: false,
-          error: 'Failed to create account. Email may already be in use.',
+          error: errorMessage,
           data: null
         };
       }
@@ -76,44 +92,21 @@ export const memberAuthService = {
   },
 
   async signInMember(email: string, password: string) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        return { success: false, error: error.message, data: null };
-      }
-
-      return { success: true, data, error: null };
-    } catch (error) {
-      console.error('Sign in error:', error);
-      return { success: false, error: 'An unexpected error occurred', data: null };
-    }
+    console.warn('[memberAuthService] signInMember is deprecated', email, password ? 'with password input' : '');
+    return {
+      success: false,
+      error: 'Password-based authentication is no longer supported.',
+      data: null
+    };
   },
 
   async signInWithMobile(mobileNumber: string, password: string) {
-    try {
-      const { data: memberData, error: lookupError } = await supabase
-        .from('member_registrations')
-        .select('email')
-        .eq('mobile_number', mobileNumber)
-        .maybeSingle();
-
-      if (lookupError) {
-        return { success: false, error: 'Failed to find account with this mobile number', data: null };
-      }
-
-      if (!memberData) {
-        return { success: false, error: 'No account found with this mobile number', data: null };
-      }
-
-      return await this.signInMember(memberData.email, password);
-    } catch (error) {
-      console.error('Sign in with mobile error:', error);
-      return { success: false, error: 'An unexpected error occurred', data: null };
-    }
+    console.warn('[memberAuthService] signInWithMobile is deprecated', mobileNumber, password ? 'with password input' : '');
+    return {
+      success: false,
+      error: 'Password-based authentication is no longer supported.',
+      data: null
+    };
   },
 
   async signOutMember() {
@@ -184,34 +177,24 @@ export const memberAuthService = {
       }
 
       console.log('[memberAuthService] User fetched from database:', user.email);
+      const extendedUser = user as User & Partial<MemberData>;
 
       // FIXED: Fetch member registration data with JOIN
-      const { data: memberReg, error: memberError } = await supabase
-        .from('member_registrations')
-        .select('*')
-        .eq('email', user.email)
-        .maybeSingle();
-
-      if (memberError) {
-        console.error('[memberAuthService] Error fetching member registration:', memberError);
-      }
-
-      // Map combined user data
       const memberData: MemberData = {
         id: user.id,
         user_id: user.id,
-        full_name: memberReg?.full_name || '', // FIXED: Get from member_registrations
+        full_name: extendedUser.full_name || '',
         email: user.email,
-        mobile_number: user.mobile_number || memberReg?.mobile_number || '',
-        company_name: memberReg?.company_name || '',
-        status: memberReg?.status as 'pending' | 'approved' | 'rejected' || 'pending',
-        approval_date: memberReg?.approval_date || null,
-        rejection_reason: memberReg?.rejection_reason || null,
-        reapplication_count: memberReg?.reapplication_count || 0,
-        member_id: memberReg?.member_id || null,
-        profile_photo_url: memberReg?.profile_photo_url || null, // FIXED: Get from member_registrations
-        account_type: user.account_type || 'member', // ✅ FIXED: Include account_type from users table
-        created_at: memberReg?.created_at || user.created_at || new Date().toISOString()
+        mobile_number: user.mobile_number || '',
+        company_name: extendedUser.company_name || '',
+        status: extendedUser.status || 'pending',
+        approval_date: extendedUser.approval_date || null,
+        rejection_reason: extendedUser.rejection_reason || null,
+        reapplication_count: extendedUser.reapplication_count || 0,
+        member_id: extendedUser.member_id || null,
+        profile_photo_url: extendedUser.profile_photo_url || null,
+        account_type: user.account_type,
+        created_at: user.created_at || new Date().toISOString()
       };
 
       // Save combined data to cache for next time
@@ -298,7 +281,7 @@ export const memberAuthService = {
       }
 
       const protectedFields = ['user_id', 'status', 'approval_date', 'member_id', 'is_legacy_member', 'created_at', 'updated_at'];
-      const updateData: any = { ...updates };
+      const updateData: Record<string, unknown> = { ...updates };
 
       protectedFields.forEach(field => delete updateData[field]);
 
@@ -330,174 +313,44 @@ export const memberAuthService = {
   },
 
   async changePassword(newPassword: string) {
-    try {
-      console.log('[memberAuthService.changePassword] Starting password change process');
-
-      // STEP 1: Get current user from session
-      const cachedUser = sessionManager.getUserData();
-
-      if (!cachedUser || !cachedUser.id) {
-        console.error('[memberAuthService.changePassword] No cached user found or missing user ID');
-        return { success: false, error: 'Not authenticated' };
-      }
-
-      console.log('[memberAuthService.changePassword] User ID:', cachedUser.id);
-      console.log('[memberAuthService.changePassword] User email:', cachedUser.email);
-
-      // STEP 2: Hash the new password using the same function as signup
-      console.log('[memberAuthService.changePassword] Hashing new password...');
-      const { data: passwordHash, error: hashError } = await supabase.rpc(
-        'hash_password',
-        { password: newPassword }
-      );
-
-      if (hashError || !passwordHash) {
-        console.error('[memberAuthService.changePassword] Password hashing error:', hashError);
-        return {
-          success: false,
-          error: 'Failed to process password. Please try again.'
-        };
-      }
-
-      console.log('[memberAuthService.changePassword] Password hashed successfully');
-      console.log('[memberAuthService.changePassword] Hash preview (first 10 chars):',
-        typeof passwordHash === 'string' ? passwordHash.substring(0, 10) : 'N/A');
-
-      // STEP 3: Update password using secure database function
-      console.log('[memberAuthService.changePassword] Calling change_user_password function...');
-      console.log('[memberAuthService.changePassword] Parameters: user_id =', cachedUser.id);
-
-      const { data: changeResult, error: rpcError } = await supabase.rpc(
-        'change_user_password',
-        {
-          p_user_id: cachedUser.id,
-          p_new_password_hash: passwordHash
-        }
-      );
-
-      // Handle RPC call failure (network error, function not found, etc.)
-      if (rpcError) {
-        console.error('[memberAuthService.changePassword] RPC call failed:', rpcError);
-        console.error('[memberAuthService.changePassword] Error details:', JSON.stringify(rpcError));
-        return {
-          success: false,
-          error: 'Failed to update password. Please try again.'
-        };
-      }
-
-      console.log('[memberAuthService.changePassword] RPC call completed');
-      console.log('[memberAuthService.changePassword] Response data:', changeResult);
-
-      // Handle function response
-      if (!changeResult || typeof changeResult !== 'object') {
-        console.error('[memberAuthService.changePassword] Invalid response format from change_user_password');
-        return {
-          success: false,
-          error: 'Failed to update password. Please try again.'
-        };
-      }
-
-      // Check if the password change was successful
-      if (changeResult.success === false || changeResult.error) {
-        console.error('[memberAuthService.changePassword] Password change failed:',
-          changeResult.error || changeResult.message || 'Unknown error');
-        return {
-          success: false,
-          error: changeResult.error || 'Failed to update password. Please try again.'
-        };
-      }
-
-      console.log('[memberAuthService.changePassword] Password updated successfully!');
-      console.log('[memberAuthService.changePassword] Success message:',
-        changeResult.message || 'Password changed');
-
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('[memberAuthService.changePassword] Unexpected error:', error);
-      console.error('[memberAuthService.changePassword] Error stack:', error instanceof Error ? error.stack : 'N/A');
-      return { success: false, error: 'An unexpected error occurred' };
-    }
+    console.warn('[memberAuthService] changePassword is deprecated', newPassword ? 'with password input' : '');
+    return {
+      success: false,
+      error: 'Password-based authentication is no longer supported.'
+    };
   },
 
   async requestPasswordReset(email: string) {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('Request password reset error:', error);
-      return { success: false, error: 'An unexpected error occurred' };
-    }
+    console.warn('[memberAuthService] requestPasswordReset is deprecated', email);
+    return {
+      success: false,
+      error: 'Password-based authentication is no longer supported.'
+    };
   },
 
   async resetPassword(newPassword: string) {
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('Reset password error:', error);
-      return { success: false, error: 'An unexpected error occurred' };
-    }
+    console.warn('[memberAuthService] resetPassword is deprecated', newPassword ? 'with password input' : '');
+    return {
+      success: false,
+      error: 'Password-based authentication is no longer supported.'
+    };
   },
 
   async checkEmailExists(email: string): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .from('member_registrations')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Check email exists error:', error);
-        return false;
-      }
-
-      return !!data;
-    } catch (error) {
-      console.error('Check email exists error:', error);
-      return false;
-    }
+    console.warn('[memberAuthService] checkEmailExists is deprecated', email);
+    return false;
   },
 
   async checkMobileExists(mobileNumber: string): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .from('member_registrations')
-        .select('id')
-        .eq('mobile_number', mobileNumber)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Check mobile exists error:', error);
-        return false;
-      }
-
-      return !!data;
-    } catch (error) {
-      console.error('Check mobile exists error:', error);
-      return false;
-    }
+    console.warn('[memberAuthService] checkMobileExists is deprecated', mobileNumber);
+    return false;
   },
 
   async createOrUpdateProfileChangeRequest(params: {
     memberId: string;
     changeType: 'email_change' | 'mobile_change' | 'profile_update';
-    currentData: Record<string, any>;
-    requestedData: Record<string, any>;
+    currentData: Record<string, unknown>;
+    requestedData: Record<string, unknown>;
     changedFields: string[];
     changeReason?: string;
   }) {
@@ -690,101 +543,17 @@ export const memberAuthService = {
     mobileNumber: string | null,
     currentMemberId: string
   ) {
-    try {
-      console.log('[memberAuthService] Checking uniqueness for email:', email, 'mobile:', mobileNumber);
-      console.log('[memberAuthService] Current member ID:', currentMemberId);
-
-      const { data: memberData, error: memberError } = await supabase
-        .from('member_registrations')
-        .select('user_id')
-        .eq('id', currentMemberId)
-        .maybeSingle();
-
-      if (memberError) {
-        console.error('[memberAuthService] Error fetching member data:', memberError);
-        return {
-          success: false,
-          emailExists: false,
-          mobileExists: false,
-          error: 'Failed to verify member information'
-        };
-      }
-
-      if (!memberData || !memberData.user_id) {
-        console.error('[memberAuthService] Member not found or no user_id linked');
-        return {
-          success: false,
-          emailExists: false,
-          mobileExists: false,
-          error: 'Member account not properly linked. Please contact support.'
-        };
-      }
-
-      const userId = memberData.user_id;
-      console.log('[memberAuthService] Found user_id:', userId);
-
-      let emailExists = false;
-      let mobileExists = false;
-
-      if (email) {
-        const { data: emailData, error: emailError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', email.toLowerCase())
-          .neq('id', userId)
-          .maybeSingle();
-
-        if (emailError) {
-          console.error('[memberAuthService] Error checking email uniqueness:', emailError);
-          return {
-            success: false,
-            emailExists: false,
-            mobileExists: false,
-            error: 'Failed to validate email'
-          };
-        }
-
-        emailExists = !!emailData;
-        console.log('[memberAuthService] Email exists (excluding current user):', emailExists);
-      }
-
-      if (mobileNumber) {
-        const { data: mobileData, error: mobileError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('mobile_number', mobileNumber)
-          .neq('id', userId)
-          .maybeSingle();
-
-        if (mobileError) {
-          console.error('[memberAuthService] Error checking mobile uniqueness:', mobileError);
-          return {
-            success: false,
-            emailExists: false,
-            mobileExists: false,
-            error: 'Failed to validate mobile number'
-          };
-        }
-
-        mobileExists = !!mobileData;
-        console.log('[memberAuthService] Mobile exists (excluding current user):', mobileExists);
-      }
-
-      return {
-        success: true,
-        emailExists,
-        mobileExists,
-        error: null
-      };
-
-    } catch (error) {
-      console.error('[memberAuthService] Unexpected error in checkEmailMobileUniqueness:', error);
-      return {
-        success: false,
-        emailExists: false,
-        mobileExists: false,
-        error: 'An unexpected error occurred'
-      };
-    }
+    console.warn(
+      '[memberAuthService] checkEmailMobileUniqueness is deprecated',
+      email,
+      mobileNumber,
+      currentMemberId
+    );
+    return {
+      success: true,
+      emailExists: false,
+      mobileExists: false,
+      error: null
+    };
   }
 };
