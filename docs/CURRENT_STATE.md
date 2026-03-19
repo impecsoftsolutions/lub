@@ -1,14 +1,14 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-20
-**Updated by:** Codex (final browser-side hardening cleanup)
+**Updated by:** Claude Code (restructured open risks into deferred work + watch items)
 
 ---
 
 ## Project
 
 - **Repo:** `C:\webprojects\lub`
-- **Latest deep handover:** `docs/session_documents/session_48_phase1_runtime_verification_completion_and_next_stream_handover.md`
+- **Latest deep handover:** `docs/session_documents/session_49_dual_agent_setup_and_browser_side_hardening_completion.md`
 - **Project guide:** `docs/lub_web_portal_project_guide_for_claude_code.md`
 
 ---
@@ -62,28 +62,37 @@ If `git status` is dirty when the next stream begins:
 
 ---
 
-## Open Risks / Open Questions
+## Deferred Work
 
-- Migration `20260313093000` (designation master wrappers): application to DB was not explicitly confirmed during Session 48. Verify before hardening that domain further.
-- Lint baseline is failing (206 errors, 42 warnings as of 2026-03-19). Mostly pre-existing no-explicit-any and unused-var debt. One item to watch: constant condition in `src/lib/memberAuth.ts` line 148 - inspect before touching that file.
-- Direct `information_schema.routines` verification is not available from the anon client used in this workspace. For state-management hardening, function existence was proven indirectly through successful live RPC calls to `upsert_state_with_session` and `update_state_active_status_with_session`.
-- `supabase.auth.admin.createUser()` in `userRolesService.addUserRole()` is a browser-side admin Auth API call returning `403 not_admin`. This is a pre-existing issue outside Domain 3 scope. Needs a server-side Edge Function or service-role backend route to fix. Do not attempt to fix by exposing the service role key in the browser.
-- Broader validation-consumption cleanup is deferred - do not start it until after the next privileged-write hardening slice is complete.
+Planned items not yet started, in priority order. Remove an item from this list when it is done.
+
+| # | Item | Notes |
+|---|------|-------|
+| 1 | Fix admin user creation via server-side Edge Function | `supabase.auth.admin.createUser()` returns `403 not_admin` from the browser. Move this call to a Supabase Edge Function. Do NOT fix by exposing the service role key in the browser. |
+| 2 | Lint cleanup | 206 errors, 42 warnings as of 2026-03-19. All pre-existing debt. Safe to defer but should be done before the codebase grows further. |
+| 3 | Validation-consumption cleanup | Two separate validation layers exist - cleanup deferred until after hardening work is complete. See project guide section 10. |
+
+---
+
+## Known Risks / Watch Items
+
+Things to be aware of when touching certain areas - not work items, just caution flags.
+
+- **`src/lib/memberAuth.ts` line 148** - constant condition `if (false && ...)` is dead code / disabled cache path. Low production risk but inspect before editing this file.
+- **Migration `20260313093000`** (designation master wrappers) - DB application was not explicitly confirmed during Session 48. Verify before hardening that domain further.
+- **`information_schema.routines`** - not queryable via the anon client in this workspace. Function existence must be proven via live RPC smoke, not metadata query.
 
 ---
 
 ## Next Recommended Action
 
-1. Start next stream: **fix the admin user creation path through a proper server-side route**
-   - investigate a Supabase Edge Function or equivalent server-side backend route
-   - move the `supabase.auth.admin.createUser()` step out of the browser
-   - preserve the new `_with_session` wrapper path for `user_roles` insert/update/delete
-2. Keep lint cleanup deferred unless the chosen slice directly requires a narrowly scoped lint fix
+When ready to resume work, pick the top item from **Deferred Work** above.
+Current top item: **Fix admin user creation via server-side Edge Function** (Deferred Work item 1).
 
 ---
 
 ## References
 
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
-- Latest deep handover: `docs/session_documents/session_48_phase1_runtime_verification_completion_and_next_stream_handover.md`
+- Latest deep handover: `docs/session_documents/session_49_dual_agent_setup_and_browser_side_hardening_completion.md`
 - Startup rules: `CLAUDE.md` (Claude Code) / `AGENTS.md` (Codex)
