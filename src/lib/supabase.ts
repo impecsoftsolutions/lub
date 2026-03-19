@@ -267,6 +267,11 @@ export const userRolesService = {
 
   async addUserRole(email: string, role: UserRole['role'], isMemberLinked: boolean): Promise<{ success: boolean; error?: string }> {
     try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
       // First, get or create the user
       const { data: userData, error: userError } = await supabase.auth.admin.createUser({
         email,
@@ -295,16 +300,20 @@ export const userRolesService = {
       }
 
       // Add the role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role,
-          is_member_linked: isMemberLinked
-        });
+      const { data, error: roleError } = await supabase.rpc('add_user_role_with_session', {
+        p_session_token: sessionToken,
+        p_user_id: userId,
+        p_role: role,
+        p_is_member_linked: isMemberLinked
+      });
 
       if (roleError) {
         return { success: false, error: roleError.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to add user role' };
       }
 
       return { success: true };
@@ -316,13 +325,24 @@ export const userRolesService = {
 
   async updateUserRole(roleId: string, updates: Partial<UserRole>): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('user_roles')
-        .update(updates)
-        .eq('id', roleId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_user_role_with_session', {
+        p_session_token: sessionToken,
+        p_role_id: roleId,
+        p_updates: updates
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update user role' };
       }
 
       return { success: true };
@@ -334,13 +354,23 @@ export const userRolesService = {
 
   async removeUserRole(roleId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('id', roleId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('remove_user_role_with_session', {
+        p_session_token: sessionToken,
+        p_role_id: roleId
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to remove user role' };
       }
 
       return { success: true };
@@ -990,18 +1020,29 @@ export const organizationProfileService = {
 
   async updateProfile(profile: Partial<OrganizationProfile>): Promise<OrganizationProfile | null> {
     try {
-      const { data, error } = await supabase
-        .from('organization_profile')
-        .upsert(profile)
-        .select()
-        .maybeSingle();
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        console.error('Error updating organization profile: User session not found');
+        return null;
+      }
+
+      const { data, error } = await supabase.rpc('update_organization_profile_with_session', {
+        p_session_token: sessionToken,
+        p_profile: profile
+      });
 
       if (error) {
         console.error('Error updating organization profile:', error);
         return null;
       }
 
-      return data;
+      const result = data as { success: boolean; error?: string; profile?: OrganizationProfile | null };
+      if (!result?.success) {
+        console.error('Error updating organization profile:', result?.error || 'RPC returned failure');
+        return null;
+      }
+
+      return result.profile ?? null;
     } catch (error) {
       console.error('Error updating organization profile:', error);
       return null;
@@ -2239,17 +2280,25 @@ export const directoryVisibilityService = {
     showToMembers: boolean
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('directory_field_visibility')
-        .update({
-          show_to_public: showToPublic,
-          show_to_members: showToMembers,
-          updated_at: new Date().toISOString()
-        })
-        .eq('field_name', fieldName);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_field_visibility_with_session', {
+        p_session_token: sessionToken,
+        p_field_name: fieldName,
+        p_show_to_public: showToPublic,
+        p_show_to_members: showToMembers
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update field visibility' };
       }
 
       return { success: true };
@@ -2263,22 +2312,23 @@ export const directoryVisibilityService = {
     updates: Array<{ field_name: string; show_to_public: boolean; show_to_members: boolean }>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const promises = updates.map(update =>
-        supabase
-          .from('directory_field_visibility')
-          .update({
-            show_to_public: update.show_to_public,
-            show_to_members: update.show_to_members,
-            updated_at: new Date().toISOString()
-          })
-          .eq('field_name', update.field_name)
-      );
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
 
-      const results = await Promise.all(promises);
-      const failed = results.find(r => r.error);
+      const { data, error } = await supabase.rpc('update_multiple_field_visibilities_with_session', {
+        p_session_token: sessionToken,
+        p_updates: updates
+      });
 
-      if (failed?.error) {
-        return { success: false, error: failed.error.message };
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update field visibilities' };
       }
 
       return { success: true };

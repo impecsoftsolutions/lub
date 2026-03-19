@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-03-19
-**Updated by:** Codex (admin state management hardening)
+**Last updated:** 2026-03-20
+**Updated by:** Codex (three-domain hardening stream)
 
 ---
 
@@ -17,7 +17,7 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-03-19) |
+| Build (`npm run build`) | PASS (2026-03-20) |
 | Lint (`npm run lint`) | FAIL - 206 errors, 42 warnings (2026-03-19, pre-existing debt, not introduced by Phase 1) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13) |
 
@@ -27,14 +27,9 @@ Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that 
 
 ## Active Stream
 
-**No active stream.** Admin state management hardening is complete.
+**No active stream.** Directory visibility, organization profile, and user role write-wrapper hardening are complete.
 
-Next recommended stream: **Audit remaining privileged admin write paths outside Phase 1 scope.**
-
-Leading candidates (in rough priority order):
-1. Admin user role management - `addUserRole`, `updateUserRole`, `removeUserRole`
-2. Admin directory visibility - `updateFieldVisibility`, `updateMultipleFieldVisibilities`
-3. Admin organization profile management
+Next recommended stream: **Investigate and fix the user creation path through a proper server-side route.**
 
 Assign exactly one domain to one agent per session. Update this section when a stream starts.
 
@@ -42,9 +37,9 @@ Assign exactly one domain to one agent per session. Update this section when a s
 
 ## Last Verified
 
-- **When:** 2026-03-19
-- **What:** Admin state management hardening verification
-- **Result:** Migration applied manually by Yogish, runtime add/toggle smoke passed, post-change build passed
+- **When:** 2026-03-20
+- **What:** Directory visibility, organization profile, and user role wrapper verification
+- **Result:** Domain 1 and 2 fully smoke-passed. Domain 3 wrappers were live-proven for add/update/remove, but the pre-existing browser-side `supabase.auth.admin.createUser()` step in `userRolesService.addUserRole()` still fails with `403 not_admin`.
 - **Command(s):**
   ```
   npm run build
@@ -54,7 +49,7 @@ Assign exactly one domain to one agent per session. Update this section when a s
 
 ## In Progress / Dirty State
 
-Phase 1 work and the shared-environment files are committed as the current baseline.
+Three-domain hardening changes are committed as the current baseline.
 
 Expected state after this checkpoint:
 - working tree clean before the next stream starts
@@ -72,17 +67,17 @@ If `git status` is dirty when the next stream begins:
 - Migration `20260313093000` (designation master wrappers): application to DB was not explicitly confirmed during Session 48. Verify before hardening that domain further.
 - Lint baseline is failing (206 errors, 42 warnings as of 2026-03-19). Mostly pre-existing no-explicit-any and unused-var debt. One item to watch: constant condition in `src/lib/memberAuth.ts` line 148 - inspect before touching that file.
 - Direct `information_schema.routines` verification is not available from the anon client used in this workspace. For state-management hardening, function existence was proven indirectly through successful live RPC calls to `upsert_state_with_session` and `update_state_active_status_with_session`.
+- `supabase.auth.admin.createUser()` in `userRolesService.addUserRole()` is a browser-side admin Auth API call returning `403 not_admin`. This is a pre-existing issue outside Domain 3 scope. Needs a server-side Edge Function or service-role backend route to fix. Do not attempt to fix by exposing the service role key in the browser.
 - Broader validation-consumption cleanup is deferred - do not start it until after the next privileged-write hardening slice is complete.
 
 ---
 
 ## Next Recommended Action
 
-1. Start next stream: **admin user role management hardening**
-   - Inspect `src/lib/supabase.ts` user-role mutation paths
-   - Inspect `src/pages/AdminUserManagement.tsx`
-   - Replace weaker browser-side privileged writes with server-authoritative wrappers
-   - Pay special attention to the current browser-side user creation path
+1. Start next stream: **fix the admin user creation path through a proper server-side route**
+   - investigate a Supabase Edge Function or equivalent server-side backend route
+   - move the `supabase.auth.admin.createUser()` step out of the browser
+   - preserve the new `_with_session` wrapper path for `user_roles` insert/update/delete
 2. Keep lint cleanup deferred unless the chosen slice directly requires a narrowly scoped lint fix
 
 ---
