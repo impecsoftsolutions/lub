@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-20
-**Updated by:** Claude Code (restructured open risks into deferred work + watch items)
+**Updated by:** Codex (role assignment UI stream)
 
 ---
 
@@ -29,7 +29,7 @@ Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that 
 
 **No active stream.** Browser-side hardening is fully complete.
 
-Next recommended stream: **Investigate and fix the user creation path through a proper server-side route.**
+Most recent completed stream: **Role assignment UI added to the routed Admin Users page using the existing hardened role wrappers.**
 
 Assign exactly one domain to one agent per session. Update this section when a stream starts.
 
@@ -38,10 +38,14 @@ Assign exactly one domain to one agent per session. Update this section when a s
 ## Last Verified
 
 - **When:** 2026-03-20
-- **What:** Directory visibility, organization profile, and user role wrapper verification
-- **Result:** Domain 1 and 2 fully smoke-passed. Domain 3 wrappers were live-proven for add/update/remove, but the pre-existing browser-side `supabase.auth.admin.createUser()` step in `userRolesService.addUserRole()` still fails with `403 not_admin`.
+- **What:** Routed Admin Users role assignment UI and hardened wrapper verification
+- **Result:** Live smoke passed end to end on `/admin/administration/users`. A signed-up user with no role was assigned `viewer`, changed to `editor`, and then returned to no role. All three wrappers returned HTTP 200 with `{ success: true }`:
+  - `add_user_role_with_session`
+  - `update_user_role_with_session`
+  - `remove_user_role_with_session`
 - **Command(s):**
   ```
+  live Playwright smoke against /admin/administration/users
   npm run build
   ```
 
@@ -66,11 +70,13 @@ If `git status` is dirty when the next stream begins:
 
 Planned items not yet started, in priority order. Remove an item from this list when it is done.
 
+Done this session:
+- Role assignment UI added to `src/pages/admin/AdminUsers.tsx` with `AssignRoleModal` and the existing hardened role wrappers. Admin user creation is now handled through Sign Up plus role assignment.
+
 | # | Item | Notes |
 |---|------|-------|
-| 1 | Fix admin user creation via server-side Edge Function | `supabase.auth.admin.createUser()` returns `403 not_admin` from the browser. Move this call to a Supabase Edge Function. Do NOT fix by exposing the service role key in the browser. |
-| 2 | Lint cleanup | 206 errors, 42 warnings as of 2026-03-19. All pre-existing debt. Safe to defer but should be done before the codebase grows further. |
-| 3 | Validation-consumption cleanup | Two separate validation layers exist - cleanup deferred until after hardening work is complete. See project guide section 10. |
+| 1 | Lint cleanup | 206 errors, 42 warnings as of 2026-03-19. All pre-existing debt. Safe to defer but should be done before the codebase grows further. |
+| 2 | Validation-consumption cleanup | Two separate validation layers exist - cleanup deferred until after hardening work is complete. See project guide section 10. |
 
 ---
 
@@ -87,7 +93,7 @@ Things to be aware of when touching certain areas - not work items, just caution
 ## Next Recommended Action
 
 When ready to resume work, pick the top item from **Deferred Work** above.
-Current top item: **Fix admin user creation via server-side Edge Function** (Deferred Work item 1).
+Current top item: **Lint cleanup** (Deferred Work item 1).
 
 ---
 

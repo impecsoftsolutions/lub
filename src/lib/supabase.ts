@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sessionManager } from './sessionManager';
+import { normalizeEmail } from './credentialValidation';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -272,37 +273,31 @@ export const userRolesService = {
         return { success: false, error: 'User session not found. Please log in again.' };
       }
 
-      // First, get or create the user
-      const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-        email,
-        email_confirm: true
-      });
-
-      let userId: string;
-      
-      if (userError && userError.message.includes('already registered')) {
-        // User exists, get their ID
-        const { data: existingUser, error: fetchError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (fetchError || !existingUser) {
-          return { success: false, error: 'User exists but could not fetch user ID' };
-        }
-
-        userId = existingUser.id;
-      } else if (userError) {
-        return { success: false, error: userError.message };
-      } else {
-        userId = userData.user.id;
+      const normalizedEmail = normalizeEmail(email);
+      if (!normalizedEmail) {
+        return { success: false, error: 'Please enter a valid email address.' };
       }
 
-      // Add the role
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (fetchError) {
+        return { success: false, error: fetchError.message };
+      }
+
+      if (!existingUser) {
+        return {
+          success: false,
+          error: 'User must sign up first before an admin role can be assigned.'
+        };
+      }
+
       const { data, error: roleError } = await supabase.rpc('add_user_role_with_session', {
         p_session_token: sessionToken,
-        p_user_id: userId,
+        p_user_id: existingUser.id,
         p_role: role,
         p_is_member_linked: isMemberLinked
       });

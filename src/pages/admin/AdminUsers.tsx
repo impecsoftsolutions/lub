@@ -8,12 +8,14 @@ import { useHasPermission } from '../../hooks/usePermissions';
 import EditUserModal from '../../components/admin/modals/EditUserModal';
 import DeleteUserModal from '../../components/admin/modals/DeleteUserModal';
 import BlockUserModal from '../../components/admin/modals/BlockUserModal';
+import AssignRoleModal from '../../components/admin/modals/AssignRoleModal';
 
 interface UserRole {
   id: string;
   role: string;
   state: string | null;
   district: string | null;
+  is_member_linked?: boolean;
 }
 
 interface User {
@@ -49,6 +51,7 @@ const AdminUsers: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [assignRoleModalOpen, setAssignRoleModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [blockAction, setBlockAction] = useState<'block' | 'unblock'>('block');
 
@@ -65,6 +68,7 @@ const AdminUsers: React.FC = () => {
   const canEdit = useHasPermission('users.edit');
   const canDelete = useHasPermission('users.delete');
   const canBlock = useHasPermission('users.edit');
+  const canAssignRoles = useHasPermission('users.roles.assign');
 
   const loadUsers = async () => {
     try {
@@ -109,7 +113,8 @@ const AdminUsers: React.FC = () => {
             id: r.id,
             role: r.role,
             state: r.state,
-            district: r.district
+            district: r.district,
+            is_member_linked: false
           }))
         };
       });
@@ -140,8 +145,18 @@ const AdminUsers: React.FC = () => {
     setBlockModalOpen(true);
   };
 
+  const handleAssignRoleClick = (user: any) => {
+    setSelectedUser(user);
+    setAssignRoleModalOpen(true);
+  };
+
   const handleModalSuccess = () => {
     loadUsers();
+  };
+
+  const handleAssignRoleSuccess = async (message: string) => {
+    await loadUsers();
+    showToast('success', message);
   };
 
   const filterUsers = () => {
@@ -205,6 +220,9 @@ const AdminUsers: React.FC = () => {
   const formatRoleName = (role: string): string => {
     const roleNames: Record<string, string> = {
       'super_admin': 'Super Admin',
+      'admin': 'Admin',
+      'editor': 'Editor',
+      'viewer': 'Viewer',
       'state_president': 'State President',
       'state_general_secretary': 'State General Secretary',
       'district_president': 'District President',
@@ -423,6 +441,9 @@ const AdminUsers: React.FC = () => {
                         Created Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -462,8 +483,34 @@ const AdminUsers: React.FC = () => {
                             </span>
                           </div>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {user.roles.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {user.roles.map((role) => (
+                                <span
+                                  key={role.id}
+                                  className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
+                                >
+                                  {formatRoleName(role.role)}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-500">No role assigned</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex gap-3 items-center">
+                            {canAssignRoles && (
+                              <button
+                                onClick={() => handleAssignRoleClick(user)}
+                                className="text-indigo-600 hover:text-indigo-900"
+                                title={user.roles.length > 0 ? 'Assign or change role' : 'Assign role'}
+                              >
+                                {user.roles.length > 0 ? 'Change Role' : 'Assign Role'}
+                              </button>
+                            )}
+
                             {canEdit && (
                               <button
                                 onClick={() => handleEditClick(user)}
@@ -530,6 +577,13 @@ const AdminUsers: React.FC = () => {
             user={selectedUser}
             action={blockAction}
             onSuccess={handleModalSuccess}
+          />
+          <AssignRoleModal
+            isOpen={assignRoleModalOpen}
+            onClose={() => setAssignRoleModalOpen(false)}
+            user={selectedUser}
+            currentRole={selectedUser?.roles?.[0] || null}
+            onSuccess={handleAssignRoleSuccess}
           />
         </>
       )}
