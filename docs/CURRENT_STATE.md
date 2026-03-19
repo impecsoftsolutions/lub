@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-19
-**Updated by:** Codex (baseline commit)
+**Updated by:** Codex (baseline verification)
 
 ---
 
@@ -17,8 +17,8 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | Last known: passing at Session 48 |
-| Lint (`npm run lint`) | Not re-verified in Session 48 - re-run before next stream |
+| Build (`npm run build`) | PASS (2026-03-19) |
+| Lint (`npm run lint`) | FAIL - 206 errors, 42 warnings (2026-03-19, pre-existing debt, not introduced by Phase 1) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13) |
 
 Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that break it.
@@ -71,7 +71,7 @@ If `git status` is dirty when the next stream begins:
 ## Open Risks / Open Questions
 
 - Migration `20260313093000` (designation master wrappers): application to DB was not explicitly confirmed during Session 48. Verify before hardening that domain further.
-- Lint status is unconfirmed - run `npm run lint` at start of next stream before touching any files.
+- Lint baseline is failing (206 errors, 42 warnings as of 2026-03-19). Mostly pre-existing no-explicit-any and unused-var debt. One item to watch: constant condition in `src/lib/memberAuth.ts` line 148 - inspect before touching that file.
 - Broader validation-consumption cleanup is deferred - do not start it until after the next privileged-write hardening slice is complete.
 
 ---
