@@ -2605,63 +2605,6 @@ export interface AuditHistoryEntry {
 }
 
 export const memberAuditService = {
-  async logFieldChange(
-    memberId: string,
-    fieldName: string,
-    oldValue: string,
-    newValue: string,
-    changedBy: string
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { error } = await supabase
-        .from('member_audit_history')
-        .insert({
-          member_id: memberId,
-          action_type: 'update',
-          field_name: fieldName,
-          old_value: oldValue,
-          new_value: newValue,
-          changed_by: changedBy
-        });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error logging field change:', error);
-      return { success: false, error: 'An unexpected error occurred' };
-    }
-  },
-
-  async logAction(
-    memberId: string,
-    actionType: 'status_change' | 'deactivate' | 'activate' | 'delete' | 'restore' | 'create',
-    changedBy: string,
-    reason?: string
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { error } = await supabase
-        .from('member_audit_history')
-        .insert({
-          member_id: memberId,
-          action_type: actionType,
-          changed_by: changedBy,
-          change_reason: reason
-        });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error logging action:', error);
-      return { success: false, error: 'An unexpected error occurred' };
-    }
-  },
-
   async getMemberAuditHistory(memberId: string): Promise<AuditHistoryEntry[]> {
     try {
       const { data, error } = await supabase

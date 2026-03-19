@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-20
-**Updated by:** Codex (three-domain hardening stream)
+**Updated by:** Codex (final browser-side hardening cleanup)
 
 ---
 
@@ -27,7 +27,7 @@ Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that 
 
 ## Active Stream
 
-**No active stream.** Directory visibility, organization profile, and user role write-wrapper hardening are complete.
+**No active stream.** Browser-side hardening is fully complete.
 
 Next recommended stream: **Investigate and fix the user creation path through a proper server-side route.**
 
