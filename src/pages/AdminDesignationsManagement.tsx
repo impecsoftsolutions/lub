@@ -221,21 +221,7 @@ const AdminDesignationsManagement: React.FC = () => {
   const loadMemberAssignments = async () => {
     try {
       setIsLoadingAssignments(true);
-
-      const sessionManager = await import('../lib/sessionManager');
-      const userData = sessionManager.sessionManager.getUserData();
-      const requestingUserId = userData?.id;
-
-      if (!requestingUserId) {
-        console.error('[AdminDesignationsManagement] Cannot load assignments: No user ID');
-        showToast('error', 'Session expired. Please log in again.');
-        setIsLoadingAssignments(false);
-        return;
-      }
-
-      const assignments = await memberLubRolesService.getAllAssignments({
-        requestingUserId
-      });
+      const assignments = await memberLubRolesService.getAllAssignments({ search: searchTermAssignments || undefined });
 
       setMemberAssignments(assignments);
       console.log(`[AdminDesignationsManagement] Loaded ${assignments.length} member role assignments`);
@@ -532,24 +518,10 @@ const AdminDesignationsManagement: React.FC = () => {
         name: r.role_name
       })));
 
-      // Get user ID from session
-      const sessionManager = await import('../lib/sessionManager');
-      const userData = sessionManager.sessionManager.getUserData();
-      const requestingUserId = userData?.id;
-
-      if (!requestingUserId) {
-        console.error('[RolesMaster] Cannot reorder roles: No user ID');
-        showToast('error', 'Session expired. Please log in again.');
-        setIsReordering(false);
-        setDraggedRole(null);
-        return;
-      }
-
       // Extract role IDs in new order
       const roleIdsInOrder = reorderedRoles.map(r => r.id);
 
       const result = await lubRolesService.reorderRoles({
-        requestingUserId,
         roleIdsInOrder
       });
 
@@ -616,18 +588,12 @@ const AdminDesignationsManagement: React.FC = () => {
     try {
       setIsSavingAssignment(true);
 
-      // Get current user ID from session
-      const sessionManager = await import('../lib/sessionManager');
-      const userData = sessionManager.sessionManager.getUserData();
-      const requesting_user_id = userData?.id;
-
       const result = await memberLubRolesService.createAssignment({
         member_id: assignmentForm.member_id,
         role_id: assignmentForm.role_id,
         level: assignmentForm.level,
         state: assignmentForm.state || undefined,
         district: assignmentForm.district || undefined,
-        requesting_user_id,
         committee_year: assignmentForm.committee_year,
         role_start_date: assignmentForm.role_start_date || null,
         role_end_date: assignmentForm.role_end_date || null
@@ -689,19 +655,7 @@ const AdminDesignationsManagement: React.FC = () => {
     try {
       setIsSavingAssignment(true);
 
-      const sessionManager = await import('../lib/sessionManager');
-      const userData = sessionManager.sessionManager.getUserData();
-      const requestingUserId = userData?.id;
-
-      if (!requestingUserId) {
-        console.error('[AdminDesignationsManagement] Cannot update assignment: No user ID');
-        showToast('error', 'Session expired. Please log in again.');
-        setIsSavingAssignment(false);
-        return;
-      }
-
       const result = await memberLubRolesService.updateAssignment({
-        requestingUserId,
         id: editingAssignment.id,
         role_id: assignmentForm.role_id,
         level: assignmentForm.level,
@@ -733,18 +687,7 @@ const AdminDesignationsManagement: React.FC = () => {
     if (!confirm('Are you sure you want to delete this member role assignment?')) return;
 
     try {
-      const sessionManager = await import('../lib/sessionManager');
-      const userData = sessionManager.sessionManager.getUserData();
-      const requestingUserId = userData?.id;
-
-      if (!requestingUserId) {
-        console.error('[AdminDesignationsManagement] Cannot delete assignment: No user ID');
-        showToast('error', 'Session expired. Please log in again.');
-        return;
-      }
-
       const result = await memberLubRolesService.deleteAssignment({
-        requestingUserId,
         assignmentId
       });
 

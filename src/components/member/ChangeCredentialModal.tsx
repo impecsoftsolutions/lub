@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Phone, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { changeEmail, changeMobile } from '../../lib/memberCredentialService';
 import { useValidation } from '../../hooks/useValidation';
+import {
+  AUTH_VALIDATION_MESSAGES,
+  normalizeEmail,
+  normalizeMobileNumber,
+  validateEmailInput,
+  validateMobileNumberInput
+} from '../../lib/credentialValidation';
 
 interface ChangeCredentialModalProps {
   isOpen: boolean;
@@ -67,9 +74,18 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
   };
 
   const handleSave = async () => {
-    // Validate not empty
-    if (!newValue || newValue.trim() === '') {
-      setError(isEmail ? 'Email address is required' : 'Mobile number is required');
+    const normalizedValue = isEmail
+      ? normalizeEmail(newValue)
+      : normalizeMobileNumber(newValue).slice(0, 10);
+
+    const localValidationError = isEmail
+      ? validateEmailInput(normalizedValue)
+      : validateMobileNumberInput(normalizedValue, {
+          invalidMessage: AUTH_VALIDATION_MESSAGES.mobileInvalidStrict
+        });
+
+    if (localValidationError) {
+      setError(localValidationError);
       return;
     }
 
@@ -79,9 +95,9 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
     try {
       let result;
       if (isEmail) {
-        result = await changeEmail(newValue.trim());
+        result = await changeEmail(normalizedValue);
       } else {
-        result = await changeMobile(newValue.trim());
+        result = await changeMobile(normalizedValue);
       }
 
       if (result.success) {
@@ -178,20 +194,25 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
               type={isEmail ? 'email' : 'text'}
               value={newValue}
               onChange={async (e) => {
-                let inputValue = e.target.value;
-
-                // For mobile: strip non-numeric characters and limit to 10 digits
-                if (!isEmail) {
-                  inputValue = inputValue.replace(/\D/g, '').slice(0, 10);
-                }
+                const inputValue = isEmail
+                  ? normalizeEmail(e.target.value)
+                  : normalizeMobileNumber(e.target.value).slice(0, 10);
 
                 setNewValue(inputValue);
                 if (error) setError('');
 
-                // Validate the input
                 if (inputValue.trim() === '') {
                   setValidationError('');
                 } else {
+                  const localValidationError = isEmail
+                    ? validateEmailInput(inputValue)
+                    : validateMobileNumberInput(inputValue);
+
+                  if (localValidationError) {
+                    setValidationError(localValidationError);
+                    return;
+                  }
+
                   const ruleName = isEmail ? 'email' : 'mobile_number';
                   const result = await validateField(ruleName, inputValue);
                   setValidationError(result.isValid ? '' : (result.message || 'Invalid value'));

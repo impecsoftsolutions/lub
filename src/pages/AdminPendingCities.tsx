@@ -1,21 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { GitMerge, AlertCircle, MapPin, Lock } from 'lucide-react';
-import { adminCitiesService, locationsService, CityOption } from '../lib/supabase';
+import {
+  adminCitiesService,
+  locationsService,
+  CityOption,
+  PendingCityAssociationRecord,
+  PendingCityListItem
+} from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
-interface PendingCustomCity {
-  key: string;
-  other_city_name_normalized: string;
-  other_city_name_display: string;
-  state_name: string;
-  district_name: string;
-  state_id: string | null;
-  district_id: string | null;
-  registrations_count: number;
-  latest_created_at: string | null;
-}
+interface PendingCustomCity extends PendingCityListItem {}
 
 export default function AdminPendingCities() {
   const canApprovePending = useHasPermission('locations.cities.approve_pending');
@@ -25,8 +21,14 @@ export default function AdminPendingCities() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedPending, setSelectedPending] = useState<PendingCustomCity | null>(null);
   const [selectedApprovedCityId, setSelectedApprovedCityId] = useState('');
+  const [finalCityName, setFinalCityName] = useState('');
   const [isLoadingApprovedCities, setIsLoadingApprovedCities] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
+  const [showAssociationsModal, setShowAssociationsModal] = useState(false);
+  const [associations, setAssociations] = useState<PendingCityAssociationRecord[]>([]);
+  const [isLoadingAssociations, setIsLoadingAssociations] = useState(false);
+  const [associationsError, setAssociationsError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -52,7 +54,7 @@ export default function AdminPendingCities() {
         return;
       }
 
-      setPendingCities(result.items || []);
+      setPendingCities((result.items || []) as PendingCustomCity[]);
     } catch (error) {
       console.error('Error fetching data:', error);
       setPendingError('Failed to load pending cities');
@@ -74,9 +76,10 @@ export default function AdminPendingCities() {
     }
   }
 
-  async function handleAssign() {
-    if (!selectedPending || !selectedApprovedCityId) {
-      alert('Please select an approved city');
+  async function openAssociationsModal(city: PendingCustomCity) {
+    const pendingCityId = city.pending_city_id;
+    if (!pendingCityId) {
+      alert('This pending city item cannot be resolved because it has no durable ID.');
       return;
     }
 
@@ -86,23 +89,86 @@ export default function AdminPendingCities() {
       return;
     }
 
-    const result = await adminCitiesService.assignCustomCity(
-      sessionToken,
-      selectedPending.state_name,
-      selectedPending.district_name,
-      selectedPending.other_city_name_normalized,
-      selectedApprovedCityId
-    );
+    setAssociations([]);
+    setAssociationsError(null);
+    setIsLoadingAssociations(true);
+    setSelectedPending(city);
+    setShowAssociationsModal(true);
 
-    if (!result.success) {
-      alert('Error assigning city: ' + (result.error || 'Unknown error'));
+    try {
+      const result = await adminCitiesService.getPendingCityAssociations(sessionToken, pendingCityId);
+      if (!result.success) {
+        setAssociationsError(result.error || 'Failed to load associated records');
+        return;
+      }
+
+      setAssociations(result.items || []);
+    } catch (error) {
+      console.error('Error loading pending city associations:', error);
+      setAssociationsError('Failed to load associated records');
+    } finally {
+      setIsLoadingAssociations(false);
+    }
+  }
+
+  function openResolveModal(city: PendingCustomCity) {
+    setSelectedPending(city);
+    setSelectedApprovedCityId('');
+    setFinalCityName(city.other_city_name_display || '');
+    setShowAssignModal(true);
+
+    if (city.district_id) {
+      loadApprovedCities(city.district_id);
+    } else {
+      setApprovedCities([]);
+    }
+  }
+
+  async function handleAssign() {
+    const pendingCityId = selectedPending?.pending_city_id;
+    if (!selectedPending || !pendingCityId) {
+      alert('Pending city identifier is missing.');
       return;
     }
+
+    const trimmedFinalCityName = finalCityName.trim();
+    if (!trimmedFinalCityName) {
+      alert('Please enter the final city name');
+      return;
+    }
+
+    const sessionToken = getSessionToken();
+    if (!sessionToken) {
+      alert('User session not found. Please log in again.');
+      return;
+    }
+
+    setIsResolving(true);
+    const result = await adminCitiesService.resolvePendingCity(sessionToken, pendingCityId, trimmedFinalCityName);
+    setIsResolving(false);
+
+    if (!result.success) {
+      alert('Error resolving city: ' + (result.error || 'Unknown error'));
+      return;
+    }
+
+    alert(
+      `Pending city resolved successfully.\nAssigned city: ${result.assignedCityName || trimmedFinalCityName}\nUpdated records: ${result.updatedCount || 0}`
+    );
 
     setShowAssignModal(false);
     setSelectedPending(null);
     setSelectedApprovedCityId('');
+    setFinalCityName('');
     await fetchData();
+  }
+
+  function handleApprovedCitySelection(approvedCityId: string) {
+    setSelectedApprovedCityId(approvedCityId);
+    const selectedCity = approvedCities.find((item) => item.city_id === approvedCityId);
+    if (selectedCity) {
+      setFinalCityName(selectedCity.city_name);
+    }
   }
 
   return (
@@ -180,7 +246,7 @@ export default function AdminPendingCities() {
                         </div>
                         <div>
                           <span className="font-medium">Registrations:</span>{' '}
-                          {city.registrations_count}
+                          {city.associated_records_count ?? city.registrations_count}
                         </div>
                         <div>
                           <span className="font-medium">Latest:</span>{' '}
@@ -204,31 +270,90 @@ export default function AdminPendingCities() {
                   {canApprovePending && (
                     <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
                       <button
-                        onClick={() => {
-                          setSelectedPending(city);
-                          setSelectedApprovedCityId('');
-                          setShowAssignModal(true);
-                          if (city.district_id) {
-                            loadApprovedCities(city.district_id);
-                          } else {
-                            setApprovedCities([]);
-                          }
-                        }}
-                        disabled={!canAssign}
+                        onClick={() => openAssociationsModal(city)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                      >
+                        View Associated Records
+                      </button>
+                      <button
+                        onClick={() => openResolveModal(city)}
+                        disabled={!canAssign || !city.pending_city_id}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                          canAssign
+                          canAssign && city.pending_city_id
                             ? 'bg-amber-600 text-white hover:bg-amber-700'
                             : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                         }`}
                       >
                         <GitMerge className="w-4 h-4" />
-                        Assign Approved City
+                        Edit + Add/Assign
                       </button>
                     </div>
                   )}
                 </div>
               );
             })}
+          </div>
+        )}
+        {showAssociationsModal && selectedPending && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Associated Records</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Pending city: "{selectedPending.other_city_name_display}"
+                  </p>
+                </div>
+              </div>
+              <div className="px-6 py-4 max-h-[60vh] overflow-auto">
+                {isLoadingAssociations ? (
+                  <p className="text-gray-600">Loading associated records...</p>
+                ) : associationsError ? (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    {associationsError}
+                  </div>
+                ) : associations.length === 0 ? (
+                  <p className="text-gray-600">No linked registrations found.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Registration ID</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {associations.map((record) => (
+                          <tr key={record.registration_id}>
+                            <td className="px-3 py-2 text-xs text-gray-700">{record.registration_id}</td>
+                            <td className="px-3 py-2 text-sm text-gray-700">{record.email || 'N/A'}</td>
+                            <td className="px-3 py-2 text-sm text-gray-700">{record.mobile_number || 'N/A'}</td>
+                            <td className="px-3 py-2 text-sm text-gray-700">{record.company_name || 'N/A'}</td>
+                            <td className="px-3 py-2 text-sm text-gray-700">{record.status || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
+                <button
+                  onClick={() => {
+                    setShowAssociationsModal(false);
+                    setAssociations([]);
+                    setAssociationsError(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
         {showAssignModal && selectedPending && canApprovePending && (
@@ -239,19 +364,34 @@ export default function AdminPendingCities() {
               </div>
               <div className="px-6 py-4 space-y-4">
                 <p className="text-sm text-gray-600">
-                  Assign an approved city for "{selectedPending.other_city_name_display}":
+                  Edit and resolve "{selectedPending.other_city_name_display}" into an approved city:
                 </p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Approved City *
+                    Final City Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={finalCityName}
+                    onChange={(e) => setFinalCityName(e.target.value)}
+                    placeholder="Enter final city name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    If this matches an existing approved city in the same district, it will be assigned. Otherwise a new approved city will be created.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Existing Approved City (Optional)
                   </label>
                   <select
                     value={selectedApprovedCityId}
-                    onChange={(e) => setSelectedApprovedCityId(e.target.value)}
+                    onChange={(e) => handleApprovedCitySelection(e.target.value)}
                     disabled={isLoadingApprovedCities}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">{isLoadingApprovedCities ? 'Loading...' : 'Choose a city...'}</option>
+                    <option value="">{isLoadingApprovedCities ? 'Loading...' : 'Choose a city to autofill...'}</option>
                     {approvedCities.map((city) => (
                       <option key={city.city_id} value={city.city_id}>
                         {city.city_name}
@@ -272,6 +412,7 @@ export default function AdminPendingCities() {
                     setShowAssignModal(false);
                     setSelectedPending(null);
                     setSelectedApprovedCityId('');
+                    setFinalCityName('');
                   }}
                   className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
@@ -279,10 +420,10 @@ export default function AdminPendingCities() {
                 </button>
                 <button
                   onClick={handleAssign}
-                  disabled={!selectedApprovedCityId}
+                  disabled={!finalCityName.trim() || isResolving}
                   className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Assign City
+                  {isResolving ? 'Resolving...' : 'Assign City'}
                 </button>
               </div>
             </div>

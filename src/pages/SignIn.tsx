@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, AlertCircle, Loader2, LogIn } from 'lucide-react';
-import { customAuth, isEmail, isMobileNumber, normalizeEmail, normalizeMobileNumber } from '../lib/customAuth';
+import { customAuth } from '../lib/customAuth';
+import {
+  AUTH_VALIDATION_MESSAGES,
+  normalizeEmail,
+  normalizeMobileNumber,
+  validateEmailInput,
+  validateMobileNumberInput
+} from '../lib/credentialValidation';
 import { sessionManager } from '../lib/sessionManager';
 import { AuthErrorCode } from '../types/auth.types';
 import Toast from '../components/Toast';
@@ -36,7 +43,7 @@ const SignIn: React.FC = () => {
     let processedValue = value;
 
     if (name === 'email') {
-      processedValue = value.toLowerCase();
+      processedValue = normalizeEmail(value);
     }
 
     if (name === 'mobile_number') {
@@ -82,16 +89,16 @@ const SignIn: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.email) {
-      newErrors.email = 'Email address is required';
-    } else if (!isEmail(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    const emailError = validateEmailInput(formData.email);
+    if (emailError) {
+      newErrors.email = emailError;
     }
 
-    if (!formData.mobile_number) {
-      newErrors.mobile_number = 'Mobile number is required';
-    } else if (!isMobileNumber(formData.mobile_number)) {
-      newErrors.mobile_number = 'Please enter a valid 10-digit mobile number';
+    const mobileError = validateMobileNumberInput(formData.mobile_number, {
+      invalidMessage: AUTH_VALIDATION_MESSAGES.mobileInvalid
+    });
+    if (mobileError) {
+      newErrors.mobile_number = mobileError;
     }
 
     if (Object.keys(newErrors).length > 0) {

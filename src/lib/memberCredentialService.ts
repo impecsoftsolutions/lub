@@ -1,23 +1,17 @@
 import { supabase } from './supabase';
 import { sessionManager } from './sessionManager';
-import { normalizeEmail, normalizeMobileNumber } from './customAuth';
+import {
+  AUTH_VALIDATION_MESSAGES,
+  normalizeEmail,
+  normalizeMobileNumber,
+  validateEmailInput,
+  validateMobileNumberInput
+} from './credentialValidation';
 
 /**
  * Service for handling immediate member credential changes (email and mobile)
  * Changes take effect immediately without admin approval, similar to password changes
  */
-
-// Validation helpers
-const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const isValidMobile = (mobile: string): boolean => {
-  // 10 digits, starts with non-zero
-  const mobileRegex = /^[1-9]\d{9}$/;
-  return mobileRegex.test(mobile);
-};
 
 /**
  * Change user's email address immediately (no admin approval needed)
@@ -35,10 +29,10 @@ export async function changeEmail(newEmail: string): Promise<{ success: boolean;
     }
 
     const trimmedEmail = normalizeEmail(newEmail);
-
-    if (!isValidEmail(trimmedEmail)) {
+    const emailError = validateEmailInput(trimmedEmail);
+    if (emailError) {
       console.error('[memberCredentialService.changeEmail] Invalid email format');
-      return { success: false, error: 'Please enter a valid email address' };
+      return { success: false, error: emailError };
     }
 
     // STEP 2: Get current user from session
@@ -129,10 +123,12 @@ export async function changeMobile(newMobile: string): Promise<{ success: boolea
     }
 
     const trimmedMobile = normalizeMobileNumber(newMobile);
-
-    if (!isValidMobile(trimmedMobile)) {
+    const mobileError = validateMobileNumberInput(trimmedMobile, {
+      invalidMessage: AUTH_VALIDATION_MESSAGES.mobileInvalidStrict
+    });
+    if (mobileError) {
       console.error('[memberCredentialService.changeMobile] Invalid mobile format');
-      return { success: false, error: 'Please enter a valid 10-digit mobile number starting with a non-zero digit' };
+      return { success: false, error: mobileError };
     }
 
     // STEP 2: Get current user from session

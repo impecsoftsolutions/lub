@@ -11,28 +11,21 @@ import {
 import { permissionService } from './permissionService';
 import type { ExtendedUser } from '../types/permissions';
 import type { UserRole } from './supabase';
-
-export const isEmail = (input: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(input.trim());
-};
-
-export const normalizeEmail = (input: string): string => input.trim().toLowerCase();
-
-export const normalizeMobileNumber = (input: string): string => {
-  let digitsOnly = input.replace(/\D/g, '');
-
-  if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
-    digitsOnly = digitsOnly.slice(1);
-  }
-
-  return digitsOnly;
-};
-
-export const isMobileNumber = (input: string): boolean => {
-  const mobileRegex = /^[1-9][0-9]{9}$/;
-  return mobileRegex.test(normalizeMobileNumber(input));
-};
+export {
+  AUTH_VALIDATION_MESSAGES,
+  isEmail,
+  isMobileNumber,
+  normalizeEmail,
+  normalizeMobileNumber,
+  validateEmailInput,
+  validateMobileNumberInput
+} from './credentialValidation';
+import {
+  isEmail,
+  isMobileNumber,
+  normalizeEmail,
+  normalizeMobileNumber
+} from './credentialValidation';
 
 const mapAuthErrorCode = (value?: string): AuthErrorCode | undefined => {
   if (!value) {

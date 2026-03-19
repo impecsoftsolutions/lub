@@ -1,0 +1,39 @@
+{
+  "registrations": {
+    "approve_target_email": "pending-approve@example.invalid",
+    "reject_target_email": "pending-reject@example.invalid",
+    "delete_target_email": "pending-delete@example.invalid",
+    "toggle_target_email": "approved-toggle@example.invalid",
+    "edit_target_email": "approved-edit@example.invalid"
+  },
+  "deleted_members": {
+    "restore_target_email": "deleted-restore@example.invalid"
+  },
+  "users": {
+    "general_user_delete_email": "general-delete@example.invalid",
+    "general_user_block_email": "general-block@example.invalid",
+    "non_general_user_delete_email": "protected-user@example.invalid",
+    "editable_user_email": "editable-user@example.invalid"
+  },
+  "locations": {
+    "state_name": "ExampleState",
+    "pending_city_name": "example-pending-city",
+    "approved_city_name_for_assignment": "Example Approved City",
+    "city_add_name_prefix": "smoke-city-",
+    "district_add_name_prefix": "smoke-district-",
+    "district_with_cities_name": "Example District With Cities",
+    "district_without_cities_name": "Example District Without Cities"
+  },
+  "validation": {
+    "rule_name_prefix": "smoke-rule-",
+    "move_target_category": "Example Category"
+  },
+  "payment": {
+    "edit_state": "ExampleExistingState",
+    "create_state": "ExampleNewState",
+    "qr_file_path": "__LOCAL_QR_FILE_PATH__"
+  },
+  "forms": {
+    "field_name": "example_field_name"
+  }
+}

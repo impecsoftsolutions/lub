@@ -80,12 +80,7 @@ const MemberEditProfile: React.FC = () => {
   const navigate = useNavigate();
   const { member, isAuthenticated, isLoading, refreshMember } = useMember();
   const {
-    isValidEmail,
-    isValidMobile,
-    isValidPIN,
-    isValidGST,
-    isValidPAN,
-    isValidWebsite
+    validateField: validateFieldByRule
   } = useValidation();
   const { isFieldRequired, isLoading: isLoadingConfig } = useFormFieldConfig();
 
@@ -692,33 +687,29 @@ const MemberEditProfile: React.FC = () => {
       newErrors.epf_registered = 'EPF registration status is required';
     }
 
-    // Format validation using validation service
-    if (formData.email.trim() && !(await isValidEmail(formData.email))) {
-      newErrors.email = 'Invalid email format';
-    }
+    const formatValidatedFields: Array<{
+      fieldName: 'email' | 'mobile_number' | 'alternate_mobile' | 'pin_code' | 'gst_number' | 'pan_company' | 'website';
+      value: string;
+      errorKey?: string;
+    }> = [
+      { fieldName: 'email', value: formData.email },
+      { fieldName: 'mobile_number', value: formData.mobile_number },
+      { fieldName: 'alternate_mobile', value: formData.alternate_mobile },
+      { fieldName: 'pin_code', value: formData.pin_code },
+      { fieldName: 'gst_number', value: formData.gst_number },
+      { fieldName: 'pan_company', value: formData.pan_company },
+      { fieldName: 'website', value: formData.website }
+    ];
 
-    if (formData.mobile_number.trim() && !(await isValidMobile(formData.mobile_number))) {
-      newErrors.mobile_number = 'Mobile number must be exactly 10 digits';
-    }
+    for (const { fieldName, value, errorKey } of formatValidatedFields) {
+      if (!value.trim()) {
+        continue;
+      }
 
-    if (formData.alternate_mobile.trim() && !(await isValidMobile(formData.alternate_mobile))) {
-      newErrors.alternate_mobile = 'Alternate mobile must be exactly 10 digits';
-    }
-
-    if (formData.pin_code.trim() && !(await isValidPIN(formData.pin_code))) {
-      newErrors.pin_code = 'PIN code must be exactly 6 digits';
-    }
-
-    if (formData.gst_number.trim() && !(await isValidGST(formData.gst_number))) {
-      newErrors.gst_number = 'Invalid GST number format';
-    }
-
-    if (formData.pan_company.trim() && !(await isValidPAN(formData.pan_company))) {
-      newErrors.pan_company = 'Invalid PAN format';
-    }
-
-    if (formData.website.trim() && !(await isValidWebsite(formData.website))) {
-      newErrors.website = 'Invalid website URL';
+      const validationResult = await validateFieldByRule(fieldName, value);
+      if (!validationResult.isValid) {
+        newErrors[errorKey ?? fieldName] = validationResult.message || 'Invalid value';
+      }
     }
 
     setErrors(newErrors);

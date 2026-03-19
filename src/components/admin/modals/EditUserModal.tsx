@@ -3,6 +3,12 @@ import { X, Mail, Phone, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabase';
 import { useValidation } from '../../../hooks/useValidation';
 import { sessionManager } from '../../../lib/sessionManager';
+import {
+  normalizeEmail,
+  normalizeMobileNumber,
+  validateEmailInput,
+  validateMobileNumberInput
+} from '../../../lib/credentialValidation';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -48,9 +54,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const processedValue = name === 'email'
+      ? normalizeEmail(value)
+      : normalizeMobileNumber(value).slice(0, 10);
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: processedValue
     }));
     setError('');
     setValidationErrors(prev => ({
@@ -60,12 +70,18 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   };
 
   const handleBlur = async (fieldName: 'email' | 'mobile_number') => {
-    const value = formData[fieldName];
+    const value = fieldName === 'email'
+      ? normalizeEmail(formData[fieldName])
+      : normalizeMobileNumber(formData[fieldName]).slice(0, 10);
 
-    if (!value) {
+    const localValidationError = fieldName === 'email'
+      ? validateEmailInput(value)
+      : validateMobileNumberInput(value);
+
+    if (localValidationError) {
       setValidationErrors(prev => ({
         ...prev,
-        [fieldName]: `${fieldName === 'email' ? 'Email' : 'Mobile number'} is required`
+        [fieldName]: localValidationError
       }));
       return;
     }
@@ -81,25 +97,36 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   };
 
   const validateForm = async (): Promise<boolean> => {
-    const emailResult = await validateField('email', formData.email);
-    if (!emailResult.isValid) {
-      setValidationErrors(prev => ({
-        ...prev,
-        email: emailResult.message || 'Invalid email'
-      }));
-      return false;
+    const nextErrors = {
+      email: '',
+      mobile_number: ''
+    };
+
+    const normalizedEmailValue = normalizeEmail(formData.email);
+    const normalizedMobileValue = normalizeMobileNumber(formData.mobile_number).slice(0, 10);
+
+    const emailLocalError = validateEmailInput(normalizedEmailValue);
+    if (emailLocalError) {
+      nextErrors.email = emailLocalError;
+    } else {
+      const emailResult = await validateField('email', normalizedEmailValue);
+      if (!emailResult.isValid) {
+        nextErrors.email = emailResult.message || 'Invalid email';
+      }
     }
 
-    const mobileResult = await validateField('mobile_number', formData.mobile_number);
-    if (!mobileResult.isValid) {
-      setValidationErrors(prev => ({
-        ...prev,
-        mobile_number: mobileResult.message || 'Invalid mobile number'
-      }));
-      return false;
+    const mobileLocalError = validateMobileNumberInput(normalizedMobileValue);
+    if (mobileLocalError) {
+      nextErrors.mobile_number = mobileLocalError;
+    } else {
+      const mobileResult = await validateField('mobile_number', normalizedMobileValue);
+      if (!mobileResult.isValid) {
+        nextErrors.mobile_number = mobileResult.message || 'Invalid mobile number';
+      }
     }
 
-    return true;
+    setValidationErrors(nextErrors);
+    return !nextErrors.email && !nextErrors.mobile_number;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,8 +150,8 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
         .rpc('admin_update_user_details', {
           p_session_token: sessionToken,
           p_user_id: user.id,
-          p_email: formData.email?.trim() || null,
-          p_mobile_number: formData.mobile_number?.trim() || null,
+          p_email: normalizeEmail(formData.email) || null,
+          p_mobile_number: normalizeMobileNumber(formData.mobile_number).slice(0, 10) || null,
           p_new_password: null
         });
 

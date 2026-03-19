@@ -697,14 +697,42 @@ export const locationsService = {
   }
 };
 
+export interface PendingCityListItem {
+  key: string;
+  pending_city_id?: string;
+  other_city_name_normalized: string;
+  other_city_name_display: string;
+  state_name: string;
+  district_name: string;
+  state_id: string | null;
+  district_id: string | null;
+  registrations_count: number;
+  associated_records_count?: number;
+  latest_created_at: string | null;
+}
+
+export interface PendingCityAssociationRecord {
+  registration_id: string;
+  full_name: string | null;
+  email: string | null;
+  mobile_number: string | null;
+  company_name: string | null;
+  status: string | null;
+  state: string | null;
+  district: string | null;
+  city: string | null;
+  other_city_name: string | null;
+  created_at: string | null;
+}
+
 export const adminCitiesService = {
-  async listPendingCustomCities(sessionToken: string): Promise<{ success: boolean; items?: any[]; error?: string }> {
+  async listPendingCustomCities(sessionToken: string): Promise<{ success: boolean; items?: PendingCityListItem[]; error?: string }> {
     try {
       if (!sessionToken) {
         return { success: false, error: 'User session not found. Please log in again.' };
       }
 
-      const { data, error } = await supabase.rpc('admin_list_custom_city_pending_with_session', {
+      const { data, error } = await supabase.rpc('admin_list_pending_cities_with_associations_with_session', {
         p_session_token: sessionToken
       });
 
@@ -712,7 +740,7 @@ export const adminCitiesService = {
         return { success: false, error: error.message };
       }
 
-      const result = data as { success: boolean; items?: any[]; error?: string };
+      const result = data as { success: boolean; items?: PendingCityListItem[]; error?: string };
       if (!result?.success) {
         return { success: false, error: result?.error || 'Failed to load pending cities' };
       }
@@ -720,6 +748,90 @@ export const adminCitiesService = {
       return { success: true, items: result.items || [] };
     } catch (error) {
       console.error('Error listing pending custom cities:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getPendingCityAssociations(
+    sessionToken: string,
+    pendingCityId: string
+  ): Promise<{ success: boolean; items?: PendingCityAssociationRecord[]; count?: number; error?: string }> {
+    try {
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_get_pending_city_associations_with_session', {
+        p_session_token: sessionToken,
+        p_pending_city_id: pendingCityId
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as {
+        success: boolean;
+        items?: PendingCityAssociationRecord[];
+        count?: number;
+        error?: string;
+      };
+
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to load associated records' };
+      }
+
+      return {
+        success: true,
+        items: result.items || [],
+        count: typeof result.count === 'number' ? result.count : (result.items?.length ?? 0)
+      };
+    } catch (error) {
+      console.error('Error fetching pending city associations:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async resolvePendingCity(
+    sessionToken: string,
+    pendingCityId: string,
+    finalCityName: string
+  ): Promise<{ success: boolean; updatedCount?: number; assignedCityId?: string; assignedCityName?: string; error?: string }> {
+    try {
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_resolve_pending_city_with_session', {
+        p_session_token: sessionToken,
+        p_pending_city_id: pendingCityId,
+        p_final_city_name: finalCityName
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as {
+        success: boolean;
+        updated_count?: number;
+        assigned_city_id?: string;
+        assigned_city_name?: string;
+        error?: string;
+      };
+
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to resolve pending city' };
+      }
+
+      return {
+        success: true,
+        updatedCount: result.updated_count || 0,
+        assignedCityId: result.assigned_city_id,
+        assignedCityName: result.assigned_city_name
+      };
+    } catch (error) {
+      console.error('Error resolving pending city:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   },
@@ -766,6 +878,46 @@ export const adminCitiesService = {
 };
 
 export const citiesService = {
+  async adminUpdateCity(params: {
+    cityId: string;
+    cityName: string;
+    stateId: string;
+    districtId: string;
+    notes?: string | null;
+    sessionToken: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { cityId, cityName, stateId, districtId, notes, sessionToken } = params;
+
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_update_city_with_session', {
+        p_session_token: sessionToken,
+        p_city_id: cityId,
+        p_city_name: cityName,
+        p_state_id: stateId,
+        p_district_id: districtId,
+        p_notes: notes ?? null
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update city' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating city:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
   async adminDeleteCity(
     cityId: string,
     sessionToken: string
@@ -880,15 +1032,24 @@ export const companyDesignationsService = {
 
   async addDesignation(designationName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('company_designations')
-        .insert({
-          designation_name: designationName,
-          is_active: isActive
-        });
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('create_company_designation_with_session', {
+        p_session_token: sessionToken,
+        p_designation_name: designationName,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to add designation' };
       }
 
       return { success: true };
@@ -898,18 +1059,31 @@ export const companyDesignationsService = {
     }
   },
 
-  async updateDesignation(id: string, designationName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+  async createDesignation(designationName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+    return this.addDesignation(designationName, isActive);
+  },
+
+  async updateDesignation(id: string, designationName?: string, isActive?: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('company_designations')
-        .update({
-          designation_name: designationName,
-          is_active: isActive
-        })
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_company_designation_with_session', {
+        p_session_token: sessionToken,
+        p_designation_id: id,
+        p_designation_name: designationName ?? null,
+        p_is_active: typeof isActive === 'boolean' ? isActive : null
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update designation' };
       }
 
       return { success: true };
@@ -921,13 +1095,23 @@ export const companyDesignationsService = {
 
   async deleteDesignation(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('company_designations')
-        .delete()
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('delete_company_designation_with_session', {
+        p_session_token: sessionToken,
+        p_designation_id: id
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete designation' };
       }
 
       return { success: true };
@@ -1583,26 +1767,24 @@ export const lubRolesService = {
 
   async addRole(roleName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      // Get the maximum display_order to add new role at the end
-      const { data: maxOrderData } = await supabase
-        .from('lub_roles_master')
-        .select('display_order')
-        .order('display_order', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
 
-      const nextOrder = (maxOrderData?.display_order || 0) + 1;
-
-      const { error } = await supabase
-        .from('lub_roles_master')
-        .insert({
-          role_name: roleName,
-          is_active: isActive,
-          display_order: nextOrder
-        });
+      const { data, error } = await supabase.rpc('create_lub_role_with_session', {
+        p_session_token: sessionToken,
+        p_role_name: roleName,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to add LUB role' };
       }
 
       return { success: true };
@@ -1612,18 +1794,31 @@ export const lubRolesService = {
     }
   },
 
+  async createRole(roleName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+    return this.addRole(roleName, isActive);
+  },
+
   async updateRole(id: string, roleName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('lub_roles_master')
-        .update({
-          role_name: roleName,
-          is_active: isActive
-        })
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_lub_role_with_session', {
+        p_session_token: sessionToken,
+        p_role_id: id,
+        p_role_name: roleName,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update LUB role' };
       }
 
       return { success: true };
@@ -1635,13 +1830,23 @@ export const lubRolesService = {
 
   async deleteRole(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('lub_roles_master')
-        .delete()
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('delete_lub_role_with_session', {
+        p_session_token: sessionToken,
+        p_role_id: id
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete LUB role' };
       }
 
       return { success: true };
@@ -1653,13 +1858,24 @@ export const lubRolesService = {
 
   async updateDisplayOrder(roleId: string, newOrder: number): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('lub_roles_master')
-        .update({ display_order: newOrder })
-        .eq('id', roleId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_lub_role_display_order_with_session', {
+        p_session_token: sessionToken,
+        p_role_id: roleId,
+        p_display_order: newOrder
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update display order' };
       }
 
       return { success: true };
@@ -1669,24 +1885,24 @@ export const lubRolesService = {
     }
   },
 
-  async reorderRoles(params: { requestingUserId: string; roleIdsInOrder: string[] }): Promise<{ success: boolean; error?: string; updated_count?: number }> {
+  async reorderRoles(params: { roleIdsInOrder: string[] }): Promise<{ success: boolean; error?: string; updated_count?: number }> {
     try {
-      const { requestingUserId, roleIdsInOrder } = params;
-
-      if (!requestingUserId) {
-        console.error('[lubRolesService.reorderRoles] Missing requestingUserId');
-        return { success: false, error: 'User ID is required' };
-      }
+      const { roleIdsInOrder } = params;
 
       if (!roleIdsInOrder || roleIdsInOrder.length === 0) {
         console.error('[lubRolesService.reorderRoles] Missing or empty roleIdsInOrder');
         return { success: false, error: 'Role IDs are required' };
       }
 
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
       console.log('[lubRolesService.reorderRoles] Sending new order:', roleIdsInOrder);
 
-      const { data, error } = await supabase.rpc('admin_reorder_lub_roles', {
-        p_requesting_user_id: requestingUserId,
+      const { data, error } = await supabase.rpc('admin_reorder_lub_roles_with_session', {
+        p_session_token: sessionToken,
         p_role_ids: roleIdsInOrder
       });
 
@@ -1721,17 +1937,16 @@ export const lubRolesService = {
 
 // Member LUB Role Assignments Service
 export const memberLubRolesService = {
-  async getAllAssignments(params: { requestingUserId: string; search?: string }): Promise<MemberLubRoleAssignment[]> {
+  async getAllAssignments(params: { search?: string }): Promise<MemberLubRoleAssignment[]> {
     try {
-      const { requestingUserId, search } = params;
-
-      if (!requestingUserId) {
-        console.error('[memberLubRolesService.getAllAssignments] Missing requestingUserId');
-        throw new Error('User ID is required to fetch assignments');
+      const { search } = params;
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('User session not found. Please log in again.');
       }
 
-      const { data, error } = await supabase.rpc('admin_get_member_lub_role_assignments', {
-        p_requesting_user_id: requestingUserId,
+      const { data, error } = await supabase.rpc('admin_get_member_lub_role_assignments_with_session', {
+        p_session_token: sessionToken,
         p_search: search || null
       });
 
@@ -1793,12 +2008,16 @@ export const memberLubRolesService = {
     level: 'national' | 'state' | 'district' | 'city';
     state?: string;
     district?: string;
-    requesting_user_id?: string;
     role_start_date?: string | null;
     role_end_date?: string | null;
     committee_year: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
       if (params.committee_year && !/^\d{4}$/.test(params.committee_year)) {
         return { success: false, error: 'Committee year must be a 4-digit year (e.g., 2025)' };
       }
@@ -1812,8 +2031,8 @@ export const memberLubRolesService = {
       }
 
       const { data, error } = await supabase
-        .rpc('admin_assign_member_lub_role', {
-          p_requesting_user_id: params.requesting_user_id || null,
+        .rpc('admin_assign_member_lub_role_with_session', {
+          p_session_token: sessionToken,
           p_member_id: params.member_id,
           p_role_id: params.role_id,
           p_level: params.level,
@@ -1842,7 +2061,6 @@ export const memberLubRolesService = {
   },
 
   async updateAssignment(params: {
-    requestingUserId: string;
     id: string;
     role_id: string;
     level: 'national' | 'state' | 'district' | 'city';
@@ -1853,20 +2071,20 @@ export const memberLubRolesService = {
     role_end_date?: string | null;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const { requestingUserId, id, role_id, level, state, district, committee_year, role_start_date, role_end_date } = params;
-
-      if (!requestingUserId) {
-        console.error('[memberLubRolesService.updateAssignment] Missing requestingUserId');
-        return { success: false, error: 'User ID is required' };
-      }
+      const { id, role_id, level, state, district, committee_year, role_start_date, role_end_date } = params;
 
       if (!id) {
         console.error('[memberLubRolesService.updateAssignment] Missing assignment ID');
         return { success: false, error: 'Assignment ID is required' };
       }
 
-      const { data, error } = await supabase.rpc('admin_update_member_lub_role_assignment', {
-        p_requesting_user_id: requestingUserId,
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_update_member_lub_role_assignment_with_session', {
+        p_session_token: sessionToken,
         p_assignment_id: id,
         p_role_id: role_id,
         p_level: level,
@@ -1902,22 +2120,22 @@ export const memberLubRolesService = {
     }
   },
 
-  async deleteAssignment(params: { requestingUserId: string; assignmentId: string }): Promise<{ success: boolean; error?: string }> {
+  async deleteAssignment(params: { assignmentId: string }): Promise<{ success: boolean; error?: string }> {
     try {
-      const { requestingUserId, assignmentId } = params;
-
-      if (!requestingUserId) {
-        console.error('[memberLubRolesService.deleteAssignment] Missing requestingUserId');
-        return { success: false, error: 'User ID is required' };
-      }
+      const { assignmentId } = params;
 
       if (!assignmentId) {
         console.error('[memberLubRolesService.deleteAssignment] Missing assignmentId');
         return { success: false, error: 'Assignment ID is required' };
       }
 
-      const { data, error } = await supabase.rpc('admin_delete_member_lub_role_assignment', {
-        p_requesting_user_id: requestingUserId,
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('admin_delete_member_lub_role_assignment_with_session', {
+        p_session_token: sessionToken,
         p_assignment_id: assignmentId
       });
 
@@ -2169,30 +2387,8 @@ export const formFieldConfigService = {
     isVisible: boolean,
     userId?: string
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const updateData: any = {
-        is_visible: isVisible,
-        updated_at: new Date().toISOString()
-      };
-
-      if (userId) {
-        updateData.updated_by = userId;
-      }
-
-      const { error } = await supabase
-        .from('form_field_configurations')
-        .update(updateData)
-        .eq('field_name', fieldName);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating field visibility:', error);
-      return { success: false, error: 'An unexpected error occurred' };
-    }
+    void userId;
+    return this.updateFieldConfiguration(fieldName, { is_visible: isVisible });
   },
 
   async updateFieldRequired(
@@ -2200,30 +2396,8 @@ export const formFieldConfigService = {
     isRequired: boolean,
     userId?: string
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const updateData: any = {
-        is_required: isRequired,
-        updated_at: new Date().toISOString()
-      };
-
-      if (userId) {
-        updateData.updated_by = userId;
-      }
-
-      const { error } = await supabase
-        .from('form_field_configurations')
-        .update(updateData)
-        .eq('field_name', fieldName);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating field required status:', error);
-      return { success: false, error: 'An unexpected error occurred' };
-    }
+    void userId;
+    return this.updateFieldConfiguration(fieldName, { is_required: isRequired });
   },
 
   async updateFieldConfiguration(
@@ -2293,27 +2467,24 @@ export const formFieldConfigService = {
     userId?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const promises = updates.map(update => {
-        const updateData: any = {
-          display_order: update.display_order,
-          updated_at: new Date().toISOString()
-        };
+      void userId;
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User not authenticated' };
+      }
 
-        if (userId) {
-          updateData.updated_by = userId;
-        }
-
-        return supabase
-          .from('form_field_configurations')
-          .update(updateData)
-          .eq('field_name', update.field_name);
+      const { data, error } = await supabase.rpc('update_form_field_display_orders_with_session', {
+        p_session_token: sessionToken,
+        p_updates: updates
       });
 
-      const results = await Promise.all(promises);
-      const failed = results.find(r => r.error);
+      if (error) {
+        return { success: false, error: error.message };
+      }
 
-      if (failed?.error) {
-        return { success: false, error: failed.error.message };
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update display orders' };
       }
 
       return { success: true };
@@ -2683,13 +2854,24 @@ export const validationRulesService = {
 
   async updateDisplayOrder(id: string, displayOrder: number): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('validation_rules')
-        .update({ display_order: displayOrder })
-        .eq('id', id);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_validation_rule_display_order_with_session', {
+        p_session_token: sessionToken,
+        p_rule_id: id,
+        p_display_order: displayOrder
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update display order' };
       }
 
       return { success: true };

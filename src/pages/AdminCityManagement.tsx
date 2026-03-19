@@ -194,29 +194,25 @@ export default function AdminCityManagement() {
     if (!editingCity) return;
 
     console.log('[AdminCityManagement] Updating city:', editingCity.id, editingCity.city_name);
-    const updateData = {
-      city_name: editingCity.city_name.trim(),
-      district_id: editingCity.district_id,
-      state_id: editingCity.state_id,
-      notes: editingCity.notes,
-      updated_at: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase
-      .from('cities_master')
-      .update(updateData)
-      .eq('id', editingCity.id)
-      .select();
-
-    if (error) {
-      console.error('[AdminCityManagement] Error updating city:', error);
-      alert('Error updating city: ' + error.message);
+    const sessionToken = getSessionToken();
+    if (!sessionToken) {
+      console.error('[AdminCityManagement] User session not found');
+      alert('User session not found. Please log in again.');
       return;
     }
 
-    if (!data || data.length === 0) {
-      console.log('[AdminCityManagement] Update failed - no rows updated (possible RLS issue)');
-      alert('Update failed: No rows were updated. This may be a permissions issue.');
+    const result = await citiesService.adminUpdateCity({
+      cityId: editingCity.id,
+      cityName: editingCity.city_name.trim(),
+      stateId: editingCity.state_id,
+      districtId: editingCity.district_id,
+      notes: editingCity.notes ?? null,
+      sessionToken
+    });
+
+    if (!result.success) {
+      console.error('[AdminCityManagement] Error updating city:', result.error);
+      alert('Error updating city: ' + (result.error || 'Unknown error'));
       return;
     }
 
