@@ -430,17 +430,24 @@ export const statesService = {
 
   async upsertState(stateName: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('states_master')
-        .upsert({
-          state_name: stateName,
-          is_active: isActive
-        }, {
-          onConflict: 'state_name'
-        });
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('upsert_state_with_session', {
+        p_session_token: sessionToken,
+        p_state_name: stateName,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to upsert state' };
       }
 
       return { success: true };
@@ -452,13 +459,24 @@ export const statesService = {
 
   async updateStateActiveStatus(stateId: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('states_master')
-        .update({ is_active: isActive })
-        .eq('id', stateId);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_state_active_status_with_session', {
+        p_session_token: sessionToken,
+        p_state_id: stateId,
+        p_is_active: isActive
+      });
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to update state status' };
       }
 
       return { success: true };

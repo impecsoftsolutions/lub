@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-19
-**Updated by:** Codex (baseline verification)
+**Updated by:** Codex (admin state management hardening)
 
 ---
 
@@ -27,15 +27,14 @@ Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that 
 
 ## Active Stream
 
-**No active stream.** Phase 1 hardening is complete.
+**No active stream.** Admin state management hardening is complete.
 
 Next recommended stream: **Audit remaining privileged admin write paths outside Phase 1 scope.**
 
 Leading candidates (in rough priority order):
-1. Admin state management - `upsertState`, `updateStateActiveStatus` in `src/lib/supabase.ts` / `src/pages/AdminStateManagement.tsx`
-2. Admin user role management - `addUserRole`, `updateUserRole`, `removeUserRole`
-3. Admin directory visibility - `updateFieldVisibility`, `updateMultipleFieldVisibilities`
-4. Admin organization profile management
+1. Admin user role management - `addUserRole`, `updateUserRole`, `removeUserRole`
+2. Admin directory visibility - `updateFieldVisibility`, `updateMultipleFieldVisibilities`
+3. Admin organization profile management
 
 Assign exactly one domain to one agent per session. Update this section when a stream starts.
 
@@ -43,12 +42,12 @@ Assign exactly one domain to one agent per session. Update this section when a s
 
 ## Last Verified
 
-- **When:** 2026-03-13
-- **What:** Full Phase 1 destructive Playwright suite
-- **Result:** 15 passed
-- **Command:**
+- **When:** 2026-03-19
+- **What:** Admin state management hardening verification
+- **Result:** Migration applied manually by Yogish, runtime add/toggle smoke passed, post-change build passed
+- **Command(s):**
   ```
-  npm run test:e2e:phase1:local:destructive
+  npm run build
   ```
 
 ---
@@ -72,20 +71,19 @@ If `git status` is dirty when the next stream begins:
 
 - Migration `20260313093000` (designation master wrappers): application to DB was not explicitly confirmed during Session 48. Verify before hardening that domain further.
 - Lint baseline is failing (206 errors, 42 warnings as of 2026-03-19). Mostly pre-existing no-explicit-any and unused-var debt. One item to watch: constant condition in `src/lib/memberAuth.ts` line 148 - inspect before touching that file.
+- Direct `information_schema.routines` verification is not available from the anon client used in this workspace. For state-management hardening, function existence was proven indirectly through successful live RPC calls to `upsert_state_with_session` and `update_state_active_status_with_session`.
 - Broader validation-consumption cleanup is deferred - do not start it until after the next privileged-write hardening slice is complete.
 
 ---
 
 ## Next Recommended Action
 
-1. Run `npm run build` and `npm run lint` on the committed baseline and record the result here
-2. Start next stream: **admin state management hardening**
-   - Inspect `src/lib/supabase.ts` service functions for state management
-   - Inspect `src/pages/AdminStateManagement.tsx`
-   - Check existing migrations for any partial wrapper coverage
-   - Plan new `_with_session` wrapper migration
-   - Implement frontend wiring
-   - Prove live with targeted Playwright coverage
+1. Start next stream: **admin user role management hardening**
+   - Inspect `src/lib/supabase.ts` user-role mutation paths
+   - Inspect `src/pages/AdminUserManagement.tsx`
+   - Replace weaker browser-side privileged writes with server-authoritative wrappers
+   - Pay special attention to the current browser-side user creation path
+2. Keep lint cleanup deferred unless the chosen slice directly requires a narrowly scoped lint fix
 
 ---
 
