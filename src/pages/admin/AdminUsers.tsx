@@ -405,11 +405,11 @@ const AdminUsers: React.FC = () => {
           ) : (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors w-[30%]"
                         onClick={() => handleSort('email')}
                       >
                         <div className="flex items-center justify-between">
@@ -421,11 +421,11 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14%]">
                         Mobile Number
                       </th>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors w-[16%]"
                         onClick={() => handleSort('account_type')}
                       >
                         <div className="flex items-center justify-between">
@@ -437,13 +437,13 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                         Created Date
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[16%]">
                         Role
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                         Actions
                       </th>
                     </tr>
@@ -451,13 +451,13 @@ const AdminUsers: React.FC = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredUsers.map((user) => (
                       <tr key={user.id} className={`hover:bg-gray-50 transition-colors ${user.is_frozen ? 'opacity-50 bg-gray-50' : ''}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
+                        <td className="px-4 py-4 max-w-0">
+                          <div className="flex items-center min-w-0">
                             <Mail className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-                            <span className="text-sm text-gray-900">{user.email}</span>
+                            <span className="text-sm text-gray-900 truncate" title={user.email}>{user.email}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <Phone className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
                             <span className="text-sm text-gray-900">
@@ -465,7 +465,7 @@ const AdminUsers: React.FC = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex gap-2 items-center">
                             {getAccountTypeBadge(user)}
                             {user.is_frozen && (
@@ -475,7 +475,7 @@ const AdminUsers: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <Calendar className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
                             <span className="text-sm text-gray-900">
@@ -483,7 +483,7 @@ const AdminUsers: React.FC = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             {user.roles.length > 0 ? (
                               <>
@@ -521,8 +521,8 @@ const AdminUsers: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex gap-3 items-center">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm">
+                          <div className="flex gap-2 items-center">
                             {canEdit && (
                               <button
                                 onClick={() => handleEditClick(user)}
