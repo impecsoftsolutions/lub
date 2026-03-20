@@ -1,33 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { memberAuthService, MemberData } from '../lib/memberAuth';
-
-interface MemberContextValue {
-  member: MemberData | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  refreshMember: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-const MemberContext = createContext<MemberContextValue | undefined>(undefined);
-
-// Create a stable fallback object to prevent infinite re-renders
-const FALLBACK_CONTEXT: MemberContextValue = {
-  member: null,
-  isAuthenticated: false,
-  isLoading: false,
-  refreshMember: async () => {},
-  signOut: async () => {}
-};
-
-export const useMember = () => {
-  const context = useContext(MemberContext);
-  // Return stable fallback when context is not available (public routes)
-  if (!context) {
-    return FALLBACK_CONTEXT;
-  }
-  return context;
-};
+import { MemberContext, MemberContextValue } from './member-context';
 
 interface MemberContextProviderProps {
   children: React.ReactNode;

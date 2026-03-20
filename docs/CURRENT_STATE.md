@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-20
-**Updated by:** Codex (warning-reduction checkpoint)
+**Updated by:** Codex (lint cleanup completion)
 
 ---
 
@@ -18,7 +18,7 @@
 | Check | Status |
 |-------|--------|
 | Build (`npm run build`) | PASS (2026-03-20) |
-| Lint (`npm run lint`) | PASS with warnings only - 0 errors, 3 warnings (2026-03-20) |
+| Lint (`npm run lint`) | PASS - 0 errors, 0 warnings (2026-03-20) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13) |
 
 Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that break it.
@@ -27,7 +27,7 @@ Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that 
 
 ## Active Stream
 
-**Active stream:** None - warning-reduction checkpoint complete.
+**Active stream:** None - lint cleanup stream complete.
 
 Most recent completed stream before this one: **Role assignment UI added to the routed Admin Users page using the existing hardened role wrappers.**
 
@@ -38,8 +38,8 @@ Assign exactly one domain to one agent per session. Update this section when a s
 ## Last Verified
 
 - **When:** 2026-03-20
-- **What:** Warning-only lint cleanup checkpoint
-- **Result:** Lint reduced further from `0 errors, 35 warnings` to `0 errors, 3 warnings`. Build remains passing after the cleanup.
+- **What:** Final lint cleanup completion
+- **Result:** Lint is now fully clean at `0 errors, 0 warnings`. Build remains passing after the cleanup.
 - **Command(s):**
   ```
   npm run lint
@@ -50,10 +50,10 @@ Assign exactly one domain to one agent per session. Update this section when a s
 
 ## In Progress / Dirty State
 
-No active implementation stream. The repo includes an uncommitted warning-reduction batch after commit `e710e58` until this checkpoint is committed.
+No active implementation stream. The repo includes an uncommitted final lint-cleanup batch after commit `a019b4b` until this checkpoint is committed.
 
 Expected state after this checkpoint:
-- working tree dirty until this warning-reduction checkpoint is committed
+- working tree dirty until this final lint-cleanup checkpoint is committed
 - Phase 1 baseline preserved at 15 passed
 - `AGENTS.md`, `CLAUDE.md`, and `docs/CURRENT_STATE.md` available as the shared startup/checkpoint files
 
@@ -69,12 +69,12 @@ Planned items not yet started, in priority order. Remove an item from this list 
 
 Done this session:
 - Role assignment UI added to `src/pages/admin/AdminUsers.tsx` with `AssignRoleModal` and the existing hardened role wrappers. Admin user creation is now handled through Sign Up plus role assignment.
-- Lint cleanup reduced the baseline from `206 errors, 42 warnings` to `0 errors, 3 warnings`. The remaining warnings are structural `react-refresh/only-export-components` warnings in the context providers.
+- Lint cleanup reduced the baseline from `206 errors, 42 warnings` to `0 errors, 0 warnings`.
 
 | # | Item | Notes |
 |---|------|-------|
-| 1 | Decide whether to clear the final 3 fast-refresh warnings | Remaining warnings are only `react-refresh/only-export-components` in `src/contexts/AdminContext.tsx`, `src/contexts/MemberContext.tsx`, and `src/contexts/PermissionContext.tsx`. This likely requires small structural file moves, not behavior changes. |
-| 2 | Validation-consumption cleanup | Two separate validation layers exist - cleanup deferred until after hardening work is complete. See project guide section 10. |
+| 1 | Validation-consumption cleanup | Two separate validation layers exist - cleanup deferred until after hardening work and lint cleanup are complete. See project guide section 10. |
+| 2 | Review non-blocking build warnings | Build still emits chunk-size and `sessionManager` import-graph warnings. These are optimization concerns, not correctness blockers. |
 
 ---
 
@@ -84,14 +84,14 @@ Things to be aware of when touching certain areas - not work items, just caution
 
 - **Migration `20260313093000`** (designation master wrappers) - DB application was not explicitly confirmed during Session 48. Verify before hardening that domain further.
 - **`information_schema.routines`** - not queryable via the anon client in this workspace. Function existence must be proven via live RPC smoke, not metadata query.
-- **Remaining lint warnings** - only 3 structural fast-refresh warnings remain, all in context providers. They do not currently block build or lint pass status.
+- **Build warnings are still present** - Vite still reports large chunk size and mixed dynamic/static import usage for `src/lib/sessionManager.ts`. These do not currently block build or lint.
 
 ---
 
 ## Next Recommended Action
 
 When ready to resume work, pick the top item from **Deferred Work** above.
-Current top item: **Decide whether to clear the final 3 fast-refresh warnings** (Deferred Work item 1).
+Current top item: **Validation-consumption cleanup** (Deferred Work item 1).
 
 ---
 

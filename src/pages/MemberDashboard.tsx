@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 import Toast from '../components/Toast';
 import { logoutService } from '../lib/logoutService';
 import { memberRegistrationService } from '../lib/supabase';

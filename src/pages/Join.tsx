@@ -32,7 +32,7 @@ import ImageCropModal from '../components/ImageCropModal';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
 import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import NormalizationPreviewModal from '../components/NormalizationPreviewModal';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 import { supabase } from '../lib/supabase';
 
 const Join: React.FC = () => {

@@ -20,7 +20,7 @@ import {
   List
 } from 'lucide-react';
 import { supabase, locationsService } from '../lib/supabase';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 import ExpandedMemberDetails from '../components/ExpandedMemberDetails';
 
 interface MemberData {

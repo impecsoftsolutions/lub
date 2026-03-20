@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle, Settings as SettingsIcon, User, Bell, Shield } from 'lucide-react';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 
 const MemberSettings: React.FC = () => {
   const navigate = useNavigate();

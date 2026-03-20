@@ -17,7 +17,7 @@ import {
   X,
   LogOut
 } from 'lucide-react';
-import { useAdmin } from '../../contexts/AdminContext';
+import { useAdmin } from '../../contexts/useAdmin';
 
 interface MenuItem {
   label: string;

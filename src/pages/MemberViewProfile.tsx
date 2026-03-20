@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, Building, Calendar, CreditCard, Edit, Loader2, AlertCircle } from 'lucide-react';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 

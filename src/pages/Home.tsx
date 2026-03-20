@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Users, Building2, TrendingUp, Award } from 'lucide-react';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 
 const Home: React.FC = () => {
   const { isAuthenticated } = useMember();

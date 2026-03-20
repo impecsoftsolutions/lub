@@ -14,7 +14,7 @@
  */
 
 import { useMemo } from 'react';
-import { usePermission } from '../contexts/PermissionContext';
+import { usePermission } from '../contexts/usePermission';
 import type { ExtendedUser, UserPermission } from '../types/permissions';
 
 /**

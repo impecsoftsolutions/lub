@@ -1,26 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase, adminCitiesService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
-
-interface AdminContextValue {
-  isSuperAdmin: boolean;
-  userEmail: string;
-  pendingRegistrationsCount: number;
-  pendingCitiesCount: number;
-  sidebarCollapsed: boolean;
-  toggleSidebar: () => void;
-  refreshCounts: () => void;
-}
-
-const AdminContext = createContext<AdminContextValue | undefined>(undefined);
-
-export const useAdmin = () => {
-  const context = useContext(AdminContext);
-  if (!context) {
-    throw new Error('useAdmin must be used within AdminContextProvider');
-  }
-  return context;
-};
+import { AdminContext, AdminContextValue } from './admin-context';
 
 interface AdminContextProviderProps {
   children: React.ReactNode;

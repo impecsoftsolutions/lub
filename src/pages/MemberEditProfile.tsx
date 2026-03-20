@@ -18,7 +18,7 @@ import {
   Upload,
   CheckCircle
 } from 'lucide-react';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 import Toast from '../components/Toast';
 import ChangeCredentialModal from '../components/member/ChangeCredentialModal';
 import ImageCropModal from '../components/ImageCropModal';

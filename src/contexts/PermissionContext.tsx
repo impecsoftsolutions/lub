@@ -1,69 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { customAuth } from '../lib/customAuth';
 import { permissionService } from '../lib/permissionService';
 import type { ExtendedUser, UserPermission } from '../types/permissions';
-
-/**
- * Permission Context Value Interface
- *
- * Provides user data, permissions, and permission check methods
- * throughout the application.
- */
-interface PermissionContextValue {
-  /** Current authenticated user with roles and permissions */
-  user: ExtendedUser | null;
-
-  /** Array of all permissions the user has */
-  permissions: UserPermission[];
-
-  /** Whether permissions are being loaded */
-  isLoading: boolean;
-
-  /** Error that occurred during permission loading */
-  error: Error | null;
-
-  /** Check if user has a specific permission (sync - checks cached data) */
-  hasPermission: (code: string) => boolean;
-
-  /** Check if user has any of the specified permissions (sync) */
-  hasAnyPermission: (codes: string[]) => boolean;
-
-  /** Check if user has all of the specified permissions (sync) */
-  hasAllPermissions: (codes: string[]) => boolean;
-
-  /** Check if user is a super admin (sync) */
-  isSuperAdmin: () => boolean;
-
-  /** Refresh permissions from database (async) */
-  refreshPermissions: () => Promise<void>;
-}
-
-/**
- * Permission Context
- *
- * React Context for managing and accessing user permissions throughout the app.
- */
-const PermissionContext = createContext<PermissionContextValue | undefined>(undefined);
-
-/**
- * usePermission Hook
- *
- * Custom hook to access permission context.
- * Throws error if used outside of PermissionProvider.
- *
- * @example
- * const { hasPermission, isSuperAdmin } = usePermission();
- * if (hasPermission('members.delete')) {
- *   // Show delete button
- * }
- */
-export const usePermission = () => {
-  const context = useContext(PermissionContext);
-  if (!context) {
-    throw new Error('usePermission must be used within PermissionProvider');
-  }
-  return context;
-};
+import { PermissionContext, PermissionContextValue } from './permission-context';
 
 /**
  * PermissionProvider Props

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
-import { useMember } from '../contexts/MemberContext';
+import { useMember } from '../contexts/useMember';
 
 const MemberReapply: React.FC = () => {
   const navigate = useNavigate();
