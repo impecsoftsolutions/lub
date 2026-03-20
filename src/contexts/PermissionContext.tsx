@@ -256,7 +256,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadUserPermissions]);
 
   /**
    * Auto-refresh on window focus (optional enhancement)

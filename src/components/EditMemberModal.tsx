@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Save, AlertCircle, Loader2, Camera, Upload, X as XIcon, CheckCircle } from 'lucide-react';
 import {
   supabase,
@@ -200,11 +200,83 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     return value;
   };
 
-  useEffect(() => {
-    checkUserRole();
-    loadStates();
-    loadDesignations();
+  const checkUserRole = useCallback(async () => {
+    try {
+      const isSuperAdminUser = await customAuth.isUserSuperAdmin();
+      setIsSuperAdmin(isSuperAdminUser);
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      setIsSuperAdmin(false);
+    }
   }, []);
+
+  const loadStates = useCallback(async () => {
+    try {
+      console.log('[EditMemberModal] Loading states...');
+      setIsLoadingStates(true);
+      const states = await statesService.getPublicPaymentStates();
+      console.log('[EditMemberModal] States loaded:', states.length, 'states');
+      setAvailableStates(states.sort((a, b) => a.state.localeCompare(b.state)));
+    } catch (error) {
+      console.error('Error loading states:', error);
+    } finally {
+      setIsLoadingStates(false);
+    }
+  }, []);
+
+  const loadDesignations = useCallback(async () => {
+    try {
+      console.log('[EditMemberModal] Loading designations...');
+      setIsLoadingDesignations(true);
+      const designations = await companyDesignationsService.getActiveDesignations();
+      console.log('[EditMemberModal] Designations loaded:', designations.length);
+      setAvailableDesignations(designations);
+    } catch (error) {
+      console.error('Error loading designations:', error);
+    } finally {
+      setIsLoadingDesignations(false);
+    }
+  }, []);
+
+  const loadDistricts = useCallback(async (stateName: string) => {
+    try {
+      console.log('[EditMemberModal] Loading districts for state:', stateName);
+      setIsLoadingDistricts(true);
+      const districts = await locationsService.getActiveDistrictsByStateName(stateName);
+      console.log('[EditMemberModal] Districts loaded:', districts.length, 'districts');
+      setAvailableDistricts(districts);
+    } catch (error) {
+      console.error('Error loading districts:', error);
+    } finally {
+      setIsLoadingDistricts(false);
+    }
+  }, []);
+
+  const loadCities = useCallback(async (districtId: string) => {
+    try {
+      console.log('[EditMemberModal] Loading cities for district:', districtId);
+      setIsLoadingCities(true);
+      const cities = await locationsService.getActiveCitiesByDistrictId(districtId);
+      console.log('[EditMemberModal] Cities loaded:', cities.length, 'cities');
+      setAvailableCities(cities);
+
+      // Only auto-show "Other" if no cities available AND we don't already have a custom city loaded
+      if (cities.length === 0 && !formData.is_custom_city) {
+        console.log('[EditMemberModal] No cities available, showing custom city option');
+        setShowOtherCity(true);
+      }
+    } catch (error) {
+      console.error('Error loading cities:', error);
+    } finally {
+      setIsLoadingCities(false);
+    }
+  }, [formData.is_custom_city]);
+
+  useEffect(() => {
+    void checkUserRole();
+    void loadStates();
+    void loadDesignations();
+  }, [checkUserRole, loadStates, loadDesignations]);
 
   useEffect(() => {
     if (member) {
@@ -284,7 +356,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
   // Load states when district changes
   useEffect(() => {
     if (formData.state) {
-      loadDistricts(formData.state);
+      void loadDistricts(formData.state);
     } else {
       setAvailableDistricts([]);
       setAvailableCities([]);
@@ -292,12 +364,12 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
       setShowOtherCity(false);
       setOtherCityText('');
     }
-  }, [formData.state]);
+  }, [formData.state, loadDistricts]);
 
   // Load cities when district changes
   useEffect(() => {
     if (selectedDistrictId) {
-      loadCities(selectedDistrictId);
+      void loadCities(selectedDistrictId);
     } else {
       setAvailableCities([]);
       // Don't clear showOtherCity if we have a custom city loaded
@@ -306,7 +378,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
         setOtherCityText('');
       }
     }
-  }, [selectedDistrictId]);
+  }, [selectedDistrictId, formData.is_custom_city, loadCities]);
 
   // When member data loads, set the selected district ID
   useEffect(() => {
@@ -327,79 +399,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
         setOtherCityText(formData.other_city_name);
       }
     }
-  }, [availableCities, isLoadingCities, formData.is_custom_city]);
-
-  const checkUserRole = async () => {
-    try {
-      const isSuperAdminUser = await customAuth.isUserSuperAdmin();
-      setIsSuperAdmin(isSuperAdminUser);
-    } catch (error) {
-      console.error('Error checking user role:', error);
-      setIsSuperAdmin(false);
-    }
-  };
-
-  const loadStates = async () => {
-    try {
-      console.log('[EditMemberModal] Loading states...');
-      setIsLoadingStates(true);
-      const states = await statesService.getPublicPaymentStates();
-      console.log('[EditMemberModal] States loaded:', states.length, 'states');
-      setAvailableStates(states.sort((a, b) => a.state.localeCompare(b.state)));
-    } catch (error) {
-      console.error('Error loading states:', error);
-    } finally {
-      setIsLoadingStates(false);
-    }
-  };
-
-  const loadDesignations = async () => {
-    try {
-      console.log('[EditMemberModal] Loading designations...');
-      setIsLoadingDesignations(true);
-      const designations = await companyDesignationsService.getActiveDesignations();
-      console.log('[EditMemberModal] Designations loaded:', designations.length);
-      setAvailableDesignations(designations);
-    } catch (error) {
-      console.error('Error loading designations:', error);
-    } finally {
-      setIsLoadingDesignations(false);
-    }
-  };
-
-  const loadDistricts = async (stateName: string) => {
-    try {
-      console.log('[EditMemberModal] Loading districts for state:', stateName);
-      setIsLoadingDistricts(true);
-      const districts = await locationsService.getActiveDistrictsByStateName(stateName);
-      console.log('[EditMemberModal] Districts loaded:', districts.length, 'districts');
-      setAvailableDistricts(districts);
-    } catch (error) {
-      console.error('Error loading districts:', error);
-    } finally {
-      setIsLoadingDistricts(false);
-    }
-  };
-
-  const loadCities = async (districtId: string) => {
-    try {
-      console.log('[EditMemberModal] Loading cities for district:', districtId);
-      setIsLoadingCities(true);
-      const cities = await locationsService.getActiveCitiesByDistrictId(districtId);
-      console.log('[EditMemberModal] Cities loaded:', cities.length, 'cities');
-      setAvailableCities(cities);
-
-      // Only auto-show "Other" if no cities available AND we don't already have a custom city loaded
-      if (cities.length === 0 && !formData.is_custom_city) {
-        console.log('[EditMemberModal] No cities available, showing custom city option');
-        setShowOtherCity(true);
-      }
-    } catch (error) {
-      console.error('Error loading cities:', error);
-    } finally {
-      setIsLoadingCities(false);
-    }
-  };
+  }, [availableCities, isLoadingCities, formData.is_custom_city, formData.other_city_name, otherCityText, showOtherCity]);
 
   const shouldShowField = (fieldName: string): boolean => {
     if (isSuperAdmin) {

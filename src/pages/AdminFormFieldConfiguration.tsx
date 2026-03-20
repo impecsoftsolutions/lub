@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -40,12 +40,15 @@ const AdminFormFieldConfiguration: React.FC = () => {
     isVisible: false
   });
 
-  useEffect(() => {
-    loadFieldConfigurations();
-    loadValidationRules();
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
   }, []);
 
-  const loadValidationRules = async () => {
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  const loadValidationRules = useCallback(async () => {
     try {
       setIsLoadingRules(true);
       const rules = await validationRulesService.getActiveValidationRules();
@@ -56,9 +59,9 @@ const AdminFormFieldConfiguration: React.FC = () => {
     } finally {
       setIsLoadingRules(false);
     }
-  };
+  }, [showToast]);
 
-  const loadFieldConfigurations = async () => {
+  const loadFieldConfigurations = useCallback(async () => {
     try {
       setIsLoading(true);
       const configs = await formFieldConfigService.getFieldConfigurationsBySection();
@@ -75,15 +78,12 @@ const AdminFormFieldConfiguration: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
+  useEffect(() => {
+    void loadFieldConfigurations();
+    void loadValidationRules();
+  }, [loadFieldConfigurations, loadValidationRules]);
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => ({

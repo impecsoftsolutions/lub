@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   CreditCard as Edit2,
   Check,
@@ -80,20 +80,15 @@ const AdminValidationSettings: React.FC = () => {
   // Permission checks
   const canManageValidation = useHasPermission('settings.validation.manage');
 
-  useEffect(() => {
-    loadValidationRules();
-    loadCategories();
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
   }, []);
 
-  useEffect(() => {
-    if (searchQuery && filteredRules.length > 0) {
-      const categoriesWithMatches = new Set<string>();
-      filteredRules.forEach(rule => categoriesWithMatches.add(rule.category));
-      setExpandedCategories(categoriesWithMatches);
-    }
-  }, [searchQuery]);
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
 
-  const loadValidationRules = async () => {
+  const loadValidationRules = useCallback(async () => {
     try {
       setIsLoadingRules(true);
       const rules = await validationRulesService.getAllValidationRules();
@@ -104,7 +99,7 @@ const AdminValidationSettings: React.FC = () => {
     } finally {
       setIsLoadingRules(false);
     }
-  };
+  }, [showToast]);
 
   const loadCategories = async () => {
     try {
@@ -113,14 +108,6 @@ const AdminValidationSettings: React.FC = () => {
     } catch (error) {
       console.error('Error loading categories:', error);
     }
-  };
-
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
   };
 
   const handleEditClick = (rule: ValidationRule) => {
@@ -446,6 +433,19 @@ const AdminValidationSettings: React.FC = () => {
   }, {} as Record<string, ValidationRule[]>);
 
   const sortedCategories = Object.keys(groupedRules).sort();
+
+  useEffect(() => {
+    void loadValidationRules();
+    void loadCategories();
+  }, [loadValidationRules]);
+
+  useEffect(() => {
+    if (searchQuery && filteredRules.length > 0) {
+      const categoriesWithMatches = new Set<string>();
+      filteredRules.forEach(rule => categoriesWithMatches.add(rule.category));
+      setExpandedCategories(categoriesWithMatches);
+    }
+  }, [filteredRules, searchQuery]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {

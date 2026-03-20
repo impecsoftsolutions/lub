@@ -76,11 +76,7 @@ const AdminDeletedMembers: React.FC = () => {
     loadDeletedMembers();
   }, [loadDeletedMembers]);
 
-  useEffect(() => {
-    filterMembers();
-  }, [deletedMembers, searchTerm]);
-
-  const filterMembers = () => {
+  const filterMembers = useCallback(() => {
     let filtered = deletedMembers;
 
     if (searchTerm.trim()) {
@@ -95,7 +91,11 @@ const AdminDeletedMembers: React.FC = () => {
     }
 
     setFilteredMembers(filtered);
-  };
+  }, [deletedMembers, searchTerm]);
+
+  useEffect(() => {
+    filterMembers();
+  }, [filterMembers]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });

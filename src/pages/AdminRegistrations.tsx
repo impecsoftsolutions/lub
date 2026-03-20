@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Users, Search, Filter, FileText, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, Download, User, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -94,15 +94,7 @@ const AdminRegistrations: React.FC = () => {
   const canDelete = useHasPermission('members.delete');
   const canExport = useHasPermission('members.export');
 
-  useEffect(() => {
-    loadRegistrations();
-  }, []);
-
-  useEffect(() => {
-    filterRegistrations();
-  }, [registrations, searchTerm, statusFilter]);
-
-  const loadRegistrations = async () => {
+  const loadRegistrations = useCallback(async () => {
     try {
       setIsLoading(true);
 
@@ -149,9 +141,9 @@ const AdminRegistrations: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const filterRegistrations = () => {
+  const filterRegistrations = useCallback(() => {
     let filtered = registrations;
 
     // Filter by status
@@ -171,7 +163,15 @@ const AdminRegistrations: React.FC = () => {
     }
 
     setFilteredRegistrations(filtered);
-  };
+  }, [registrations, searchTerm, statusFilter]);
+
+  useEffect(() => {
+    void loadRegistrations();
+  }, [loadRegistrations]);
+
+  useEffect(() => {
+    filterRegistrations();
+  }, [filterRegistrations]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Clock, User, File as FileEdit, Activity } from 'lucide-react';
 import { memberAuditService, AuditHistoryEntry } from '../lib/supabase';
 
@@ -18,13 +18,7 @@ const AuditHistoryModal: React.FC<AuditHistoryModalProps> = ({
   const [history, setHistory] = useState<AuditHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (isOpen && memberId) {
-      loadHistory();
-    }
-  }, [isOpen, memberId]);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await memberAuditService.getMemberAuditHistory(memberId);
@@ -34,7 +28,13 @@ const AuditHistoryModal: React.FC<AuditHistoryModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [memberId]);
+
+  useEffect(() => {
+    if (isOpen && memberId) {
+      void loadHistory();
+    }
+  }, [isOpen, memberId, loadHistory]);
 
   const getActionIcon = (actionType: string) => {
     switch (actionType) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { GitMerge, AlertCircle, MapPin, Lock } from 'lucide-react';
 import {
   adminCitiesService,
@@ -30,13 +30,9 @@ export default function AdminPendingCities() {
   const [isLoadingAssociations, setIsLoadingAssociations] = useState(false);
   const [associationsError, setAssociationsError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const getSessionToken = (): string | null => sessionManager.getSessionToken();
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setPendingError(null);
     try {
@@ -61,7 +57,11 @@ export default function AdminPendingCities() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   async function loadApprovedCities(districtId: string) {
     try {

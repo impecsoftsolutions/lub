@@ -114,7 +114,7 @@ export const MemberContextProvider: React.FC<MemberContextProviderProps> = ({ ch
     return () => {
       mounted = false;
     };
-  }, []); // Empty dependency - only initialize auth once on mount
+  }, [loadMember]);
 
   // Memoize the context value to prevent unnecessary re-renders
   const value: MemberContextValue = useMemo(() => ({

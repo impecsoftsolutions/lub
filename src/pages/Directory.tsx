@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -108,8 +108,10 @@ const Directory: React.FC = () => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (mobile && recordsPerPage > MOBILE_RECORDS_PER_PAGE) {
-        setRecordsPerPage(MOBILE_RECORDS_PER_PAGE);
+      if (mobile) {
+        setRecordsPerPage(prev =>
+          prev > MOBILE_RECORDS_PER_PAGE ? MOBILE_RECORDS_PER_PAGE : prev
+        );
       }
     };
 
@@ -137,10 +139,6 @@ const Directory: React.FC = () => {
     localStorage.setItem('directory-view-mode', mode);
   };
 
-  useEffect(() => {
-    loadMembers();
-  }, []);
-
   // Update user role when member authentication changes
   useEffect(() => {
     if (isAuthenticated && member) {
@@ -159,20 +157,7 @@ const Directory: React.FC = () => {
     }
   }, [isAuthenticated, member]);
 
-  useEffect(() => {
-    const params: Record<string, string> = {};
-    if (searchTerm) params.search = searchTerm;
-    if (selectedState) params.state = selectedState;
-    if (selectedDistrict) params.district = selectedDistrict;
-    if (currentPage > 1) params.page = currentPage.toString();
-    if (recordsPerPage !== 25) params.perPage = recordsPerPage.toString();
-
-    setSearchParams(params);
-    setExpandedMemberId(null);
-  }, [searchTerm, selectedState, selectedDistrict, currentPage, recordsPerPage]);
-
-
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     console.log('[Directory] Loading members...');
     try {
       setIsLoading(true);
@@ -267,7 +252,7 @@ const Directory: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const filteredMembers = useMemo(() => {
     console.log('[Directory] Applying filters - search:', searchTerm, 'state:', selectedState, 'district:', selectedDistrict, 'city:', selectedCity);
@@ -382,24 +367,7 @@ const Directory: React.FC = () => {
     return allDistricts;
   }, [allDistricts]);
 
-  useEffect(() => {
-    if (selectedState) {
-      loadDistrictsForState(selectedState);
-    } else {
-      setAllDistricts([]);
-      setAllCities([]);
-    }
-  }, [selectedState]);
-
-  useEffect(() => {
-    if (selectedDistrict) {
-      loadCitiesForDistrict(selectedDistrict);
-    } else {
-      setAllCities([]);
-    }
-  }, [selectedDistrict]);
-
-  const loadDistrictsForState = async (stateName: string) => {
+  const loadDistrictsForState = useCallback(async (stateName: string) => {
     console.log('[Directory] Loading districts for state:', stateName);
     try {
       const districts = await locationsService.getActiveDistrictsByStateName(stateName);
@@ -410,9 +378,9 @@ const Directory: React.FC = () => {
       console.error('[Directory] Error loading districts:', error);
       setAllDistricts([]);
     }
-  };
+  }, []);
 
-  const loadCitiesForDistrict = async (districtName: string) => {
+  const loadCitiesForDistrict = useCallback(async (districtName: string) => {
     console.log('[Directory] Loading cities for district:', districtName);
     try {
       const districts = await locationsService.getActiveDistrictsByStateName(selectedState);
@@ -429,7 +397,40 @@ const Directory: React.FC = () => {
       console.error('[Directory] Error loading cities:', error);
       setAllCities([]);
     }
-  };
+  }, [selectedState]);
+
+  useEffect(() => {
+    void loadMembers();
+  }, [loadMembers]);
+
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (searchTerm) params.search = searchTerm;
+    if (selectedState) params.state = selectedState;
+    if (selectedDistrict) params.district = selectedDistrict;
+    if (currentPage > 1) params.page = currentPage.toString();
+    if (recordsPerPage !== 25) params.perPage = recordsPerPage.toString();
+
+    setSearchParams(params);
+    setExpandedMemberId(null);
+  }, [currentPage, recordsPerPage, searchTerm, selectedDistrict, selectedState, setSearchParams]);
+
+  useEffect(() => {
+    if (selectedState) {
+      void loadDistrictsForState(selectedState);
+    } else {
+      setAllDistricts([]);
+      setAllCities([]);
+    }
+  }, [loadDistrictsForState, selectedState]);
+
+  useEffect(() => {
+    if (selectedDistrict) {
+      void loadCitiesForDistrict(selectedDistrict);
+    } else {
+      setAllCities([]);
+    }
+  }, [loadCitiesForDistrict, selectedDistrict]);
 
   const clearFilters = () => {
     setSearchTerm('');

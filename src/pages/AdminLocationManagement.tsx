@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MapPin, Plus, Search, ArrowLeft, Building2, CreditCard as Edit3, Trash2, Users, AlertCircle, Loader2, X, Lock } from 'lucide-react';
 import { locationsService, DistrictOption, CityOption, statesService } from '../lib/supabase';
@@ -60,14 +60,6 @@ const AdminLocationManagement: React.FC = () => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (stateName) {
-      const decodedStateName = decodeURIComponent(stateName);
-      loadStateId(decodedStateName);
-      loadDistricts(decodedStateName);
-    }
-  }, [stateName]);
-
   const getSessionToken = (): string | null => sessionManager.getSessionToken();
 
   const loadStateId = async (state: string) => {
@@ -86,7 +78,15 @@ const AdminLocationManagement: React.FC = () => {
     }
   };
 
-  const loadDistricts = async (state: string) => {
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  const loadDistricts = useCallback(async (state: string) => {
     try {
       setIsLoadingDistricts(true);
       const districtsData = await locationsService.getActiveDistrictsByStateName(state);
@@ -97,7 +97,7 @@ const AdminLocationManagement: React.FC = () => {
     } finally {
       setIsLoadingDistricts(false);
     }
-  };
+  }, [showToast]);
 
   const loadCities = async (districtId: string) => {
     try {
@@ -118,13 +118,13 @@ const AdminLocationManagement: React.FC = () => {
     await loadCities(district.district_id);
   };
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
+  useEffect(() => {
+    if (stateName) {
+      const decodedStateName = decodeURIComponent(stateName);
+      void loadStateId(decodedStateName);
+      void loadDistricts(decodedStateName);
+    }
+  }, [loadDistricts, stateName]);
 
   const handleAddDistrict = async () => {
     console.log('[AdminLocationManagement] Adding new district:', newDistrictName);

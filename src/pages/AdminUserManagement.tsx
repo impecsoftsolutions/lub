@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, Shield, User, Building2, Mail, Phone, CheckCircle, X, Lock } from 'lucide-react';
 import { userRolesService, UserRole, AdminUser } from '../lib/supabase';
@@ -63,11 +63,15 @@ const AdminUserManagement: React.FC = () => {
     viewer: 'Read-only access to view members, roles, payments, and analytics'
   };
 
-  useEffect(() => {
-    loadAdminUsers();
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
   }, []);
 
-  const loadAdminUsers = async () => {
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  const loadAdminUsers = useCallback(async () => {
     try {
       setIsLoading(true);
       const users = await userRolesService.getAllAdminUsers();
@@ -78,15 +82,11 @@ const AdminUserManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
+  useEffect(() => {
+    void loadAdminUsers();
+  }, [loadAdminUsers]);
 
   const handleEmailChange = async (email: string) => {
     setAddUserForm(prev => ({ ...prev, email, memberInfo: null }));

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase, locationsService, citiesService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { Search, Plus, CreditCard as Edit2, Trash2, MapPin, Lock } from 'lucide-react';
@@ -56,11 +56,6 @@ export default function AdminCityManagement() {
     notes: ''
   });
 
-  useEffect(() => {
-    fetchData();
-    checkUserRole();
-  }, [statusFilter, districtFilter]);
-
   const getSessionToken = (): string | null => sessionManager.getSessionToken();
 
   async function checkUserRole() {
@@ -90,33 +85,7 @@ export default function AdminCityManagement() {
     }
   }
 
-  async function fetchData() {
-    console.log('[AdminCityManagement] Loading data (districts, states, cities)...');
-    setLoading(true);
-    try {
-      const [districtsRes, statesRes] = await Promise.all([
-        supabase.from('districts_master').select('*').eq('is_active', true).order('district_name'),
-        supabase.from('states_master').select('*').eq('is_active', true).order('state_name')
-      ]);
-
-      if (districtsRes.data) {
-        console.log('[AdminCityManagement] Districts loaded:', districtsRes.data.length);
-        setDistricts(districtsRes.data);
-      }
-      if (statesRes.data) {
-        console.log('[AdminCityManagement] States loaded:', statesRes.data.length);
-        setStates(statesRes.data);
-      }
-
-      await fetchCities();
-    } catch (error) {
-      console.error('[AdminCityManagement] Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function fetchCities() {
+  const fetchCities = useCallback(async () => {
     console.log('[AdminCityManagement] Fetching cities with filters:', {
       statusFilter,
       districtFilter: districtFilter || 'all'
@@ -147,7 +116,38 @@ export default function AdminCityManagement() {
 
     console.log('[AdminCityManagement] Cities loaded:', data?.length || 0, 'cities');
     setCities(data || []);
-  }
+  }, [districtFilter, statusFilter]);
+
+  const fetchData = useCallback(async () => {
+    console.log('[AdminCityManagement] Loading data (districts, states, cities)...');
+    setLoading(true);
+    try {
+      const [districtsRes, statesRes] = await Promise.all([
+        supabase.from('districts_master').select('*').eq('is_active', true).order('district_name'),
+        supabase.from('states_master').select('*').eq('is_active', true).order('state_name')
+      ]);
+
+      if (districtsRes.data) {
+        console.log('[AdminCityManagement] Districts loaded:', districtsRes.data.length);
+        setDistricts(districtsRes.data);
+      }
+      if (statesRes.data) {
+        console.log('[AdminCityManagement] States loaded:', statesRes.data.length);
+        setStates(statesRes.data);
+      }
+
+      await fetchCities();
+    } catch (error) {
+      console.error('[AdminCityManagement] Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchCities]);
+
+  useEffect(() => {
+    void fetchData();
+    void checkUserRole();
+  }, [fetchData]);
 
   async function handleAddCity() {
     console.log('[AdminCityManagement] Adding new city:', newCity.city_name);

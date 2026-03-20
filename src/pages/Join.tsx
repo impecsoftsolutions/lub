@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -138,6 +138,14 @@ const Join: React.FC = () => {
     isVisible: false
   });
 
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
   // Check authentication - redirect to sign in if not authenticated
   useEffect(() => {
     if (!isLoadingAuth && !isAuthenticated) {
@@ -223,49 +231,6 @@ const Join: React.FC = () => {
   }, [isAuthenticated, member, navigate]);
 
   // Load initial data and handle URL parameters
-  useEffect(() => {
-    console.log('[Join.tsx] Component mounted, loading initial data');
-    loadStates();
-    loadDesignations();
-
-    // Handle state parameter from URL
-    const stateParam = searchParams.get('state');
-    if (stateParam) {
-      console.log('[Join.tsx] State parameter from URL:', stateParam);
-      setFormData(prev => ({ ...prev, state: stateParam }));
-    }
-  }, [searchParams]);
-
-  // Load districts and payment settings when state changes
-  useEffect(() => {
-    if (formData.state) {
-      loadDistricts(formData.state);
-      loadPaymentSettingsForState(formData.state);
-    } else {
-      // Clear dependent fields when state is cleared
-      setAvailableDistricts([]);
-      setAvailableCities([]);
-      setSelectedDistrictId('');
-      setShowOtherCity(false);
-      setOtherCityText('');
-      setCurrentStatePaymentSettings(null);
-      setFormData(prev => ({ ...prev, district: '', city: '', other_city_name: '', is_custom_city: false, amount_paid: '' }));
-    }
-  }, [formData.state]);
-
-  // Load cities when district changes
-  useEffect(() => {
-    if (selectedDistrictId) {
-      loadCities(selectedDistrictId);
-    } else {
-      // Clear dependent fields when district is cleared
-      setAvailableCities([]);
-      setShowOtherCity(false);
-      setOtherCityText('');
-      setFormData(prev => ({ ...prev, city: '', other_city_name: '', is_custom_city: false }));
-    }
-  }, [selectedDistrictId]);
-
   // Auto-fill amount paid based on state payment settings and gender
   useEffect(() => {
     if (currentStatePaymentSettings && formData.gender) {
@@ -279,7 +244,7 @@ const Join: React.FC = () => {
     }
   }, [formData.gender, currentStatePaymentSettings]);
 
-  const loadStates = async () => {
+  const loadStates = useCallback(async () => {
     try {
       console.log('[Join.tsx] Loading states...');
       setIsLoadingStates(true);
@@ -292,9 +257,9 @@ const Join: React.FC = () => {
     } finally {
       setIsLoadingStates(false);
     }
-  };
+  }, [showToast]);
 
-  const loadDesignations = async () => {
+  const loadDesignations = useCallback(async () => {
     try {
       console.log('[Join.tsx] Loading designations...');
       setIsLoadingDesignations(true);
@@ -307,9 +272,9 @@ const Join: React.FC = () => {
     } finally {
       setIsLoadingDesignations(false);
     }
-  };
+  }, [showToast]);
 
-  const loadDistricts = async (stateName: string) => {
+  const loadDistricts = useCallback(async (stateName: string) => {
     try {
       console.log('[Join.tsx] Loading districts for state:', stateName);
       setIsLoadingDistricts(true);
@@ -322,9 +287,9 @@ const Join: React.FC = () => {
     } finally {
       setIsLoadingDistricts(false);
     }
-  };
+  }, [showToast]);
 
-  const loadCities = async (districtId: string) => {
+  const loadCities = useCallback(async (districtId: string) => {
     try {
       console.log('[Join.tsx] Loading cities for district ID:', districtId);
       setIsLoadingCities(true);
@@ -343,9 +308,9 @@ const Join: React.FC = () => {
     } finally {
       setIsLoadingCities(false);
     }
-  };
+  }, [showToast]);
 
-  const loadPaymentSettingsForState = async (stateName: string) => {
+  const loadPaymentSettingsForState = useCallback(async (stateName: string) => {
     try {
       setIsLoadingPaymentSettings(true);
       const paymentSettings = await statesService.getPublicPaymentStateByName(stateName);
@@ -363,15 +328,45 @@ const Join: React.FC = () => {
     } finally {
       setIsLoadingPaymentSettings(false);
     }
-  };
+  }, [showToast]);
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
+  useEffect(() => {
+    console.log('[Join.tsx] Component mounted, loading initial data');
+    void loadStates();
+    void loadDesignations();
 
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
+    const stateParam = searchParams.get('state');
+    if (stateParam) {
+      console.log('[Join.tsx] State parameter from URL:', stateParam);
+      setFormData(prev => ({ ...prev, state: stateParam }));
+    }
+  }, [loadDesignations, loadStates, searchParams]);
+
+  useEffect(() => {
+    if (formData.state) {
+      void loadDistricts(formData.state);
+      void loadPaymentSettingsForState(formData.state);
+    } else {
+      setAvailableDistricts([]);
+      setAvailableCities([]);
+      setSelectedDistrictId('');
+      setShowOtherCity(false);
+      setOtherCityText('');
+      setCurrentStatePaymentSettings(null);
+      setFormData(prev => ({ ...prev, district: '', city: '', other_city_name: '', is_custom_city: false, amount_paid: '' }));
+    }
+  }, [formData.state, loadDistricts, loadPaymentSettingsForState]);
+
+  useEffect(() => {
+    if (selectedDistrictId) {
+      void loadCities(selectedDistrictId);
+    } else {
+      setAvailableCities([]);
+      setShowOtherCity(false);
+      setOtherCityText('');
+      setFormData(prev => ({ ...prev, city: '', other_city_name: '', is_custom_city: false }));
+    }
+  }, [loadCities, selectedDistrictId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

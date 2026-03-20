@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -189,6 +189,14 @@ const MemberEditProfile: React.FC = () => {
     isVisible: false
   });
 
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -196,14 +204,8 @@ const MemberEditProfile: React.FC = () => {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  // Load initial data
-  useEffect(() => {
-    loadStates();
-    loadDesignations();
-  }, []);
-
   // Load complete member profile data from database
-  const loadMemberProfile = async () => {
+  const loadMemberProfile = useCallback(async () => {
     if (!member?.id) return;
 
     console.log('[MemberEditProfile] Loading complete profile for member:', member.id);
@@ -290,59 +292,9 @@ const MemberEditProfile: React.FC = () => {
       console.error('[MemberEditProfile] Error loading member profile:', error);
       showToast('error', 'Failed to load profile data');
     }
-  };
+  }, [member, showToast]);
 
-  // Load member profile when member.id is available
-  useEffect(() => {
-    if (member?.id) {
-      loadMemberProfile();
-    }
-  }, [member?.id]);
-
-  // Load districts when state changes
-  useEffect(() => {
-    console.log('[useEffect state] State changed to:', formData.state);
-    if (formData.state) {
-      console.log('[useEffect state] Calling loadDistricts...');
-      loadDistricts(formData.state);
-    } else {
-      console.log('[useEffect state] Clearing districts');
-      setAvailableDistricts([]);
-      setAvailableCities([]);
-      setSelectedDistrictId('');
-      setShowOtherCity(false);
-    }
-  }, [formData.state]);
-
-  // Load cities when district changes
-  useEffect(() => {
-    if (selectedDistrictId) {
-      loadCities(selectedDistrictId);
-    } else {
-      setAvailableCities([]);
-      setShowOtherCity(false);
-    }
-  }, [selectedDistrictId]);
-
-  // Handle district selection
-  useEffect(() => {
-    if (formData.district && availableDistricts.length > 0) {
-      const selectedDistrict = availableDistricts.find(d => d.district_name === formData.district);
-      if (selectedDistrict) {
-        setSelectedDistrictId(selectedDistrict.district_id);
-      }
-    }
-  }, [formData.district, availableDistricts]);
-
-  // Load districts on initial load if member has a state
-  useEffect(() => {
-    if (member && member.state && !isLoadingStates) {
-      console.log('[useEffect initial] Loading districts for member state:', member.state);
-      loadDistricts(member.state);
-    }
-  }, [member?.id, isLoadingStates, member?.state]);
-
-  const loadStates = async () => {
+  const loadStates = useCallback(async () => {
     try {
       setIsLoadingStates(true);
       const states = await statesService.getPublicPaymentStates();
@@ -353,9 +305,9 @@ const MemberEditProfile: React.FC = () => {
     } finally {
       setIsLoadingStates(false);
     }
-  };
+  }, [showToast]);
 
-  const loadDesignations = async () => {
+  const loadDesignations = useCallback(async () => {
     try {
       setIsLoadingDesignations(true);
       const designations = await companyDesignationsService.getActiveDesignations();
@@ -366,9 +318,9 @@ const MemberEditProfile: React.FC = () => {
     } finally {
       setIsLoadingDesignations(false);
     }
-  };
+  }, [showToast]);
 
-  const loadDistricts = async (stateName: string) => {
+  const loadDistricts = useCallback(async (stateName: string) => {
     try {
       console.log('[loadDistricts] Loading districts for state:', stateName);
       setIsLoadingDistricts(true);
@@ -381,9 +333,9 @@ const MemberEditProfile: React.FC = () => {
     } finally {
       setIsLoadingDistricts(false);
     }
-  };
+  }, [showToast]);
 
-  const loadCities = async (districtId: string) => {
+  const loadCities = useCallback(async (districtId: string) => {
     try {
       setIsLoadingCities(true);
       const cities = await locationsService.getActiveCitiesByDistrictId(districtId);
@@ -398,15 +350,57 @@ const MemberEditProfile: React.FC = () => {
     } finally {
       setIsLoadingCities(false);
     }
-  };
+  }, [showToast]);
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
+  useEffect(() => {
+    void loadStates();
+    void loadDesignations();
+  }, [loadDesignations, loadStates]);
 
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
+  useEffect(() => {
+    if (member?.id) {
+      void loadMemberProfile();
+    }
+  }, [loadMemberProfile, member?.id]);
+
+  useEffect(() => {
+    console.log('[useEffect state] State changed to:', formData.state);
+    if (formData.state) {
+      console.log('[useEffect state] Calling loadDistricts...');
+      void loadDistricts(formData.state);
+    } else {
+      console.log('[useEffect state] Clearing districts');
+      setAvailableDistricts([]);
+      setAvailableCities([]);
+      setSelectedDistrictId('');
+      setShowOtherCity(false);
+    }
+  }, [formData.state, loadDistricts]);
+
+  useEffect(() => {
+    if (selectedDistrictId) {
+      void loadCities(selectedDistrictId);
+    } else {
+      setAvailableCities([]);
+      setShowOtherCity(false);
+    }
+  }, [loadCities, selectedDistrictId]);
+
+  useEffect(() => {
+    if (formData.district && availableDistricts.length > 0) {
+      const selectedDistrict = availableDistricts.find(d => d.district_name === formData.district);
+      if (selectedDistrict) {
+        setSelectedDistrictId(selectedDistrict.district_id);
+      }
+    }
+  }, [availableDistricts, formData.district]);
+
+  useEffect(() => {
+    if (member && member.state && !isLoadingStates) {
+      console.log('[useEffect initial] Loading districts for member state:', member.state);
+      void loadDistricts(member.state);
+    }
+  }, [isLoadingStates, loadDistricts, member]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

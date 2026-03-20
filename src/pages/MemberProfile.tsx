@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, 
@@ -57,14 +57,7 @@ const MemberProfile: React.FC = () => {
     isMember: false
   });
 
-  useEffect(() => {
-    if (id) {
-      checkUserRole();
-      loadMemberProfile();
-    }
-  }, [id]);
-
-  const checkUserRole = async () => {
+  const checkUserRole = useCallback(async () => {
     try {
       const user = await customAuth.getCurrentUserFromSession();
       if (user) {
@@ -84,9 +77,9 @@ const MemberProfile: React.FC = () => {
     } catch (error) {
       console.error('Error checking user role:', error);
     }
-  };
+  }, []);
 
-  const loadMemberProfile = async () => {
+  const loadMemberProfile = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
@@ -130,7 +123,14 @@ const MemberProfile: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      void checkUserRole();
+      void loadMemberProfile();
+    }
+  }, [checkUserRole, id, loadMemberProfile]);
 
   const formatProductsServices = (products: string) => {
     return products.split(',').map(item => item.trim()).filter(Boolean);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Building2, Plus, Search, CreditCard as Edit3, Trash2, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -102,50 +102,15 @@ const AdminDesignationsManagement: React.FC = () => {
   // Permission checks
   const canManageDesignations = useHasPermission('organization.designations.manage');
 
-  useEffect(() => {
-    loadStates();
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message, isVisible: true });
   }, []);
 
-  useEffect(() => {
-    if (activeTab === 'company') {
-      loadCompanyDesignations();
-    } else if (activeTab === 'lub') {
-      loadLubRoles();
-      if (lubRolesSubTab === 'assignments') {
-        loadMemberAssignments();
-      }
-    }
-  }, [activeTab, lubRolesSubTab]);
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
 
-  // Load districts when state changes
-  useEffect(() => {
-    if (assignmentForm.state && (assignmentForm.level === 'district' || assignmentForm.level === 'city')) {
-      loadDistricts(assignmentForm.state);
-    } else {
-      setAvailableDistricts([]);
-      setAssignmentForm(prev => ({ ...prev, district: '' }));
-    }
-  }, [assignmentForm.state, assignmentForm.level]);
-
-  useEffect(() => {
-    if (lubRolesSubTab === 'assignments') {
-      loadAssignmentStates();
-    }
-  }, [lubRolesSubTab]);
-
-  useEffect(() => {
-    if (assignmentFilters.state && (assignmentFilters.level === 'district' || assignmentFilters.level === 'city')) {
-      loadAssignmentDistricts(assignmentFilters.state);
-    } else {
-      setAssignmentDistricts([]);
-      if (assignmentFilters.level !== 'all' && assignmentFilters.level !== 'national' && assignmentFilters.level !== 'state') {
-        setAssignmentFilters(prev => ({ ...prev, district: '' }));
-      }
-    }
-  }, [assignmentFilters.state, assignmentFilters.level]);
-
-
-  const loadStates = async () => {
+  const loadStates = useCallback(async () => {
     try {
       setIsLoadingStates(true);
       const states = await statesService.getAllStates();
@@ -156,9 +121,9 @@ const AdminDesignationsManagement: React.FC = () => {
     } finally {
       setIsLoadingStates(false);
     }
-  };
+  }, [showToast]);
 
-  const loadDistricts = async (stateName: string) => {
+  const loadDistricts = useCallback(async (stateName: string) => {
     try {
       setIsLoadingDistricts(true);
       const districts = await locationsService.getActiveDistrictsByStateName(stateName);
@@ -169,27 +134,27 @@ const AdminDesignationsManagement: React.FC = () => {
     } finally {
       setIsLoadingDistricts(false);
     }
-  };
+  }, [showToast]);
 
-  const loadAssignmentStates = async () => {
+  const loadAssignmentStates = useCallback(async () => {
     try {
       const states = await statesService.getAllStates();
       setAssignmentStates(states.filter(state => state.is_active));
     } catch (error) {
       console.error('[AdminDesignationsManagement] Error loading assignment filter states:', error);
     }
-  };
+  }, []);
 
-  const loadAssignmentDistricts = async (stateName: string) => {
+  const loadAssignmentDistricts = useCallback(async (stateName: string) => {
     try {
       const districts = await locationsService.getActiveDistrictsByStateName(stateName);
       setAssignmentDistricts(districts);
     } catch (error) {
       console.error('[AdminDesignationsManagement] Error loading assignment filter districts:', error);
     }
-  };
+  }, []);
 
-  const loadCompanyDesignations = async () => {
+  const loadCompanyDesignations = useCallback(async () => {
     try {
       setIsLoadingCompany(true);
       const designations = await companyDesignationsService.getAllDesignations();
@@ -200,9 +165,9 @@ const AdminDesignationsManagement: React.FC = () => {
     } finally {
       setIsLoadingCompany(false);
     }
-  };
+  }, [showToast]);
 
-  const loadLubRoles = async () => {
+  const loadLubRoles = useCallback(async () => {
     try {
       setIsLoadingLubRoles(true);
       const roles = await lubRolesService.getAllRoles();
@@ -213,9 +178,9 @@ const AdminDesignationsManagement: React.FC = () => {
     } finally {
       setIsLoadingLubRoles(false);
     }
-  };
+  }, [showToast]);
 
-  const loadMemberAssignments = async () => {
+  const loadMemberAssignments = useCallback(async () => {
     try {
       setIsLoadingAssignments(true);
       const assignments = await memberLubRolesService.getAllAssignments({ search: searchTermAssignments || undefined });
@@ -228,7 +193,7 @@ const AdminDesignationsManagement: React.FC = () => {
     } finally {
       setIsLoadingAssignments(false);
     }
-  };
+  }, [searchTermAssignments, showToast]);
 
   const searchMembers = async (searchTerm: string) => {
     if (!searchTerm.trim() || searchTerm.length < 2) {
@@ -248,13 +213,46 @@ const AdminDesignationsManagement: React.FC = () => {
     }
   };
 
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
+  useEffect(() => {
+    void loadStates();
+  }, [loadStates]);
 
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
+  useEffect(() => {
+    if (activeTab === 'company') {
+      void loadCompanyDesignations();
+    } else if (activeTab === 'lub') {
+      void loadLubRoles();
+      if (lubRolesSubTab === 'assignments') {
+        void loadMemberAssignments();
+      }
+    }
+  }, [activeTab, loadCompanyDesignations, loadLubRoles, loadMemberAssignments, lubRolesSubTab]);
+
+  useEffect(() => {
+    if (assignmentForm.state && (assignmentForm.level === 'district' || assignmentForm.level === 'city')) {
+      void loadDistricts(assignmentForm.state);
+    } else {
+      setAvailableDistricts([]);
+      setAssignmentForm(prev => ({ ...prev, district: '' }));
+    }
+  }, [assignmentForm.level, assignmentForm.state, loadDistricts]);
+
+  useEffect(() => {
+    if (lubRolesSubTab === 'assignments') {
+      void loadAssignmentStates();
+    }
+  }, [loadAssignmentStates, lubRolesSubTab]);
+
+  useEffect(() => {
+    if (assignmentFilters.state && (assignmentFilters.level === 'district' || assignmentFilters.level === 'city')) {
+      void loadAssignmentDistricts(assignmentFilters.state);
+    } else {
+      setAssignmentDistricts([]);
+      if (assignmentFilters.level !== 'all' && assignmentFilters.level !== 'national' && assignmentFilters.level !== 'state') {
+        setAssignmentFilters(prev => ({ ...prev, district: '' }));
+      }
+    }
+  }, [assignmentFilters.level, assignmentFilters.state, loadAssignmentDistricts]);
 
   // Company Designations Functions
   const handleAddCompanyDesignation = async () => {

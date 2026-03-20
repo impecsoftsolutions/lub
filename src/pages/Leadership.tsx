@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Users, MapPin, Phone, AlertCircle, Loader2, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { statesService, locationsService, leadershipService } from '../lib/supabase';
@@ -64,26 +64,7 @@ const Leadership: React.FC = () => {
   const [isLoadingCommitteeYears, setIsLoadingCommitteeYears] = useState<boolean>(false);
   const [committeeYearsError, setCommitteeYearsError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadStates();
-    loadCommitteeYears();
-  }, []);
-
-  useEffect(() => {
-    if (level === 'district' || level === 'state') {
-      if (stateName) {
-        loadDistricts(stateName);
-      }
-    }
-  }, [level, stateName]);
-
-  useEffect(() => {
-    if (hasLoaded) {
-      loadLeadershipAssignments();
-    }
-  }, [committeeYear, level, stateName, districtName]);
-
-  const loadStates = async () => {
+  const loadStates = useCallback(async () => {
     try {
       setIsLoadingStates(true);
       const data = await statesService.getActiveStates();
@@ -93,9 +74,9 @@ const Leadership: React.FC = () => {
     } finally {
       setIsLoadingStates(false);
     }
-  };
+  }, []);
 
-  const loadCommitteeYears = async () => {
+  const loadCommitteeYears = useCallback(async () => {
     try {
       setIsLoadingCommitteeYears(true);
       setCommitteeYearsError(null);
@@ -109,9 +90,9 @@ const Leadership: React.FC = () => {
     } finally {
       setIsLoadingCommitteeYears(false);
     }
-  };
+  }, []);
 
-  const loadDistricts = async (state: string) => {
+  const loadDistricts = useCallback(async (state: string) => {
     try {
       setIsLoadingDistricts(true);
       const data = await locationsService.getActiveDistrictsByStateName(state);
@@ -125,9 +106,9 @@ const Leadership: React.FC = () => {
     } finally {
       setIsLoadingDistricts(false);
     }
-  };
+  }, [districtName, level]);
 
-  const loadLeadershipAssignments = async () => {
+  const loadLeadershipAssignments = useCallback(async () => {
     setError(null);
     setIsLoadingAssignments(true);
 
@@ -158,11 +139,28 @@ const Leadership: React.FC = () => {
     } finally {
       setIsLoadingAssignments(false);
     }
-  };
+  }, [committeeYear, districtName, level, stateName]);
+
+  useEffect(() => {
+    void loadStates();
+    void loadCommitteeYears();
+  }, [loadCommitteeYears, loadStates]);
+
+  useEffect(() => {
+    if ((level === 'district' || level === 'state') && stateName) {
+      void loadDistricts(stateName);
+    }
+  }, [level, loadDistricts, stateName]);
+
+  useEffect(() => {
+    if (hasLoaded) {
+      void loadLeadershipAssignments();
+    }
+  }, [hasLoaded, loadLeadershipAssignments]);
 
   const handleLoadCommittee = () => {
     setHasLoaded(true);
-    loadLeadershipAssignments();
+    void loadLeadershipAssignments();
   };
 
   const isLoadButtonDisabled = () => {
