@@ -484,7 +484,7 @@ const AdminUsers: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2">
                             {user.roles.length > 0 ? (
                               <>
                                 {user.roles.map((role) => (
