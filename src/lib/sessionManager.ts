@@ -1,5 +1,22 @@
-import { DEFAULT_SESSION_CONFIG, SessionConfig } from '../types/auth.types';
+import { DEFAULT_SESSION_CONFIG, SessionConfig, User as AuthUser } from '../types/auth.types';
 import { customAuth } from './customAuth';
+
+interface StoredSessionData {
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+interface SessionUserData extends AuthUser {
+  full_name?: string | null;
+  company_name?: string | null;
+  status?: 'pending' | 'approved' | 'rejected';
+  approval_date?: string | null;
+  rejection_reason?: string | null;
+  reapplication_count?: number;
+  member_id?: string | null;
+  profile_photo_url?: string | null;
+}
 
 class SessionManager {
   private config: SessionConfig;
@@ -11,9 +28,9 @@ class SessionManager {
     this.config = { ...DEFAULT_SESSION_CONFIG, ...config };
   }
 
-  saveSession(sessionToken: string, expiresAt: string, userData?: any): void {
+  saveSession(sessionToken: string, expiresAt: string, userData?: SessionUserData): void {
     try {
-      const sessionData = {
+      const sessionData: StoredSessionData = {
         token: sessionToken,
         expiresAt,
         createdAt: new Date().toISOString(),
@@ -42,7 +59,7 @@ class SessionManager {
         return null;
       }
 
-      const parsed = JSON.parse(sessionData);
+      const parsed = JSON.parse(sessionData) as StoredSessionData;
       return parsed.token || null;
     } catch (error) {
       console.error('[SessionManager] Error getting session token:', error);
@@ -50,7 +67,7 @@ class SessionManager {
     }
   }
 
-  getUserData(): any | null {
+  getUserData(): SessionUserData | null {
     try {
       // FIXED: Use the correct key with _user suffix
       const userData = localStorage.getItem(`${this.config.storageKey}_user`);
@@ -59,14 +76,14 @@ class SessionManager {
         return null;
       }
 
-      return JSON.parse(userData);
+      return JSON.parse(userData) as SessionUserData;
     } catch (error) {
       console.error('[SessionManager] Error getting user data:', error);
       return null;
     }
   }
 
-  saveUserData(userData: any): void {
+  saveUserData(userData: SessionUserData): void {
     try {
       localStorage.setItem(`${this.config.storageKey}_user`, JSON.stringify(userData));
       console.log('[SessionManager] User data saved successfully');
@@ -216,7 +233,7 @@ class SessionManager {
     }
   }
 
-  private throttle<T extends (...args: any[]) => void>(
+  private throttle<T extends (...args: unknown[]) => void>(
     func: T,
     delay: number
   ): (...args: Parameters<T>) => void {
@@ -237,7 +254,7 @@ class SessionManager {
     token: string | null;
     expiresAt: string | null;
     isExpired: boolean;
-    userData: any | null;
+    userData: SessionUserData | null;
   } {
     return {
       hasSession: this.hasSession(),

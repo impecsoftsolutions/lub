@@ -12,7 +12,7 @@ import {
   User,
   Download
 } from 'lucide-react';
-import { supabase, directoryVisibilityService, DirectoryFieldVisibility } from '../lib/supabase';
+import { directoryVisibilityService, DirectoryFieldVisibility } from '../lib/supabase';
 
 interface MemberData {
   id: string;
@@ -52,8 +52,7 @@ interface ExpandedMemberDetailsProps {
 
 const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
   member,
-  userRole,
-  onClose
+  userRole
 }) => {
   const [visibilitySettings, setVisibilitySettings] = useState<DirectoryFieldVisibility[]>([]);
   const [isLoading, setIsLoading] = useState(true);

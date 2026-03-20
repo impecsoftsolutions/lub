@@ -103,7 +103,7 @@ const Leadership: React.FC = () => {
       const years = await leadershipService.getCommitteeYears();
 
       setAvailableCommitteeYears(years);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[Leadership] Failed to load committee years', err);
       setCommitteeYearsError('Failed to load committee years. Please try again.');
     } finally {
@@ -132,16 +132,8 @@ const Leadership: React.FC = () => {
     setIsLoadingAssignments(true);
 
     try {
-      let p_state = null;
-      let p_district = null;
-
-      if (level === 'state' || level === 'district') {
-        p_state = stateName;
-      }
-
-      if (level === 'district') {
-        p_district = districtName;
-      }
+      const p_state = level === 'state' || level === 'district' ? stateName : null;
+      const p_district = level === 'district' ? districtName : null;
 
       const { data, error: rpcError } = await supabase.rpc('get_public_leadership_assignments', {
         p_level: level,
@@ -159,9 +151,9 @@ const Leadership: React.FC = () => {
       }
 
       setAssignments(data || []);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error loading leadership assignments:', err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      setError((err as { message?: string }).message || 'An unexpected error occurred. Please try again.');
       setAssignments([]);
     } finally {
       setIsLoadingAssignments(false);
@@ -233,14 +225,6 @@ const Leadership: React.FC = () => {
       return `Smt. ${fullName}`;
     }
     return fullName;
-  };
-
-  const getMemberInitials = (fullName: string) => {
-    const names = fullName.trim().split(' ');
-    if (names.length >= 2) {
-      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-    }
-    return fullName.substring(0, 2).toUpperCase();
   };
 
   const groupAssignmentsByRole = (): GroupedRole[] => {
@@ -442,7 +426,6 @@ const Leadership: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {roleGroup.members.map((member, idx) => {
                         const displayName = getMemberDisplayName(member.member_full_name, member.member_gender);
-                        const initials = getMemberInitials(member.member_full_name);
                         const district = member.member_district || member.assignment_district;
 
                         return (

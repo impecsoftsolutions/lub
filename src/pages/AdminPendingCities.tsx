@@ -11,7 +11,7 @@ import { sessionManager } from '../lib/sessionManager';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
-interface PendingCustomCity extends PendingCityListItem {}
+type PendingCustomCity = PendingCityListItem;
 
 export default function AdminPendingCities() {
   const canApprovePending = useHasPermission('locations.cities.approve_pending');

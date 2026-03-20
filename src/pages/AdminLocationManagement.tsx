@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { MapPin, Plus, Search, ArrowLeft, Building2, CreditCard as Edit3, Trash2, Users, AlertCircle, Loader2, X, Lock } from 'lucide-react';
 import { locationsService, DistrictOption, CityOption, statesService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
@@ -9,9 +9,7 @@ import { useHasPermission } from '../hooks/usePermissions';
 
 const AdminLocationManagement: React.FC = () => {
   const { stateName } = useParams<{ stateName: string }>();
-  const canViewDistricts = useHasPermission('locations.districts.view');
   const canManageDistricts = useHasPermission('locations.districts.manage');
-  const canViewCities = useHasPermission('locations.cities.view');
   const canManageCities = useHasPermission('locations.cities.manage');
   const [districts, setDistricts] = useState<DistrictOption[]>([]);
   const [selectedDistrict, setSelectedDistrict] = useState<DistrictOption | null>(null);
@@ -24,7 +22,6 @@ const AdminLocationManagement: React.FC = () => {
   const [isAddDistrictOpen, setIsAddDistrictOpen] = useState(false);
   const [isAddCityOpen, setIsAddCityOpen] = useState(false);
   const [selectedDistrictId, setSelectedDistrictId] = useState<string | null>(null);
-  const [selectedDistrictName, setSelectedDistrictName] = useState<string | null>(null);
   
   // Form state
   const [newDistrictName, setNewDistrictName] = useState('');
@@ -424,7 +421,6 @@ const AdminLocationManagement: React.FC = () => {
                   className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   onClick={() => {
                     setSelectedDistrictId(selectedDistrict.district_id);
-                    setSelectedDistrictName(selectedDistrict.district_name);
                     setIsAddCityOpen(true);
                   }}
                 >

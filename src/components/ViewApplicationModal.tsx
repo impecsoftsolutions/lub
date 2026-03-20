@@ -1,13 +1,72 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { X, CreditCard as Edit, CheckCircle, XCircle, FileText, ExternalLink, User, Building2, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
+
+interface CompanyDesignationSummary {
+  designation_name: string;
+}
+
+interface ApplicationDetails {
+  id: string;
+  full_name: string;
+  email: string;
+  mobile_number: string;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  member_id?: string | null;
+  company_name: string;
+  company_designations?: CompanyDesignationSummary | null;
+  company_address?: string | null;
+  products_services?: string | null;
+  brand_names?: string | null;
+  website?: string | null;
+  state?: string | null;
+  district?: string | null;
+  city?: string | null;
+  other_city_name?: string | null;
+  is_custom_city?: boolean;
+  pin_code?: string | null;
+  industry?: string | null;
+  activity_type?: string | null;
+  constitution?: string | null;
+  annual_turnover?: string | null;
+  number_of_employees?: string | null;
+  gst_registered?: string | null;
+  gst_number?: string | null;
+  pan_company?: string | null;
+  esic_registered?: string | null;
+  epf_registered?: string | null;
+  amount_paid?: string | null;
+  payment_date?: string | null;
+  payment_mode?: string | null;
+  transaction_id?: string | null;
+  bank_reference?: string | null;
+  alternate_contact_name?: string | null;
+  alternate_mobile?: string | null;
+  referred_by?: string | null;
+  gst_certificate_url?: string | null;
+  udyam_certificate_url?: string | null;
+  payment_proof_url?: string | null;
+  profile_photo_url?: string | null;
+  status?: 'pending' | 'approved' | 'rejected';
+  first_viewed_at?: string | null;
+  reviewed_count?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+interface SectionField {
+  label: string;
+  value: string | number | boolean | null | undefined;
+  type?: 'date';
+}
 
 interface ViewApplicationModalProps {
   applicationId: string;
   isOpen: boolean;
   onClose: () => void;
-  onEdit: (applicationData: any) => void;
+  onEdit: (applicationData: ApplicationDetails) => void;
   onApprove: (applicationId: string) => void;
   onReject: (applicationId: string) => void;
 }
@@ -15,7 +74,7 @@ interface ViewApplicationModalProps {
 interface SectionData {
   title: string;
   icon: React.ReactNode;
-  fields: { label: string; value: any; type?: string }[];
+  fields: SectionField[];
 }
 
 const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
@@ -26,18 +85,12 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
   onApprove,
   onReject
 }) => {
-  const [applicationData, setApplicationData] = useState<any>(null);
+  const [applicationData, setApplicationData] = useState<ApplicationDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['personal', 'company']));
 
-  useEffect(() => {
-    if (isOpen && applicationId) {
-      loadApplicationDetails();
-    }
-  }, [isOpen, applicationId]);
-
-  const loadApplicationDetails = async () => {
+  const loadApplicationDetails = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
@@ -62,7 +115,13 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [applicationId]);
+
+  useEffect(() => {
+    if (isOpen && applicationId) {
+      void loadApplicationDetails();
+    }
+  }, [applicationId, isOpen, loadApplicationDetails]);
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -83,7 +142,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     });
   };
 
-  const formatValue = (value: any, type?: string): string => {
+  const formatValue = (value: SectionField['value'], type?: SectionField['type']): string => {
     if (value === null || value === undefined || value === '') {
       return 'Not provided';
     }
@@ -96,7 +155,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     return String(value);
   };
 
-  const renderField = (label: string, value: any, type?: string) => {
+  const renderField = (label: string, value: SectionField['value'], type?: SectionField['type']) => {
     const formattedValue = formatValue(value, type);
     const isEmpty = formattedValue === 'Not provided';
 
@@ -176,7 +235,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
   }
 
   // Only show filled fields
-  const getFilledFields = (fields: { label: string; value: any; type?: string }[]) => {
+  const getFilledFields = (fields: SectionField[]) => {
     return fields.filter(field => {
       const value = field.value;
       return value !== null && value !== undefined && value !== '';

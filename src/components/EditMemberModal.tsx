@@ -7,6 +7,7 @@ import {
   locationsService,
   companyDesignationsService,
   fileUploadService,
+  CompanyDesignation,
   PublicPaymentState,
   DistrictOption,
   CityOption
@@ -17,8 +18,92 @@ import { useValidation } from '../hooks/useValidation';
 import ImageCropModal from './ImageCropModal';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
 
+type MemberEditFormValue = string | boolean | null | undefined;
+
+interface EditableMember {
+  id: string;
+  full_name?: string | null;
+  email?: string | null;
+  mobile_number?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  member_id?: string | null;
+  company_name?: string | null;
+  company_designation_id?: string | null;
+  company_address?: string | null;
+  city?: string | null;
+  other_city_name?: string | null;
+  is_custom_city?: boolean | null;
+  district?: string | null;
+  state?: string | null;
+  pin_code?: string | null;
+  industry?: string | null;
+  activity_type?: string | null;
+  constitution?: string | null;
+  annual_turnover?: string | null;
+  number_of_employees?: string | null;
+  products_services?: string | null;
+  brand_names?: string | null;
+  website?: string | null;
+  gst_registered?: string | null;
+  gst_number?: string | null;
+  pan_company?: string | null;
+  esic_registered?: string | null;
+  epf_registered?: string | null;
+  alternate_contact_name?: string | null;
+  alternate_mobile?: string | null;
+  referred_by?: string | null;
+  amount_paid?: string | null;
+  payment_date?: string | null;
+  payment_mode?: string | null;
+  transaction_id?: string | null;
+  bank_reference?: string | null;
+  profile_photo_url?: string | null;
+}
+
+interface MemberEditFormData {
+  [key: string]: MemberEditFormValue;
+  full_name: string;
+  email: string;
+  mobile_number: string;
+  gender: string;
+  date_of_birth: string;
+  member_id: string;
+  company_name: string;
+  company_designation_id: string;
+  company_address: string;
+  city: string;
+  other_city_name: string;
+  is_custom_city: boolean;
+  district: string;
+  state: string;
+  pin_code: string;
+  industry: string;
+  activity_type: string;
+  constitution: string;
+  annual_turnover: string;
+  number_of_employees: string;
+  products_services: string;
+  brand_names: string;
+  website: string;
+  gst_registered: string;
+  gst_number: string;
+  pan_company: string;
+  esic_registered: string;
+  epf_registered: string;
+  alternate_contact_name: string;
+  alternate_mobile: string;
+  referred_by: string;
+  amount_paid: string;
+  payment_date: string;
+  payment_mode: string;
+  transaction_id: string;
+  bank_reference: string;
+  profile_photo_url?: string | null;
+}
+
 interface EditMemberModalProps {
-  member: any;
+  member: EditableMember;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -34,14 +119,51 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<MemberEditFormData>({
+    full_name: '',
+    email: '',
+    mobile_number: '',
+    gender: 'male',
+    date_of_birth: '',
+    member_id: '',
+    company_name: '',
+    company_designation_id: '',
+    company_address: '',
+    city: '',
+    other_city_name: '',
+    is_custom_city: false,
+    district: '',
+    state: '',
+    pin_code: '',
+    industry: '',
+    activity_type: '',
+    constitution: '',
+    annual_turnover: '',
+    number_of_employees: '',
+    products_services: '',
+    brand_names: '',
+    website: '',
+    gst_registered: '',
+    gst_number: '',
+    pan_company: '',
+    esic_registered: '',
+    epf_registered: '',
+    alternate_contact_name: '',
+    alternate_mobile: '',
+    referred_by: '',
+    amount_paid: '',
+    payment_date: '',
+    payment_mode: '',
+    transaction_id: '',
+    bank_reference: '',
+  });
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
 
   // Location state
   const [availableStates, setAvailableStates] = useState<PublicPaymentState[]>([]);
   const [availableDistricts, setAvailableDistricts] = useState<DistrictOption[]>([]);
   const [availableCities, setAvailableCities] = useState<CityOption[]>([]);
-  const [availableDesignations, setAvailableDesignations] = useState<any[]>([]);
+  const [availableDesignations, setAvailableDesignations] = useState<CompanyDesignation[]>([]);
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>('');
   const [showOtherCity, setShowOtherCity] = useState(false);
   const [otherCityText, setOtherCityText] = useState('');
@@ -62,7 +184,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
 
-  const { isFieldVisible, isFieldRequired, getValidationRuleName, isLoading: isLoadingFieldConfig } = useFormFieldConfig();
+  const { isFieldVisible, isFieldRequired, isLoading: isLoadingFieldConfig } = useFormFieldConfig();
   const { validateField: validateFieldByRule, isLoading: isLoadingValidation } = useValidation();
 
   const normalizePaymentMode = (value: string | null | undefined): string => {
@@ -302,7 +424,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
 
     if (validationErrors[name]) {
       setValidationErrors(prev => {
@@ -317,7 +439,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const stateName = e.target.value;
     console.log('[EditMemberModal] State changed to:', stateName);
 
-    setFormData((prev: any) => ({
+    setFormData(prev => ({
       ...prev,
       state: stateName,
       district: '',
@@ -342,7 +464,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const districtName = e.target.value;
     const selectedDistrict = availableDistricts.find(d => d.district_name === districtName);
 
-    setFormData((prev: any) => ({ ...prev, district: districtName, city: '', other_city_name: '', is_custom_city: false }));
+    setFormData(prev => ({ ...prev, district: districtName, city: '', other_city_name: '', is_custom_city: false }));
     setSelectedDistrictId(selectedDistrict?.district_id || '');
     setShowOtherCity(false);
     setOtherCityText('');
@@ -363,13 +485,13 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     if (cityName === 'Other') {
       console.log('[EditMemberModal] "Other" city selected, enabling custom city input');
       setShowOtherCity(true);
-      setFormData((prev: any) => ({ ...prev, city: '', other_city_name: '', is_custom_city: true }));
+      setFormData(prev => ({ ...prev, city: '', other_city_name: '', is_custom_city: true }));
       setOtherCityText('');
     } else {
       console.log('[EditMemberModal] Standard city selected');
       setShowOtherCity(false);
       setOtherCityText('');
-      setFormData((prev: any) => ({ ...prev, city: cityName, other_city_name: '', is_custom_city: false }));
+      setFormData(prev => ({ ...prev, city: cityName, other_city_name: '', is_custom_city: false }));
     }
 
     if (validationErrors.city) {
@@ -386,7 +508,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     console.log('[EditMemberModal] Custom city name changed to:', value);
     setOtherCityText(value);
 
-    setFormData((prev: any) => ({
+    setFormData(prev => ({
       ...prev,
       other_city_name: value,
       is_custom_city: true
@@ -408,7 +530,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
       numericValue = numericValue.substring(1);
     }
     // No length limit - let validation handle it
-    setFormData((prev: any) => ({ ...prev, [name]: numericValue }));
+    setFormData(prev => ({ ...prev, [name]: numericValue }));
     if (validationErrors[name]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
@@ -422,11 +544,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const { name, value } = e.target;
 
     // Remove all non-alphanumeric characters and convert to uppercase
-    let alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     // No length limit - let validation handle it
 
-    setFormData((prev: any) => ({ ...prev, [name]: alphanumericValue }));
+    setFormData(prev => ({ ...prev, [name]: alphanumericValue }));
 
     // Clear error when user starts typing
     if (validationErrors[name]) {
@@ -442,11 +564,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const { name, value } = e.target;
 
     // Remove all non-alphanumeric characters and convert to uppercase
-    let alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     // No length limit - let validation handle it
 
-    setFormData((prev: any) => ({ ...prev, [name]: alphanumericValue }));
+    setFormData(prev => ({ ...prev, [name]: alphanumericValue }));
 
     // Clear error when user starts typing
     if (validationErrors[name]) {
@@ -614,12 +736,12 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  const sanitizeFormData = (data: any) => {
+  const sanitizeFormData = (data: MemberEditFormData): MemberEditFormData => {
     console.log('[EditMemberModal] Sanitizing form data');
     console.log('[EditMemberModal] is_custom_city:', data.is_custom_city);
     console.log('[EditMemberModal] city:', data.city);
     console.log('[EditMemberModal] other_city_name:', data.other_city_name);
-    const sanitized: any = { ...data };
+    const sanitized: MemberEditFormData = { ...data };
 
     // DEFENSIVE CHECK: If other_city_name has a value but city is empty/null, infer custom city
     if (sanitized.other_city_name && sanitized.other_city_name.trim() !== '' &&
@@ -694,7 +816,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
       const imageSrc = await readFileAsDataURL(file);
       setPhotoImageSrc(imageSrc);
       setIsCropModalOpen(true);
-    } catch (error) {
+    } catch {
       onError('Failed to read image file');
       e.target.value = '';
     }
@@ -718,7 +840,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
       setPhotoToDelete(member.profile_photo_url);
 
       // Update form data to indicate photo should be removed
-      setFormData((prev: any) => ({ ...prev, profile_photo_url: null }));
+      setFormData(prev => ({ ...prev, profile_photo_url: null }));
     }
 
     // Clear the photo preview and any pending new photo

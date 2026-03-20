@@ -89,7 +89,7 @@ export const useDashboardData = (): DashboardData => {
       ]);
 
       const uniqueAdminUsers = new Set(
-        activeAdminUsersResult.data?.map((role: any) => role.user_id) || []
+        activeAdminUsersResult.data?.map((role: { user_id: string }) => role.user_id) || []
       ).size;
 
       setMetrics({

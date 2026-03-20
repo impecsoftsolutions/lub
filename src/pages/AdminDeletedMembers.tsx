@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Trash2,
   Search,
-  ArrowLeft,
   RotateCcw,
   AlertTriangle,
   Clock,
@@ -39,17 +37,7 @@ const AdminDeletedMembers: React.FC = () => {
     isVisible: false
   });
 
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    loadDeletedMembers();
-  }, []);
-
-  useEffect(() => {
-    filterMembers();
-  }, [deletedMembers, searchTerm]);
-
-  const loadDeletedMembers = async () => {
+  const loadDeletedMembers = useCallback(async () => {
     try {
       setIsLoading(true);
       const sessionToken = sessionManager.getSessionToken();
@@ -65,13 +53,14 @@ const AdminDeletedMembers: React.FC = () => {
       setDeletedMembers(data);
 
       console.debug('[AdminDeletedMembers] loaded', { count: Array.isArray(data) ? data.length : 0 });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[AdminDeletedMembers] fetch error', error);
+      const resolvedError = error as { message?: string; code?: string };
 
       // Distinguish permission errors from other errors
-      if (error?.message?.toLowerCase?.().includes('not authorized') ||
-          error?.message?.toLowerCase?.().includes('permission') ||
-          error?.code === 'PGRST301') {
+      if (resolvedError?.message?.toLowerCase?.().includes('not authorized') ||
+          resolvedError?.message?.toLowerCase?.().includes('permission') ||
+          resolvedError?.code === 'PGRST301') {
         showToast('error', 'Access restricted: You do not have permission to view deleted members');
         setDeletedMembers([]);
         return;
@@ -81,7 +70,15 @@ const AdminDeletedMembers: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchTerm]);
+
+  useEffect(() => {
+    loadDeletedMembers();
+  }, [loadDeletedMembers]);
+
+  useEffect(() => {
+    filterMembers();
+  }, [deletedMembers, searchTerm]);
 
   const filterMembers = () => {
     let filtered = deletedMembers;
@@ -133,9 +130,9 @@ const AdminDeletedMembers: React.FC = () => {
       setRestoreDialog({ isOpen: false, memberId: '', memberName: '' });
 
       await loadDeletedMembers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[AdminDeletedMembers] Error restoring member:', error);
-      const errorMsg = error?.message || 'An unexpected error occurred';
+      const errorMsg = (error as { message?: string })?.message || 'An unexpected error occurred';
       showToast('error', errorMsg);
     }
   };

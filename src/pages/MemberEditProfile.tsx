@@ -9,7 +9,6 @@ import {
   Building,
   Phone,
   Mail,
-  MapPin,
   FileText,
   Users,
   Lock,
@@ -25,7 +24,7 @@ import ChangeCredentialModal from '../components/member/ChangeCredentialModal';
 import ImageCropModal from '../components/ImageCropModal';
 import NormalizationPreviewModal from '../components/NormalizationPreviewModal';
 import { changeEmail, changeMobile } from '../lib/memberCredentialService';
-import { normalizeMemberData } from '../lib/normalization';
+import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import { useValidation } from '../hooks/useValidation';
 import { useFormFieldConfig } from '../hooks/useFormFieldConfig';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
@@ -82,13 +81,12 @@ const MemberEditProfile: React.FC = () => {
   const {
     validateField: validateFieldByRule
   } = useValidation();
-  const { isFieldRequired, isLoading: isLoadingConfig } = useFormFieldConfig();
+  const { isFieldRequired } = useFormFieldConfig();
 
   // Profile photo state (same as Join.tsx)
   const [profilePhoto, setProfilePhoto] = useState<Blob | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string>('');
   const [photoFileName, setPhotoFileName] = useState<string>('');
-  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoImageSrc, setPhotoImageSrc] = useState<string>('');
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
@@ -150,8 +148,8 @@ const MemberEditProfile: React.FC = () => {
   const [originalData, setOriginalData] = useState(formData);
 
   // Email/Mobile editing states
-  const [isEmailEditable, setIsEmailEditable] = useState(false);
-  const [isMobileEditable, setIsMobileEditable] = useState(false);
+  const [isEmailEditable] = useState(false);
+  const [isMobileEditable] = useState(false);
 
   // Modal states for credential changes
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -175,7 +173,7 @@ const MemberEditProfile: React.FC = () => {
 
   // Normalization states
   const [showNormalizationModal, setShowNormalizationModal] = useState(false);
-  const [normalizationResult, setNormalizationResult] = useState<any>(null);
+  const [normalizationResult, setNormalizationResult] = useState<NormalizationResult | null>(null);
 
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -502,10 +500,9 @@ const MemberEditProfile: React.FC = () => {
 
     try {
       const imageSrc = await readFileAsDataURL(file);
-      setSelectedPhotoFile(file);
       setPhotoImageSrc(imageSrc);
       setIsCropModalOpen(true);
-    } catch (error) {
+    } catch {
       showToast('error', 'Failed to read image file');
       e.target.value = '';
     }
@@ -528,7 +525,6 @@ const MemberEditProfile: React.FC = () => {
     setProfilePhoto(null);
     setProfilePhotoPreview('');
     setPhotoFileName('');
-    setSelectedPhotoFile(null);
     setPhotoImageSrc('');
 
     const fileInput = document.getElementById('profile-photo-input') as HTMLInputElement;
@@ -542,22 +538,6 @@ const MemberEditProfile: React.FC = () => {
 
   const handleCropError = (error: string) => {
     showToast('error', error);
-  };
-
-  const toggleEmailEditable = () => {
-    if (isEmailEditable) {
-      // Cancel - revert to original
-      setFormData(prev => ({ ...prev, email: originalData.email }));
-    }
-    setIsEmailEditable(!isEmailEditable);
-  };
-
-  const toggleMobileEditable = () => {
-    if (isMobileEditable) {
-      // Cancel - revert to original
-      setFormData(prev => ({ ...prev, mobile_number: originalData.mobile_number }));
-    }
-    setIsMobileEditable(!isMobileEditable);
   };
 
   const hasFormChanges = (): boolean => {
@@ -582,35 +562,6 @@ const MemberEditProfile: React.FC = () => {
     });
 
     return changed;
-  };
-
-  const determineChangeType = (changedFields: string[]): string => {
-    const hasEmail = changedFields.includes('email');
-    const hasMobile = changedFields.includes('mobile_number');
-
-    if (hasEmail && hasMobile) return 'profile_update';
-    if (hasEmail) return 'email_change';
-    if (hasMobile) return 'mobile_change';
-
-    return 'profile_update';
-  };
-
-  const buildCurrentData = (changedFields: string[]): Record<string, any> => {
-    const data: Record<string, any> = {};
-    changedFields.forEach(field => {
-      const typedField = field as keyof typeof originalData;
-      data[field] = originalData[typedField];
-    });
-    return data;
-  };
-
-  const buildRequestedData = (changedFields: string[]): Record<string, any> => {
-    const data: Record<string, any> = {};
-    changedFields.forEach(field => {
-      const typedField = field as keyof typeof formData;
-      data[field] = formData[typedField];
-    });
-    return data;
   };
 
   const validateForm = async (): Promise<boolean> => {
@@ -770,7 +721,7 @@ const MemberEditProfile: React.FC = () => {
     }
   };
 
-  const saveProfileData = async (dataToSave: any) => {
+  const saveProfileData = async (dataToSave: typeof formData) => {
     setIsSaving(true);
 
     try {
@@ -925,7 +876,6 @@ const MemberEditProfile: React.FC = () => {
       setProfilePhoto(null);
       setProfilePhotoPreview(finalPhotoUrl || ''); // Show the newly uploaded photo
       setPhotoFileName('');
-      setSelectedPhotoFile(null);
       setPhotoImageSrc('');
 
       // Refresh MemberContext to update the cache and Header photo
@@ -945,7 +895,7 @@ const MemberEditProfile: React.FC = () => {
     }
   };
 
-  const handleAcceptNormalization = async (acceptedData: any) => {
+  const handleAcceptNormalization = async (acceptedData: typeof formData) => {
     console.log('[MemberEditProfile] User accepted normalized data');
     setFormData(acceptedData);
     setShowNormalizationModal(false);

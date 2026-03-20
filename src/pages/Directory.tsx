@@ -11,18 +11,15 @@ import {
   ExternalLink,
   Users,
   ChevronDown,
-  Eye,
   EyeOff,
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Briefcase,
   X,
   LayoutGrid,
   List
 } from 'lucide-react';
 import { supabase, locationsService } from '../lib/supabase';
-import { urlUtils } from '../lib/supabase';
 import { useMember } from '../contexts/MemberContext';
 import ExpandedMemberDetails from '../components/ExpandedMemberDetails';
 
@@ -181,7 +178,7 @@ const Directory: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
-      let query = supabase
+      const query = supabase
         .from('member_registrations')
         .select(`
           id,
@@ -232,31 +229,37 @@ const Directory: React.FC = () => {
 
       console.log('[Directory] Members loaded successfully:', data.length, 'members');
       setMembers(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Directory] Error loading members:', err);
       console.error('[Directory] Error type:', typeof err);
-      console.error('[Directory] Error keys:', Object.keys(err));
+      console.error('[Directory] Error keys:', err && typeof err === 'object' ? Object.keys(err) : []);
 
       let errorMessage = 'Failed to load members. ';
+      const supabaseError = err as {
+        message?: string;
+        details?: string;
+        hint?: string;
+        code?: string;
+      };
 
-      if (err.message) {
-        errorMessage += `Error: ${err.message}`;
+      if (supabaseError.message) {
+        errorMessage += `Error: ${supabaseError.message}`;
       }
-      if (err.details) {
-        errorMessage += ` Details: ${err.details}`;
+      if (supabaseError.details) {
+        errorMessage += ` Details: ${supabaseError.details}`;
       }
-      if (err.hint) {
-        errorMessage += ` Hint: ${err.hint}`;
+      if (supabaseError.hint) {
+        errorMessage += ` Hint: ${supabaseError.hint}`;
       }
-      if (err.code) {
-        errorMessage += ` (Code: ${err.code})`;
+      if (supabaseError.code) {
+        errorMessage += ` (Code: ${supabaseError.code})`;
       }
 
-      if (err.code === 'PGRST116') {
+      if (supabaseError.code === 'PGRST116') {
         errorMessage = 'Foreign key constraint error. The company_designations table relationship may have issues.';
-      } else if (err.code === 'PGRST301') {
+      } else if (supabaseError.code === 'PGRST301') {
         errorMessage = 'Permission denied. RLS policies may not be configured correctly.';
-      } else if (err.message?.includes('foreign key')) {
+      } else if (supabaseError.message?.includes('foreign key')) {
         errorMessage = 'Database relationship error. Some members may have invalid company designation references.';
       }
 
@@ -326,7 +329,7 @@ const Directory: React.FC = () => {
     const startIndex = (currentPage - 1) * recordsPerPage;
     const endIndex = startIndex + recordsPerPage;
 
-    let flatMembers: Array<{ type: 'member' | 'header'; data: any; state?: string }> = [];
+    const flatMembers: Array<{ type: 'member' | 'header'; data: MemberData | { state: string; count: number }; state?: string }> = [];
 
     stateGroups.forEach(group => {
       flatMembers.push({
@@ -451,11 +454,6 @@ const Directory: React.FC = () => {
   const formatMemberSince = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  };
-
-  const getIndustryBadge = (productsServices: string) => {
-    const firstProduct = productsServices.split(',')[0].trim();
-    return firstProduct.substring(0, 30) + (firstProduct.length > 30 ? '...' : '');
   };
 
   const MemberCard: React.FC<{ member: MemberData }> = ({ member }) => {

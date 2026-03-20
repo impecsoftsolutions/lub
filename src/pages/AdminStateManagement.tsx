@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   MapPin,
   Plus,
   Search,
-  ArrowLeft,
-  Settings,
   ToggleLeft,
   ToggleRight,
   X,
-  AlertCircle,
   Lock
 } from 'lucide-react';
 import { statesService, StateMaster } from '../lib/supabase';
@@ -18,7 +15,6 @@ import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
 const AdminStateManagement: React.FC = () => {
-  const canViewStates = useHasPermission('locations.states.view');
   const canManageStates = useHasPermission('locations.states.manage');
   const [states, setStates] = useState<StateMaster[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,13 +33,7 @@ const AdminStateManagement: React.FC = () => {
     isVisible: false
   });
 
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    loadStates();
-  }, []);
-
-  const loadStates = async () => {
+  const loadStates = useCallback(async () => {
     try {
       setIsLoading(true);
       const statesData = await statesService.getAllStates();
@@ -54,7 +44,11 @@ const AdminStateManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadStates();
+  }, [loadStates]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });

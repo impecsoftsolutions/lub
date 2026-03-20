@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, Shield, User, Building2, MapPin, Mail, Phone, AlertCircle, CheckCircle, X, Lock } from 'lucide-react';
-import { userRolesService, UserRole, AdminUser, statesService, StateMaster } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, Shield, User, Building2, Mail, Phone, CheckCircle, X, Lock } from 'lucide-react';
+import { userRolesService, UserRole, AdminUser } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
 const AdminUserManagement: React.FC = () => {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
-  const [allStates, setAllStates] = useState<StateMaster[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingStates, setIsLoadingStates] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -45,8 +42,6 @@ const AdminUserManagement: React.FC = () => {
   // Permission checks
   const canCreateUsers = useHasPermission('users.create');
   const canAssignRoles = useHasPermission('users.roles.assign');
-  const canDeleteUsers = useHasPermission('users.delete');
-
   const roleLabels: Record<UserRole['role'], string> = {
     super_admin: 'Super Admin',
     admin: 'Admin',
@@ -70,21 +65,7 @@ const AdminUserManagement: React.FC = () => {
 
   useEffect(() => {
     loadAdminUsers();
-    loadStates();
   }, []);
-
-  const loadStates = async () => {
-    try {
-      setIsLoadingStates(true);
-      const states = await statesService.getAllStates();
-      setAllStates(states.filter(state => state.is_active));
-    } catch (error) {
-      console.error('Error loading states:', error);
-      showToast('error', 'Failed to load states');
-    } finally {
-      setIsLoadingStates(false);
-    }
-  };
 
   const loadAdminUsers = async () => {
     try {
@@ -156,7 +137,7 @@ const AdminUserManagement: React.FC = () => {
   };
 
   const handleEditRole = (user: AdminUser, role: UserRole) => {
-    setSelectedUser(user);
+    void user;
     setSelectedRole(role);
     setEditRoleForm({
       role: role.role,

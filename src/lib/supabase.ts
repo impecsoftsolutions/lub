@@ -154,6 +154,57 @@ export interface FormFieldConfiguration {
   updated_at: string;
 }
 
+type JsonRecord = Record<string, unknown>;
+
+interface UserRoleQueryRow {
+  id: string;
+  user_id: string;
+  role: UserRole['role'];
+  state?: string;
+  district?: string;
+  is_member_linked: boolean;
+  created_at?: string;
+  updated_at?: string;
+  user?: {
+    email?: string | null;
+  } | null;
+}
+
+interface MemberRegistrationRpcRow extends JsonRecord {
+  company_designation_name?: string | null;
+}
+
+interface SubmitRegistrationPayload extends JsonRecord {
+  user_id?: string | null;
+  is_custom_city?: boolean;
+}
+
+interface UpdateStatusResult {
+  success: boolean;
+  error?: string;
+  registration?: JsonRecord;
+}
+
+interface MemberLubRoleAssignmentRpcRow {
+  assignment_id: string;
+  member_id: string;
+  lub_role_id: string;
+  level: MemberLubRoleAssignment['level'];
+  state?: string;
+  district?: string;
+  committee_year?: string | null;
+  role_start_date?: string | null;
+  role_end_date?: string | null;
+  created_at: string;
+  updated_at: string;
+  member_full_name: string;
+  member_email: string;
+  member_mobile_number: string;
+  member_company_name: string;
+  lub_role_name: string;
+  lub_role_display_order?: number | null;
+}
+
 // User Roles Service
 export const userRolesService = {
   async getCurrentUserRoles(): Promise<UserRole[]> {
@@ -201,7 +252,7 @@ export const userRolesService = {
       // Group roles by user
       const userMap = new Map<string, AdminUser>();
       
-      data?.forEach((roleData: any) => {
+      data?.forEach((roleData: UserRoleQueryRow) => {
         const userId = roleData.user_id;
         const userEmail = roleData.user?.email;
         
@@ -1205,7 +1256,7 @@ export const fileUploadService = {
     try {
       const filePath = `${folder}/${fileName}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('public-files')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -1232,7 +1283,7 @@ export const fileUploadService = {
     try {
       const filePath = fileName;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('member-photos')
         .upload(filePath, photoBlob, {
           cacheControl: '3600',
@@ -1378,7 +1429,7 @@ export const memberRegistrationService = {
     }
   },
 
-  async getMyMemberRegistrationByToken(sessionToken: string): Promise<{ data: any | null; error: string | null }> {
+  async getMyMemberRegistrationByToken(sessionToken: string): Promise<{ data: JsonRecord | null; error: string | null }> {
     try {
       if (!sessionToken) {
         return { data: null, error: 'User session not found. Please log in again.' };
@@ -1393,11 +1444,11 @@ export const memberRegistrationService = {
         return { data: null, error: error.message };
       }
 
-      let row: any | null = null;
+      let row: JsonRecord | null = null;
       if (Array.isArray(data)) {
-        row = data.length > 0 ? data[0] : null;
+        row = data.length > 0 ? (data[0] as JsonRecord) : null;
       } else if (data && typeof data === 'object') {
-        row = data;
+        row = data as JsonRecord;
       }
 
       return { data: row, error: null };
@@ -1408,7 +1459,7 @@ export const memberRegistrationService = {
   },
 
   async submitRegistration(
-    registrationData: any,
+    registrationData: SubmitRegistrationPayload,
     files: {
       gstCertificate: File | null;
       udyamCertificate: File | null;
@@ -1538,7 +1589,7 @@ export const memberRegistrationService = {
 
   async updateMemberRegistration(
     memberId: string,
-    updates: any,
+    updates: JsonRecord,
     sessionToken?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
@@ -1651,8 +1702,9 @@ export const memberRegistrationService = {
         return { success: false, error: result?.error || 'Failed to delete member' };
       }
       return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to delete member' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete member';
+      return { success: false, error: message };
     }
   },
 
@@ -1661,7 +1713,7 @@ export const memberRegistrationService = {
     status: 'approved' | 'rejected',
     sessionToken: string,
     rejectionReason?: string
-  ): Promise<{ success: boolean; error?: string; data?: any }> {
+  ): Promise<{ success: boolean; error?: string; data?: JsonRecord }> {
     try {
       if (!sessionToken) {
         return { success: false, error: 'User session not found. Please log in again.' };
@@ -1690,7 +1742,7 @@ export const memberRegistrationService = {
       }
 
       // Parse the JSONB response
-      const result = data as { success: boolean; error?: string; registration?: any };
+      const result = data as UpdateStatusResult;
 
       if (!result.success) {
         console.error('[updateStatusWithReason] RPC returned failure:', result.error);
@@ -1706,7 +1758,7 @@ export const memberRegistrationService = {
     }
   },
 
-  async getApplicationDetails(applicationId: string, sessionToken: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  async getApplicationDetails(applicationId: string, sessionToken: string): Promise<{ success: boolean; data?: MemberRegistrationRpcRow; error?: string }> {
     try {
       if (!sessionToken) {
         console.error('[getApplicationDetails] Session token not found');
@@ -1727,7 +1779,9 @@ export const memberRegistrationService = {
       }
 
       // RPC returns an array (SETOF), take the first item
-      const registration = data && data.length > 0 ? data[0] : null;
+      const registration = Array.isArray(data) && data.length > 0
+        ? (data[0] as MemberRegistrationRpcRow)
+        : null;
 
       if (!registration) {
         return { success: false, error: 'Application not found' };
@@ -2021,7 +2075,7 @@ export const memberLubRolesService = {
       }
 
       // Map RPC result to match interface
-      const mappedData = data.map((row: any) => ({
+      const mappedData = data.map((row: MemberLubRoleAssignmentRpcRow) => ({
         id: row.assignment_id,
         member_id: row.member_id,
         role_id: row.lub_role_id,

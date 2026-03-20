@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Filter, Mail, Phone, Shield, Calendar, Lock, ChevronUp, ChevronDown } from 'lucide-react';
 import { PermissionGate } from '../../components/permissions/PermissionGate';
@@ -30,6 +30,7 @@ interface User {
 
 type SortField = 'email' | 'account_type' | null;
 type SortDirection = 'asc' | 'desc';
+type SelectedUser = User | null;
 
 const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -52,25 +53,17 @@ const AdminUsers: React.FC = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [assignRoleModalOpen, setAssignRoleModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<SelectedUser>(null);
   const [blockAction, setBlockAction] = useState<'block' | 'unblock'>('block');
 
   const navigate = useNavigate();
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    filterUsers();
-  }, [users, searchTerm, accountTypeFilter, sortField, sortDirection]);
 
   const canEdit = useHasPermission('users.edit');
   const canDelete = useHasPermission('users.delete');
   const canBlock = useHasPermission('users.edit');
   const canAssignRoles = useHasPermission('users.roles.assign');
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setIsLoading(true);
 
@@ -123,29 +116,33 @@ const AdminUsers: React.FC = () => {
       setUsers(usersWithRoles);
     } catch (error) {
       console.error('[AdminUsers] Error loading users:', error);
-      showToast('error', 'Failed to load users');
+      setToast({ type: 'error', message: 'Failed to load users', isVisible: true });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleEditClick = (user: any) => {
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  const handleEditClick = (user: User) => {
     setSelectedUser(user);
     setEditModalOpen(true);
   };
 
-  const handleDeleteClick = (user: any) => {
+  const handleDeleteClick = (user: User) => {
     setSelectedUser(user);
     setDeleteModalOpen(true);
   };
 
-  const handleBlockClick = (user: any, action: 'block' | 'unblock') => {
+  const handleBlockClick = (user: User, action: 'block' | 'unblock') => {
     setSelectedUser(user);
     setBlockAction(action);
     setBlockModalOpen(true);
   };
 
-  const handleAssignRoleClick = (user: any) => {
+  const handleAssignRoleClick = (user: User) => {
     setSelectedUser(user);
     setAssignRoleModalOpen(true);
   };
@@ -159,7 +156,7 @@ const AdminUsers: React.FC = () => {
     showToast('success', message);
   };
 
-  const filterUsers = () => {
+  const filterUsers = useCallback(() => {
     let filtered = users;
 
     if (accountTypeFilter !== 'all') {
@@ -190,7 +187,11 @@ const AdminUsers: React.FC = () => {
     }
 
     setFilteredUsers(filtered);
-  };
+  }, [users, searchTerm, accountTypeFilter, sortField, sortDirection]);
+
+  useEffect(() => {
+    filterUsers();
+  }, [filterUsers]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });

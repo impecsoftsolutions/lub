@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase, locationsService, citiesService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
-import { Search, Plus, CreditCard as Edit2, Trash2, Eye, MapPin, Building2, Check, X, ArrowLeft, Lock } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit2, Trash2, MapPin, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
@@ -39,9 +38,7 @@ interface State {
 }
 
 export default function AdminCityManagement() {
-  const canViewCities = useHasPermission('locations.cities.view');
   const canManageCities = useHasPermission('locations.cities.manage');
-  const navigate = useNavigate();
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [states, setStates] = useState<State[]>([]);
@@ -310,7 +307,9 @@ export default function AdminCityManagement() {
               </label>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as 'all' | 'approved' | 'pending' | 'rejected')
+                }
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>

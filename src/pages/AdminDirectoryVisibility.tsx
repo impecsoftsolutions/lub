@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Eye,
-  EyeOff,
   Save,
   AlertCircle,
   CheckCircle,
@@ -19,10 +16,7 @@ const AdminDirectoryVisibility: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const navigate = useNavigate();
 
-  // Permission checks
-  const canViewSettings = useHasPermission('settings.directory.view');
   const canConfigureSettings = useHasPermission('settings.directory.configure');
 
   useEffect(() => {

@@ -1660,7 +1660,7 @@ async function getAdminRegistrationSnapshotByEmail(
         return { error: error.message };
       }
 
-      const registration = (data || []).find((row: any) => String(row.email || '').toLowerCase() === targetEmail.toLowerCase());
+      const registration = ((data || []) as Array<{ id?: string; email?: string | null }>).find((row) => String(row.email || '').toLowerCase() === targetEmail.toLowerCase());
       if (!registration?.id) {
         return null;
       }
@@ -1777,7 +1777,7 @@ async function createMemberRoleAssignmentProofTarget(page: Page): Promise<Member
           const committeeYear = makeYear(yearOffset + memberIndex * 25);
           const originalRole = roles[0];
           const updatedRole = roles[1] ?? roles[0];
-          const originalLevel: 'national' = 'national';
+          const originalLevel = 'national' as const;
           const updatedLevel: 'national' | 'state' = roles.length > 1 ? 'national' : 'state';
           const updatedState = updatedLevel === 'state' ? states[0]?.state_name : undefined;
 

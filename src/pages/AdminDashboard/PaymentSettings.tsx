@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Plus, CreditCard as Edit3, Save, X, Upload, Eye, MapPin, Building2, CreditCard, QrCode, ArrowLeft, Lock } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, CreditCard as Edit3, Save, X, Upload, MapPin, QrCode, Lock, AlertCircle } from 'lucide-react';
 import { PermissionGate } from '../../components/permissions/PermissionGate';
 import { useHasPermission } from '../../hooks/usePermissions';
 import { supabase, fileUploadService, statesService, StateMaster } from '../../lib/supabase';
@@ -32,7 +32,6 @@ const PaymentSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [qrCodeFiles, setQrCodeFiles] = useState<{ [key: string]: File }>({});
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [specificStateNotFound, setSpecificStateNotFound] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -61,36 +60,9 @@ const PaymentSettings: React.FC = () => {
     validity_years: undefined
   });
 
-  // Permission checks
-  const canViewPayment = useHasPermission('settings.payment.view');
   const canManagePayment = useHasPermission('settings.payment.manage');
 
-  useEffect(() => {
-    loadPaymentSettings();
-    loadAllStates();
-  }, []);
-
-  // Handle state parameter from URL after payment settings are loaded
-  useEffect(() => {
-    if (!isLoading && paymentSettings.length > 0) {
-      const stateParam = searchParams.get('state');
-      if (stateParam) {
-        const matchingState = paymentSettings.find(s => s.state === stateParam);
-        if (matchingState) {
-          // Auto-select this state for editing
-          handleEdit(matchingState);
-          setSpecificStateNotFound(null);
-        } else {
-          // State parameter provided but no matching settings found
-          setSpecificStateNotFound(stateParam);
-        }
-      } else {
-        setSpecificStateNotFound(null);
-      }
-    }
-  }, [isLoading, paymentSettings, searchParams]);
-
-  const loadPaymentSettings = async () => {
+  const loadPaymentSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
@@ -109,9 +81,9 @@ const PaymentSettings: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadAllStates = async () => {
+  const loadAllStates = useCallback(async () => {
     try {
       setIsLoadingStates(true);
       const states = await statesService.getAllStates();
@@ -122,7 +94,30 @@ const PaymentSettings: React.FC = () => {
     } finally {
       setIsLoadingStates(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPaymentSettings();
+    loadAllStates();
+  }, [loadAllStates, loadPaymentSettings]);
+
+  // Handle state parameter from URL after payment settings are loaded
+  useEffect(() => {
+    if (!isLoading && paymentSettings.length > 0) {
+      const stateParam = searchParams.get('state');
+      if (stateParam) {
+        const matchingState = paymentSettings.find(s => s.state === stateParam);
+        if (matchingState) {
+          handleEdit(matchingState);
+          setSpecificStateNotFound(null);
+        } else {
+          setSpecificStateNotFound(stateParam);
+        }
+      } else {
+        setSpecificStateNotFound(null);
+      }
+    }
+  }, [isLoading, paymentSettings, searchParams]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });
@@ -179,7 +174,7 @@ const PaymentSettings: React.FC = () => {
         throw new Error('User session not found. Please log in again.');
       }
 
-      let updatedSettings = { ...editForm };
+      const updatedSettings = { ...editForm };
 
       // Upload new QR code if selected
       if (qrCodeFiles[editingState]) {
@@ -241,7 +236,7 @@ const PaymentSettings: React.FC = () => {
         throw new Error('User session not found. Please log in again.');
       }
 
-      let newSettings = { ...addForm };
+      const newSettings = { ...addForm };
 
       // Upload QR code if selected
       if (qrCodeFiles['new']) {

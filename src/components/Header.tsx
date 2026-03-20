@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, MapPin, LogOut, LayoutDashboard, Shield, User, ChevronDown, Key } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, Shield, User, ChevronDown, Key } from 'lucide-react';
 import { organizationProfileService } from '../lib/supabase';
 import { useMember } from '../contexts/MemberContext';
 import { logoutService } from '../lib/logoutService';

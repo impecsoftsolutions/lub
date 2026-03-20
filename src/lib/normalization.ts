@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
 
+type NormalizationPayload = Record<string, unknown>;
+
 export interface NormalizationResult {
-  original: any;
+  original: NormalizationPayload;
   normalized: {
     full_name: string;
     email: string;
@@ -15,7 +17,7 @@ export interface NormalizationResult {
   };
 }
 
-export const normalizeMemberData = async (formData: any): Promise<NormalizationResult> => {
+export const normalizeMemberData = async (formData: NormalizationPayload): Promise<NormalizationResult> => {
   try {
     console.log('🚀 Calling Edge Function with:', formData);
     

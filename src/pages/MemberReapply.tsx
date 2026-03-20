@@ -1,22 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
 import { useMember } from '../contexts/MemberContext';
-import Toast from '../components/Toast';
 
 const MemberReapply: React.FC = () => {
   const navigate = useNavigate();
-  const { member, isAuthenticated, isLoading, refreshMember } = useMember();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toast, setToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-    isVisible: boolean;
-  }>({
-    type: 'success',
-    message: '',
-    isVisible: false
-  });
+  const { member, isAuthenticated, isLoading } = useMember();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -29,14 +18,6 @@ const MemberReapply: React.FC = () => {
       navigate('/dashboard');
     }
   }, [member, navigate]);
-
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message, isVisible: true });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, isVisible: false }));
-  };
 
   const handleReapply = () => {
     navigate('/join');
@@ -91,13 +72,6 @@ const MemberReapply: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <Toast
-        type={toast.type}
-        message={toast.message}
-        isVisible={toast.isVisible}
-        onClose={hideToast}
-      />
-
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <button

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { userRolesService, UserRole } from './supabase';
+import type { Session } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
@@ -37,12 +38,12 @@ export const authService = {
   },
 
   // Listen to auth changes
-  onAuthStateChange(callback: (event: string, session: any) => void) {
+  onAuthStateChange(callback: (event: string, session: Session | null) => void) {
     return supabase.auth.onAuthStateChange(callback);
   },
 
   // Get current user with roles
-  async getCurrentUserWithRoles(): Promise<{ user: User | null; error: any }> {
+  async getCurrentUserWithRoles(): Promise<{ user: User | null; error: unknown }> {
     try {
       const { user, error } = await this.getCurrentUser();
       

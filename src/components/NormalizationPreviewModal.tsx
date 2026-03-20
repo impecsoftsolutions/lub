@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, CheckCircle } from 'lucide-react';
 
+type PreviewData = Record<string, string | undefined>;
+
 interface NormalizationPreviewModalProps {
   isOpen: boolean;
-  original: any;
-  normalized: any;
-  onAcceptNormalized: (data: any) => void;
+  original: PreviewData;
+  normalized: PreviewData;
+  onAcceptNormalized: (data: PreviewData) => void;
   onSubmitOriginal: () => void;
   onClose: () => void;
 }
@@ -18,7 +20,7 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
   onSubmitOriginal,
   onClose
 }) => {
-  const [editedData, setEditedData] = useState(normalized || {});
+  const [editedData, setEditedData] = useState<PreviewData>(normalized || {});
 
   useEffect(() => {
     setEditedData(normalized || {});

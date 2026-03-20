@@ -12,6 +12,14 @@ interface EmailRequest {
   from?: string;
 }
 
+interface ResendEmailPayload {
+  from: string;
+  to: string[];
+  subject: string;
+  html?: string;
+  text?: string;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -90,7 +98,7 @@ Deno.serve(async (req: Request) => {
 
     const fromAddress = from || 'LUB Membership <noreply@lub.org.in>';
 
-    const emailPayload: any = {
+    const emailPayload: ResendEmailPayload = {
       from: fromAddress,
       to: Array.isArray(to) ? to : [to],
       subject,

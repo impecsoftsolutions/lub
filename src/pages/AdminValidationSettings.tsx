@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   CreditCard as Edit2,
   Check,
   X,
@@ -15,7 +13,6 @@ import {
   ChevronRight,
   ChevronDown,
   GripVertical,
-  MoveVertical,
   Lock
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
@@ -25,7 +22,6 @@ import { validationRulesService, ValidationRule } from '../lib/supabase';
 import Toast from '../components/Toast';
 
 const AdminValidationSettings: React.FC = () => {
-  const navigate = useNavigate();
   const [validationRules, setValidationRules] = useState<ValidationRule[]>([]);
   const [isLoadingRules, setIsLoadingRules] = useState(true);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -82,7 +78,6 @@ const AdminValidationSettings: React.FC = () => {
   });
 
   // Permission checks
-  const canViewValidation = useHasPermission('settings.validation.view');
   const canManageValidation = useHasPermission('settings.validation.manage');
 
   useEffect(() => {
@@ -305,7 +300,7 @@ const AdminValidationSettings: React.FC = () => {
     try {
       new RegExp(value);
       setPatternValid(value.length > 0);
-    } catch (error) {
+    } catch {
       setPatternValid(false);
     }
   };

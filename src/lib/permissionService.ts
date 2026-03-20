@@ -24,7 +24,6 @@ import { customAuth } from './customAuth';
 import type { UserRole } from './supabase';
 import {
   UserPermission,
-  PermissionCache,
   PermissionCacheStore,
   PermissionError,
   PermissionErrorCode,

@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, FileText, Edit, Key, LogOut, AlertCircle, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { useMember } from '../contexts/MemberContext';
 import Toast from '../components/Toast';
 import { logoutService } from '../lib/logoutService';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 
+interface RegistrationSummary {
+  full_name?: string | null;
+  company_name?: string | null;
+  status?: string | null;
+}
+
 const MemberDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { member, isAuthenticated, isLoading, refreshMember, signOut } = useMember();
+  const { member, isAuthenticated, isLoading, refreshMember } = useMember();
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -21,7 +27,7 @@ const MemberDashboard: React.FC = () => {
   });
   const [hasRegistrationRecord, setHasRegistrationRecord] = useState<boolean | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
-  const [registrationRow, setRegistrationRow] = useState<any | null>(null);
+  const [registrationRow, setRegistrationRow] = useState<RegistrationSummary | null>(null);
   const [registrationLookupError, setRegistrationLookupError] = useState<string | null>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [registrationRetryCounter, setRegistrationRetryCounter] = useState(0);

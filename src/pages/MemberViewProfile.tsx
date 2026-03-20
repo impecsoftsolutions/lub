@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Building, MapPin, Calendar, CreditCard, Edit, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Building, Calendar, CreditCard, Edit, Loader2, AlertCircle } from 'lucide-react';
 import { useMember } from '../contexts/MemberContext';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 
+interface MemberRegistrationSummary {
+  status?: string | null;
+  rejection_reason?: string | null;
+  full_name?: string | null;
+  company_name?: string | null;
+}
+
 const MemberViewProfile: React.FC = () => {
   const navigate = useNavigate();
   const { member, isAuthenticated, isLoading, refreshMember } = useMember();
-  const [registration, setRegistration] = useState<any | null>(null);
+  const [registration, setRegistration] = useState<MemberRegistrationSummary | null>(null);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const getFirstTwoWords = (name: string | null | undefined): string => {
     if (!name) return '';
@@ -46,7 +53,7 @@ const MemberViewProfile: React.FC = () => {
 
         setRegistration(data);
         setRegistrationError(null);
-      } catch (error) {
+      } catch {
         setRegistrationError('Unknown error');
       }
     };

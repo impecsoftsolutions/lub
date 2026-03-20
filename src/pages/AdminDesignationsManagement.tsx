@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Building2, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, ToggleLeft, ToggleRight, X, AlertCircle, Users, Shield, MapPin, User, ArrowUp, ArrowDown, GripVertical, Lock } from 'lucide-react';
+import { Building2, Plus, Search, CreditCard as Edit3, Trash2, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
 import Toast from '../components/Toast';
+
+type MemberSearchResult = {
+  id: string;
+  full_name: string;
+  company_name: string;
+  email: string;
+  city: string;
+  district: string;
+};
 
 const AdminDesignationsManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'company' | 'lub'>('company');
@@ -52,8 +60,6 @@ const AdminDesignationsManagement: React.FC = () => {
   });
   const [assignmentStates, setAssignmentStates] = useState<StateMaster[]>([]);
   const [assignmentDistricts, setAssignmentDistricts] = useState<DistrictOption[]>([]);
-  const [isLoadingAssignmentStates, setIsLoadingAssignmentStates] = useState(false);
-  const [isLoadingAssignmentDistricts, setIsLoadingAssignmentDistricts] = useState(false);
   const [showAddAssignmentModal, setShowAddAssignmentModal] = useState(false);
   const [showEditAssignmentModal, setShowEditAssignmentModal] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<MemberLubRoleAssignment | null>(null);
@@ -73,9 +79,9 @@ const AdminDesignationsManagement: React.FC = () => {
 
   // Member search state
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
-  const [memberSearchResults, setMemberSearchResults] = useState<any[]>([]);
+  const [memberSearchResults, setMemberSearchResults] = useState<MemberSearchResult[]>([]);
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
 
   // Geographic data
   const [allStates, setAllStates] = useState<StateMaster[]>([]);
@@ -93,10 +99,7 @@ const AdminDesignationsManagement: React.FC = () => {
     isVisible: false
   });
 
-  const navigate = useNavigate();
-
   // Permission checks
-  const canViewDesignations = useHasPermission('organization.designations.view');
   const canManageDesignations = useHasPermission('organization.designations.manage');
 
   useEffect(() => {
@@ -170,25 +173,19 @@ const AdminDesignationsManagement: React.FC = () => {
 
   const loadAssignmentStates = async () => {
     try {
-      setIsLoadingAssignmentStates(true);
       const states = await statesService.getAllStates();
       setAssignmentStates(states.filter(state => state.is_active));
     } catch (error) {
       console.error('[AdminDesignationsManagement] Error loading assignment filter states:', error);
-    } finally {
-      setIsLoadingAssignmentStates(false);
     }
   };
 
   const loadAssignmentDistricts = async (stateName: string) => {
     try {
-      setIsLoadingAssignmentDistricts(true);
       const districts = await locationsService.getActiveDistrictsByStateName(stateName);
       setAssignmentDistricts(districts);
     } catch (error) {
       console.error('[AdminDesignationsManagement] Error loading assignment filter districts:', error);
-    } finally {
-      setIsLoadingAssignmentDistricts(false);
     }
   };
 
@@ -623,9 +620,9 @@ const AdminDesignationsManagement: React.FC = () => {
       level: assignment.level,
       state: assignment.state || '',
       district: assignment.district || '',
-      committee_year: (assignment as any).committee_year || '',
-      role_start_date: (assignment as any).role_start_date || '',
-      role_end_date: (assignment as any).role_end_date || ''
+      committee_year: assignment.committee_year || '',
+      role_start_date: assignment.role_start_date || '',
+      role_end_date: assignment.role_end_date || ''
     });
     setSelectedMember({
       id: assignment.member_id,
@@ -728,7 +725,7 @@ const AdminDesignationsManagement: React.FC = () => {
     }
   };
 
-  const handleMemberSelect = (member: any) => {
+  const handleMemberSelect = (member: MemberSearchResult) => {
     setSelectedMember(member);
     setAssignmentForm(prev => ({ ...prev, member_id: member.id }));
     setMemberSearchTerm(member.full_name);
@@ -755,12 +752,12 @@ const AdminDesignationsManagement: React.FC = () => {
 
   const committeeYearOptions = useMemo(() => {
     const years = Array.from(
-      new Set(
-        memberAssignments
-          .map((a) => (a as any).committee_year as string | null | undefined)
+        new Set(
+          memberAssignments
+          .map((a) => a.committee_year)
           .filter((y): y is string => !!y && y.trim().length > 0)
-      )
-    );
+        )
+      );
 
     years.sort((a, b) => b.localeCompare(a)); // Newest first
     return years;
@@ -790,7 +787,7 @@ const AdminDesignationsManagement: React.FC = () => {
       }
 
       if (assignmentFilters.committeeYear) {
-        const assignmentYear = ((assignment as any).committee_year as string | null | undefined) ?? '';
+        const assignmentYear = assignment.committee_year ?? '';
         if (assignmentYear !== assignmentFilters.committeeYear) {
           return false;
         }
@@ -1873,7 +1870,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   value={assignmentForm.level}
                   onChange={(e) => setAssignmentForm(prev => ({ 
                     ...prev, 
-                    level: e.target.value as any,
+                    level: e.target.value as 'national' | 'state' | 'district' | 'city' | '',
                     state: e.target.value === 'national' ? '' : prev.state,
                     district: e.target.value === 'national' || e.target.value === 'state' ? '' : prev.district
                   }))}
@@ -2059,7 +2056,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   value={assignmentForm.level}
                   onChange={(e) => setAssignmentForm(prev => ({ 
                     ...prev, 
-                    level: e.target.value as any,
+                    level: e.target.value as 'national' | 'state' | 'district' | 'city' | '',
                     state: e.target.value === 'national' ? '' : prev.state,
                     district: e.target.value === 'national' || e.target.value === 'state' ? '' : prev.district
                   }))}

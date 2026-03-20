@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Users, Search, Filter, FileText, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, Download, User, ArrowLeft, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock } from 'lucide-react';
+import { Users, Search, Filter, FileText, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, Download, User, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { supabase, memberRegistrationService } from '../lib/supabase';
@@ -34,6 +33,10 @@ interface MemberRegistration {
   is_active?: boolean;
   rejection_reason?: string;
   member_id?: string;
+}
+
+interface RegistrationRpcRow extends Omit<MemberRegistration, 'company_designations'> {
+  company_designation_name?: string | null;
 }
 
 const AdminRegistrations: React.FC = () => {
@@ -84,12 +87,9 @@ const AdminRegistrations: React.FC = () => {
     isVisible: false
   });
 
-  const navigate = useNavigate();
-
   // Permission checks
   const canViewMembers = useHasPermission('members.view');
   const canApprove = useHasPermission('members.approve');
-  const canReject = useHasPermission('members.reject');
   const canEdit = useHasPermission('members.edit');
   const canDelete = useHasPermission('members.delete');
   const canExport = useHasPermission('members.export');
@@ -135,7 +135,7 @@ const AdminRegistrations: React.FC = () => {
       console.log('[AdminRegistrations] Fetched registrations:', data?.length || 0);
 
       // Transform data to match expected structure (RPC returns flat data with company_designation_name)
-      const transformedData = (data || []).map((reg: any) => ({
+      const transformedData = ((data || []) as RegistrationRpcRow[]).map((reg) => ({
         ...reg,
         company_designations: reg.company_designation_name
           ? { designation_name: reg.company_designation_name }
@@ -312,7 +312,7 @@ const AdminRegistrations: React.FC = () => {
     setShowViewModal(true);
   };
 
-  const handleEditFromView = (applicationData: any) => {
+  const handleEditFromView = (applicationData: MemberRegistration) => {
     setShowViewModal(false);
     setEditingMember(applicationData);
     setShowEditModal(true);

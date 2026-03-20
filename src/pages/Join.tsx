@@ -8,7 +8,6 @@ import {
   Building2,
   MapPin,
   Phone,
-  Mail,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -31,23 +30,10 @@ import { useFormFieldConfig } from '../hooks/useFormFieldConfig';
 import { useValidation } from '../hooks/useValidation';
 import ImageCropModal from '../components/ImageCropModal';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
-import { normalizeMemberData } from '../lib/normalization';
+import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import NormalizationPreviewModal from '../components/NormalizationPreviewModal';
 import { useMember } from '../contexts/MemberContext';
 import { supabase } from '../lib/supabase';
-
-// Type definition for existing registration record
-interface ExistingRegistration {
-  id: string;
-  status: 'pending' | 'approved' | 'rejected';
-  full_name: string;
-  email: string;
-  mobile_number: string;
-  company_name: string;
-  rejection_reason: string | null;
-  reapplication_count: number;
-  created_at: string;
-}
 
 const Join: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -58,7 +44,6 @@ const Join: React.FC = () => {
   // Authentication and existing registration state
   const { member, isAuthenticated, isLoading: isLoadingAuth, refreshMember } = useMember();
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
-  const [existingRegistration, setExistingRegistration] = useState<ExistingRegistration | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -114,7 +99,7 @@ const Join: React.FC = () => {
   const [isLoadingDesignations, setIsLoadingDesignations] = useState(true);
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
-  const [isLoadingPaymentSettings, setIsLoadingPaymentSettings] = useState(false);
+  const [, setIsLoadingPaymentSettings] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // File uploads
@@ -132,14 +117,13 @@ const Join: React.FC = () => {
   const [profilePhoto, setProfilePhoto] = useState<Blob | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string>('');
   const [photoFileName, setPhotoFileName] = useState<string>('');
-  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoImageSrc, setPhotoImageSrc] = useState<string>('');
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
   // Normalization state
   const [showNormalizationModal, setShowNormalizationModal] = useState(false);
-  const [normalizationResult, setNormalizationResult] = useState<any>(null);
-  const [normalizationOriginalSnapshot, setNormalizationOriginalSnapshot] = useState<any>(null);
+  const [normalizationResult, setNormalizationResult] = useState<NormalizationResult | null>(null);
+  const [normalizationOriginalSnapshot, setNormalizationOriginalSnapshot] = useState<typeof formData | null>(null);
 
   // Validation and UI state
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -183,7 +167,6 @@ const Join: React.FC = () => {
 
         if (error) {
           console.error('[Join] Error checking registration:', error);
-          setExistingRegistration(null);
           setIsCheckingExisting(false);
           return;
         }
@@ -191,7 +174,6 @@ const Join: React.FC = () => {
         // Handle different registration statuses
         if (data) {
           console.log('[Join] Found existing registration with status:', data.status);
-          setExistingRegistration(data);
 
           // Pending: Redirect to dashboard
           if (data.status === 'pending') {
@@ -215,8 +197,6 @@ const Join: React.FC = () => {
           }
         } else {
           console.log('[Join] No existing registration found - user can proceed with form');
-          setExistingRegistration(null);
-
           // Pre-fill email and mobile from authenticated user account
           if (isAuthenticated && member) {
             setFormData(prev => ({
@@ -229,7 +209,6 @@ const Join: React.FC = () => {
         }
       } catch (error) {
         console.error('[Join] Unexpected error checking registration:', error);
-        setExistingRegistration(null);
       } finally {
         setIsCheckingExisting(false);
       }
@@ -465,7 +444,7 @@ const Join: React.FC = () => {
     const { name, value } = e.target;
 
     // Remove all non-numeric characters
-    let numericValue = value.replace(/\D/g, '');
+    const numericValue = value.replace(/\D/g, '');
 
     // No length limit - let validation handle it
 
@@ -481,7 +460,7 @@ const Join: React.FC = () => {
     const { name, value } = e.target;
 
     // Remove all non-alphanumeric characters and convert to uppercase
-    let alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     // No length limit - let validation handle it
 
@@ -497,7 +476,7 @@ const Join: React.FC = () => {
     const { name, value } = e.target;
 
     // Remove all non-alphanumeric characters and convert to uppercase
-    let alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const alphanumericValue = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     // No length limit - let validation handle it
 
@@ -620,10 +599,9 @@ const Join: React.FC = () => {
 
     try {
       const imageSrc = await readFileAsDataURL(file);
-      setSelectedPhotoFile(file);
       setPhotoImageSrc(imageSrc);
       setIsCropModalOpen(true);
-    } catch (error) {
+    } catch {
       showToast('error', 'Failed to read image file');
       e.target.value = '';
     }
@@ -643,7 +621,6 @@ const Join: React.FC = () => {
     setProfilePhoto(null);
     setProfilePhotoPreview('');
     setPhotoFileName('');
-    setSelectedPhotoFile(null);
     setPhotoImageSrc('');
 
     const fileInput = document.getElementById('profile-photo-input') as HTMLInputElement;
@@ -794,7 +771,18 @@ const Join: React.FC = () => {
     console.log('[Join.tsx] city value:', data.city || 'null');
     console.log('[Join.tsx] other_city_name value:', data.other_city_name || 'null');
 
-    const sanitized: any = { ...data };
+    const sanitized = {
+      ...data,
+      city: data.city as string | null,
+      other_city_name: data.other_city_name as string | null,
+      company_designation_id: data.company_designation_id as string | null,
+      date_of_birth: data.date_of_birth as string | null,
+      payment_date: data.payment_date as string | null,
+      gst_registered: data.gst_registered as string | null,
+      esic_registered: data.esic_registered as string | null,
+      epf_registered: data.epf_registered as string | null,
+      gender: data.gender as string | null
+    };
 
     // Handle custom city: when is_custom_city is true, set city to null
     // The custom city name is stored in other_city_name field
@@ -970,18 +958,46 @@ const Join: React.FC = () => {
     }
   };
 
-  const normalizeResultAdapter = (raw: any, fallbackOriginal: any) => {
+  const normalizeResultAdapter = (raw: unknown, fallbackOriginal: typeof formData): NormalizationResult => {
     if (raw && typeof raw === 'object') {
-      if (raw.original && typeof raw.original === 'object' && raw.normalized && typeof raw.normalized === 'object') {
-        return raw;
+      const candidate = raw as {
+        original?: unknown;
+        normalized?: unknown;
+        data?: {
+          original?: unknown;
+          normalized?: unknown;
+        };
+      };
+
+      if (candidate.original && typeof candidate.original === 'object' && candidate.normalized && typeof candidate.normalized === 'object') {
+        return candidate as NormalizationResult;
       }
 
-      if (raw.data && raw.data.original && typeof raw.data.original === 'object' && raw.data.normalized && typeof raw.data.normalized === 'object') {
-        return raw.data;
+      if (
+        candidate.data &&
+        candidate.data.original &&
+        typeof candidate.data.original === 'object' &&
+        candidate.data.normalized &&
+        typeof candidate.data.normalized === 'object'
+      ) {
+        return candidate.data as NormalizationResult;
       }
     }
 
-    return { original: fallbackOriginal, normalized: fallbackOriginal };
+    return {
+      original: fallbackOriginal,
+      normalized: {
+        full_name: fallbackOriginal.full_name,
+        email: fallbackOriginal.email,
+        mobile_number: fallbackOriginal.mobile_number,
+        company_name: fallbackOriginal.company_name,
+        company_address: fallbackOriginal.company_address,
+        products_services: fallbackOriginal.products_services,
+        alternate_contact_name: fallbackOriginal.alternate_contact_name,
+        alternate_mobile: fallbackOriginal.alternate_mobile,
+        referred_by: fallbackOriginal.referred_by
+      }
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -998,7 +1014,10 @@ const Join: React.FC = () => {
       setIsSubmitting(true);
       console.log('[Join.tsx] Normalizing member data...');
 
-      const { email, mobile_number, alternate_mobile, ...normalizationPayload } = formData;
+      const normalizationPayload = { ...formData };
+      delete normalizationPayload.email;
+      delete normalizationPayload.mobile_number;
+      delete normalizationPayload.alternate_mobile;
       const raw = await normalizeMemberData(normalizationPayload);
       const adapted = normalizeResultAdapter(raw, formData);
 
@@ -1034,7 +1053,7 @@ const Join: React.FC = () => {
     await submitFormData(normalizationOriginalSnapshot ?? formData);
   };
 
-  const handleAcceptNormalizedFromModal = async (acceptedData: any) => {
+  const handleAcceptNormalizedFromModal = async (acceptedData: typeof formData) => {
     console.log('[Join.tsx] User accepted normalized data');
     const dataToSubmit = {
       ...acceptedData,

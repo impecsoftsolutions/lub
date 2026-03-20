@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   User,
   Upload,
   Save,
-  ArrowLeft,
   Building2,
   Phone,
-  Mail,
-  MapPin,
   Globe,
   Plus,
   Trash2,
@@ -36,17 +32,9 @@ const AdminProfileSettings: React.FC = () => {
     isVisible: false
   });
 
-  const navigate = useNavigate();
-
-  // Permission checks
-  const canViewProfile = useHasPermission('organization.profile.view');
   const canEditProfile = useHasPermission('organization.profile.edit');
 
-  useEffect(() => {
-    loadOrganizationProfile();
-  }, []);
-
-  const loadOrganizationProfile = async () => {
+  const loadOrganizationProfile = useCallback(async () => {
     try {
       setIsLoading(true);
       const profile = await organizationProfileService.getProfile();
@@ -57,7 +45,11 @@ const AdminProfileSettings: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadOrganizationProfile();
+  }, [loadOrganizationProfile]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });
@@ -133,7 +125,7 @@ const AdminProfileSettings: React.FC = () => {
 
     try {
       setIsSaving(true);
-      let updatedProfile = { ...organizationProfile };
+      const updatedProfile = { ...organizationProfile };
 
       // Upload new logo if selected
       if (logoFile) {

@@ -9,7 +9,9 @@ export const KeyAudit: React.FC<KeyAuditProps> = ({ name, children }) => {
   console.log(`[KeyAudit:${name}] 🔍 Running audit...`);
 
   const kids = React.Children.toArray(children);
-  const keys = kids.map((k: any) => (k && k.key != null ? String(k.key) : null));
+  const keys = kids.map((child) =>
+    React.isValidElement(child) && child.key != null ? String(child.key) : null
+  );
 
   const dups = new Set<string>();
   const seen = new Set<string>();

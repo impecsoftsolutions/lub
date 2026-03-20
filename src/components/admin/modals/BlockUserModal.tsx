@@ -116,9 +116,9 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
         onClose();
       }, 1000);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Block/unblock user error:', error);
-      setError(error.message || `Failed to ${action} user`);
+      setError((error as { message?: string }).message || `Failed to ${action} user`);
     } finally {
       setIsProcessing(false);
     }

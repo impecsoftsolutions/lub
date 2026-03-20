@@ -142,32 +142,9 @@ export const memberAuthService = {
         return null;
       }
 
-      // Get user data from localStorage cache (INSTANT - no database call!)
-      const cachedUser = sessionManager.getUserData();
-
-      if (false && cachedUser && !bypassCache) {
-        console.log('[memberAuthService] Returning cached user data from localStorage');
-
-        // Map to MemberData format
-        const memberData: MemberData = {
-          id: cachedUser.id,
-          user_id: cachedUser.id,
-          full_name: cachedUser.full_name || '',
-          email: cachedUser.email,
-          mobile_number: cachedUser.mobile_number,
-          company_name: cachedUser.company_name || '',
-          status: cachedUser.status as 'pending' | 'approved' | 'rejected',
-          approval_date: cachedUser.approval_date || null,
-          rejection_reason: cachedUser.rejection_reason || null,
-          reapplication_count: cachedUser.reapplication_count || 0,
-          member_id: cachedUser.member_id || null,
-          profile_photo_url: cachedUser.profile_photo_url || null,
-          account_type: cachedUser.account_type || 'member', // ✅ FIXED: Include account_type
-          created_at: cachedUser.created_at || new Date().toISOString()
-        };
-
-        return memberData;
-      }
+      // Cached user data exists for diagnostics and write helpers, but current reads
+      // intentionally validate the active session instead of returning a local fast-path.
+      sessionManager.getUserData();
 
       // If no cache or bypassCache is true, fetch from database
       if (bypassCache) {

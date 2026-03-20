@@ -6,7 +6,7 @@ import { logoutService } from '../lib/logoutService';
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'payment-settings'>('overview');
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const isSuperAdmin = false;
 
   const navigate = useNavigate();
   const location = useLocation();
