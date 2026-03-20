@@ -484,33 +484,45 @@ const AdminUsers: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {user.roles.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {user.roles.map((role) => (
-                                <span
-                                  key={role.id}
-                                  className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
-                                >
-                                  {formatRoleName(role.role)}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">No role assigned</span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {user.roles.length > 0 ? (
+                              <>
+                                {user.roles.map((role) => (
+                                  <span
+                                    key={role.id}
+                                    className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
+                                  >
+                                    {formatRoleName(role.role)}
+                                  </span>
+                                ))}
+                                {canAssignRoles && (
+                                  <button
+                                    onClick={() => handleAssignRoleClick(user)}
+                                    className="text-xs font-medium text-indigo-600 hover:text-indigo-900"
+                                    title="Assign or change role"
+                                  >
+                                    Change
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-sm text-gray-500">No role assigned</span>
+                                {canAssignRoles && (
+                                  <button
+                                    onClick={() => handleAssignRoleClick(user)}
+                                    className="text-xs font-medium text-indigo-600 hover:text-indigo-900"
+                                    title="Assign role"
+                                  >
+                                    Assign
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex gap-3 items-center">
-                            {canAssignRoles && (
-                              <button
-                                onClick={() => handleAssignRoleClick(user)}
-                                className="text-indigo-600 hover:text-indigo-900"
-                                title={user.roles.length > 0 ? 'Assign or change role' : 'Assign role'}
-                              >
-                                {user.roles.length > 0 ? 'Change Role' : 'Assign Role'}
-                              </button>
-                            )}
-
                             {canEdit && (
                               <button
                                 onClick={() => handleEditClick(user)}
