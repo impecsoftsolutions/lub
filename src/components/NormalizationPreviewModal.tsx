@@ -1,3 +1,4 @@
+// Deprecated: kept temporarily while the single-field correction stepper is proven in active flows.
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, CheckCircle } from 'lucide-react';
 

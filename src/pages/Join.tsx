@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,9 +31,18 @@ import { useValidation } from '../hooks/useValidation';
 import ImageCropModal from '../components/ImageCropModal';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
 import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
-import NormalizationPreviewModal from '../components/NormalizationPreviewModal';
+import FieldCorrectionStepper, { type FieldCorrectionStep } from '../components/FieldCorrectionStepper';
 import { useMember } from '../contexts/useMember';
 import { supabase } from '../lib/supabase';
+
+const correctionFieldLabels: Record<string, string> = {
+  full_name: 'Full Name',
+  company_name: 'Company Name',
+  company_address: 'Company Address',
+  products_services: 'Products & Services',
+  alternate_contact_name: 'Alternate Contact Name',
+  referred_by: 'Referred By'
+};
 
 const Join: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -121,9 +130,10 @@ const Join: React.FC = () => {
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
   // Normalization state
-  const [showNormalizationModal, setShowNormalizationModal] = useState(false);
-  const [normalizationResult, setNormalizationResult] = useState<NormalizationResult | null>(null);
   const [normalizationOriginalSnapshot, setNormalizationOriginalSnapshot] = useState<typeof formData | null>(null);
+  const [correctionFields, setCorrectionFields] = useState<FieldCorrectionStep[]>([]);
+  const [showCorrectionStepper, setShowCorrectionStepper] = useState(false);
+  const submitButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Validation and UI state
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -144,6 +154,27 @@ const Join: React.FC = () => {
 
   const hideToast = useCallback(() => {
     setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  const getCorrectionFields = useCallback((result: NormalizationResult): FieldCorrectionStep[] => {
+    return Object.entries(correctionFieldLabels)
+      .filter(([fieldName]) => {
+        const originalValue = String(result.original[fieldName] ?? '').trim();
+        const correctedValue = String(result.normalized[fieldName as keyof typeof result.normalized] ?? '').trim();
+        return originalValue !== correctedValue;
+      })
+      .map(([fieldName, label]) => ({
+        fieldName,
+        label,
+        value: String(result.normalized[fieldName as keyof typeof result.normalized] ?? '')
+      }));
+  }, []);
+
+  const focusSubmitButton = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      submitButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      submitButtonRef.current?.focus();
+    });
   }, []);
 
   // Check authentication - redirect to sign in if not authenticated
@@ -1023,44 +1054,45 @@ const Join: React.FC = () => {
       adapted.normalized.mobile_number = formData.mobile_number;
       adapted.normalized.alternate_mobile = formData.alternate_mobile;
 
+      const correctedFields = getCorrectionFields(adapted);
+
+      if (correctedFields.length === 0) {
+        await submitFormData(formData);
+        return;
+      }
+
       setNormalizationOriginalSnapshot(formData);
-      setNormalizationResult(adapted);
-      setShowNormalizationModal(true);
+      setCorrectionFields(correctedFields);
+      setShowCorrectionStepper(true);
       setIsSubmitting(false);
     } catch (error) {
       console.error('[Join.tsx] Normalization failed:', error);
-      // If normalization fails, allow user to review and confirm before submitting
-      showToast('error', 'Data normalization failed. Please review and confirm before submitting.');
-      setNormalizationOriginalSnapshot(formData);
-      setNormalizationResult({ original: formData, normalized: formData });
-      setShowNormalizationModal(true);
+      showToast('error', 'We could not check your details right now. Please review the form and submit again.');
       setIsSubmitting(false);
-      return;
     }
   };
 
-  const handleCloseNormalizationModal = () => {
-    setShowNormalizationModal(false);
-  };
+  const handleFieldConfirmed = useCallback((fieldName: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  }, []);
 
-  const handleSubmitOriginalFromModal = async () => {
-    setShowNormalizationModal(false);
-    await submitFormData(normalizationOriginalSnapshot ?? formData);
-  };
+  const handleCorrectionComplete = useCallback(() => {
+    setShowCorrectionStepper(false);
+    setCorrectionFields([]);
+    focusSubmitButton();
+    showToast('success', 'Please click Submit Registration to finish.');
+  }, [focusSubmitButton, showToast]);
 
-  const handleAcceptNormalizedFromModal = async (acceptedData: typeof formData) => {
-    console.log('[Join.tsx] User accepted normalized data');
-    const dataToSubmit = {
-      ...acceptedData,
-      email: formData.email,
-      mobile_number: formData.mobile_number,
-      alternate_mobile: formData.alternate_mobile
-    };
-    setFormData(dataToSubmit);
-    setShowNormalizationModal(false);
-    // Submit with normalized data directly
-    await submitFormData(dataToSubmit);
-  };
+  const handleCorrectionDiscard = useCallback(() => {
+    setShowCorrectionStepper(false);
+    setCorrectionFields([]);
+    if (normalizationOriginalSnapshot) {
+      setFormData(normalizationOriginalSnapshot);
+    }
+  }, [normalizationOriginalSnapshot]);
 
   // Show loading state while checking authentication or existing registration
   if (isLoadingConfig || isLoadingValidation || isLoadingAuth || isCheckingExisting) {
@@ -2069,6 +2101,7 @@ const Join: React.FC = () => {
               </Link>
               
               <button
+                ref={submitButtonRef}
                 type="submit"
                 disabled={isSubmitting}
                 className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-2 ${
@@ -2101,13 +2134,11 @@ const Join: React.FC = () => {
           onError={handleCropError}
         />
 
-        <NormalizationPreviewModal
-          isOpen={showNormalizationModal}
-          original={normalizationResult?.original || {}}
-          normalized={normalizationResult?.normalized || {}}
-          onClose={handleCloseNormalizationModal}
-          onSubmitOriginal={handleSubmitOriginalFromModal}
-          onAcceptNormalized={handleAcceptNormalizedFromModal}
+        <FieldCorrectionStepper
+          fields={showCorrectionStepper ? correctionFields : []}
+          onFieldConfirmed={handleFieldConfirmed}
+          onComplete={handleCorrectionComplete}
+          onDiscard={handleCorrectionDiscard}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -22,7 +22,7 @@ import { useMember } from '../contexts/useMember';
 import Toast from '../components/Toast';
 import ChangeCredentialModal from '../components/member/ChangeCredentialModal';
 import ImageCropModal from '../components/ImageCropModal';
-import NormalizationPreviewModal from '../components/NormalizationPreviewModal';
+import FieldCorrectionStepper, { type FieldCorrectionStep } from '../components/FieldCorrectionStepper';
 import { changeEmail, changeMobile } from '../lib/memberCredentialService';
 import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import { useValidation } from '../hooks/useValidation';
@@ -74,6 +74,15 @@ const EMPLOYEE_COUNT_OPTIONS = [
   '101 to 150 employees',
   'Above 151 employees'
 ];
+
+const correctionFieldLabels: Record<string, string> = {
+  full_name: 'Full Name',
+  company_name: 'Company Name',
+  company_address: 'Company Address',
+  products_services: 'Products & Services',
+  alternate_contact_name: 'Alternate Contact Name',
+  referred_by: 'Referred By'
+};
 
 const MemberEditProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -172,8 +181,9 @@ const MemberEditProfile: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Normalization states
-  const [showNormalizationModal, setShowNormalizationModal] = useState(false);
-  const [normalizationResult, setNormalizationResult] = useState<NormalizationResult | null>(null);
+  const [correctionFields, setCorrectionFields] = useState<FieldCorrectionStep[]>([]);
+  const [showCorrectionStepper, setShowCorrectionStepper] = useState(false);
+  const [correctionSnapshot, setCorrectionSnapshot] = useState<typeof formData | null>(null);
 
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -195,6 +205,28 @@ const MemberEditProfile: React.FC = () => {
 
   const hideToast = useCallback(() => {
     setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+  const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const getCorrectionFields = useCallback((result: NormalizationResult): FieldCorrectionStep[] => {
+    return Object.entries(correctionFieldLabels)
+      .filter(([fieldName]) => {
+        const originalValue = String(result.original[fieldName] ?? '').trim();
+        const correctedValue = String(result.normalized[fieldName as keyof typeof result.normalized] ?? '').trim();
+        return originalValue !== correctedValue;
+      })
+      .map(([fieldName, label]) => ({
+        fieldName,
+        label,
+        value: String(result.normalized[fieldName as keyof typeof result.normalized] ?? '')
+      }));
+  }, []);
+
+  const focusSubmitButton = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      submitButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      submitButtonRef.current?.focus();
+    });
   }, []);
 
   // Redirect if not authenticated
@@ -693,14 +725,13 @@ const MemberEditProfile: React.FC = () => {
       console.log('[MemberEditProfile] Normalizing member data...');
       const result = await normalizeMemberData(formData);
 
-      // Check if normalization made any changes
-      const hasNormalizationChanges = JSON.stringify(result.original) !== JSON.stringify(result.normalized);
+      const correctedFields = getCorrectionFields(result);
 
-      if (hasNormalizationChanges) {
-        // Show modal for user to review changes
-        console.log('[MemberEditProfile] Normalization changes detected, showing modal');
-        setNormalizationResult(result);
-        setShowNormalizationModal(true);
+      if (correctedFields.length > 0) {
+        console.log('[MemberEditProfile] Correction changes detected, showing stepper');
+        setCorrectionSnapshot(formData);
+        setCorrectionFields(correctedFields);
+        setShowCorrectionStepper(true);
         setIsSaving(false);
       } else {
         // No normalization needed, save directly
@@ -889,22 +920,27 @@ const MemberEditProfile: React.FC = () => {
     }
   };
 
-  const handleAcceptNormalization = async (acceptedData: typeof formData) => {
-    console.log('[MemberEditProfile] User accepted normalized data');
-    setFormData(acceptedData);
-    setShowNormalizationModal(false);
-    await saveProfileData(acceptedData);
-  };
+  const handleFieldConfirmed = useCallback((fieldName: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  }, []);
 
-  const handleCloseNormalizationModal = () => {
-    setShowNormalizationModal(false);
-  };
+  const handleCorrectionComplete = useCallback(() => {
+    setShowCorrectionStepper(false);
+    setCorrectionFields([]);
+    focusSubmitButton();
+    showToast('success', 'Please click Submit to finish.');
+  }, [focusSubmitButton, showToast]);
 
-  const handleRejectNormalization = async () => {
-    console.log('[MemberEditProfile] User rejected normalization, using original data');
-    setShowNormalizationModal(false);
-    await saveProfileData(formData);
-  };
+  const handleCorrectionDiscard = useCallback(() => {
+    setShowCorrectionStepper(false);
+    setCorrectionFields([]);
+    if (correctionSnapshot) {
+      setFormData(correctionSnapshot);
+    }
+  }, [correctionSnapshot]);
 
   if (isLoading) {
     return (
@@ -1804,6 +1840,7 @@ const MemberEditProfile: React.FC = () => {
                 Cancel
               </Link>
               <button
+                ref={submitButtonRef}
                 type="submit"
                 disabled={isSaving || !hasFormChanges()}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -1861,14 +1898,11 @@ const MemberEditProfile: React.FC = () => {
         onError={handleCropError}
       />
 
-      {/* Normalization Preview Modal */}
-      <NormalizationPreviewModal
-        isOpen={showNormalizationModal}
-        original={normalizationResult?.original}
-        normalized={normalizationResult?.normalized}
-        onClose={handleCloseNormalizationModal}
-        onSubmitOriginal={handleRejectNormalization}
-        onAcceptNormalized={handleAcceptNormalization}
+      <FieldCorrectionStepper
+        fields={showCorrectionStepper ? correctionFields : []}
+        onFieldConfirmed={handleFieldConfirmed}
+        onComplete={handleCorrectionComplete}
+        onDiscard={handleCorrectionDiscard}
       />
     </div>
   );
