@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Phone, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Phone, AlertCircle, Loader2, MapPin } from 'lucide-react';
 import { memberAuthService } from '../lib/memberAuth';
+import { PublicPaymentState, statesService } from '../lib/supabase';
 import {
   AUTH_VALIDATION_MESSAGES,
   normalizeEmail,
@@ -16,10 +17,13 @@ const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
-    mobile_number: ''
+    mobile_number: '',
+    state: ''
   });
+  const [availableStates, setAvailableStates] = useState<PublicPaymentState[]>([]);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingStates, setIsLoadingStates] = useState(true);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -41,15 +45,32 @@ const SignUp: React.FC = () => {
     void checkIfAlreadyAuthenticated();
   }, [navigate]);
 
-  const showToast = (type: 'success' | 'error', message: string) => {
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });
-  };
+  }, []);
 
-  const hideToast = () => {
+  const hideToast = useCallback(() => {
     setToast(prev => ({ ...prev, isVisible: false }));
-  };
+  }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    const loadStates = async () => {
+      try {
+        setIsLoadingStates(true);
+        const states = await statesService.getPublicPaymentStates();
+        setAvailableStates(states);
+      } catch (error) {
+        console.error('Failed to load states for signup:', error);
+        showToast('error', 'Failed to load states. Please refresh and try again.');
+      } finally {
+        setIsLoadingStates(false);
+      }
+    };
+
+    void loadStates();
+  }, [showToast]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let processedValue = value;
 
@@ -87,6 +108,10 @@ const SignUp: React.FC = () => {
       newErrors.mobile_number = mobileError;
     }
 
+    if (!formData.state.trim()) {
+      newErrors.state = 'Please select a state.';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       showToast('error', 'Please fix the errors in the form');
@@ -108,7 +133,8 @@ const SignUp: React.FC = () => {
 
       const result = await memberAuthService.signUpMember(
         normalizeEmail(formData.email),
-        normalizeMobileNumber(formData.mobile_number)
+        normalizeMobileNumber(formData.mobile_number),
+        formData.state
       );
 
       if (!result.success) {
@@ -148,7 +174,7 @@ const SignUp: React.FC = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900">Create Your Account</h2>
-          <p className="mt-2 text-gray-600">Sign up with your email address and mobile number</p>
+          <p className="mt-2 text-gray-600">Sign up with your email address, mobile number, and state</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-8">
@@ -203,6 +229,39 @@ const SignUp: React.FC = () => {
                 <p className="mt-1 text-sm text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {errors.mobile_number}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                State <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <MapPin className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <select
+                  id="state"
+                  name="state"
+                  required
+                  value={formData.state}
+                  onChange={handleInputChange}
+                  disabled={isLoadingStates}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    errors.state ? 'border-red-500' : 'border-gray-300'
+                  } ${isLoadingStates ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                >
+                  <option value="">{isLoadingStates ? 'Loading states...' : 'Select State'}</option>
+                  {availableStates.map(state => (
+                    <option key={state.state} value={state.state}>
+                      {state.state}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {errors.state && (
+                <p className="mt-1 text-sm text-red-600 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  {errors.state}
                 </p>
               )}
             </div>

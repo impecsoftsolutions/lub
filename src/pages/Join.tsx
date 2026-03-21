@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Upload,
   FileText,
   User,
@@ -110,6 +109,7 @@ const Join: React.FC = () => {
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [, setIsLoadingPaymentSettings] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // File uploads
   const [files, setFiles] = useState<{
@@ -130,6 +130,8 @@ const Join: React.FC = () => {
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
   // Normalization state
+  const [initialFormSnapshot, setInitialFormSnapshot] = useState(formData);
+  const [isVerifiedForSubmit, setIsVerifiedForSubmit] = useState(false);
   const [normalizationOriginalSnapshot, setNormalizationOriginalSnapshot] = useState<typeof formData | null>(null);
   const [correctionFields, setCorrectionFields] = useState<FieldCorrectionStep[]>([]);
   const [showCorrectionStepper, setShowCorrectionStepper] = useState(false);
@@ -176,6 +178,10 @@ const Join: React.FC = () => {
       submitButtonRef.current?.focus();
     });
   }, []);
+
+  const hasFormChanges = useCallback(() => {
+    return JSON.stringify(formData) !== JSON.stringify(initialFormSnapshot);
+  }, [formData, initialFormSnapshot]);
 
   // Check authentication - redirect to sign in if not authenticated
   useEffect(() => {
@@ -236,14 +242,25 @@ const Join: React.FC = () => {
           }
         } else {
           console.log('[Join] No existing registration found - user can proceed with form');
-          // Pre-fill email and mobile from authenticated user account
+          // Pre-fill account fields from authenticated user account
           if (isAuthenticated && member) {
-            setFormData(prev => ({
-              ...prev,
-              email: member.email || '',
-              mobile_number: member.mobile_number || ''
-            }));
-            console.log('[Join] Pre-filled email and mobile from user account');
+            setFormData(prev => {
+              const resolvedState = prev.state || member.state || '';
+              const nextFormData = {
+                ...prev,
+                email: member.email || '',
+                mobile_number: member.mobile_number || '',
+                state: resolvedState
+              };
+              setInitialFormSnapshot(snapshot => ({
+                ...snapshot,
+                email: member.email || '',
+                mobile_number: member.mobile_number || '',
+                state: resolvedState
+              }));
+              return nextFormData;
+            });
+            console.log('[Join] Pre-filled account fields from user account');
           }
         }
       } catch (error) {
@@ -370,6 +387,7 @@ const Join: React.FC = () => {
     if (stateParam) {
       console.log('[Join.tsx] State parameter from URL:', stateParam);
       setFormData(prev => ({ ...prev, state: stateParam }));
+      setInitialFormSnapshot(prev => ({ ...prev, state: stateParam }));
     }
   }, [loadDesignations, loadStates, searchParams]);
 
@@ -406,6 +424,7 @@ const Join: React.FC = () => {
     const processedValue = (name === 'email' || name === 'website') ? value.toLowerCase() : value;
 
     setFormData(prev => ({ ...prev, [name]: processedValue }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error for this field when user starts typing
     if (errors[name]) {
@@ -443,6 +462,7 @@ const Join: React.FC = () => {
     // No length limit - let validation handle it
 
     setFormData(prev => ({ ...prev, [name]: numericValue }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error for this field when user starts typing
     if (errors[name]) {
@@ -475,6 +495,7 @@ const Join: React.FC = () => {
     // No length limit - let validation handle it
 
     setFormData(prev => ({ ...prev, [name]: numericValue }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error when user starts typing
     if (errors[name]) {
@@ -491,6 +512,7 @@ const Join: React.FC = () => {
     // No length limit - let validation handle it
 
     setFormData(prev => ({ ...prev, [name]: alphanumericValue }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error when user starts typing
     if (errors[name]) {
@@ -507,6 +529,7 @@ const Join: React.FC = () => {
     // No length limit - let validation handle it
 
     setFormData(prev => ({ ...prev, [name]: alphanumericValue }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error when user starts typing
     if (errors[name]) {
@@ -566,6 +589,7 @@ const Join: React.FC = () => {
     const selectedDistrict = availableDistricts.find(d => d.district_name === districtName);
 
     setFormData(prev => ({ ...prev, district: districtName, city: '', other_city_name: '', is_custom_city: false }));
+    setIsVerifiedForSubmit(false);
     setSelectedDistrictId(selectedDistrict?.district_id || '');
     setShowOtherCity(false);
     setOtherCityText('');
@@ -586,6 +610,7 @@ const Join: React.FC = () => {
       setOtherCityText('');
       setFormData(prev => ({ ...prev, city: cityName, other_city_name: '', is_custom_city: false }));
     }
+    setIsVerifiedForSubmit(false);
   };
 
   const handleOtherCityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -598,6 +623,7 @@ const Join: React.FC = () => {
       is_custom_city: true,
       city: ''
     }));
+    setIsVerifiedForSubmit(false);
 
     if (errors.city) {
       setErrors(prev => {
@@ -610,6 +636,7 @@ const Join: React.FC = () => {
 
   const handleFileChange = (fileType: keyof typeof files, file: File | null) => {
     setFiles(prev => ({ ...prev, [fileType]: file }));
+    setIsVerifiedForSubmit(false);
   };
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -636,6 +663,7 @@ const Join: React.FC = () => {
   const handleCropComplete = (croppedImageBlob: Blob) => {
     setProfilePhoto(croppedImageBlob);
     setPhotoFileName(generatePhotoFileName());
+    setIsVerifiedForSubmit(false);
 
     const previewUrl = URL.createObjectURL(croppedImageBlob);
     setProfilePhotoPreview(previewUrl);
@@ -648,6 +676,7 @@ const Join: React.FC = () => {
     setProfilePhotoPreview('');
     setPhotoFileName('');
     setPhotoImageSrc('');
+    setIsVerifiedForSubmit(false);
 
     const fileInput = document.getElementById('profile-photo-input') as HTMLInputElement;
     if (fileInput) {
@@ -878,7 +907,7 @@ const Join: React.FC = () => {
     }
 
     try {
-      setIsSubmitting(true);
+      setIsVerifying(true);
       console.log('[Join.tsx] Checking for duplicate email and mobile...');
 
       // Check for duplicate email/mobile
@@ -980,7 +1009,7 @@ const Join: React.FC = () => {
         showToast('error', 'An unexpected error occurred. Please try again');
       }
     } finally {
-      setIsSubmitting(false);
+      setIsVerifying(false);
     }
   };
 
@@ -1026,19 +1055,26 @@ const Join: React.FC = () => {
     };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('[Join.tsx] Form submission started');
+  const handleVerify = async () => {
+    console.log('[Join.tsx] Verification started');
 
-    // Prevent submission if field configurations are still loading
     if (isLoadingConfig) {
-      showToast('info', 'Please wait while the form loads...');
+      showToast('error', 'Please wait while the form loads.');
+      return;
+    }
+
+    if (!hasFormChanges()) {
+      showToast('error', 'Please make changes before verifying.');
+      return;
+    }
+
+    const isValid = await validateForm(formData);
+    if (!isValid) {
       return;
     }
 
     try {
       setIsSubmitting(true);
-      console.log('[Join.tsx] Normalizing member data...');
 
       const normalizationPayload = { ...formData };
       delete normalizationPayload.email;
@@ -1057,19 +1093,33 @@ const Join: React.FC = () => {
       const correctedFields = getCorrectionFields(adapted);
 
       if (correctedFields.length === 0) {
-        await submitFormData(formData);
+        setIsVerifiedForSubmit(true);
+        focusSubmitButton();
+        showToast('success', 'Your details are ready. Please click Submit.');
         return;
       }
 
       setNormalizationOriginalSnapshot(formData);
       setCorrectionFields(correctedFields);
       setShowCorrectionStepper(true);
-      setIsSubmitting(false);
     } catch (error) {
-      console.error('[Join.tsx] Normalization failed:', error);
-      showToast('error', 'We could not check your details right now. Please review the form and submit again.');
-      setIsSubmitting(false);
+      console.error('[Join.tsx] Verification failed:', error);
+      setIsVerifiedForSubmit(false);
+      showToast('error', 'This is a technical error. Please contact system Admin');
+    } finally {
+      setIsVerifying(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!isVerifiedForSubmit) {
+      showToast('error', 'Please click Verify before submitting.');
+      return;
+    }
+
+    await submitFormData(formData);
   };
 
   const handleFieldConfirmed = useCallback((fieldName: string, value: string) => {
@@ -1082,13 +1132,15 @@ const Join: React.FC = () => {
   const handleCorrectionComplete = useCallback(() => {
     setShowCorrectionStepper(false);
     setCorrectionFields([]);
+    setIsVerifiedForSubmit(true);
     focusSubmitButton();
-    showToast('success', 'Please click Submit Registration to finish.');
+    showToast('success', 'Your details are ready. Please click Submit.');
   }, [focusSubmitButton, showToast]);
 
   const handleCorrectionDiscard = useCallback(() => {
     setShowCorrectionStepper(false);
     setCorrectionFields([]);
+    setIsVerifiedForSubmit(false);
     if (normalizationOriginalSnapshot) {
       setFormData(normalizationOriginalSnapshot);
     }
@@ -1304,6 +1356,132 @@ const Join: React.FC = () => {
                       required={isFieldRequired('mobile_number')}
                   />
                   {errors.mobile_number && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Payment Information */}
+            <section>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                <Phone className="w-5 h-5 mr-2 text-blue-600" />
+                Payment Information
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {isFieldVisible('amount_paid') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Amount Paid{isFieldRequired('amount_paid') && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      name="amount_paid"
+                      value={formData.amount_paid}
+                      onChange={handleInputChange}
+                      placeholder="Select state and gender first"
+                      disabled
+                      className={`w-full px-3 py-2 border rounded-lg bg-gray-50 cursor-not-allowed ${
+                        errors.amount_paid ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {errors.amount_paid && <p className="text-red-500 text-sm mt-1">{errors.amount_paid}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('payment_date') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment Date{isFieldRequired('payment_date') && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="date"
+                      name="payment_date"
+                      value={formData.payment_date}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.payment_date ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      required={isFieldRequired('payment_date')}
+                    />
+                    {errors.payment_date && <p className="text-red-500 text-sm mt-1">{errors.payment_date}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('payment_mode') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment Mode{isFieldRequired('payment_mode') && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <select
+                      name="payment_mode"
+                      value={formData.payment_mode}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.payment_mode ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      required={isFieldRequired('payment_mode')}
+                    >
+                    <option value="">Select Payment Mode</option>
+                    <option value="QR Code / UPI">QR Code / UPI</option>
+                    <option value="Bank Transfer (NEFT/RTGS/IMPS)">Bank Transfer (NEFT/RTGS/IMPS)</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Demand Draft">Demand Draft</option>
+                    <option value="Cash">Cash</option>
+                    </select>
+                    {errors.payment_mode && <p className="text-red-500 text-sm mt-1">{errors.payment_mode}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('transaction_id') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Transaction ID / Reference{isFieldRequired('transaction_id') && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      name="transaction_id"
+                      value={formData.transaction_id}
+                      onChange={handleInputChange}
+                      placeholder="Transaction ID or reference number"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required={isFieldRequired('transaction_id')}
+                    />
+                  </div>
+                )}
+
+                {isFieldVisible('bank_reference') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bank Reference{isFieldRequired('bank_reference') && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      name="bank_reference"
+                      value={formData.bank_reference}
+                      onChange={handleInputChange}
+                      placeholder="Bank reference number (if any)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required={isFieldRequired('bank_reference')}
+                    />
+                  </div>
+                )}
+
+                {isFieldVisible('payment_proof_url') && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment Proof{isFieldRequired('payment_proof_url') && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileChange('paymentProof', e.target.files?.[0] || null)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.payment_proof ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Upload screenshot or receipt of your membership fee payment</p>
+                    {errors.payment_proof && <p className="text-red-500 text-sm mt-1">{errors.payment_proof}</p>}
                   </div>
                 )}
               </div>
@@ -1897,131 +2075,6 @@ const Join: React.FC = () => {
                   </div>
                 )}
 
-                {isFieldVisible('payment_proof_url') && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Proof{isFieldRequired('payment_proof_url') && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange('paymentProof', e.target.files?.[0] || null)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.payment_proof ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Upload screenshot or receipt of your membership fee payment</p>
-                    {errors.payment_proof && <p className="text-red-500 text-sm mt-1">{errors.payment_proof}</p>}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Payment Information */}
-            <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                <Phone className="w-5 h-5 mr-2 text-blue-600" />
-                Payment Information
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {isFieldVisible('amount_paid') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Amount Paid{isFieldRequired('amount_paid') && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      name="amount_paid"
-                      value={formData.amount_paid}
-                      onChange={handleInputChange}
-                      placeholder="Select state and gender first"
-                      disabled
-                      className={`w-full px-3 py-2 border rounded-lg bg-gray-50 cursor-not-allowed ${
-                        errors.amount_paid ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors.amount_paid && <p className="text-red-500 text-sm mt-1">{errors.amount_paid}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('payment_date') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Date{isFieldRequired('payment_date') && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="date"
-                      name="payment_date"
-                      value={formData.payment_date}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.payment_date ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      required={isFieldRequired('payment_date')}
-                    />
-                    {errors.payment_date && <p className="text-red-500 text-sm mt-1">{errors.payment_date}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('payment_mode') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Mode{isFieldRequired('payment_mode') && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <select
-                      name="payment_mode"
-                      value={formData.payment_mode}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.payment_mode ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      required={isFieldRequired('payment_mode')}
-                    >
-                    <option value="">Select Payment Mode</option>
-                    <option value="QR Code / UPI">QR Code / UPI</option>
-                    <option value="Bank Transfer (NEFT/RTGS/IMPS)">Bank Transfer (NEFT/RTGS/IMPS)</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Demand Draft">Demand Draft</option>
-                    <option value="Cash">Cash</option>
-                    </select>
-                    {errors.payment_mode && <p className="text-red-500 text-sm mt-1">{errors.payment_mode}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('transaction_id') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Transaction ID / Reference{isFieldRequired('transaction_id') && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      name="transaction_id"
-                      value={formData.transaction_id}
-                      onChange={handleInputChange}
-                      placeholder="Transaction ID or reference number"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required={isFieldRequired('transaction_id')}
-                    />
-                  </div>
-                )}
-
-                {isFieldVisible('bank_reference') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Bank Reference{isFieldRequired('bank_reference') && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      name="bank_reference"
-                      value={formData.bank_reference}
-                      onChange={handleInputChange}
-                      placeholder="Bank reference number (if any)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required={isFieldRequired('bank_reference')}
-                    />
-                  </div>
-                )}
               </div>
             </section>
 
@@ -2091,21 +2144,20 @@ const Join: React.FC = () => {
             </section>
 
             {/* Submit Button */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between pt-8 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row gap-4 justify-end pt-8 border-t border-gray-200">
               <Link
-                to="/payment"
+                to="/dashboard"
                 className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200 sm:order-1"
               >
-                <ArrowLeft className="mr-2 h-5 w-5" />
-                View Payment Details
+                Cancel
               </Link>
               
               <button
                 ref={submitButtonRef}
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isVerifying || !isVerifiedForSubmit}
                 className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-2 ${
-                  isSubmitting
+                  isSubmitting || isVerifying || !isVerifiedForSubmit
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
@@ -2118,8 +2170,27 @@ const Join: React.FC = () => {
                 ) : (
                   <>
                     <CheckCircle className="mr-2 h-5 w-5" />
-                    Submit Registration
+                    Submit
                   </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleVerify()}
+                disabled={isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()}
+                className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-3 ${
+                  isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify'
                 )}
               </button>
             </div>

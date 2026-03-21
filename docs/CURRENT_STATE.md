@@ -1,14 +1,14 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-03-21
-**Updated by:** Codex (single-field correction stepper stream)
+**Updated by:** Codex (signup state persistence and Join prefill stream)
 
 ---
 
 ## Project
 
 - **Repo:** `C:\webprojects\lub`
-- **Latest deep handover:** `docs/session_documents/session_49_dual_agent_setup_and_browser_side_hardening_completion.md`
+- **Latest deep handover:** `docs/session_documents/session_50_signup_state_join_prefill_and_join_flow_handover.md`
 - **Project guide:** `docs/lub_web_portal_project_guide_for_claude_code.md`
 
 ---
@@ -27,9 +27,9 @@ Phase 1 baseline is the non-negotiable floor. Do not merge or ship changes that 
 
 ## Active Stream
 
-**Active stream:** None - single-field correction stepper stream complete.
+**Active stream:** None - signup state persistence and Join prefill stream complete.
 
-Most recent completed stream before this one: **Role assignment UI added to the routed Admin Users page using the existing hardened role wrappers.**
+Most recent completed stream before this one: **Single-field correction stepper added to Join and Member Edit Profile.**
 
 Assign exactly one domain to one agent per session. Update this section when a stream starts.
 
@@ -38,8 +38,8 @@ Assign exactly one domain to one agent per session. Update this section when a s
 ## Last Verified
 
 - **When:** 2026-03-21
-- **What:** Single-field correction stepper for Join and Member Edit Profile
-- **Result:** Build and lint pass. Live smoke passed in both flows. Join now pauses on one corrected field at a time and returns the user to the form for manual final submission. Member edit uses the same flow.
+- **What:** Signup state persistence and Join state auto-prefill
+- **Result:** Build and lint pass. DB migration applied successfully. Signup now stores state in the user account, and Join auto-fills state from the authenticated account. Manual smoke confirmed the flow works.
 - **Command(s):**
   ```
   npm run lint
@@ -50,10 +50,10 @@ Assign exactly one domain to one agent per session. Update this section when a s
 
 ## In Progress / Dirty State
 
-No active implementation stream. The repo includes an uncommitted single-field correction stepper batch until this checkpoint is committed.
+No active implementation stream. Working tree should be clean after the current checkpoint commit.
 
 Expected state after this checkpoint:
-- working tree dirty until this correction-stepper checkpoint is committed
+- working tree clean
 - Phase 1 baseline preserved at 15 passed
 - `AGENTS.md`, `CLAUDE.md`, and `docs/CURRENT_STATE.md` available as the shared startup/checkpoint files
 
@@ -71,6 +71,8 @@ Done this session:
 - Role assignment UI added to `src/pages/admin/AdminUsers.tsx` with `AssignRoleModal` and the existing hardened role wrappers. Admin user creation is now handled through Sign Up plus role assignment.
 - Lint cleanup reduced the baseline from `206 errors, 42 warnings` to `0 errors, 0 warnings`.
 - Join and Member Edit Profile now use a single-field correction stepper instead of the old multi-field review modal. The user confirms one corrected field at a time and must still click the form submit button afterward.
+- Signup now captures `State`, persists it in `public.users`, and Join auto-fills the same state from the authenticated account.
+- Join layout updated so `Payment Information` sits below `Personal Information`, `Payment Proof` is inside `Payment Information`, and Join action buttons are right-aligned with the Verify/Submit flow.
 
 | # | Item | Notes |
 |---|------|-------|
@@ -100,5 +102,5 @@ Current top item: **Validation-consumption cleanup** (Deferred Work item 1).
 ## References
 
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
-- Latest deep handover: `docs/session_documents/session_49_dual_agent_setup_and_browser_side_hardening_completion.md`
+- Latest deep handover: `docs/session_documents/session_50_signup_state_join_prefill_and_join_flow_handover.md`
 - Startup rules: `CLAUDE.md` (Claude Code) / `AGENTS.md` (Codex)

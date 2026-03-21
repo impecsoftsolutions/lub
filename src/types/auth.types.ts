@@ -19,6 +19,7 @@ export interface User {
   id: string;
   email: string;
   mobile_number: string | null;
+  state?: string | null;
   account_type: 'admin' | 'member' | 'both' | 'general_user';
   account_status: 'active' | 'password_pending' | 'locked' | 'suspended';
   email_verified: boolean;

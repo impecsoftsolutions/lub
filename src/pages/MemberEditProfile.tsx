@@ -179,8 +179,10 @@ const MemberEditProfile: React.FC = () => {
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // Normalization states
+  const [isVerifiedForSubmit, setIsVerifiedForSubmit] = useState(false);
   const [correctionFields, setCorrectionFields] = useState<FieldCorrectionStep[]>([]);
   const [showCorrectionStepper, setShowCorrectionStepper] = useState(false);
   const [correctionSnapshot, setCorrectionSnapshot] = useState<typeof formData | null>(null);
@@ -444,6 +446,7 @@ const MemberEditProfile: React.FC = () => {
       ...prev,
       [name]: processedValue
     }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error for this field
     if (errors[name]) {
@@ -502,6 +505,7 @@ const MemberEditProfile: React.FC = () => {
     }
 
     setFormData(prev => ({ ...prev, [name]: numericValue }));
+    setIsVerifiedForSubmit(false);
 
     // Clear error
     if (errors[name]) {
@@ -537,6 +541,7 @@ const MemberEditProfile: React.FC = () => {
   const handleCropComplete = (croppedImageBlob: Blob) => {
     setProfilePhoto(croppedImageBlob);
     setPhotoFileName(generatePhotoFileName());
+    setIsVerifiedForSubmit(false);
 
     const previewUrl = URL.createObjectURL(croppedImageBlob);
     setProfilePhotoPreview(previewUrl);
@@ -560,6 +565,7 @@ const MemberEditProfile: React.FC = () => {
 
     // Mark as removed to enable Submit button
     setFormData(prev => ({ ...prev, profile_photo_url: '' }));
+    setIsVerifiedForSubmit(false);
   };
 
   const handleCropError = (error: string) => {
@@ -693,6 +699,48 @@ const MemberEditProfile: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleVerify = async () => {
+    if (!member) {
+      showToast('error', 'Member data not available');
+      return;
+    }
+
+    const isValid = await validateForm();
+    if (!isValid) {
+      showToast('error', 'Please fix all validation errors before verifying');
+      return;
+    }
+
+    const changedFields = detectChangedFields();
+
+    if (changedFields.length === 0) {
+      showToast('error', 'No changes detected');
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+      const result = await normalizeMemberData(formData);
+      const correctedFields = getCorrectionFields(result);
+
+      if (correctedFields.length > 0) {
+        setCorrectionSnapshot(formData);
+        setCorrectionFields(correctedFields);
+        setShowCorrectionStepper(true);
+      } else {
+        setIsVerifiedForSubmit(true);
+        focusSubmitButton();
+        showToast('success', 'Your details are ready. Please click Submit.');
+      }
+    } catch (error) {
+      console.error('[MemberEditProfile] Error in handleVerify:', error);
+      setIsVerifiedForSubmit(false);
+      showToast('error', 'This is a technical error. Please contact system Admin');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -701,49 +749,12 @@ const MemberEditProfile: React.FC = () => {
       return;
     }
 
-    // Validate form
-    const isValid = await validateForm();
-    if (!isValid) {
-      showToast('error', 'Please fix all validation errors before submitting');
+    if (!isVerifiedForSubmit) {
+      showToast('error', 'Please click Verify before submitting.');
       return;
     }
 
-    // Detect changed fields
-    const changedFields = detectChangedFields();
-
-    if (changedFields.length === 0) {
-      showToast('error', 'No changes detected');
-      return;
-    }
-
-    console.log('[MemberEditProfile] Changed fields:', changedFields);
-
-    try {
-      setIsSaving(true);
-
-      // Call normalization service
-      console.log('[MemberEditProfile] Normalizing member data...');
-      const result = await normalizeMemberData(formData);
-
-      const correctedFields = getCorrectionFields(result);
-
-      if (correctedFields.length > 0) {
-        console.log('[MemberEditProfile] Correction changes detected, showing stepper');
-        setCorrectionSnapshot(formData);
-        setCorrectionFields(correctedFields);
-        setShowCorrectionStepper(true);
-        setIsSaving(false);
-      } else {
-        // No normalization needed, save directly
-        console.log('[MemberEditProfile] No normalization changes, saving directly');
-        await saveProfileData(formData);
-      }
-    } catch (error) {
-      console.error('[MemberEditProfile] Error in handleSubmit:', error);
-      // If normalization fails, proceed with original data
-      showToast('error', 'Data normalization failed. Proceeding with original data.');
-      await saveProfileData(formData);
-    }
+    await saveProfileData(formData);
   };
 
   const saveProfileData = async (dataToSave: typeof formData) => {
@@ -930,13 +941,15 @@ const MemberEditProfile: React.FC = () => {
   const handleCorrectionComplete = useCallback(() => {
     setShowCorrectionStepper(false);
     setCorrectionFields([]);
+    setIsVerifiedForSubmit(true);
     focusSubmitButton();
-    showToast('success', 'Please click Submit to finish.');
+    showToast('success', 'Your details are ready. Please click Submit.');
   }, [focusSubmitButton, showToast]);
 
   const handleCorrectionDiscard = useCallback(() => {
     setShowCorrectionStepper(false);
     setCorrectionFields([]);
+    setIsVerifiedForSubmit(false);
     if (correctionSnapshot) {
       setFormData(correctionSnapshot);
     }
@@ -1842,9 +1855,9 @@ const MemberEditProfile: React.FC = () => {
               <button
                 ref={submitButtonRef}
                 type="submit"
-                disabled={isSaving || !hasFormChanges()}
+                disabled={isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isSaving || !hasFormChanges()
+                  isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
@@ -1858,6 +1871,28 @@ const MemberEditProfile: React.FC = () => {
                   <>
                     <Save className="w-4 h-4" />
                     Submit
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleVerify()}
+                disabled={isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
+                  isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Verify
                   </>
                 )}
               </button>

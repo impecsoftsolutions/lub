@@ -9,6 +9,7 @@ export interface MemberData {
   full_name: string;
   email: string;
   mobile_number: string;
+  state: string;
   company_name: string;
   status: 'pending' | 'approved' | 'rejected';
   approval_date: string | null;
@@ -30,10 +31,11 @@ interface SignUpResult {
 }
 
 export const memberAuthService = {
-  async signUpMember(email: string, mobile_number: string): Promise<SignUpResult> {
+  async signUpMember(email: string, mobile_number: string, state: string): Promise<SignUpResult> {
     try {
       const normalizedEmail = normalizeEmail(email);
       const normalizedMobile = normalizeMobileNumber(mobile_number);
+      const normalizedState = state.trim();
       console.log('[memberAuthService] Sign up attempt for:', normalizedEmail);
 
       if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -52,10 +54,19 @@ export const memberAuthService = {
         };
       }
 
+      if (!normalizedState) {
+        return {
+          success: false,
+          error: 'Please select a state.',
+          data: null
+        };
+      }
+
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
       const { data, error: rpcError } = await supabase.rpc('create_portal_user_with_session', {
         p_email: normalizedEmail,
         p_mobile_number: normalizedMobile,
+        p_state: normalizedState,
         p_ip_address: null,
         p_user_agent: userAgent
       });
@@ -173,6 +184,7 @@ export const memberAuthService = {
         full_name: extendedUser.full_name || '',
         email: user.email,
         mobile_number: user.mobile_number || '',
+        state: extendedUser.state || '',
         company_name: extendedUser.company_name || '',
         status: extendedUser.status || 'pending',
         approval_date: extendedUser.approval_date || null,
