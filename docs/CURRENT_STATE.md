@@ -8,7 +8,7 @@
 ## Project
 
 - **Repo:** `C:\webprojects\lub`
-- **Latest deep handover:** `docs/session_documents/session_50_signup_state_join_prefill_and_join_flow_handover.md`
+- **Latest deep handover:** `docs/session_documents/session_51_hardcoded_cleanup_payment_settings_and_shared_workflow_closeout.md`
 - **Project guide:** `docs/lub_web_portal_project_guide_for_claude_code.md`
 
 ---
@@ -57,14 +57,14 @@ Most recently completed stream:
 
 ## In Progress / Dirty State
 
-This stream is ready to commit.
+Session closeout docs were updated after the main code commit.
 
 Expected state after the next checkpoint commit:
-- working tree clean
-- coordination docs committed
-- hardcoded-values cleanup and payment-settings delete flow checkpointed
+- working tree clean except for local-only `.claude/` if it remains untracked
+- `CURRENT_STATE.md` points to Session 51
+- session closeout documentation is preserved in git
 
-If `git status` is dirty after that commit, inspect the delta before starting the next stream.
+If `git status` is dirty beyond local-only machine files, inspect the delta before starting the next stream.
 
 ---
 
@@ -101,4 +101,4 @@ Only remaining environment follow-up from the completed stream:
 - Task board: `docs/agent_coordination/TASK_BOARD.md`
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
-- Latest deep handover: `docs/session_documents/session_50_signup_state_join_prefill_and_join_flow_handover.md`
+- Latest deep handover: `docs/session_documents/session_51_hardcoded_cleanup_payment_settings_and_shared_workflow_closeout.md`
