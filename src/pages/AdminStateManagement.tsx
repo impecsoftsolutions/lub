@@ -289,7 +289,7 @@ const AdminStateManagement: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <Link
-                          to={`/admin/state-management/${encodeURIComponent(state.state_name)}/locations`}
+                          to={`/admin/locations/states/${encodeURIComponent(state.state_name)}/locations`}
                           className="inline-flex items-center px-3 py-1 text-sm font-medium text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
                         >
                           <MapPin className="w-3 h-3 mr-1" />

@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { type Locator, type Page } from '@playwright/test';
 
 const SESSION_KEYS = [
@@ -5,6 +7,14 @@ const SESSION_KEYS = [
   'lub_session_token_expiry',
   'lub_session_token_user',
 ] as const;
+const LOCAL_SMOKE_ADMIN_CONFIG_PATH = resolve(process.cwd(), 'lub-private', 'phase1-smoke-admin.json');
+
+type Phase1SmokeAdminConfig = {
+  admin_email?: string;
+  admin_mobile?: string;
+};
+
+let cachedSmokeAdminConfig: Phase1SmokeAdminConfig | null | undefined;
 
 export function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -14,6 +24,59 @@ export function getRequiredEnv(name: string): string {
   }
 
   return value;
+}
+
+function getOptionalEnv(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+
+function loadLocalSmokeAdminConfig(): Phase1SmokeAdminConfig | null {
+  if (cachedSmokeAdminConfig !== undefined) {
+    return cachedSmokeAdminConfig;
+  }
+
+  if (!existsSync(LOCAL_SMOKE_ADMIN_CONFIG_PATH)) {
+    cachedSmokeAdminConfig = null;
+    return cachedSmokeAdminConfig;
+  }
+
+  try {
+    const raw = readFileSync(LOCAL_SMOKE_ADMIN_CONFIG_PATH, 'utf8');
+    cachedSmokeAdminConfig = JSON.parse(raw) as Phase1SmokeAdminConfig;
+    return cachedSmokeAdminConfig;
+  } catch (error) {
+    throw new Error(
+      `Failed to read local smoke admin config at ${LOCAL_SMOKE_ADMIN_CONFIG_PATH}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+function resolveSmokeAdminCredentials(): { email: string; mobile: string } {
+  const envEmail = getOptionalEnv('PHASE1_SMOKE_ADMIN_EMAIL');
+  const envMobile = getOptionalEnv('PHASE1_SMOKE_ADMIN_MOBILE');
+
+  if (envEmail || envMobile) {
+    if (!envEmail || !envMobile) {
+      throw new Error(
+        'PHASE1_SMOKE_ADMIN_EMAIL and PHASE1_SMOKE_ADMIN_MOBILE must both be provided when overriding smoke admin credentials via environment variables.'
+      );
+    }
+
+    return { email: envEmail, mobile: envMobile };
+  }
+
+  const config = loadLocalSmokeAdminConfig();
+  const fileEmail = config?.admin_email?.trim();
+  const fileMobile = config?.admin_mobile?.trim();
+
+  if (fileEmail && fileMobile) {
+    return { email: fileEmail, mobile: fileMobile };
+  }
+
+  throw new Error(
+    `Smoke admin credentials are missing. Provide PHASE1_SMOKE_ADMIN_EMAIL and PHASE1_SMOKE_ADMIN_MOBILE, or create ${LOCAL_SMOKE_ADMIN_CONFIG_PATH} with admin_email and admin_mobile.`
+  );
 }
 
 export function getBaseUrl(): string {
@@ -366,8 +429,7 @@ export async function assertAdminRouteAccessWithOptions(
 }
 
 export async function loginAsAdmin(page: Page): Promise<void> {
-  const email = getRequiredEnv('PHASE1_SMOKE_ADMIN_EMAIL');
-  const mobile = getRequiredEnv('PHASE1_SMOKE_ADMIN_MOBILE');
+  const { email, mobile } = resolveSmokeAdminCredentials();
 
   await gotoAppPath(page, '/signin');
 

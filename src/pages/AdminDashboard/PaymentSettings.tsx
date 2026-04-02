@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, CreditCard as Edit3, Save, X, Upload, MapPin, QrCode, Lock, AlertCircle } from 'lucide-react';
+import { Plus, CreditCard as Edit3, Save, X, Upload, MapPin, QrCode, Lock, AlertCircle, Trash2 } from 'lucide-react';
 import { PermissionGate } from '../../components/permissions/PermissionGate';
 import { useHasPermission } from '../../hooks/usePermissions';
 import { supabase, fileUploadService, statesService, StateMaster } from '../../lib/supabase';
@@ -211,6 +211,43 @@ const PaymentSettings: React.FC = () => {
     } catch (error) {
       console.error('Error updating payment settings:', error);
       showToast('error', 'Failed to update payment settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteSettings = async (state: string) => {
+    if (!confirm(`Delete payment settings for "${state}"?`)) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('User session not found. Please log in again.');
+      }
+
+      const { data, error } = await supabase.rpc('delete_payment_settings_with_session', {
+        p_session_token: sessionToken,
+        p_state: state
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to delete payment settings');
+      }
+
+      showToast('success', `Payment settings for ${state} deleted successfully`);
+      handleCancelEdit();
+      await loadPaymentSettings();
+    } catch (error) {
+      console.error('Error deleting payment settings:', error);
+      showToast('error', 'Failed to delete payment settings');
     } finally {
       setIsSaving(false);
     }
@@ -530,6 +567,14 @@ const PaymentSettings: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {editingState === settings.state ? (
                         <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleDeleteSettings(settings.state)}
+                            disabled={isSaving}
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
+                          </button>
                           <button
                             onClick={handleSaveEdit}
                             disabled={isSaving}

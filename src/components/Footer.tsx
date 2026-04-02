@@ -1,24 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { organizationProfileService } from '../lib/supabase';
+import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
 
 const Footer: React.FC = () => {
-  const [orgLogo, setOrgLogo] = React.useState<string>('');
+  const { profile } = useOrganisationProfile();
 
-  // Load organization logo
-  React.useEffect(() => {
-    const loadOrgLogo = async () => {
-      try {
-        const profile = await organizationProfileService.getProfile();
-        if (profile?.organization_logo_url) {
-          setOrgLogo(profile.organization_logo_url);
-        }
-      } catch (error) {
-        console.error('Error loading organization logo:', error);
-      }
-    };
-    loadOrgLogo();
-  }, []);
+  const orgName = profile?.organization_name ?? 'LUB';
+  const orgEmail = profile?.email_address ?? 'contact@lub.org.in';
+  const orgWebsite = profile?.organization_website ?? 'www.lub.org.in';
+  const orgLogo = profile?.organization_logo_url ?? '';
+  const currentYear = new Date().getFullYear();
 
   return (
     <footer className="bg-blue-900 text-white">
@@ -28,9 +19,9 @@ const Footer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
               {orgLogo ? (
-                <img 
-                  src={orgLogo} 
-                  alt="LUB Logo" 
+                <img
+                  src={orgLogo}
+                  alt={`${orgName} Logo`}
                   className="w-10 h-10 object-contain rounded-lg bg-white p-1"
                 />
               ) : (
@@ -38,7 +29,7 @@ const Footer: React.FC = () => {
                   <span className="text-white font-bold text-lg">L</span>
                 </div>
               )}
-              <span className="text-2xl font-bold">LUB</span>
+              <span className="text-2xl font-bold">{orgName}</span>
             </div>
             <p className="text-blue-100 text-sm leading-relaxed">
               Empowering Micro, Small and Medium Enterprises across India through
@@ -76,10 +67,10 @@ const Footer: React.FC = () => {
             <h3 className="text-lg font-semibold">Contact</h3>
             <div className="space-y-2 text-sm">
               <p className="text-blue-100">
-                Email: contact@lub.org.in
+                Email: {orgEmail}
               </p>
               <p className="text-blue-100">
-                Website: www.lub.org.in
+                Website: {orgWebsite}
               </p>
             </div>
           </div>
@@ -88,7 +79,7 @@ const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="border-t border-blue-800 mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-blue-100 text-sm">
-            © 2025 Laghu Udyog Bharati India. All rights reserved.
+            © {currentYear} {orgName}. All rights reserved.
           </p>
           <div className="flex space-x-4 mt-4 sm:mt-0">
             <Link to="/styleguide" className="text-blue-100 hover:text-white text-sm transition-colors">

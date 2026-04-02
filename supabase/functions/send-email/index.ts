@@ -78,6 +78,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const configuredFromAddress = Deno.env.get('RESEND_FROM_ADDRESS')?.trim();
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY is not configured');
@@ -96,7 +97,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const fromAddress = from || 'LUB Membership <noreply@lub.org.in>';
+    if (!configuredFromAddress) {
+      console.error('RESEND_FROM_ADDRESS is not configured');
+      return new Response(
+        JSON.stringify({
+          error: 'Email service not configured',
+          details: 'RESEND_FROM_ADDRESS environment variable is missing',
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+
+    const fromAddress = from || configuredFromAddress;
 
     const emailPayload: ResendEmailPayload = {
       from: fromAddress,

@@ -84,6 +84,7 @@ export interface OrganizationProfile {
   organization_logo_url: string;
   contact_number: string;
   email_address: string;
+  organization_website?: string;
   address: string;
   social_media_handles: SocialMediaHandle[];
   created_at: string;

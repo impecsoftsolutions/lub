@@ -3,8 +3,9 @@
 ## Read These First (in order)
 
 1. `docs/CURRENT_STATE.md` - lightweight rolling checkpoint (what changed, what's next)
-2. `docs/session_documents/session_48_phase1_runtime_verification_completion_and_next_stream_handover.md` - latest deep handover
-3. `docs/lub_web_portal_project_guide_for_claude_code.md` - full project architecture and orientation
+2. `docs/agent_coordination/TASK_BOARD.md` - strict shared queue and slice ownership
+3. Latest deep handover referenced by `docs/CURRENT_STATE.md`
+4. `docs/lub_web_portal_project_guide_for_claude_code.md` - full project architecture and orientation
 
 Do not skip step 1. It is the fastest way to know where the project currently stands.
 
@@ -12,6 +13,7 @@ Do not skip step 1. It is the fastest way to know where the project currently st
 
 ### Before starting any task
 - Read `docs/CURRENT_STATE.md`
+- Read `docs/agent_coordination/TASK_BOARD.md`
 - Read `src/lib/supabase.ts` before changing any domain
 - Check `supabase/migrations/` for the relevant domain's SQL before writing frontend code
 - Inspect the relevant page/component/service before proposing changes
@@ -20,6 +22,22 @@ Do not skip step 1. It is the fastest way to know where the project currently st
 - One agent owns one implementation slice end-to-end at a time
 - Do not concurrently edit the same domain/files as another agent unless explicitly coordinated
 - Slices cross page + service layer + SQL migration + Playwright - own all four for your slice
+- Claude owns UI/UX by default:
+  - `src/pages/**`
+  - `src/components/**`
+  - layout
+  - interaction flow
+  - client-side UX wording
+  - visual polish
+- Claude should avoid independently changing DB/API contracts.
+- Codex owns backend/data/runtime by default:
+  - `src/lib/supabase.ts`
+  - auth/session behavior
+  - SQL migrations
+  - data model changes
+  - Playwright/runtime verification
+  - DB cleanup SQL
+- Follow `docs/agent_coordination/OWNERSHIP_RULES.md` for handoff triggers and blocked states.
 
 ### Security direction
 - Privileged admin/browser writes must use `_with_session` RPC wrappers
@@ -43,6 +61,8 @@ Do not skip step 1. It is the fastest way to know where the project currently st
 
 ## End of Session
 - Update `docs/CURRENT_STATE.md` - overwrite the relevant sections, do not append a journal
+- Update `docs/agent_coordination/TASK_BOARD.md`
+- Update `docs/agent_coordination/HANDOFF_NOTES.md` if handing off or blocking
 - For major stream completions, create a new `docs/session_documents/session_NN_...md`
 
 ## Key Commands

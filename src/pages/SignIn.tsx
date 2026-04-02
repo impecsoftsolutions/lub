@@ -12,8 +12,10 @@ import {
 import { sessionManager } from '../lib/sessionManager';
 import { AuthErrorCode } from '../types/auth.types';
 import Toast from '../components/Toast';
+import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
 
 const SignIn: React.FC = () => {
+  const { profile } = useOrganisationProfile();
   const [formData, setFormData] = useState({
     email: '',
     mobile_number: ''
@@ -73,7 +75,7 @@ const SignIn: React.FC = () => {
         return 'Account is locked. Please contact support.';
 
       case AuthErrorCode.ACCOUNT_SUSPENDED:
-        return 'Your account has been suspended. Please contact support at support@lub.org.in.';
+        return `Your account has been suspended. Please contact support${profile?.email_address ? ` at ${profile.email_address}` : ''}.`;
 
       case AuthErrorCode.ACCOUNT_FROZEN:
         return 'Your account is unavailable. Please contact support.';

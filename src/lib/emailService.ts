@@ -1,5 +1,5 @@
 import emailjs from '@emailjs/browser';
-import { stateLeadersService } from './supabase';
+import { organizationProfileService, stateLeadersService } from './supabase';
 
 // EmailJS configuration
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -24,19 +24,24 @@ export const emailService = {
 
   // Generate welcome email content with dynamic state leader
   async generateWelcomeMessage(data: WelcomeEmailData): Promise<string> {
-    // Fetch state leader information
-    const stateLeader = await stateLeadersService.getStateLeader(data.state);
-    
-    // Fallback values if state leader not found
-    const presidentName = stateLeader?.president_name || 'State President';
-    const presidentMobile = stateLeader?.president_mobile || '9848043392';
-    
+    const [stateLeader, organizationProfile] = await Promise.all([
+      stateLeadersService.getStateLeader(data.state),
+      organizationProfileService.getProfile(),
+    ]);
+
+    const organizationName = organizationProfile?.organization_name?.trim() || 'LUB';
+    const fallbackContactNumber = organizationProfile?.contact_number?.trim() || '';
+    const contactName = stateLeader?.president_name?.trim() || organizationName;
+    const contactMobile = stateLeader?.president_mobile?.trim() || fallbackContactNumber;
+    const contactTitle = stateLeader ? 'State President' : 'Organization Contact';
+
     const stateText = data.state === 'Andhra Pradesh' ? 'Andhra Pradesh' : data.state;
     const referredByLine = data.referred_by ? `\nReferred by: ${data.referred_by}` : '';
+    const contactLine = contactMobile ? `\nContact Number: ${contactMobile}` : '';
     
     return `Dear ${data.full_name},
 
-Welcome to Laghu Udyog Bharati, ${stateText}!
+Welcome to ${organizationName}, ${stateText}!
 
 We are delighted to inform you that your membership application has been approved. You are now officially part of the LUB family, and we look forward to supporting your business journey.
 
@@ -45,13 +50,12 @@ Mobile: ${data.mobile_number}${referredByLine}
 As a member, you will have access to our comprehensive support programs, networking opportunities, and resources designed to help MSMEs thrive in today's competitive market.
 
 We promise to make your membership experience as smooth as your business operations (and hopefully with fewer spreadsheets)!
-
-Mobile: +91 ${presidentMobile}
+${contactLine}
 
 Regards,
-${presidentName}
-State President
-LUB, ${data.state}`;
+${contactName}
+${contactTitle}
+${organizationName}${stateLeader ? `, ${data.state}` : ''}`;
   },
 
   // Send welcome email
@@ -66,10 +70,10 @@ LUB, ${data.state}`;
       const templateParams = {
         to_name: data.full_name,
         to_email: data.email,
-        subject: `Welcome to Laghu Udyog Bharati, ${data.state}!`,
+        subject: `Welcome to ${data.state}!`,
         message: message,
         from_name: 'LUB Team',
-        from_title: `Laghu Udyog Bharati, ${data.state}`
+        from_title: `LUB, ${data.state}`
       };
 
       const response = await emailjs.send(

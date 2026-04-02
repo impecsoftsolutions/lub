@@ -11,9 +11,9 @@
     "test:e2e:phase1": "playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium",
     "test:e2e:phase1:headed": "playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium --headed",
     "test:e2e:phase1:list": "playwright test tests/e2e/phase1-production-smoke.spec.ts --list",
-    "test:e2e:phase1:local": "cross-env PHASE1_SMOKE_BASE_URL=http://localhost:5173 PHASE1_SMOKE_ADMIN_EMAIL=yogish@gmail.com PHASE1_SMOKE_ADMIN_MOBILE=9848043392 RUN_DESTRUCTIVE=false playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium",
-    "test:e2e:phase1:local:headed": "cross-env PHASE1_SMOKE_BASE_URL=http://localhost:5173 PHASE1_SMOKE_ADMIN_EMAIL=yogish@gmail.com PHASE1_SMOKE_ADMIN_MOBILE=9848043392 RUN_DESTRUCTIVE=false playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium --headed",
-    "test:e2e:phase1:local:destructive": "cross-env PHASE1_SMOKE_BASE_URL=http://localhost:5173 PHASE1_SMOKE_ADMIN_EMAIL=yogish@gmail.com PHASE1_SMOKE_ADMIN_MOBILE=9848043392 RUN_DESTRUCTIVE=true PHASE1_SMOKE_FIXTURES_FILE=C:\\lub-private\\phase1-smoke-fixtures.json playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium"
+    "test:e2e:phase1:local": "cross-env PHASE1_SMOKE_BASE_URL=http://localhost:5173 RUN_DESTRUCTIVE=false playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium",
+    "test:e2e:phase1:local:headed": "cross-env PHASE1_SMOKE_BASE_URL=http://localhost:5173 RUN_DESTRUCTIVE=false playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium --headed",
+    "test:e2e:phase1:local:destructive": "cross-env PHASE1_SMOKE_BASE_URL=http://localhost:5173 RUN_DESTRUCTIVE=true PHASE1_SMOKE_FIXTURES_FILE=C:\\lub-private\\phase1-smoke-fixtures.json playwright test tests/e2e/phase1-production-smoke.spec.ts --project=chromium"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
