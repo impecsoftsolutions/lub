@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  User,
   Upload,
   Save,
   Building2,
@@ -15,6 +14,7 @@ import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { organizationProfileService, OrganizationProfile, SocialMediaHandle, fileUploadService } from '../lib/supabase';
 import Toast from '../components/Toast';
+import { PageHeader } from '../components/ui/PageHeader';
 
 const AdminProfileSettings: React.FC = () => {
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile | null>(null);
@@ -170,7 +170,7 @@ const AdminProfileSettings: React.FC = () => {
         </div>
       }
     >
-    <div className="min-h-screen bg-gray-50">
+    <div className="p-6">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -178,50 +178,38 @@ const AdminProfileSettings: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <User className="w-8 h-8 mr-3 text-blue-600" />
-                Organization Profile Settings
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage your organization's public profile information
-              </p>
-            </div>
-            <div className="flex gap-3">
-              {canEditProfile && (
-                <>
-                  {isEditing && (
-                    <button
-                      onClick={handleEditToggle}
-                      disabled={isSaving}
-                      className="inline-flex items-center px-4 py-2 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  <button
-                    onClick={isEditing ? handleSaveProfile : handleEditToggle}
-                    disabled={isSaving || isLoading}
-                    className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+      <div>
+        <PageHeader
+          title="Organization Profile Settings"
+          subtitle="Manage your organization's public profile information"
+          actions={canEditProfile ? (
+            <>
+              {isEditing && (
+                <button
+                  onClick={handleEditToggle}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                onClick={isEditing ? handleSaveProfile : handleEditToggle}
+                disabled={isSaving || isLoading}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-md transition-colors ${
                   isSaving || isLoading
-                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : isEditing
                     ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}
               >
-                <Save className="w-4 h-4 mr-2" />
+                <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Edit Profile'}
               </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+            </>
+          ) : undefined}
+        />
 
         {isLoading ? (
           <div className="text-center py-12">

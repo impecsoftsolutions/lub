@@ -18,6 +18,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { useAdmin } from '../../contexts/useAdmin';
+import { useOrganisationProfile } from '../../hooks/useOrganisationProfile';
 
 interface MenuItem {
   label: string;
@@ -34,6 +35,7 @@ export function AdminLayout() {
   const [expandedSections, setExpandedSections] = useState<string[]>(['Dashboard', 'Members', 'Locations']);
   const location = useLocation();
   const { sidebarCollapsed, toggleSidebar, pendingRegistrationsCount, pendingCitiesCount } = useAdmin();
+  const { profile: orgProfile } = useOrganisationProfile();
 
   useEffect(() => {
     let isMounted = true;
@@ -188,69 +190,86 @@ export function AdminLayout() {
       {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 h-screen bg-white border-r border-gray-200 transition-all duration-300 z-30 flex flex-col ${
-          sidebarCollapsed ? 'w-16' : 'w-64'
+          sidebarCollapsed ? 'w-16' : 'w-60'
         }`}
       >
-        {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+        {/* Sidebar Header — blue accent strip */}
+        <div className="h-14 flex items-center justify-between px-3 bg-blue-600 flex-shrink-0">
           {!sidebarCollapsed && (
-            <h1 className="text-xl font-bold text-gray-900">Admin Portal</h1>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {orgProfile?.organization_logo_url ? (
+                <img
+                  src={orgProfile.organization_logo_url}
+                  alt="Logo"
+                  className="w-7 h-7 rounded object-contain flex-shrink-0 bg-white/20 p-0.5"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-bold">
+                    {(orgProfile?.organization_name ?? 'A').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <span className="text-sm font-semibold text-white truncate">
+                {orgProfile?.organization_name ?? 'Admin Portal'}
+              </span>
+            </div>
           )}
           <button
             onClick={toggleSidebar}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-white/20 rounded-md transition-colors flex-shrink-0"
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {sidebarCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
+            {sidebarCollapsed ? <Menu className="w-4 h-4 text-white" /> : <X className="w-4 h-4 text-white" />}
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4">
-          <ul className="space-y-1 px-2">
+        <nav className="flex-1 overflow-y-auto py-3">
+          <ul className="space-y-0.5 px-2">
             {menuItems.map((item) => (
               <li key={item.label}>
                 <button
                   onClick={() => !item.disabled && toggleSection(item.label)}
                   disabled={item.disabled}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md transition-colors ${
                     item.disabled
-                      ? 'opacity-50 cursor-not-allowed text-gray-400'
-                      : 'hover:bg-gray-100 text-gray-700'
+                      ? 'opacity-40 cursor-not-allowed text-gray-400'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                   title={sidebarCollapsed ? item.label : ''}
                 >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <div className="flex items-center gap-2.5">
+                    <item.icon className="w-4 h-4 flex-shrink-0" />
                     {!sidebarCollapsed && (
-                      <span className="font-medium text-sm">{item.label}</span>
+                      <span className="text-sm font-medium">{item.label}</span>
                     )}
                   </div>
                   {!sidebarCollapsed && !item.disabled && (
                     expandedSections.includes(item.label) ? (
-                      <ChevronDown className="w-4 h-4" />
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                     ) : (
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                     )
                   )}
                 </button>
 
                 {/* Submenu */}
                 {!sidebarCollapsed && expandedSections.includes(item.label) && item.children && (
-                  <ul className="mt-1 ml-8 space-y-1">
+                  <ul className="mt-0.5 ml-6 space-y-0.5">
                     {item.children.map((child) => (
                       <li key={child.path}>
                         <Link
                           to={child.path}
-                          className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                          className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${
                             location.pathname === child.path
-                              ? 'bg-blue-50 text-blue-700 font-medium'
-                              : 'text-gray-600 hover:bg-gray-50'
+                              ? 'bg-blue-50 text-blue-700 font-medium border-l-2 border-blue-600 rounded-l-none'
+                              : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
                           }`}
                         >
                           <span>{child.label}</span>
                           {child.badge && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                            <span className="px-1.5 py-0.5 text-xs font-semibold bg-red-500 text-white rounded-full min-w-[18px] text-center">
                               {child.badge}
                             </span>
                           )}
@@ -264,38 +283,43 @@ export function AdminLayout() {
           </ul>
         </nav>
 
-        {/* User Info & Sign Out */}
-        <div className="border-t border-gray-200 p-4">
-          {!sidebarCollapsed ? (
-            <>
-              <div className="mb-3">
-                <p className="text-xs text-gray-500 mb-1">Signed in as</p>
-                <p className="text-sm font-medium text-gray-900 truncate">{userEmail}</p>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </button>
-            </>
-          ) : (
+        {/* Collapsed sign-out (icon only) */}
+        {sidebarCollapsed && (
+          <div className="border-t border-gray-200 p-3 flex-shrink-0">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
               title="Sign Out"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
+
+      {/* Top header bar */}
+      <div
+        className={`fixed top-0 right-0 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-20 transition-all duration-300 ${
+          sidebarCollapsed ? 'left-16' : 'left-60'
+        }`}
+      >
+        <div />
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 hidden sm:block">{userEmail}</span>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:block">Sign out</span>
+          </button>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main
-        className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
+        className={`flex-1 transition-all duration-300 pt-14 ${
+          sidebarCollapsed ? 'ml-16' : 'ml-60'
         }`}
       >
         <Outlet />

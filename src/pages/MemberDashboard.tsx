@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
+import MemberNav from '../components/MemberNav';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useMember } from '../contexts/useMember';
 import Toast from '../components/Toast';
 import { logoutService } from '../lib/logoutService';
@@ -222,7 +224,8 @@ const MemberDashboard: React.FC = () => {
   const companyName = registrationRow?.company_name || member?.company_name || '';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div>
+      <MemberNav />
       <Toast
         type={toast.type}
         message={toast.message}
@@ -230,25 +233,23 @@ const MemberDashboard: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="mb-8 flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Member Dashboard</h1>
-              <p className="mt-1 text-gray-600">Welcome back, {displayName}!</p>
-            </div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        <PageHeader
+          title="Dashboard"
+          subtitle={`Welcome back, ${displayName}`}
+          actions={
             <button
               onClick={refreshMember}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors mt-1"
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
               title="Refresh"
             >
-              <RefreshCw className="w-5 h-5" />
+              <RefreshCw className="w-4 h-4" />
             </button>
-          </div>
+          }
+        />
 
-
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-5">
               {checkingRegistration || registrationLookupError || hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
             </h2>
 
@@ -367,8 +368,8 @@ const MemberDashboard: React.FC = () => {
             ) : null}
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Information</h2>
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Your Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Email</p>
@@ -390,13 +391,12 @@ const MemberDashboard: React.FC = () => {
           </div>
 
           {member.member_id && (
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-md p-6 text-white">
-              <h3 className="text-lg font-semibold mb-2">Member ID</h3>
-              <p className="text-3xl font-bold">{member.member_id}</p>
-              <p className="text-sm text-blue-100 mt-2">Your unique member identifier</p>
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Member ID</p>
+              <p className="text-2xl font-semibold text-gray-900">{member.member_id}</p>
+              <p className="text-xs text-gray-400 mt-1">Your unique member identifier</p>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

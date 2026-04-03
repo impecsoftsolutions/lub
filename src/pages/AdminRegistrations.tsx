@@ -1,17 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Users, Search, Filter, FileText, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, Download, User, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock, MoreHorizontal } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
 import { supabase, memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { emailService, WelcomeEmailData } from '../lib/emailService';
-import { vCardGenerator, VCardData } from '../lib/vCardGenerator';
 import Toast from '../components/Toast';
 import EditMemberModal from '../components/EditMemberModal';
 import AuditHistoryModal from '../components/AuditHistoryModal';
 import ViewApplicationModal from '../components/ViewApplicationModal';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 
 interface MemberRegistration {
   id: string;
@@ -46,8 +44,6 @@ const AdminRegistrations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
-  const [isGeneratingVCards, setIsGeneratingVCards] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     registrationId: string;
@@ -77,6 +73,9 @@ const AdminRegistrations: React.FC = () => {
     memberName: ''
   });
   const [deletionReason, setDeletionReason] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const menuRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -92,7 +91,25 @@ const AdminRegistrations: React.FC = () => {
   const canApprove = useHasPermission('members.approve');
   const canEdit = useHasPermission('members.edit');
   const canDelete = useHasPermission('members.delete');
-  const canExport = useHasPermission('members.export');
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [openMenuId]);
+
+  const handleMenuToggle = (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setOpenMenuId(prev => (prev === id ? null : id));
+  };
 
   const loadRegistrations = useCallback(async () => {
     try {
@@ -377,79 +394,6 @@ const AdminRegistrations: React.FC = () => {
     });
   };
 
-  const handleMemberSelection = (memberId: string, isSelected: boolean) => {
-    const newSelection = new Set(selectedMembers);
-    if (isSelected) {
-      newSelection.add(memberId);
-    } else {
-      newSelection.delete(memberId);
-    }
-    setSelectedMembers(newSelection);
-  };
-
-  const handleSelectAll = () => {
-    const approvedMembers = filteredRegistrations.filter(reg => reg.status === 'approved');
-    if (selectedMembers.size === approvedMembers.length) {
-      // Deselect all
-      setSelectedMembers(new Set());
-    } else {
-      // Select all approved members
-      setSelectedMembers(new Set(approvedMembers.map(reg => reg.id)));
-    }
-  };
-
-  const generateVCards = async () => {
-    if (selectedMembers.size === 0) {
-      showToast('error', 'Please select at least one approved member');
-      return;
-    }
-
-    try {
-      setIsGeneratingVCards(true);
-      const zip = new JSZip();
-      
-      // Get selected members data
-      const selectedMembersData = registrations.filter(reg => 
-        selectedMembers.has(reg.id) && reg.status === 'approved'
-      );
-
-      if (selectedMembersData.length === 0) {
-        showToast('error', 'No approved members selected');
-        return;
-      }
-
-      // Generate vCard for each selected member
-      selectedMembersData.forEach(member => {
-        const vCardData: VCardData = {
-          fullName: member.full_name,
-          companyName: member.company_name,
-          mobileNumber: member.mobile_number,
-          district: member.district,
-          state: member.state || 'Unknown',
-          productsServices: member.products_services || 'Not specified',
-          referredBy: member.referred_by || undefined
-        };
-
-        const vCardContent = vCardGenerator.generateVCard(vCardData);
-        const fileName = vCardGenerator.generateFileName(member.full_name, member.state || 'Unknown');
-        
-        zip.file(fileName, vCardContent);
-      });
-
-      // Generate and download zip file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      saveAs(zipBlob, 'lub-vcards.zip');
-      
-      showToast('success', `Generated ${selectedMembersData.length} vCard(s) successfully!`);
-      setSelectedMembers(new Set()); // Clear selection
-    } catch (error) {
-      console.error('Error generating vCards:', error);
-      showToast('error', 'Failed to generate vCards');
-    } finally {
-      setIsGeneratingVCards(false);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
     
@@ -492,16 +436,14 @@ const AdminRegistrations: React.FC = () => {
     <PermissionGate
       permission="members.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view member registrations.</p>
-          </div>
+        <div className="p-6 text-center py-16">
+          <Lock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Access Denied</h2>
+          <p className="text-sm text-gray-500">You don't have permission to view member registrations.</p>
         </div>
       }
     >
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="p-6">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -509,335 +451,183 @@ const AdminRegistrations: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Users className="w-8 h-8 mr-3 text-blue-600" />
-                Member Registrations
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage and review membership applications
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total Registrations</p>
-              <p className="text-2xl font-bold text-gray-900">{registrations.length}</p>
-            </div>
+      <PageHeader
+        title="Member Registrations"
+        subtitle="Manage and review membership applications"
+        actions={<span className="text-sm text-gray-500">{registrations.length} total</span>}
+      />
+
+      {/* Filter bar */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, email, or mobile number..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
+            />
+          </div>
+          <div className="sm:w-44 relative">
+            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
           </div>
         </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or mobile number..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <div className="sm:w-48">
-              <div className="relative">
-                <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Results count */}
-          <div className="mt-4 text-sm text-gray-600">
-            Showing {filteredRegistrations.length} of {registrations.length} registrations
-          </div>
-        </div>
-
-        {/* vCard Generation Section */}
-        {canExport && filteredRegistrations.some(reg => reg.status === 'approved') && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <User className="w-5 h-5 mr-2 text-blue-600" />
-                  Member vCard Generator
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Select approved members to generate contact cards (.vcf files)
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSelectAll}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  {selectedMembers.size === filteredRegistrations.filter(reg => reg.status === 'approved').length 
-                    ? 'Deselect All' 
-                    : 'Select All Approved'
-                  }
-                </button>
-                <button
-                  onClick={generateVCards}
-                  disabled={selectedMembers.size === 0 || isGeneratingVCards}
-                  className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    selectedMembers.size === 0 || isGeneratingVCards
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  {isGeneratingVCards 
-                    ? 'Generating...' 
-                    : `Download vCards (${selectedMembers.size})`
-                  }
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Registrations List */}
-        {isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading registrations...</p>
-          </div>
-        ) : filteredRegistrations.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No registrations found</h3>
-            <p className="text-gray-600">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filter criteria'
-                : 'No member registrations have been submitted yet'
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredRegistrations.map((registration) => (
-              <div key={registration.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                {/* Selection Checkbox for Approved Members */}
-                {registration.status === 'approved' && (
-                  <div className="flex items-center mb-4">
-                    <input
-                      type="checkbox"
-                      id={`select-${registration.id}`}
-                      checked={selectedMembers.has(registration.id)}
-                      onChange={(e) => handleMemberSelection(registration.id, e.target.checked)}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                    />
-                    <label htmlFor={`select-${registration.id}`} className="ml-2 text-sm font-medium text-gray-700">
-                      Select for vCard generation
-                    </label>
-                  </div>
-                )}
-                
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                  {/* Main Info */}
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 lg:mb-0">
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-lg">{registration.full_name}</h3>
-                      <p className="text-sm text-gray-600">{registration.email}</p>
-                      <p className="text-sm text-gray-600">{registration.mobile_number}</p>
-                      {registration.member_id && (
-                        <p className="text-sm font-medium text-blue-600 mt-1">
-                          ID: {registration.member_id}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <p className="font-medium text-gray-900">{registration.company_name}</p>
-                      <p className="text-sm text-gray-600">
-                        {registration.company_designations?.designation_name || 'N/A'}
-                      </p>
-                      <p className="text-sm text-gray-600">{registration.district}</p>
-                    </div>
-                    
-                    <div>
-                      <div className="mb-2 flex flex-wrap gap-2 items-center">
-                        {getStatusBadge(registration.status)}
-                        {registration.is_active === false && registration.status === 'approved' && (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-orange-800 bg-orange-100 rounded">
-                            <EyeOff className="w-3 h-3 mr-1" />
-                            Hidden from Directory
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Submitted: {formatDate(registration.created_at)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3 lg:ml-6">
-                    {/* File Links */}
-                    <div className="flex gap-2">
-                      {registration.gst_certificate_url && (
-                        <a
-                          href={registration.gst_certificate_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          GST
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      )}
-                      {registration.udyam_certificate_url && (
-                        <a
-                          href={registration.udyam_certificate_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-3 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors"
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          UDYAM
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      )}
-                      {registration.payment_proof_url && (
-                        <a
-                          href={registration.payment_proof_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-3 py-1 text-xs font-medium text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition-colors"
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          Payment
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Status Actions */}
-                    {registration.status === 'pending' && canViewMembers && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleViewApplication(registration.id)}
-                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <ViewIcon className="w-4 h-4 mr-1" />
-                          View Details
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Re-approval Action for Rejected */}
-                    {registration.status === 'rejected' && canApprove && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openConfirmDialog(registration.id, 'approved', registration.full_name)}
-                          disabled={actionLoading === registration.id}
-                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Re-approve this rejected registration"
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Approve
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Management Actions for Approved/Rejected Members */}
-                    {registration.status !== 'pending' && (
-                      <div className="flex flex-wrap gap-2">
-                        {canEdit && (
-                          <button
-                            onClick={() => handleEditMember(registration)}
-                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                            title="Edit Member"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 mr-1" />
-                            Edit
-                          </button>
-                        )}
-
-                        {canEdit && registration.status === 'approved' && (
-                          <button
-                            onClick={() => handleToggleActive(registration.id, registration.is_active !== false)}
-                            className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                              registration.is_active === false
-                                ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                                : 'text-orange-600 bg-orange-50 hover:bg-orange-100'
-                            }`}
-                            title={registration.is_active === false ? 'Activate Member' : 'Deactivate Member'}
-                          >
-                            {registration.is_active === false ? (
-                              <>
-                                <Eye className="w-3.5 h-3.5 mr-1" />
-                                Activate
-                              </>
-                            ) : (
-                              <>
-                                <EyeOff className="w-3.5 h-3.5 mr-1" />
-                                Deactivate
-                              </>
-                            )}
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleViewHistory(registration.id, registration.full_name)}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-                          title="View Change History"
-                        >
-                          <History className="w-3.5 h-3.5 mr-1" />
-                          History
-                        </button>
-
-                        {canDelete && (
-                          <button
-                            onClick={() => setDeleteDialog({ isOpen: true, memberId: registration.id, memberName: registration.full_name })}
-                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                            title="Delete Member"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 mr-1" />
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {registration.rejection_reason && registration.status === 'rejected' && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
-                        <p className="font-medium text-red-800">Rejection Reason:</p>
-                        <p className="text-red-700 mt-1">{registration.rejection_reason}</p>
-                      </div>
-                    )}
-
-                    {actionLoading === registration.id && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                        Processing...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-xs text-gray-500 mt-2.5">
+          Showing {filteredRegistrations.length} of {registrations.length} registrations
+        </p>
       </div>
+
+      {/* Registrations Table */}
+      {isLoading ? (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-sm text-gray-500">Loading registrations...</p>
+        </div>
+      ) : filteredRegistrations.length === 0 ? (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
+          <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-sm font-medium text-gray-900 mb-1">No registrations found</h3>
+          <p className="text-sm text-gray-500">
+            {searchTerm || statusFilter !== 'all'
+              ? 'Try adjusting your search or filter criteria'
+              : 'No member registrations have been submitted yet'}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Member</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Company</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Docs</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredRegistrations.map((registration) => (
+                  <React.Fragment key={registration.id}>
+                    <tr className="hover:bg-gray-50 transition-colors group">
+                      {/* Member */}
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900 leading-tight">{registration.full_name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{registration.email}</p>
+                        <p className="text-xs text-gray-400">{registration.mobile_number}</p>
+                        {registration.member_id && (
+                          <p className="text-xs font-medium text-blue-600 mt-0.5">ID: {registration.member_id}</p>
+                        )}
+                      </td>
+                      {/* Company */}
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-gray-900 leading-tight">{registration.company_name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {registration.company_designations?.designation_name || '—'} · {registration.district}
+                        </p>
+                      </td>
+                      {/* Status */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {getStatusBadge(registration.status)}
+                          {registration.is_active === false && registration.status === 'approved' && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-full">
+                              <EyeOff className="w-3 h-3 mr-1" />Hidden
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">{formatDate(registration.created_at)}</p>
+                      </td>
+                      {/* Documents */}
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          {registration.gst_certificate_url && (
+                            <a href={registration.gst_certificate_url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors" title="GST Certificate">
+                              GST <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          )}
+                          {registration.udyam_certificate_url && (
+                            <a href={registration.udyam_certificate_url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 transition-colors" title="UDYAM Certificate">
+                              UDYAM <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          )}
+                          {registration.payment_proof_url && (
+                            <a href={registration.payment_proof_url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors" title="Payment Proof">
+                              Pay <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          )}
+                          {!registration.gst_certificate_url && !registration.udyam_certificate_url && !registration.payment_proof_url && (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </div>
+                      </td>
+                      {/* Actions */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Pending: show Approve button prominently */}
+                          {registration.status === 'pending' && canApprove && (
+                            <button
+                              onClick={() => openConfirmDialog(registration.id, 'approved', registration.full_name)}
+                              disabled={actionLoading === registration.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />Approve
+                            </button>
+                          )}
+                          {/* View — always visible */}
+                          {canViewMembers && (
+                            <button
+                              onClick={() => handleViewApplication(registration.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                            >
+                              <ViewIcon className="w-3.5 h-3.5" />View
+                            </button>
+                          )}
+                          {/* ⋯ overflow menu */}
+                          <button
+                            onClick={(e) => handleMenuToggle(e, registration.id)}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                            title="More actions"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                          {actionLoading === registration.id && (
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-blue-600" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {registration.rejection_reason && registration.status === 'rejected' && (
+                      <tr className="bg-red-50">
+                        <td colSpan={5} className="px-4 py-2">
+                          <p className="text-xs text-red-700">
+                            <span className="font-medium">Rejection reason:</span> {registration.rejection_reason}
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       {confirmDialog.isOpen && (
@@ -1015,6 +805,80 @@ const AdminRegistrations: React.FC = () => {
           onReject={handleRejectFromView}
         />
       )}
+
+      {/* ⋯ Overflow dropdown — fixed position, outside any overflow container */}
+      {openMenuId && (() => {
+        const reg = filteredRegistrations.find(r => r.id === openMenuId);
+        if (!reg) return null;
+        return (
+          <div
+            ref={menuRef}
+            className="fixed z-50 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+          >
+            {/* Reject — only for pending */}
+            {reg.status === 'pending' && canApprove && (
+              <button
+                onClick={() => { setOpenMenuId(null); openConfirmDialog(reg.id, 'rejected', reg.full_name); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <XCircle className="w-4 h-4" />Reject
+              </button>
+            )}
+            {/* Re-approve — only for rejected */}
+            {reg.status === 'rejected' && canApprove && (
+              <button
+                onClick={() => { setOpenMenuId(null); openConfirmDialog(reg.id, 'approved', reg.full_name); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+              >
+                <CheckCircle className="w-4 h-4" />Approve
+              </button>
+            )}
+            {/* Edit */}
+            {reg.status !== 'pending' && canEdit && (
+              <button
+                onClick={() => { setOpenMenuId(null); handleEditMember(reg); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Edit3 className="w-4 h-4" />Edit
+              </button>
+            )}
+            {/* Activate / Deactivate */}
+            {reg.status === 'approved' && canEdit && (
+              <button
+                onClick={() => { setOpenMenuId(null); handleToggleActive(reg.id, reg.is_active !== false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                {reg.is_active === false
+                  ? <><Eye className="w-4 h-4 text-green-600" />Activate</>
+                  : <><EyeOff className="w-4 h-4 text-orange-500" />Deactivate</>
+                }
+              </button>
+            )}
+            {/* History */}
+            {reg.status !== 'pending' && (
+              <button
+                onClick={() => { setOpenMenuId(null); handleViewHistory(reg.id, reg.full_name); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <History className="w-4 h-4" />History
+              </button>
+            )}
+            {/* Delete — separated with a divider */}
+            {reg.status !== 'pending' && canDelete && (
+              <>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  onClick={() => { setOpenMenuId(null); setDeleteDialog({ isOpen: true, memberId: reg.id, memberName: reg.full_name }); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />Delete
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
     </PermissionGate>
   );

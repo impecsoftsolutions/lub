@@ -13,6 +13,7 @@ import { statesService, StateMaster } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
+import { PageHeader } from '../components/ui/PageHeader';
 
 const AdminStateManagement: React.FC = () => {
   const canManageStates = useHasPermission('locations.states.manage');
@@ -133,7 +134,7 @@ const AdminStateManagement: React.FC = () => {
         </div>
       }
     >
-      <div className="min-h-screen bg-gray-50">
+      <div className="p-6">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -141,30 +142,20 @@ const AdminStateManagement: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <MapPin className="w-8 h-8 mr-3 text-blue-600" />
-                State Management
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage states, payment details, and locations
-              </p>
-            </div>
-            {canManageStates && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add State
-              </button>
-            )}
-          </div>
-        </div>
+      <div>
+        <PageHeader
+          title="State Management"
+          subtitle="Manage states, payment details, and locations"
+          actions={canManageStates ? (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add State
+            </button>
+          ) : undefined}
+        />
         {/* Search */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="relative">

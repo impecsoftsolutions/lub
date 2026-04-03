@@ -34,15 +34,27 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   const [permissions, setPermissions] = useState<UserPermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
    * Load user with permissions from database
    */
-  const loadUserPermissions = useCallback(async () => {
+  const loadUserPermissions = useCallback(async (options?: { background?: boolean; forceRefresh?: boolean }) => {
+    const background = options?.background ?? false;
+    const forceRefresh = options?.forceRefresh ?? false;
+
     try {
       console.log('[PermissionContext] Loading user permissions...');
-      setIsLoading(true);
+      if (background) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
+
+      if (forceRefresh) {
+        permissionService.clearCache();
+      }
 
       // Fetch user with roles and permissions
       const userData = await customAuth.getCurrentUserWithPermissions();
@@ -64,7 +76,11 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
       setUser(null);
       setPermissions([]);
     } finally {
-      setIsLoading(false);
+      if (background) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -74,12 +90,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
    */
   const refreshPermissions = useCallback(async () => {
     console.log('[PermissionContext] Refreshing permissions...');
-
-    // Clear cache to force fresh fetch
-    permissionService.clearCache();
-
-    // Reload user permissions
-    await loadUserPermissions();
+    await loadUserPermissions({ background: true, forceRefresh: true });
 
     console.log('[PermissionContext] Permissions refreshed');
   }, [loadUserPermissions]);
@@ -206,9 +217,9 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
       console.log('[PermissionContext] Window focused, checking for stale permissions...');
 
       // Only refresh if user is authenticated
-      if (user) {
+      if (user && !isRefreshing) {
         // Don't await - let it happen in background
-        refreshPermissions();
+        void refreshPermissions();
       }
     };
 
@@ -217,7 +228,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user, refreshPermissions]);
+  }, [user, isRefreshing, refreshPermissions]);
 
   /**
    * Memoize context value to prevent unnecessary re-renders

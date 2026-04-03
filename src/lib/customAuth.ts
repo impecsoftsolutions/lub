@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { sessionManager } from './sessionManager';
 import {
   User,
   AuthResult,
@@ -362,8 +363,7 @@ export const customAuth = {
 
   async getCurrentUserFromSession(): Promise<User | null> {
     try {
-      const sessionManager = await import('./sessionManager');
-      const sessionToken = sessionManager.sessionManager.getSessionToken();
+      const sessionToken = sessionManager.getSessionToken();
 
       if (!sessionToken) {
         console.log('[customAuth] No session token found');

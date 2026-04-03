@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, Shield, User, Building2, Mail, Phone, CheckCircle, X, Lock } from 'lucide-react';
+import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, User, Building2, Mail, Phone, CheckCircle, X, Lock } from 'lucide-react';
 import { userRolesService, UserRole, AdminUser } from '../lib/supabase';
 import Toast from '../components/Toast';
+import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 
@@ -218,7 +219,7 @@ const AdminUserManagement: React.FC = () => {
         </div>
       }
     >
-      <div className="min-h-screen bg-gray-50">
+      <div className="p-6">
         <Toast
           type={toast.type}
           message={toast.message}
@@ -226,30 +227,22 @@ const AdminUserManagement: React.FC = () => {
           onClose={hideToast}
         />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Shield className="w-8 h-8 mr-3 text-blue-600" />
-                Admin User Management
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage admin users and their role permissions
-              </p>
-            </div>
+        <div>
+        <PageHeader
+          title="Admin User Management"
+          subtitle="Manage admin users and their role permissions"
+          actions={
             <PermissionGate permission="users.create">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4" />
                 Add Admin User
               </button>
             </PermissionGate>
-          </div>
-        </div>
+          }
+        />
         {/* Search */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="relative">

@@ -4,6 +4,7 @@ import { sessionManager } from '../lib/sessionManager';
 import { Search, Plus, CreditCard as Edit2, Trash2, MapPin, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
+import { PageHeader } from '../components/ui/PageHeader';
 
 interface City {
   id: string;
@@ -265,23 +266,21 @@ export default function AdminCityManagement() {
         </div>
       }
     >
-      <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">City Management</h1>
-            <p className="mt-2 text-gray-600">Manage approved cities in the system</p>
-          </div>
-          {canManageCities && (
+      <div className="p-6">
+      <div>
+        <PageHeader
+          title="City Management"
+          subtitle="Manage approved cities in the system"
+          actions={canManageCities ? (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               Add City
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

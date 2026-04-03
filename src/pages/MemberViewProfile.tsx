@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Building, Calendar, CreditCard, Edit, Loader2, AlertCircle } from 'lucide-react';
+import { User, Mail, Phone, Building, Calendar, CreditCard, Edit, Loader2, AlertCircle } from 'lucide-react';
+import MemberNav from '../components/MemberNav';
 import { useMember } from '../contexts/useMember';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
@@ -116,41 +117,35 @@ const MemberViewProfile: React.FC = () => {
   const displayName = getFirstTwoWords(displayNameRaw);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Dashboard
-          </button>
-        </div>
+    <div>
+      <MemberNav />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
                   {member.profile_photo_url ? (
                     <img
                       src={member.profile_photo_url}
                       alt={member.full_name}
-                      className="w-20 h-20 rounded-full object-cover"
+                      className="w-14 h-14 rounded-full object-cover"
                     />
                   ) : (
-                    <User className="w-10 h-10 text-blue-600" />
+                    <User className="w-7 h-7 text-gray-400" />
                   )}
                 </div>
-                <div className="text-white">
-                  <h1 className="text-2xl font-bold">{displayName}</h1>
-                  <p className="text-blue-100">{''}</p>
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900">{displayName}</h1>
+                  {registration?.company_name && (
+                    <p className="text-sm text-gray-500 mt-0.5">{registration.company_name}</p>
+                  )}
                 </div>
               </div>
               <Link
                 to="/dashboard/edit"
-                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
               >
                 <Edit className="w-4 h-4" />
                 Edit Profile
@@ -272,3 +267,4 @@ const MemberViewProfile: React.FC = () => {
 };
 
 export default MemberViewProfile;
+

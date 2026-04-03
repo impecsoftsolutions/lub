@@ -28,43 +28,38 @@ Phase 1 baseline remains the non-negotiable floor.
 
 ## Active Stream
 
-**Active stream:** None - the hardcoded-values cleanup stream is complete.  
+**Active stream:** None - the authenticated Stripe-style redesign, PDF export refinements, narrow build-warning cleanup, focus-return refresh fix, and dashboard admin-user metric alignment are complete and no slice is currently in progress.  
 **Current owner:** None  
 **Task board:** `docs/agent_coordination/TASK_BOARD.md`
 
 Most recently completed stream:
-- Hardcoded-values cleanup across org-profile data, smoke-test admin credentials, Footer/SignIn/AdminProfileSettings UI consumption, and payment-settings admin cleanup
+- COD-DASH-001: aligned the dashboard `Active Admin Users` metric with real admin-capable users by counting active, non-frozen `users` rows where `account_type` is `admin` or `both`
+- CLAUDE-UI-004: Stripe-style redesign for authenticated portal surfaces (admin chrome, registrations table, member portal nav/cards/pages)
+- CLAUDE-UI-003: member detail view for all statuses + professional PDF export (View Details button, Download PDF, LUB logo header, all member sections, dynamic import of jsPDF + html2canvas)
+- COD-PDF-002: strict A4 pagination, whole-section layout, 2 cm margins, last-page-only footer
+- COD-BLD-001: removed the `sessionManager` mixed dynamic/static import warning; left the oversized main bundle warning deferred as an optimization concern
+- COD-RUN-001: changed the window-focus permission refresh to a background refresh so the first click after returning focus is no longer swallowed by permission-gated rerenders
 
 ---
 
 ## Last Verified
 
 - **When:** 2026-04-03
-- **What:** Hardcoded-values cleanup plus payment-settings follow-up
-- **Result:** Lint and build pass after:
-  - `organization_website` DB/type/RPC wiring
-  - Footer website + org-profile UI consumption
-  - smoke admin credential cleanup
-  - payment-settings delete action
+- **What:** Dashboard admin-user metric alignment
+- **Result:** Build passes after replacing the `Active Admin Users` dashboard metric source. It now counts active, non-frozen `users` rows with `account_type IN ('admin', 'both')` instead of counting distinct `user_roles.user_id` values, so the card matches real admin-shell access. Repo-wide lint is currently blocked by unrelated errors under `vendor/shadcnuikit`.
 - **Command(s):**
   ```
   npm run lint
   npm run build
-  npm run test:e2e:phase1:local
   ```
 
 ---
 
 ## In Progress / Dirty State
 
-Session closeout docs were updated after the main code commit.
+No active slice.
 
-Expected state after the next checkpoint commit:
-- working tree clean except for local-only `.claude/` if it remains untracked
-- `CURRENT_STATE.md` points to Session 51
-- session closeout documentation is preserved in git
-
-If `git status` is dirty beyond local-only machine files, inspect the delta before starting the next stream.
+Working tree is currently dirty with uncommitted code and coordination-doc changes from the recent PDF export, vCard removal, validation, and build-warning slices. Run `git status` before starting the next stream.
 
 ---
 
@@ -72,8 +67,10 @@ If `git status` is dirty beyond local-only machine files, inspect the delta befo
 
 | # | Item | Notes |
 |---|------|-------|
-| 1 | Validation-consumption cleanup | Two separate validation layers exist. This is the next Codex stream. |
-| 2 | Review non-blocking build warnings | Build still emits chunk-size and `sessionManager` import-graph warnings. These are optimization concerns, not correctness blockers. |
+| 1 | Review remaining main chunk-size warning | The `sessionManager` import-graph warning is fixed. The remaining oversized main bundle is still an optimization concern, not a correctness blocker. |
+| 2 | Broader validation cleanup follow-up | First safe slice is done. Any broader validation changes should be evidence-driven and kept narrow. |
+| 3 | Define and implement app-wide settings hub | Add a portal-level Settings area for global/application settings that do not fit an existing narrower settings section. Queue entry lives on the shared task board as `CLAUDE-UI-005`. |
+| 4 | Investigate any remaining focus-return anomalies | The shared permission-refresh root cause is fixed. Reopen only if there is still fresh evidence of a similar issue in a page-specific flow. |
 
 ---
 
@@ -81,14 +78,15 @@ If `git status` is dirty beyond local-only machine files, inspect the delta befo
 
 - **Edge env step still pending** - `supabase/functions/send-email/index.ts` now requires `RESEND_FROM_ADDRESS` in the edge-function environment.
 - **Storage migration may still be pending in the real environment** - `supabase/migrations/20260403123000_create_storage_buckets_for_public_files_and_member_photos.sql` should be applied if QR/document uploads are still failing.
-- **Build warnings are still present** - Vite still reports large chunk size and mixed dynamic/static import usage for `src/lib/sessionManager.ts`.
+- **Build warning still present** - Vite still reports a large main application chunk. The earlier `sessionManager` mixed import-graph warning is fixed.
 - **Join payment-proof upload path** - if the storage migration has not been applied, this path can still fail for the same reason as QR uploads.
+- **Repo-wide lint is currently noisy** - `npm run lint` is failing on unrelated files under `vendor/shadcnuikit`, not on the portal code touched in the latest metric fix.
 
 ---
 
 ## Next Recommended Action
 
-Start **COD-VAL-001**: validation-consumption cleanup.
+Start **CLAUDE-UI-005** unless a different user-prioritized feature or bug takes precedence.
 
 Only remaining environment follow-up from the completed stream:
 1. set `RESEND_FROM_ADDRESS`

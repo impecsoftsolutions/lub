@@ -4,6 +4,7 @@ import { Users, Search, Filter, Mail, Phone, Shield, Calendar, Lock, ChevronUp, 
 import { PermissionGate } from '../../components/permissions/PermissionGate';
 import { supabase } from '../../lib/supabase';
 import Toast from '../../components/Toast';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useHasPermission } from '../../hooks/usePermissions';
 import EditUserModal from '../../components/admin/modals/EditUserModal';
 import DeleteUserModal from '../../components/admin/modals/DeleteUserModal';
@@ -323,7 +324,7 @@ const AdminUsers: React.FC = () => {
         </div>
       }
     >
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="p-6">
         <Toast
           type={toast.type}
           message={toast.message}
@@ -331,24 +332,14 @@ const AdminUsers: React.FC = () => {
           onClose={hideToast}
         />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                  <Users className="w-8 h-8 mr-3 text-blue-600" />
-                  Users
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  View all registered users in the system
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{users.length}</p>
-              </div>
-            </div>
-          </div>
+        <div>
+          <PageHeader
+            title="Users"
+            subtitle="View all registered users in the system"
+            actions={
+              <span className="text-sm text-gray-500">{users.length} total</span>
+            }
+          />
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4">

@@ -20,6 +20,7 @@ import { useHasPermission } from '../hooks/usePermissions';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { validationRulesService, ValidationRule } from '../lib/supabase';
 import Toast from '../components/Toast';
+import { PageHeader } from '../components/ui/PageHeader';
 
 const AdminValidationSettings: React.FC = () => {
   const [validationRules, setValidationRules] = useState<ValidationRule[]>([]);
@@ -505,7 +506,7 @@ const AdminValidationSettings: React.FC = () => {
         </div>
       }
     >
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="p-6">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -513,29 +514,20 @@ const AdminValidationSettings: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-        </div>
-
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Validation Rules Management</h1>
-              <p className="text-gray-600 mt-2">
-                Configure validation patterns and error messages for form fields
-              </p>
-            </div>
-            {canManageValidation && (
-              <button
-                onClick={handleOpenAddModal}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add New Rule
-              </button>
-            )}
-          </div>
-        </div>
+      <div>
+        <PageHeader
+          title="Validation Rules Management"
+          subtitle="Configure validation patterns and error messages for form fields"
+          actions={canManageValidation ? (
+            <button
+              onClick={handleOpenAddModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add New Rule
+            </button>
+          ) : undefined}
+        />
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">

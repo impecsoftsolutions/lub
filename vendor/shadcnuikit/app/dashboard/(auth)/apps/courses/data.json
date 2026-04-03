@@ -1,0 +1,88 @@
+{
+  "data": {
+    "id": 1,
+    "title": "Mastering Illustration",
+    "instructor": {
+      "name": "Simon Simorangkir",
+      "role": "Mentor • Illustrator at Google",
+      "avatar": "https://i.pravatar.cc/150?img=12"
+    },
+    "video": {
+      "thumbnail": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&h=675&fit=crop",
+      "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      "currentTime": "12:30",
+      "duration": "1:20:00",
+      "progress": 95
+    },
+    "about": "Unlock your creative potential with our Beginner-Level Illustrator Course! Are you ready to embark on a journey into the world of digital art and design? Our Mastering Illustrator course is perfect for beginners looking to learn the ropes of Adobe Illustrator, the industry-standard vector graphics software. From crafting stunning graphics to bringing your artistic visions to life, this comprehensive course will guide you through every essential tool and technique. Whether you're an aspiring graphic designer, a creative professional looking to expand your skillset, or simply someone with a passion for digital art, this course is designed to take you from novice to confident illustrator. Join thousands of students who have transformed their creative abilities and started building impressive portfolios. With hands-on projects, step-by-step tutorials, and expert guidance, you'll master the fundamentals and beyond. Start your creative journey today and discover the endless possibilities of Adobe Illustrator!",
+    "suitFor": [
+      "Anyone who wants to start their career & get paid for their illustration design skills.",
+      "This course is for beginners, newbies & amateurs in the field of illustration field.",
+      "For anyone that needs to add 'Illustration' to their portfolio.",
+      "Aimed at people new to the world of illustration design."
+    ],
+    "progress": {
+      "percentage": 55,
+      "points": [
+        { "value": 25, "reached": true },
+        { "value": 50, "reached": false },
+        { "value": 75, "reached": false },
+        { "value": 100, "reached": false }
+      ],
+      "message": "Great Job! 🎉 You're on the path to becoming a certified Mastering Illustration. Your dedication to learning is impressive Finish strong!"
+    },
+    "modules": [
+      {
+        "id": 1,
+        "title": "Introduction",
+        "duration": "20 min",
+        "completed": true,
+        "current": false
+      },
+      {
+        "id": 2,
+        "title": "Mastering Tools",
+        "duration": "1 hour 20 min",
+        "completed": false,
+        "current": true
+      },
+      {
+        "id": 3,
+        "title": "Mastering Adobe Illustrator",
+        "duration": "2 hour 10 min",
+        "completed": false,
+        "current": false
+      },
+      {
+        "id": 4,
+        "title": "Create Simple Shape",
+        "duration": "40 min",
+        "completed": false,
+        "current": false
+      },
+      {
+        "id": 5,
+        "title": "Typography",
+        "duration": "40 min",
+        "completed": false,
+        "current": false
+      },
+      {
+        "id": 6,
+        "title": "Mastering Pen Tool",
+        "duration": "1 hour 40 min",
+        "completed": false,
+        "current": false
+      },
+      {
+        "id": 7,
+        "title": "Mastering Pro Create",
+        "duration": "2 hour",
+        "completed": false,
+        "current": false
+      }
+    ],
+    "totalModules": 25,
+    "completedModules": 1
+  }
+}

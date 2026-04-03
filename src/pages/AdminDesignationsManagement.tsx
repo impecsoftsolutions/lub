@@ -4,6 +4,7 @@ import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
 import Toast from '../components/Toast';
+import { PageHeader } from '../components/ui/PageHeader';
 
 type MemberSearchResult = {
   id: string;
@@ -853,7 +854,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="p-6">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -861,21 +862,11 @@ const AdminDesignationsManagement: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Building2 className="w-8 h-8 mr-3 text-blue-600" />
-                Designations Management
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage company roles, LUB roles, and member assignments
-              </p>
-            </div>
-          </div>
-        </div>
+      <div>
+        <PageHeader
+          title="Designations Management"
+          subtitle="Manage company roles, LUB roles, and member assignments"
+        />
         {/* Main Tabs */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="border-b border-gray-200">

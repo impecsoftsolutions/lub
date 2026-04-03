@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, AlertCircle, Settings as SettingsIcon, User, Bell, Shield } from 'lucide-react';
+import { Loader2, AlertCircle, User, Bell, Shield } from 'lucide-react';
+import MemberNav from '../components/MemberNav';
 import { useMember } from '../contexts/useMember';
+import { PageHeader } from '../components/ui/PageHeader';
 
 const MemberSettings: React.FC = () => {
   const navigate = useNavigate();
@@ -43,93 +45,69 @@ const MemberSettings: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Dashboard
-          </button>
-        </div>
+    <div>
+      <MemberNav />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <PageHeader
+          title="Settings"
+          subtitle="Manage your account preferences"
+        />
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-6">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <SettingsIcon className="w-6 h-6" />
-              Settings
-            </h1>
-            <p className="text-blue-100 mt-1">Manage your account preferences</p>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm divide-y divide-gray-200">
+          <div className="p-5">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Account</h2>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Profile Information</p>
+                  <p className="text-xs text-gray-500">Update your personal and company details</p>
+                </div>
+              </div>
+              <Link
+                to="/dashboard/edit"
+                className="px-3.5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Edit Profile
+              </Link>
+            </div>
           </div>
 
-          <div className="p-6 space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Account Settings</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <User className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Profile Information</h3>
-                      <p className="text-sm text-gray-600">Update your personal and company details</p>
-                    </div>
+          <div className="p-5">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Additional Options</h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 opacity-50 cursor-not-allowed">
+                <div className="flex items-center gap-3">
+                  <Bell className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Notifications</p>
+                    <p className="text-xs text-gray-500">Manage email and push notification preferences</p>
                   </div>
-                  <Link
-                    to="/dashboard/edit"
-                    className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    Edit Profile
-                  </Link>
                 </div>
+                <span className="px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 rounded-full">
+                  Coming Soon
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2 opacity-50 cursor-not-allowed">
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Privacy & Security</p>
+                    <p className="text-xs text-gray-500">Password-based authentication is no longer supported</p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 rounded-full">
+                  Info
+                </span>
               </div>
             </div>
+          </div>
 
-            <div className="border-t border-gray-200 pt-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Additional Options</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg opacity-60 cursor-not-allowed">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Bell className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Notifications</h3>
-                      <p className="text-sm text-gray-600">Manage email and push notification preferences</p>
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-200 rounded-full">
-                    Coming Soon
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg opacity-60 cursor-not-allowed">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Privacy & Security</h3>
-                      <p className="text-sm text-gray-600">Password-based authentication is no longer supported</p>
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-200 rounded-full">
-                    Info
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 pt-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Need Help?</strong> Sign in with your email address and 10-digit mobile number. Contact support if your contact details need to be corrected.
-                </p>
-              </div>
-            </div>
+          <div className="p-5">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Need Help?</span> Sign in with your email address and 10-digit mobile number. Contact support if your contact details need to be corrected.
+            </p>
           </div>
         </div>
       </div>

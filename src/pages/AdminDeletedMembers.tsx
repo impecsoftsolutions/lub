@@ -12,6 +12,7 @@ import { PermissionGate } from '../components/permissions/PermissionGate';
 import { deletedMembersService, DeletedMember } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
+import { PageHeader } from '../components/ui/PageHeader';
 
 const AdminDeletedMembers: React.FC = () => {
   const [deletedMembers, setDeletedMembers] = useState<DeletedMember[]>([]);
@@ -160,7 +161,7 @@ const AdminDeletedMembers: React.FC = () => {
         </div>
       }
     >
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="p-6">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -168,27 +169,14 @@ const AdminDeletedMembers: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-        </div>
-
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Trash2 className="w-8 h-8 mr-3 text-red-600" />
-                Deleted Members Archive
-              </h1>
-              <p className="text-gray-600 mt-2">
-                View and restore deleted member records (Super Admin Only)
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total Deleted</p>
-              <p className="text-2xl font-bold text-gray-900">{deletedMembers.length}</p>
-            </div>
-          </div>
-        </div>
+      <div>
+        <PageHeader
+          title="Deleted Members Archive"
+          subtitle="View and restore deleted member records (Super Admin Only)"
+          actions={
+            <span className="text-sm text-gray-500">{deletedMembers.length} total</span>
+          }
+        />
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="relative">

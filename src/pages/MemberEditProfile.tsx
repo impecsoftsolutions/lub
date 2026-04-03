@@ -627,11 +627,14 @@ const MemberEditProfile: React.FC = () => {
     if (isFieldRequired('district') && !formData.district) {
       newErrors.district = 'District is required';
     }
-    if (isFieldRequired('city') && !formData.city) {
-      newErrors.city = 'City is required';
-    }
-    if (showOtherCity && isFieldRequired('other_city_name') && !formData.other_city_name.trim()) {
-      newErrors.other_city_name = 'City name is required';
+    if (isFieldRequired('city')) {
+      if (showOtherCity) {
+        if (!formData.other_city_name.trim()) {
+          newErrors.other_city_name = 'City name is required';
+        }
+      } else if (!formData.city) {
+        newErrors.city = 'City is required';
+      }
     }
     if (isFieldRequired('pin_code') && !formData.pin_code.trim()) {
       newErrors.pin_code = 'PIN code is required';

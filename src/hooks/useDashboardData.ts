@@ -69,8 +69,12 @@ export const useDashboardData = (): DashboardData => {
           ? adminCitiesService.listPendingCustomCities(sessionToken)
           : Promise.resolve({ success: false, items: [] }),
         supabase
-          .from('user_roles')
-          .select('user_id'),
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .in('account_type', ['admin', 'both'])
+          .eq('account_status', 'active')
+          .eq('is_active', true)
+          .eq('is_frozen', false),
         supabase
           .from('member_registrations')
           .select('id, full_name, email, status, created_at')
@@ -88,15 +92,11 @@ export const useDashboardData = (): DashboardData => {
           .select('*', { count: 'exact', head: true })
       ]);
 
-      const uniqueAdminUsers = new Set(
-        activeAdminUsersResult.data?.map((role: { user_id: string }) => role.user_id) || []
-      ).size;
-
       setMetrics({
         approvedMembers: approvedMembersResult.count || 0,
         pendingRegistrations: pendingRegistrationsResult.count || 0,
         pendingCities: pendingCitiesResult.success ? (pendingCitiesResult.items?.length || 0) : 0,
-        activeAdminUsers: uniqueAdminUsers
+        activeAdminUsers: activeAdminUsersResult.count || 0
       });
 
       setRecentActivity(recentActivityResult.data || []);

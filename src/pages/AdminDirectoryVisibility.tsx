@@ -7,6 +7,7 @@ import {
   Lock
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
 import { directoryVisibilityService, DirectoryFieldVisibility } from '../lib/supabase';
 
@@ -92,26 +93,12 @@ const AdminDirectoryVisibility: React.FC = () => {
         </div>
       }
     >
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Button */}
-        <div className="mb-6">
-        </div>
-
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Directory Field Visibility Settings
-              </h1>
-              <p className="text-gray-600">
-                Control which member information is visible to public visitors and logged-in members in the directory
-              </p>
-            </div>
-            <Eye className="w-12 h-12 text-blue-600" />
-          </div>
-        </div>
+    <div className="p-6">
+      <div>
+        <PageHeader
+          title="Directory Field Visibility Settings"
+          subtitle="Control which member information is visible to public visitors and logged-in members"
+        />
 
         {/* Info Box */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

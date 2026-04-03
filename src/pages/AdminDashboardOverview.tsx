@@ -1,16 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Clock, MapPin, Shield, RefreshCw, AlertCircle, Lock } from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useDashboardData } from '../hooks/useDashboardData';
 import DashboardCard from '../components/dashboard/DashboardCard';
-import RecentActivityList from '../components/dashboard/RecentActivityList';
 import QuickActionsPanel from '../components/dashboard/QuickActionsPanel';
 import SystemStatusPanel from '../components/dashboard/SystemStatusPanel';
 
 const AdminDashboardOverview: React.FC = () => {
   const navigate = useNavigate();
-  const { metrics, recentActivity, systemStatus, isLoading, error, refresh } = useDashboardData();
+  const { metrics, systemStatus, isLoading, error, refresh } = useDashboardData();
 
   const handleRefresh = async () => {
     await refresh();
@@ -29,22 +29,22 @@ const AdminDashboardOverview: React.FC = () => {
         </div>
       }
     >
-      <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-          <p className="text-gray-600 mt-2">Welcome to your admin dashboard</p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={isLoading}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Refresh all dashboard data"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
+      <div className="p-6">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Overview of your organisation's membership activity"
+        actions={
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh all dashboard data"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        }
+      />
 
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -61,13 +61,13 @@ const AdminDashboardOverview: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <DashboardCard
           title="Total Approved Members"
           value={metrics?.approvedMembers ?? '--'}
           icon={Users}
           iconColor="text-blue-600"
-          bgColor="bg-blue-100"
+          iconBg="bg-blue-50"
           isLoading={isLoading}
           onClick={() => navigate('/admin/registrations')}
           delay={0}
@@ -78,7 +78,7 @@ const AdminDashboardOverview: React.FC = () => {
           value={metrics?.pendingRegistrations ?? '--'}
           icon={Clock}
           iconColor="text-amber-600"
-          bgColor="bg-amber-100"
+          iconBg="bg-amber-50"
           isLoading={isLoading}
           badge={
             metrics?.pendingRegistrations && metrics.pendingRegistrations > 0
@@ -96,8 +96,8 @@ const AdminDashboardOverview: React.FC = () => {
           title="Pending Cities"
           value={metrics?.pendingCities ?? '--'}
           icon={MapPin}
-          iconColor="text-green-600"
-          bgColor="bg-green-100"
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50"
           isLoading={isLoading}
           onClick={() => navigate('/admin/pending-cities')}
           delay={200}
@@ -107,31 +107,21 @@ const AdminDashboardOverview: React.FC = () => {
           title="Active Admin Users"
           value={metrics?.activeAdminUsers ?? '--'}
           icon={Shield}
-          iconColor="text-blue-600"
-          bgColor="bg-blue-100"
+          iconColor="text-violet-600"
+          iconBg="bg-violet-50"
           isLoading={isLoading}
           onClick={() => navigate('/admin/user-management')}
           delay={300}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div className="lg:col-span-2">
-          <RecentActivityList
-            activities={recentActivity}
-            isLoading={isLoading}
-            lastUpdated={systemStatus?.lastUpdated}
-          />
-        </div>
-
-        <div>
-          <QuickActionsPanel
-            pendingRegistrations={metrics?.pendingRegistrations ?? 0}
-            pendingCities={metrics?.pendingCities ?? 0}
-            approvedMembers={metrics?.approvedMembers ?? 0}
-            isLoading={isLoading}
-          />
-        </div>
+      <div className="mb-6">
+        <QuickActionsPanel
+          pendingRegistrations={metrics?.pendingRegistrations ?? 0}
+          pendingCities={metrics?.pendingCities ?? 0}
+          approvedMembers={metrics?.approvedMembers ?? 0}
+          isLoading={isLoading}
+        />
       </div>
 
       <SystemStatusPanel

@@ -10,6 +10,7 @@ import {
 import { sessionManager } from '../lib/sessionManager';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
+import { PageHeader } from '../components/ui/PageHeader';
 
 type PendingCustomCity = PendingCityListItem;
 
@@ -184,14 +185,12 @@ export default function AdminPendingCities() {
         </div>
       }
     >
-      <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Pending Cities Review</h1>
-          <p className="mt-2 text-gray-600">
-            Review and approve cities submitted through registration forms
-          </p>
-        </div>
+      <div className="p-6">
+      <div>
+        <PageHeader
+          title="Pending Cities Review"
+          subtitle="Review and approve cities submitted through registration forms"
+        />
 
         {loading ? (
           <div className="text-center py-12">

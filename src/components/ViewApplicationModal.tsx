@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { X, CreditCard as Edit, CheckCircle, XCircle, FileText, ExternalLink, User, Building2, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { X, CreditCard as Edit, CheckCircle, XCircle, FileText, ExternalLink, User, Building2, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp, Eye, Download, Loader2 } from 'lucide-react';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
+import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
 
 interface CompanyDesignationSummary {
   designation_name: string;
@@ -89,6 +90,9 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['personal', 'company']));
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const pdfTemplateRef = useRef<HTMLDivElement>(null);
+  const { profile: orgProfile } = useOrganisationProfile();
 
   const loadApplicationDetails = useCallback(async () => {
     try {
@@ -122,6 +126,167 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
       void loadApplicationDetails();
     }
   }, [applicationId, isOpen, loadApplicationDetails]);
+
+  const handleDownloadPdf = async () => {
+    if (!applicationData || !pdfTemplateRef.current) return;
+
+    const templateRoot = pdfTemplateRef.current;
+    const headerTemplate = templateRoot.querySelector('[data-pdf-template="header"]') as HTMLDivElement | null;
+    const summaryTemplate = templateRoot.querySelector('[data-pdf-template="summary"]') as HTMLDivElement | null;
+    const footerTemplate = templateRoot.querySelector('[data-pdf-template="footer"]') as HTMLDivElement | null;
+    const sectionTemplates = Array.from(templateRoot.querySelectorAll('[data-pdf-section="true"]')) as HTMLDivElement[];
+
+    if (!headerTemplate || !summaryTemplate || !footerTemplate || sectionTemplates.length === 0) {
+      return;
+    }
+
+    let pageHost: HTMLDivElement | null = null;
+
+    try {
+      setIsGeneratingPdf(true);
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas')
+      ]);
+
+      const PAGE_WIDTH = 794;
+      const PAGE_HEIGHT = 1123;
+      const PAGE_MARGIN = 76;
+
+      pageHost = document.createElement('div');
+      pageHost.style.position = 'fixed';
+      pageHost.style.left = '-20000px';
+      pageHost.style.top = '0';
+      pageHost.style.width = `${PAGE_WIDTH}px`;
+      pageHost.style.pointerEvents = 'none';
+      pageHost.style.opacity = '0';
+      pageHost.style.zIndex = '-1';
+      pageHost.style.fontFamily = 'Arial, Helvetica, sans-serif';
+      pageHost.style.WebkitFontSmoothing = 'antialiased';
+      pageHost.style.MozOsxFontSmoothing = 'grayscale';
+      pageHost.style.textRendering = 'geometricPrecision';
+      document.body.appendChild(pageHost);
+
+      const createPdfPage = (includeHeader: boolean, includeSummary: boolean) => {
+        const page = document.createElement('div');
+        page.style.width = `${PAGE_WIDTH}px`;
+        page.style.height = `${PAGE_HEIGHT}px`;
+        page.style.background = '#ffffff';
+        page.style.display = 'flex';
+        page.style.flexDirection = 'column';
+        page.style.boxSizing = 'border-box';
+        page.style.overflow = 'hidden';
+        page.style.pageBreakAfter = 'always';
+        page.style.fontFamily = 'Arial, Helvetica, sans-serif';
+        page.style.WebkitFontSmoothing = 'antialiased';
+        page.style.MozOsxFontSmoothing = 'grayscale';
+        page.style.textRendering = 'geometricPrecision';
+
+        const body = document.createElement('div');
+        body.style.display = 'flex';
+        body.style.flexDirection = 'column';
+        body.style.flex = '1 1 auto';
+        body.style.padding = `${PAGE_MARGIN}px`;
+        body.style.boxSizing = 'border-box';
+        body.style.height = '100%';
+        body.style.background = '#ffffff';
+        page.appendChild(body);
+
+        if (includeHeader) {
+          body.appendChild(headerTemplate.cloneNode(true));
+        }
+
+        if (includeSummary) {
+          body.appendChild(summaryTemplate.cloneNode(true));
+        }
+
+        const content = document.createElement('div');
+        content.style.flex = '1 1 auto';
+        content.style.padding = '22px 0 0';
+        content.style.background = '#f8fafc';
+        content.style.boxSizing = 'border-box';
+        content.style.overflow = 'hidden';
+        content.style.minHeight = '0';
+        body.appendChild(content);
+
+        pageHost.appendChild(page);
+
+        return { page, body, content };
+      };
+
+      const measurePage = createPdfPage(true, true);
+      const firstPageCapacity = measurePage.content.clientHeight;
+      measurePage.page.remove();
+
+      const spillMeasurePage = createPdfPage(false, false);
+      const spillPageCapacity = spillMeasurePage.content.clientHeight;
+      spillMeasurePage.page.remove();
+
+      const footerMeasurePage = createPdfPage(false, false);
+      const footerClone = footerTemplate.cloneNode(true) as HTMLDivElement;
+      footerMeasurePage.body.appendChild(footerClone);
+      const footerHeight = footerClone.offsetHeight;
+      footerMeasurePage.page.remove();
+
+      let currentPage = createPdfPage(true, true);
+      let remainingHeight = firstPageCapacity;
+
+      sectionTemplates.forEach((sectionTemplate) => {
+        const sectionHeight = sectionTemplate.offsetHeight;
+        const needsNewPage = sectionHeight > remainingHeight && currentPage.content.children.length > 0;
+
+        if (needsNewPage) {
+          currentPage = createPdfPage(false, false);
+          remainingHeight = spillPageCapacity;
+        }
+
+        currentPage.content.appendChild(sectionTemplate.cloneNode(true));
+        remainingHeight -= sectionHeight;
+      });
+
+      if (remainingHeight < footerHeight && currentPage.content.children.length > 0) {
+        currentPage = createPdfPage(false, false);
+      }
+
+      currentPage.body.appendChild(footerTemplate.cloneNode(true));
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+      const pages = Array.from(pageHost.children) as HTMLDivElement[];
+
+      for (let index = 0; index < pages.length; index += 1) {
+        const pageElement = pages[index];
+        const canvas = await html2canvas(pageElement, {
+          scale: 4,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          width: PAGE_WIDTH,
+          height: PAGE_HEIGHT,
+          windowWidth: PAGE_WIDTH,
+          windowHeight: PAGE_HEIGHT,
+          scrollX: 0,
+          scrollY: 0,
+          logging: false
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        if (index > 0) {
+          pdf.addPage();
+        }
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+
+      const safeName = applicationData.full_name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      const date = new Date().toISOString().split('T')[0];
+      pdf.save(`LUB_MemberDetails_${safeName}_${date}.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    } finally {
+      pageHost?.remove();
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -297,7 +462,6 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     fields: getFilledFields([
       { label: 'GST Registered', value: applicationData.gst_registered },
       { label: 'GST Number', value: applicationData.gst_number },
-      { label: 'PAN (Company)', value: applicationData.pan_company },
       { label: 'ESIC Registered', value: applicationData.esic_registered },
       { label: 'EPF Registered', value: applicationData.epf_registered }
     ])
@@ -306,13 +470,17 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
   const paymentSection: SectionData = {
     title: 'Payment Information',
     icon: <CreditCard className="w-5 h-5 text-blue-600" />,
-    fields: getFilledFields([
-      { label: 'Amount Paid', value: applicationData.amount_paid },
-      { label: 'Payment Date', value: applicationData.payment_date, type: 'date' },
-      { label: 'Payment Mode', value: applicationData.payment_mode },
-      { label: 'Transaction ID', value: applicationData.transaction_id },
-      { label: 'Bank Reference', value: applicationData.bank_reference }
-    ])
+    fields: [
+      ...getFilledFields([
+        { label: 'Amount Paid', value: applicationData.amount_paid },
+        { label: 'Payment Mode', value: applicationData.payment_mode },
+        { label: 'Transaction ID', value: applicationData.transaction_id },
+        { label: 'Bank Reference', value: applicationData.bank_reference }
+      ]),
+      applicationData.payment_date
+        ? { label: 'Payment Date', value: applicationData.payment_date, type: 'date' as const }
+        : { label: 'Payment Date', value: 'Not Available' }
+    ]
   };
 
   const additionalSection: SectionData = {
@@ -369,6 +537,17 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
                 </span>
               )}
             </div>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGeneratingPdf ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</>
+              ) : (
+                <><Download className="w-4 h-4 mr-2" />Download PDF</>
+              )}
+            </button>
             <button
               onClick={() => onEdit(applicationData)}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
@@ -440,15 +619,6 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
             {sections.map(section => renderSection(section.data, section.id))}
           </div>
 
-          {/* Submission Info */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="text-sm text-gray-600">
-              <p><span className="font-medium">Submitted:</span> {formatDate(applicationData.created_at)}</p>
-              {applicationData.updated_at && applicationData.updated_at !== applicationData.created_at && (
-                <p className="mt-1"><span className="font-medium">Last Updated:</span> {formatDate(applicationData.updated_at)}</p>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Footer Actions */}
@@ -505,6 +675,168 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Off-screen PDF content — captured by html2canvas on demand */}
+      <div
+        ref={pdfTemplateRef}
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          width: '794px',
+          backgroundColor: '#ffffff',
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '13px',
+          color: '#1f2937',
+          lineHeight: '1.5',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+          textRendering: 'geometricPrecision'
+        }}
+      >
+        {/* PDF Header — brand bar */}
+        <div data-pdf-template="header" style={{ background: '#1e40af', padding: '22px 32px', display: 'flex', alignItems: 'center', gap: '18px' }}>
+          {orgProfile?.organization_logo_url && (
+            <img
+              src={orgProfile.organization_logo_url}
+              crossOrigin="anonymous"
+              alt="Logo"
+              style={{ width: 54, height: 54, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 5, flexShrink: 0 }}
+            />
+          )}
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'white', fontSize: 21, fontWeight: 700, letterSpacing: '-0.01em' }}>
+              {orgProfile?.organization_name ?? 'Laghu Udyog Bharati'}
+            </div>
+            <div style={{ color: '#bfdbfe', fontSize: 11, marginTop: 4, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Member Details
+            </div>
+          </div>
+          {applicationData.member_id && (
+            <div style={{ textAlign: 'right', color: '#e0f2fe', fontSize: 11 }}>
+              Member ID: {applicationData.member_id}
+            </div>
+          )}
+        </div>
+
+        {/* Member Summary — clean white card with accent border */}
+        <div data-pdf-template="summary" style={{ background: '#ffffff', padding: '18px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', borderLeft: '4px solid #3b82f6' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>{applicationData.full_name}</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+              {applicationData.company_name}
+              {applicationData.company_designations?.designation_name && ` - ${applicationData.company_designations.designation_name}`}
+            </div>
+          </div>
+          <div style={{
+            background: applicationData.status === 'approved' ? '#dcfce7' : applicationData.status === 'rejected' ? '#fee2e2' : '#fef9c3',
+            color: applicationData.status === 'approved' ? '#15803d' : applicationData.status === 'rejected' ? '#b91c1c' : '#a16207',
+            border: `1px solid ${applicationData.status === 'approved' ? '#86efac' : applicationData.status === 'rejected' ? '#fca5a5' : '#fde047'}`,
+            display: 'table',
+            minWidth: 138,
+            height: 32,
+            borderRadius: 20,
+            padding: '0 16px'
+          }}>
+            <div style={{
+              display: 'table-cell',
+              verticalAlign: 'middle',
+              textAlign: 'center',
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.07em',
+              lineHeight: 1
+            }}>
+              {applicationData.status ?? 'Pending'}
+            </div>
+          </div>
+        </div>
+
+        {/* Sections */}
+        <div style={{ padding: '22px 32px', background: '#f8fafc' }}>
+          {[
+            { title: 'Personal Information', fields: [
+              { label: 'Full Name', value: applicationData.full_name },
+              { label: 'Email', value: applicationData.email },
+              { label: 'Mobile Number', value: applicationData.mobile_number },
+              { label: 'Gender', value: applicationData.gender },
+              { label: 'Date of Birth', value: applicationData.date_of_birth ? formatDate(applicationData.date_of_birth) : null },
+              { label: 'Member ID', value: applicationData.member_id }
+            ]},
+            { title: 'Company Information', fields: [
+              { label: 'Company Name', value: applicationData.company_name },
+              { label: 'Designation', value: applicationData.company_designations?.designation_name },
+              { label: 'Company Address', value: applicationData.company_address },
+              { label: 'Products & Services', value: applicationData.products_services },
+              { label: 'Brand Names', value: applicationData.brand_names },
+              { label: 'Website', value: applicationData.website }
+            ]},
+            { title: 'Location Details', fields: [
+              { label: 'State', value: applicationData.state },
+              { label: 'District', value: applicationData.district },
+              { label: 'City', value: applicationData.is_custom_city ? applicationData.other_city_name : applicationData.city },
+              { label: 'PIN Code', value: applicationData.pin_code }
+            ]},
+            { title: 'Business Details', fields: [
+              { label: 'Industry', value: applicationData.industry },
+              { label: 'Activity Type', value: applicationData.activity_type },
+              { label: 'Constitution', value: applicationData.constitution },
+              { label: 'Annual Turnover', value: applicationData.annual_turnover },
+              { label: 'Number of Employees', value: applicationData.number_of_employees }
+            ]},
+            { title: 'Registration Information', fields: [
+              { label: 'GST Registered', value: applicationData.gst_registered },
+              { label: 'GST Number', value: applicationData.gst_number },
+              { label: 'ESIC Registered', value: applicationData.esic_registered },
+              { label: 'EPF Registered', value: applicationData.epf_registered }
+            ]},
+            { title: 'Payment Information', fields: [
+              { label: 'Amount Paid', value: applicationData.amount_paid },
+              { label: 'Payment Date', value: applicationData.payment_date ? formatDate(applicationData.payment_date) : 'Not Available' },
+              { label: 'Payment Mode', value: applicationData.payment_mode },
+              { label: 'Transaction ID', value: applicationData.transaction_id },
+              { label: 'Bank Reference', value: applicationData.bank_reference }
+            ]},
+            { title: 'Additional Information', fields: [
+              { label: 'Alternate Contact Name', value: applicationData.alternate_contact_name },
+              { label: 'Alternate Mobile', value: applicationData.alternate_mobile },
+              { label: 'Referred By', value: applicationData.referred_by }
+            ]}
+          ].map(section => {
+            const filled = section.fields.filter(f => f.value !== null && f.value !== undefined && f.value !== '');
+            if (filled.length === 0) return null;
+            return (
+              <div key={section.title} data-pdf-section="true" style={{ marginBottom: 16, background: '#ffffff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                <div style={{ background: '#eff6ff', borderBottom: '1px solid #bfdbfe', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 3, height: 14, background: '#3b82f6', borderRadius: 2, flexShrink: 0 }} />
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{section.title}</div>
+                </div>
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                    {filled.map(field => (
+                      <div key={field.label} style={{ width: '50%', paddingRight: 16, paddingBottom: 12 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{field.label}</div>
+                        <div style={{ fontSize: 12, color: '#1e293b', fontWeight: 500, wordBreak: 'break-word' }}>{String(field.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* PDF Footer */}
+        <div data-pdf-template="footer" style={{ marginTop: '18px', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #cbd5e1', background: '#ffffff' }}>
+          <div style={{ fontSize: 10, color: '#64748b' }}>
+            {orgProfile?.organization_name ?? 'Laghu Udyog Bharati'} - Confidential. For internal use only.
+          </div>
+          <div style={{ fontSize: 10, color: '#64748b' }}>
+            Generated {new Date().toLocaleDateString('en-IN')}
+          </div>
+        </div>
       </div>
     </div>
   );

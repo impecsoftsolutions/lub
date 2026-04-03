@@ -6,7 +6,7 @@ interface DashboardCardProps {
   value: string | number;
   icon: LucideIcon;
   iconColor: string;
-  bgColor: string;
+  iconBg?: string;
   isLoading?: boolean;
   badge?: {
     text: string;
@@ -21,7 +21,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   value,
   icon: Icon,
   iconColor,
-  bgColor,
+  iconBg = 'bg-gray-100',
   isLoading = false,
   badge,
   onClick,
@@ -30,26 +30,26 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 transition-all duration-200 ${
-        onClick ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''
+      className={`bg-white rounded-lg border border-gray-200 shadow-sm p-5 transition-all duration-200 ${
+        onClick ? 'cursor-pointer hover:shadow-md hover:border-gray-300' : ''
       }`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-lg ${bgColor}`}>
-          <Icon className={`w-6 h-6 ${iconColor}`} />
+        <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center flex-shrink-0`}>
+          <Icon className={`w-4.5 h-4.5 ${iconColor}`} style={{ width: '18px', height: '18px' }} />
         </div>
         {badge && (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
             {badge.text}
           </span>
         )}
       </div>
-      <h3 className="text-sm font-medium text-gray-600 mb-1">{title}</h3>
+      <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{title}</h3>
       {isLoading ? (
-        <div className="h-8 bg-gray-200 animate-pulse rounded w-20"></div>
+        <div className="h-7 bg-gray-100 animate-pulse rounded w-20"></div>
       ) : (
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
+        <p className="text-2xl font-semibold text-gray-900">{value}</p>
       )}
     </div>
   );
