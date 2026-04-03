@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock, MoreHorizontal } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -10,6 +10,19 @@ import Toast from '../components/Toast';
 import EditMemberModal from '../components/EditMemberModal';
 import AuditHistoryModal from '../components/AuditHistoryModal';
 import ViewApplicationModal from '../components/ViewApplicationModal';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from '@/components/ui/table';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Textarea } from '@/components/ui/textarea';
 
 interface MemberRegistration {
   id: string;
@@ -73,9 +86,6 @@ const AdminRegistrations: React.FC = () => {
     memberName: ''
   });
   const [deletionReason, setDeletionReason] = useState('');
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
-  const menuRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -92,24 +102,6 @@ const AdminRegistrations: React.FC = () => {
   const canEdit = useHasPermission('members.edit');
   const canDelete = useHasPermission('members.delete');
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!openMenuId) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [openMenuId]);
-
-  const handleMenuToggle = (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    setOpenMenuId(prev => (prev === id ? null : id));
-  };
 
   const loadRegistrations = useCallback(async () => {
     try {
@@ -395,29 +387,27 @@ const AdminRegistrations: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
-    
     switch (status) {
       case 'approved':
         return (
-          <span className={`${baseClasses} bg-green-100 text-green-800`}>
-            <CheckCircle className="w-3 h-3 mr-1" />
+          <Badge variant="success">
+            <CheckCircle className="w-3 h-3" />
             Approved
-          </span>
+          </Badge>
         );
       case 'rejected':
         return (
-          <span className={`${baseClasses} bg-red-100 text-red-800`}>
-            <XCircle className="w-3 h-3 mr-1" />
+          <Badge variant="destructive">
+            <XCircle className="w-3 h-3" />
             Rejected
-          </span>
+          </Badge>
         );
       default:
         return (
-          <span className={`${baseClasses} bg-yellow-100 text-yellow-800`}>
-            <Clock className="w-3 h-3 mr-1" />
+          <Badge variant="warning">
+            <Clock className="w-3 h-3" />
             Pending
-          </span>
+          </Badge>
         );
     }
   };
@@ -458,24 +448,24 @@ const AdminRegistrations: React.FC = () => {
       />
 
       {/* Filter bar */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
+      <div className="bg-card rounded-lg border shadow-sm p-4 mb-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
               type="text"
               placeholder="Search by name, email, or mobile number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
+              className="pl-9"
             />
           </div>
           <div className="sm:w-44 relative">
-            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+              className="w-full pl-9 pr-3 py-1.5 border border-input rounded-md text-sm bg-transparent focus:ring-1 focus:ring-ring appearance-none"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -484,7 +474,7 @@ const AdminRegistrations: React.FC = () => {
             </select>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2.5">
+        <p className="text-xs text-muted-foreground mt-2.5">
           Showing {filteredRegistrations.length} of {registrations.length} registrations
         </p>
       </div>
@@ -506,254 +496,296 @@ const AdminRegistrations: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Member</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Company</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Docs</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredRegistrations.map((registration) => (
-                  <React.Fragment key={registration.id}>
-                    <tr className="hover:bg-gray-50 transition-colors group">
-                      {/* Member */}
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-gray-900 leading-tight">{registration.full_name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{registration.email}</p>
-                        <p className="text-xs text-gray-400">{registration.mobile_number}</p>
-                        {registration.member_id && (
-                          <p className="text-xs font-medium text-blue-600 mt-0.5">ID: {registration.member_id}</p>
+        <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Member</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Docs</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRegistrations.map((registration) => (
+                <React.Fragment key={registration.id}>
+                  <TableRow>
+                    {/* Member */}
+                    <TableCell>
+                      <p className="text-sm font-medium leading-tight">{registration.full_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{registration.email}</p>
+                      <p className="text-xs text-muted-foreground">{registration.mobile_number}</p>
+                      {registration.member_id && (
+                        <p className="text-xs font-medium text-primary mt-0.5">ID: {registration.member_id}</p>
+                      )}
+                    </TableCell>
+                    {/* Company */}
+                    <TableCell>
+                      <p className="text-sm leading-tight">{registration.company_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {registration.company_designations?.designation_name || '—'} · {registration.district}
+                      </p>
+                    </TableCell>
+                    {/* Status */}
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {getStatusBadge(registration.status)}
+                        {registration.is_active === false && registration.status === 'approved' && (
+                          <Badge variant="warning">
+                            <EyeOff className="w-3 h-3" />Hidden
+                          </Badge>
                         )}
-                      </td>
-                      {/* Company */}
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-900 leading-tight">{registration.company_name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {registration.company_designations?.designation_name || '—'} · {registration.district}
-                        </p>
-                      </td>
-                      {/* Status */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {getStatusBadge(registration.status)}
-                          {registration.is_active === false && registration.status === 'approved' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-full">
-                              <EyeOff className="w-3 h-3 mr-1" />Hidden
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1">{formatDate(registration.created_at)}</p>
-                      </td>
-                      {/* Documents */}
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          {registration.gst_certificate_url && (
-                            <a href={registration.gst_certificate_url} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors" title="GST Certificate">
-                              GST <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          )}
-                          {registration.udyam_certificate_url && (
-                            <a href={registration.udyam_certificate_url} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 transition-colors" title="UDYAM Certificate">
-                              UDYAM <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          )}
-                          {registration.payment_proof_url && (
-                            <a href={registration.payment_proof_url} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors" title="Payment Proof">
-                              Pay <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          )}
-                          {!registration.gst_certificate_url && !registration.udyam_certificate_url && !registration.payment_proof_url && (
-                            <span className="text-xs text-gray-300">—</span>
-                          )}
-                        </div>
-                      </td>
-                      {/* Actions */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Pending: show Approve button prominently */}
-                          {registration.status === 'pending' && canApprove && (
-                            <button
-                              onClick={() => openConfirmDialog(registration.id, 'approved', registration.full_name)}
-                              disabled={actionLoading === registration.id}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />Approve
-                            </button>
-                          )}
-                          {/* View — always visible */}
-                          {canViewMembers && (
-                            <button
-                              onClick={() => handleViewApplication(registration.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                            >
-                              <ViewIcon className="w-3.5 h-3.5" />View
-                            </button>
-                          )}
-                          {/* ⋯ overflow menu */}
-                          <button
-                            onClick={(e) => handleMenuToggle(e, registration.id)}
-                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                            title="More actions"
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{formatDate(registration.created_at)}</p>
+                    </TableCell>
+                    {/* Documents */}
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {registration.gst_certificate_url && (
+                          <a href={registration.gst_certificate_url} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="info" className="cursor-pointer">
+                              GST <ExternalLink className="w-3 h-3" />
+                            </Badge>
+                          </a>
+                        )}
+                        {registration.udyam_certificate_url && (
+                          <a href={registration.udyam_certificate_url} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="secondary" className="cursor-pointer">
+                              UDYAM <ExternalLink className="w-3 h-3" />
+                            </Badge>
+                          </a>
+                        )}
+                        {registration.payment_proof_url && (
+                          <a href={registration.payment_proof_url} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="success" className="cursor-pointer">
+                              Pay <ExternalLink className="w-3 h-3" />
+                            </Badge>
+                          </a>
+                        )}
+                        {!registration.gst_certificate_url && !registration.udyam_certificate_url && !registration.payment_proof_url && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    {/* Actions */}
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {registration.status === 'pending' && canApprove && (
+                          <Button
+                            size="sm"
+                            onClick={() => openConfirmDialog(registration.id, 'approved', registration.full_name)}
+                            disabled={actionLoading === registration.id}
+                            className="h-7 px-2 text-xs gap-1"
                           >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                          {actionLoading === registration.id && (
-                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-blue-600" />
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {registration.rejection_reason && registration.status === 'rejected' && (
-                      <tr className="bg-red-50">
-                        <td colSpan={5} className="px-4 py-2">
-                          <p className="text-xs text-red-700">
-                            <span className="font-medium">Rejection reason:</span> {registration.rejection_reason}
-                          </p>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                            <CheckCircle className="w-3.5 h-3.5" />Approve
+                          </Button>
+                        )}
+                        {canViewMembers && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewApplication(registration.id)}
+                            className="h-7 px-2 text-xs gap-1"
+                          >
+                            <ViewIcon className="w-3.5 h-3.5" />View
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" className="h-7 w-7">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {canEdit && (
+                              <DropdownMenuItem onClick={() => handleEditMember(registration)}>
+                                <Edit3 className="w-4 h-4" />Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canViewMembers && (
+                              <DropdownMenuItem onClick={() => handleViewHistory(registration.id, registration.full_name)}>
+                                <History className="w-4 h-4" />Audit History
+                              </DropdownMenuItem>
+                            )}
+                            {registration.status === 'approved' && canApprove && (
+                              <DropdownMenuItem onClick={() => handleToggleActive(registration.id, registration.is_active ?? true)}>
+                                {registration.is_active !== false ? (
+                                  <><EyeOff className="w-4 h-4" />Hide from Directory</>
+                                ) : (
+                                  <><Eye className="w-4 h-4" />Show in Directory</>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                            {registration.status === 'pending' && canApprove && (
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => openConfirmDialog(registration.id, 'rejected', registration.full_name)}
+                              >
+                                <XCircle className="w-4 h-4" />Reject
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => openDeleteDialog(registration.id, registration.full_name)}
+                                >
+                                  <Trash2 className="w-4 h-4" />Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        {actionLoading === registration.id && (
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary" />
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {registration.rejection_reason && registration.status === 'rejected' && (
+                    <TableRow className="bg-destructive/5">
+                      <TableCell colSpan={5} className="py-2">
+                        <p className="text-xs text-destructive">
+                          <span className="font-medium">Rejection reason:</span> {registration.rejection_reason}
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 
       {/* Confirmation Dialog */}
-      {confirmDialog.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-orange-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">
-                Confirm {confirmDialog.action === 'approved' ? 'Approval' : 'Rejection'}
-              </h3>
+      <Dialog
+        open={confirmDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDialog({ isOpen: false, registrationId: '', action: 'approved', memberName: '' });
+            setRejectionReason('');
+          }
+        }}
+      >
+        <DialogContent showCloseIcon={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              Confirm {confirmDialog.action === 'approved' ? 'Approval' : 'Rejection'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to {confirmDialog.action === 'approved' ? 'approve' : 'reject'} the registration for{' '}
+            <span className="font-semibold text-foreground">{confirmDialog.memberName}</span>?
+          </p>
+
+          {confirmDialog.action === 'rejected' && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Rejection Reason <span className="text-destructive">*</span>
+              </label>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Please provide a reason for rejecting this registration..."
+                rows={4}
+                className="resize-none"
+              />
+              <p className="text-xs text-muted-foreground">{rejectionReason.length} characters</p>
             </div>
+          )}
 
-            <p className="text-gray-600 mb-4">
-              Are you sure you want to {confirmDialog.action === 'approved' ? 'approve' : 'reject'} the registration for{' '}
-              <span className="font-semibold">{confirmDialog.memberName}</span>?
-            </p>
-
-            {confirmDialog.action === 'rejected' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rejection Reason <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Please provide a reason for rejecting this registration..."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {rejectionReason.length} characters
-                </p>
-              </div>
-            )}
-
-            {actionLoading === confirmDialog.registrationId && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-center text-sm text-blue-700">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                Processing your request...
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setConfirmDialog({ isOpen: false, registrationId: '', action: 'approved', memberName: '' });
-                  setRejectionReason('');
-                }}
-                disabled={actionLoading === confirmDialog.registrationId}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleStatusUpdate(confirmDialog.registrationId, confirmDialog.action)}
-                disabled={actionLoading === confirmDialog.registrationId}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  confirmDialog.action === 'approved'
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-red-600 hover:bg-red-700'
-                }`}
-              >
-                {actionLoading === confirmDialog.registrationId && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                )}
-                {actionLoading === confirmDialog.registrationId ? 'Processing...' :
-                  confirmDialog.action === 'approved' ? 'Approve' : 'Reject'
-                }
-              </button>
+          {actionLoading === confirmDialog.registrationId && (
+            <div className="p-3 bg-primary/5 rounded-lg flex items-center text-sm text-primary">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+              Processing your request...
             </div>
-          </div>
-        </div>
-      )}
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmDialog({ isOpen: false, registrationId: '', action: 'approved', memberName: '' });
+                setRejectionReason('');
+              }}
+              disabled={actionLoading === confirmDialog.registrationId}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={confirmDialog.action === 'approved' ? 'default' : 'destructive'}
+              onClick={() => handleStatusUpdate(confirmDialog.registrationId, confirmDialog.action)}
+              disabled={actionLoading === confirmDialog.registrationId}
+            >
+              {actionLoading === confirmDialog.registrationId && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-1" />
+              )}
+              {actionLoading === confirmDialog.registrationId ? 'Processing...' :
+                confirmDialog.action === 'approved' ? 'Approve' : 'Reject'
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      {deleteDialog.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-red-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">
-                Confirm Deletion
-              </h3>
-            </div>
+      <Dialog
+        open={deleteDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialog({ isOpen: false, memberId: '', memberName: '' });
+            setDeletionReason('');
+          }
+        }}
+      >
+        <DialogContent showCloseIcon={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Confirm Deletion
+            </DialogTitle>
+          </DialogHeader>
 
-            <p className="text-gray-600 mb-4">
-              Are you sure you want to delete <span className="font-semibold">{deleteDialog.memberName}</span>?
-              This member will be moved to the deleted members archive.
-            </p>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <span className="font-semibold text-foreground">{deleteDialog.memberName}</span>?
+            This member will be moved to the deleted members archive.
+          </p>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Deletion Reason <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={deletionReason}
-                onChange={(e) => setDeletionReason(e.target.value)}
-                placeholder="Please provide a reason for deleting this member..."
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {deletionReason.length} characters
-              </p>
-            </div>
-
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setDeleteDialog({ isOpen: false, memberId: '', memberName: '' });
-                  setDeletionReason('');
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteMember}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Delete Member
-              </button>
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Deletion Reason <span className="text-destructive">*</span>
+            </label>
+            <Textarea
+              value={deletionReason}
+              onChange={(e) => setDeletionReason(e.target.value)}
+              placeholder="Please provide a reason for deleting this member..."
+              rows={4}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">{deletionReason.length} characters</p>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialog({ isOpen: false, memberId: '', memberName: '' });
+                setDeletionReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteMember}>
+              Delete Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Member Modal */}
       {showEditModal && editingMember && (
@@ -806,79 +838,6 @@ const AdminRegistrations: React.FC = () => {
         />
       )}
 
-      {/* ⋯ Overflow dropdown — fixed position, outside any overflow container */}
-      {openMenuId && (() => {
-        const reg = filteredRegistrations.find(r => r.id === openMenuId);
-        if (!reg) return null;
-        return (
-          <div
-            ref={menuRef}
-            className="fixed z-50 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
-            style={{ top: menuPosition.top, right: menuPosition.right }}
-          >
-            {/* Reject — only for pending */}
-            {reg.status === 'pending' && canApprove && (
-              <button
-                onClick={() => { setOpenMenuId(null); openConfirmDialog(reg.id, 'rejected', reg.full_name); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-              >
-                <XCircle className="w-4 h-4" />Reject
-              </button>
-            )}
-            {/* Re-approve — only for rejected */}
-            {reg.status === 'rejected' && canApprove && (
-              <button
-                onClick={() => { setOpenMenuId(null); openConfirmDialog(reg.id, 'approved', reg.full_name); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
-              >
-                <CheckCircle className="w-4 h-4" />Approve
-              </button>
-            )}
-            {/* Edit */}
-            {reg.status !== 'pending' && canEdit && (
-              <button
-                onClick={() => { setOpenMenuId(null); handleEditMember(reg); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <Edit3 className="w-4 h-4" />Edit
-              </button>
-            )}
-            {/* Activate / Deactivate */}
-            {reg.status === 'approved' && canEdit && (
-              <button
-                onClick={() => { setOpenMenuId(null); handleToggleActive(reg.id, reg.is_active !== false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                {reg.is_active === false
-                  ? <><Eye className="w-4 h-4 text-green-600" />Activate</>
-                  : <><EyeOff className="w-4 h-4 text-orange-500" />Deactivate</>
-                }
-              </button>
-            )}
-            {/* History */}
-            {reg.status !== 'pending' && (
-              <button
-                onClick={() => { setOpenMenuId(null); handleViewHistory(reg.id, reg.full_name); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <History className="w-4 h-4" />History
-              </button>
-            )}
-            {/* Delete — separated with a divider */}
-            {reg.status !== 'pending' && canDelete && (
-              <>
-                <div className="my-1 border-t border-gray-100" />
-                <button
-                  onClick={() => { setOpenMenuId(null); setDeleteDialog({ isOpen: true, memberId: reg.id, memberName: reg.full_name }); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />Delete
-                </button>
-              </>
-            )}
-          </div>
-        );
-      })()}
     </div>
     </PermissionGate>
   );

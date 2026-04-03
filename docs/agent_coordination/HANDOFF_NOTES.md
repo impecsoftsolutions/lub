@@ -4,42 +4,41 @@ Keep this file short and overwrite it instead of appending a journal.
 
 ## Current Owner
 
-- None - no active slice.
+- **No active slice** - shadcn migration complete, runtime-verified, and committed
 
 ## Current Slice
 
-- `COD-DASH-001` - complete
-- `CLAUDE-UI-004` - complete
-- `COD-RUN-001` - complete
-- `COD-BLD-001` - complete
-- `COD-PDF-002` - complete
-- `CLAUDE-UI-003` - complete
-- `COD-PDF-001` - complete
-- `COD-ADM-VCARD-001` - complete
-- `COD-VAL-001` - first safe slice complete
-- `CLAUDE-UI-002` - fully complete
-- `COD-HC-001` - complete
+- `CLAUDE-SHADCN-002` - COMPLETE (2026-04-03)
+- `COD-SHADCN-001` - COMPLETE (2026-04-03)
+
+Previously completed:
+- `COD-DASH-001`, `CLAUDE-UI-004`, `COD-RUN-001`, `COD-BLD-001`, `COD-PDF-002`, `CLAUDE-UI-003`, `COD-PDF-001`, `COD-ADM-VCARD-001`, `COD-VAL-001`, `CLAUDE-UI-002`, `COD-HC-001` - all complete
 
 ## What Changed Last
 
-**COD-DASH-001 (Codex):**
-- Updated `src/hooks/useDashboardData.ts` so the dashboard no longer counts distinct `user_roles.user_id` values for `Active Admin Users`
-- The metric now counts active, non-frozen `users` rows with `account_type IN ('admin', 'both')`, which matches actual admin-shell access semantics used elsewhere in the portal
-- Build: PASS. Repo-wide lint is currently blocked by unrelated errors under `vendor/shadcnuikit`.
+**shadcn/ui + Tailwind v4 migration complete and committed (2026-04-03):**
 
-**CLAUDE-UI-004 (Claude):**
-- Added a Stripe-style admin chrome layer in `src/components/admin/AdminLayout.tsx`, `src/components/dashboard/DashboardCard.tsx`, and `src/pages/AdminDashboardOverview.tsx`
-- Converted `src/pages/AdminRegistrations.tsx` from card-per-row layout to a compact table while preserving all data, permission, and modal logic
-- Added `src/components/MemberNav.tsx` and restyled `src/pages/MemberDashboard.tsx`, `src/pages/MemberViewProfile.tsx`, and `src/pages/MemberSettings.tsx` to match the authenticated Stripe-like portal direction
-- Lint: PASS. Build: PASS.
+Key delivered pieces:
+- Tailwind v4 with `@tailwindcss/vite`
+- Ocean Breeze CSS theme with shadcn token mapping
+- 19 shadcn UI components in `src/components/ui/`
+- `src/lib/utils.ts` and `src/hooks/use-mobile.ts`
+- `AppSidebar.tsx` adapted for React Router
+- `AdminLayout.tsx` rewritten with `SidebarProvider` + `AppSidebar`
+- `DashboardCard`, `AdminDashboardOverview`, `AdminRegistrations`, `AdminUserManagement`, and `ViewApplicationModal` migrated to shadcn primitives
+
+**Verification completed by Codex:**
+- `npm run build` - PASS
+- `npm run lint` - 0 errors, 3 expected warnings in shadcn primitives
+- `npm run test:e2e:phase1:local` - 3 passed / 12 skipped
 
 ## Needs Review From The Other Agent
 
-- No active review request.
+- None
 
 ## Files In Play
 
-- None currently checked out for an active slice.
+- None currently locked
 
 ## Needs From User / Environment (still pending)
 
@@ -48,4 +47,4 @@ Keep this file short and overwrite it instead of appending a journal.
 
 ## Next Recommended Stream
 
-- `CLAUDE-UI-005` - Application settings hub in Settings, unless the user prioritizes a different feature/bug first
+- `CLAUDE-UI-005` - Application settings hub in Settings

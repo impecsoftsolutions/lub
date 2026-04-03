@@ -7,6 +7,7 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import QuickActionsPanel from '../components/dashboard/QuickActionsPanel';
 import SystemStatusPanel from '../components/dashboard/SystemStatusPanel';
+import { Button } from '@/components/ui/button';
 
 const AdminDashboardOverview: React.FC = () => {
   const navigate = useNavigate();
@@ -20,11 +21,11 @@ const AdminDashboardOverview: React.FC = () => {
     <PermissionGate
       permission="dashboard.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-muted flex items-center justify-center">
           <div className="text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view the dashboard.</p>
+            <Lock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view the dashboard.</p>
           </div>
         </div>
       }
@@ -34,29 +35,32 @@ const AdminDashboardOverview: React.FC = () => {
         title="Dashboard"
         subtitle="Overview of your organisation's membership activity"
         actions={
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleRefresh}
             disabled={isLoading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Refresh all dashboard data"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
-          </button>
+          </Button>
         }
       />
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="mb-6 bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800">{error}</p>
-            <button
+            <p className="text-sm font-medium text-destructive">{error}</p>
+            <Button
+              variant="link"
+              size="sm"
               onClick={handleRefresh}
-              className="text-sm text-red-600 hover:text-red-700 font-medium mt-1"
+              className="text-destructive hover:text-destructive/80 h-auto p-0 mt-1"
             >
               Try again
-            </button>
+            </Button>
           </div>
         </div>
       )}

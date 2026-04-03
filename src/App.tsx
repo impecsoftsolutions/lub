@@ -38,11 +38,14 @@ import PaymentSettings from './pages/AdminDashboard/PaymentSettings';
 import Styleguide from './pages/Styleguide';
 import Payment from './pages/Payment';
 import MemberProfile from './pages/MemberProfile';
-import { AdminLayout } from './components/admin/AdminLayout';
 import { MemberContextProvider } from './contexts/MemberContext';
 import { PermissionProvider } from './contexts/PermissionContext';
 import { AdminContextProvider } from './contexts/AdminContext';
 import { sessionManager } from './lib/sessionManager';
+
+const AdminLayoutLazy = React.lazy(() =>
+  import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout }))
+);
 
 function AdminLayoutWrapper() {
   const userData = sessionManager.getUserData();
@@ -51,7 +54,13 @@ function AdminLayoutWrapper() {
 
   return (
     <AdminContextProvider isSuperAdmin={isSuperAdmin} userEmail={userEmail}>
-      <AdminLayout />
+      <React.Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-muted">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      }>
+        <AdminLayoutLazy />
+      </React.Suspense>
     </AdminContextProvider>
   );
 }

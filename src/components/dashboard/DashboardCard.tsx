@@ -1,5 +1,9 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface DashboardCardProps {
   title: string;
@@ -21,37 +25,40 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   value,
   icon: Icon,
   iconColor,
-  iconBg = 'bg-gray-100',
+  iconBg = 'bg-muted',
   isLoading = false,
   badge,
   onClick,
   delay = 0
 }) => {
   return (
-    <div
+    <Card
       onClick={onClick}
-      className={`bg-white rounded-lg border border-gray-200 shadow-sm p-5 transition-all duration-200 ${
-        onClick ? 'cursor-pointer hover:shadow-md hover:border-gray-300' : ''
-      }`}
+      className={cn(
+        'gap-0 py-5 transition-all duration-200',
+        onClick ? 'cursor-pointer hover:shadow-md' : ''
+      )}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center flex-shrink-0`}>
-          <Icon className={`w-4.5 h-4.5 ${iconColor}`} style={{ width: '18px', height: '18px' }} />
+      <CardContent className="px-5">
+        <div className="flex items-start justify-between mb-4">
+          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', iconBg)}>
+            <Icon className={cn('w-[18px] h-[18px]', iconColor)} />
+          </div>
+          {badge && (
+            <Badge variant="outline" className={badge.color}>
+              {badge.text}
+            </Badge>
+          )}
         </div>
-        {badge && (
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
-            {badge.text}
-          </span>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{title}</p>
+        {isLoading ? (
+          <Skeleton className="h-7 w-20" />
+        ) : (
+          <p className="text-2xl font-semibold">{value}</p>
         )}
-      </div>
-      <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{title}</h3>
-      {isLoading ? (
-        <div className="h-7 bg-gray-100 animate-pulse rounded w-20"></div>
-      ) : (
-        <p className="text-2xl font-semibold text-gray-900">{value}</p>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 

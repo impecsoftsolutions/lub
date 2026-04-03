@@ -1,11 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, User, Building2, Mail, Phone, CheckCircle, X, Lock } from 'lucide-react';
+import { Users, Plus, Search, CreditCard as Edit3, Trash2, ArrowLeft, User, Building2, Mail, Phone, CheckCircle, Lock } from 'lucide-react';
 import { userRolesService, UserRole, AdminUser } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
 
 const AdminUserManagement: React.FC = () => {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -50,11 +61,11 @@ const AdminUserManagement: React.FC = () => {
     viewer: 'Viewer'
   };
 
-  const roleColors: Record<UserRole['role'], string> = {
-    super_admin: 'bg-purple-100 text-purple-800',
-    admin: 'bg-blue-100 text-blue-800',
-    editor: 'bg-green-100 text-green-800',
-    viewer: 'bg-gray-100 text-gray-800'
+  const roleBadgeVariant: Record<UserRole['role'], 'default' | 'info' | 'success' | 'secondary'> = {
+    super_admin: 'default',
+    admin: 'info',
+    editor: 'success',
+    viewer: 'secondary'
   };
 
   const roleDescriptions: Record<UserRole['role'], string> = {
@@ -199,22 +210,19 @@ const AdminUserManagement: React.FC = () => {
     <PermissionGate
       permission="users.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-muted flex items-center justify-center">
           <div className="text-center">
-            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Lock className="w-10 h-10 text-red-600" />
+            <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Lock className="w-10 h-10 text-destructive" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground mb-6">
               You don't have permission to view admin user management.
             </p>
-            <button
-              onClick={() => navigate('/admin')}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            <Button onClick={() => navigate('/admin')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
-            </button>
+            </Button>
           </div>
         </div>
       }
@@ -233,70 +241,67 @@ const AdminUserManagement: React.FC = () => {
           subtitle="Manage admin users and their role permissions"
           actions={
             <PermissionGate permission="users.create">
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
+              <Button size="sm" onClick={() => setShowAddModal(true)}>
                 <Plus className="w-4 h-4" />
                 Add Admin User
-              </button>
+              </Button>
             </PermissionGate>
           }
         />
         {/* Search */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg border p-6 mb-6">
           <div className="relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
+            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            <Input
               type="text"
               placeholder="Search by email, name, or role..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="pl-10"
             />
           </div>
         </div>
 
         {/* Admin Users List */}
         {isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading admin users...</p>
+          <div className="bg-card rounded-lg border p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading admin users...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No admin users found</h3>
-            <p className="text-gray-600">
+          <div className="bg-card rounded-lg border p-12 text-center">
+            <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No admin users found</h3>
+            <p className="text-muted-foreground">
               {searchTerm ? 'Try adjusting your search criteria' : 'No admin users have been added yet'}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {filteredUsers.map((user) => (
-              <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div key={user.id} className="bg-card rounded-lg border p-6">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
                   {/* User Info */}
                   <div className="flex-1 mb-4 lg:mb-0">
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <div className="flex items-center mb-2">
-                          <Mail className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="font-medium text-gray-900">{user.email}</span>
+                          <Mail className="w-4 h-4 text-muted-foreground mr-2" />
+                          <span className="font-medium text-foreground">{user.email}</span>
                         </div>
-                        
+
                         {user.member_info && (
-                          <div className="space-y-1 text-sm text-gray-600">
+                          <div className="space-y-1 text-sm text-muted-foreground">
                             <div className="flex items-center">
-                              <User className="w-4 h-4 text-gray-400 mr-2" />
+                              <User className="w-4 h-4 text-muted-foreground mr-2" />
                               <span>{user.member_info.full_name}</span>
                             </div>
                             <div className="flex items-center">
-                              <Building2 className="w-4 h-4 text-gray-400 mr-2" />
+                              <Building2 className="w-4 h-4 text-muted-foreground mr-2" />
                               <span>{user.member_info.company_name}</span>
                             </div>
                             <div className="flex items-center">
-                              <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                              <Phone className="w-4 h-4 text-muted-foreground mr-2" />
                               <span>{user.member_info.mobile_number}</span>
                             </div>
                           </div>
@@ -306,40 +311,43 @@ const AdminUserManagement: React.FC = () => {
 
                     {/* Roles */}
                     <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Assigned Roles:</h4>
+                      <h4 className="text-sm font-medium text-foreground mb-2">Assigned Roles:</h4>
                       <div className="space-y-2">
                         {user.roles.map((role) => (
-                          <div key={role.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                          <div key={role.id} className="flex items-center justify-between bg-muted rounded-lg p-3">
                             <div className="flex items-center space-x-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleColors[role.role]}`}>
+                              <Badge variant={roleBadgeVariant[role.role]}>
                                 {roleLabels[role.role]}
-                              </span>
+                              </Badge>
                               {role.is_member_linked && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <Badge variant="success">
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   Member Linked
-                                </span>
+                                </Badge>
                               )}
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
                               <PermissionGate permission="users.roles.assign">
-                                <button
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
                                   onClick={() => handleEditRole(user, role)}
-                                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                                   title="Edit role"
                                 >
                                   <Edit3 className="w-4 h-4" />
-                                </button>
+                                </Button>
                               </PermissionGate>
                               <PermissionGate permission="users.delete">
-                                <button
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
                                   onClick={() => handleRemoveRole(role.id!)}
-                                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
                                   title="Remove role"
+                                  className="text-muted-foreground hover:text-destructive"
                                 >
                                   <Trash2 className="w-4 h-4" />
-                                </button>
+                                </Button>
                               </PermissionGate>
                             </div>
                           </div>
@@ -355,39 +363,30 @@ const AdminUserManagement: React.FC = () => {
         </div>
 
         {/* Add User Modal */}
-        {showAddModal && canCreateUsers && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Admin User</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
+        <Dialog open={showAddModal && !!canCreateUsers} onOpenChange={(open) => !open && setShowAddModal(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Admin User</DialogTitle>
+            </DialogHeader>
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="add-email">Email Address</Label>
+                <Input
+                  id="add-email"
                   type="email"
                   value={addUserForm.email}
                   onChange={(e) => handleEmailChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="user@example.com"
                 />
-                
+
                 {addUserForm.memberInfo && (
-                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="mt-2 p-3 bg-success/10 border border-success/20 rounded-lg">
                     <div className="flex items-center mb-2">
-                      <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-                      <span className="text-sm font-medium text-green-800">Existing LUB Member Found</span>
+                      <CheckCircle className="w-4 h-4 text-success mr-2" />
+                      <span className="text-sm font-medium text-success">Existing LUB Member Found</span>
                     </div>
-                    <div className="text-sm text-green-700">
+                    <div className="text-sm text-success/80">
                       <p><strong>{addUserForm.memberInfo.full_name}</strong></p>
                       <p>{addUserForm.memberInfo.company_name}</p>
                       <p>{addUserForm.memberInfo.mobile_number}</p>
@@ -396,14 +395,13 @@ const AdminUserManagement: React.FC = () => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
-                </label>
+              <div className="space-y-1.5">
+                <Label htmlFor="add-role">Role</Label>
                 <select
+                  id="add-role"
                   value={addUserForm.role}
                   onChange={(e) => setAddUserForm(prev => ({ ...prev, role: e.target.value as UserRole['role'] }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   title={addUserForm.role ? roleDescriptions[addUserForm.role] : 'Select a role to see description'}
                 >
                   <option value="">Select Role</option>
@@ -414,67 +412,46 @@ const AdminUserManagement: React.FC = () => {
                   ))}
                 </select>
                 {addUserForm.role && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground">
                     {roleDescriptions[addUserForm.role]}
                   </p>
                 )}
               </div>
 
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="isMemberLinked"
                   checked={addUserForm.isMemberLinked}
                   onChange={(e) => setAddUserForm(prev => ({ ...prev, isMemberLinked: e.target.checked }))}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 rounded border-input"
                 />
-                <label htmlFor="isMemberLinked" className="ml-2 text-sm font-medium text-gray-700">
-                  Link to LUB member account
-                </label>
+                <Label htmlFor="isMemberLinked">Link to LUB member account</Label>
               </div>
             </div>
-            
-            <div className="flex gap-3 justify-end mt-6">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddUser}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add User
-              </button>
-            </div>
-          </div>
-        </div>
-        )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
+              <Button onClick={handleAddUser}>Add User</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Role Modal */}
-        {showEditModal && selectedRole && canAssignRoles && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Role</h3>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
+        <Dialog open={showEditModal && !!selectedRole && !!canAssignRoles} onOpenChange={(open) => !open && setShowEditModal(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Role</DialogTitle>
+            </DialogHeader>
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
-                </label>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-role">Role</Label>
                 <select
+                  id="edit-role"
                   value={editRoleForm.role}
                   onChange={(e) => setEditRoleForm(prev => ({ ...prev, role: e.target.value as UserRole['role'] }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   title={editRoleForm.role ? roleDescriptions[editRoleForm.role] : 'Select a role to see description'}
                 >
                   {Object.entries(roleLabels).map(([value, label]) => (
@@ -484,43 +461,30 @@ const AdminUserManagement: React.FC = () => {
                   ))}
                 </select>
                 {editRoleForm.role && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground">
                     {roleDescriptions[editRoleForm.role]}
                   </p>
                 )}
               </div>
 
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="editIsMemberLinked"
                   checked={editRoleForm.isMemberLinked}
                   onChange={(e) => setEditRoleForm(prev => ({ ...prev, isMemberLinked: e.target.checked }))}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 rounded border-input"
                 />
-                <label htmlFor="editIsMemberLinked" className="ml-2 text-sm font-medium text-gray-700">
-                  Link to LUB member account
-                </label>
+                <Label htmlFor="editIsMemberLinked">Link to LUB member account</Label>
               </div>
             </div>
-            
-            <div className="flex gap-3 justify-end mt-6">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateRole}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Update Role
-              </button>
-            </div>
-          </div>
-          </div>
-        )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+              <Button onClick={handleUpdateRole}>Update Role</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PermissionGate>
   );

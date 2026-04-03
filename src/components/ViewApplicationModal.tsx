@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X, CreditCard as Edit, CheckCircle, XCircle, FileText, ExternalLink, User, Building2, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp, Eye, Download, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
@@ -381,19 +383,14 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   if (error || !applicationData) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
           <div className="flex items-center mb-4">
-            <AlertCircle className="w-6 h-6 text-red-500 mr-3" />
-            <h3 className="text-lg font-semibold text-gray-900">Error Loading Application</h3>
+            <AlertCircle className="w-6 h-6 text-destructive mr-3" />
+            <h3 className="text-lg font-semibold text-foreground">Error Loading Application</h3>
           </div>
-          <p className="text-gray-600 mb-6">{error || 'Failed to load application details'}</p>
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            Close
-          </button>
+          <p className="text-muted-foreground mb-6">{error || 'Failed to load application details'}</p>
+          <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
         </div>
       </div>
     );
@@ -504,22 +501,19 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
   ].filter(section => section.data.fields.length > 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto my-8">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto my-8">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-card border-b px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Application Review</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-xl font-semibold text-foreground">Application Review</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               {applicationData.full_name} - {applicationData.company_name}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
         {/* Content */}
@@ -527,34 +521,38 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
           {/* Status Badge */}
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+              <Badge variant={applicationData.status === 'approved' ? 'success' : applicationData.status === 'rejected' ? 'destructive' : 'warning'}>
                 Status: {applicationData.status || 'Pending'}
-              </span>
+              </Badge>
               {applicationData.first_viewed_at && (
-                <span className="inline-flex items-center text-sm text-gray-600">
+                <span className="inline-flex items-center text-sm text-muted-foreground">
                   <Eye className="w-4 h-4 mr-1" />
                   Viewed {applicationData.reviewed_count || 1} time(s)
                 </span>
               )}
             </div>
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGeneratingPdf ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</>
-              ) : (
-                <><Download className="w-4 h-4 mr-2" />Download PDF</>
-              )}
-            </button>
-            <button
-              onClick={() => onEdit(applicationData)}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Application
-            </button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+              >
+                {isGeneratingPdf ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</>
+                ) : (
+                  <><Download className="w-4 h-4 mr-2" />Download PDF</>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(applicationData)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Application
+              </Button>
+            </div>
           </div>
 
           {/* Documents Section */}
@@ -623,56 +621,32 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
         {/* Footer Actions */}
         {applicationData.status === 'pending' && (
-          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Close
-            </button>
-            <button
-              onClick={() => onReject(applicationId)}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-            >
+          <div className="sticky bottom-0 bg-muted border-t px-6 py-4 flex gap-3 justify-end">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button variant="destructive" onClick={() => onReject(applicationId)}>
               <XCircle className="w-4 h-4 mr-2" />
               Reject
-            </button>
-            <button
-              onClick={() => onApprove(applicationId)}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
-            >
+            </Button>
+            <Button onClick={() => onApprove(applicationId)}>
               <CheckCircle className="w-4 h-4 mr-2" />
               Approve
-            </button>
+            </Button>
           </div>
         )}
 
         {applicationData.status === 'rejected' && (
-          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Close
-            </button>
-            <button
-              onClick={() => onApprove(applicationId)}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
-            >
+          <div className="sticky bottom-0 bg-muted border-t px-6 py-4 flex gap-3 justify-end">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={() => onApprove(applicationId)}>
               <CheckCircle className="w-4 h-4 mr-2" />
               Approve
-            </button>
+            </Button>
           </div>
         )}
 
         {applicationData.status === 'approved' && (
-          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Close
-            </button>
+          <div className="sticky bottom-0 bg-muted border-t px-6 py-4 flex gap-3 justify-end">
+            <Button variant="outline" onClick={onClose}>Close</Button>
           </div>
         )}
       </div>
