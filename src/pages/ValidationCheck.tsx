@@ -113,11 +113,11 @@ const ValidationCheck: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Checking validation rules...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Checking validation rules...</p>
           </div>
         </div>
       </div>
@@ -126,14 +126,14 @@ const ValidationCheck: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6">
             <div className="flex items-start">
-              <XCircle className="w-6 h-6 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
+              <XCircle className="w-6 h-6 text-destructive mr-3 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-lg font-semibold text-red-900 mb-2">Error</h3>
-                <p className="text-red-800">{error}</p>
+                <h3 className="text-section font-semibold text-destructive mb-2">Error</h3>
+                <p className="text-destructive">{error}</p>
               </div>
             </div>
           </div>
@@ -147,38 +147,38 @@ const ValidationCheck: React.FC = () => {
   const hasIssues = result.missingRules.length > 0 || result.inactiveRules.length > 0 || result.mappingIssues.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Validation Rules Database Check</h1>
+        <h1 className="text-xl font-semibold text-foreground mb-8">Validation Rules Database Check</h1>
 
         {/* Summary */}
-        <div className={`border rounded-lg p-6 mb-6 ${hasIssues ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+        <div className={`border rounded-lg p-6 mb-6 ${hasIssues ? 'bg-destructive/10 border-destructive/20' : 'bg-primary/10 border-primary/20'}`}>
           <div className="flex items-start">
             {hasIssues ? (
-              <AlertCircle className="w-6 h-6 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-6 h-6 text-destructive mr-3 flex-shrink-0 mt-0.5" />
             ) : (
-              <CheckCircle className="w-6 h-6 text-green-600 mr-3 flex-shrink-0 mt-0.5" />
+              <CheckCircle className="w-6 h-6 text-primary mr-3 flex-shrink-0 mt-0.5" />
             )}
             <div>
-              <h2 className="text-xl font-semibold mb-4">Summary</h2>
+              <h2 className="text-section font-semibold text-foreground mb-4">Summary</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Total Rules</p>
-                  <p className="text-2xl font-bold">{result.allRules.length}</p>
+                  <p className="text-label font-medium text-muted-foreground uppercase tracking-wider">Total Rules</p>
+                  <p className="text-xl font-semibold text-foreground">{result.allRules.length}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Active Rules</p>
-                  <p className="text-2xl font-bold text-green-600">{result.activeRules.length}</p>
+                  <p className="text-label font-medium text-muted-foreground uppercase tracking-wider">Active Rules</p>
+                  <p className="text-xl font-semibold text-primary">{result.activeRules.length}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Missing Rules</p>
-                  <p className={`text-2xl font-bold ${result.missingRules.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  <p className="text-label font-medium text-muted-foreground uppercase tracking-wider">Missing Rules</p>
+                  <p className={`text-xl font-semibold ${result.missingRules.length > 0 ? 'text-destructive' : 'text-primary'}`}>
                     {result.missingRules.length}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Mapping Issues</p>
-                  <p className={`text-2xl font-bold ${result.mappingIssues.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  <p className="text-label font-medium text-muted-foreground uppercase tracking-wider">Mapping Issues</p>
+                  <p className={`text-xl font-semibold ${result.mappingIssues.length > 0 ? 'text-destructive' : 'text-primary'}`}>
                     {result.mappingIssues.length}
                   </p>
                 </div>
@@ -189,16 +189,16 @@ const ValidationCheck: React.FC = () => {
 
         {/* Issues */}
         {hasIssues && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Issues Found</h2>
+          <div className="bg-card border border-border rounded-lg p-6 mb-6">
+            <h2 className="text-section font-semibold text-foreground mb-4">Issues Found</h2>
 
             {result.missingRules.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-lg font-medium text-red-900 mb-2 flex items-center">
+                <h3 className="text-section font-semibold text-destructive mb-2 flex items-center">
                   <XCircle className="w-5 h-5 mr-2" />
                   Missing Rules ({result.missingRules.length})
                 </h3>
-                <ul className="list-disc list-inside text-red-800">
+                <ul className="list-disc list-inside text-destructive">
                   {result.missingRules.map(rule => (
                     <li key={rule}>{rule}</li>
                   ))}
@@ -208,11 +208,11 @@ const ValidationCheck: React.FC = () => {
 
             {result.inactiveRules.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-lg font-medium text-yellow-900 mb-2 flex items-center">
+                <h3 className="text-section font-semibold text-foreground mb-2 flex items-center">
                   <AlertCircle className="w-5 h-5 mr-2" />
                   Inactive Rules ({result.inactiveRules.length})
                 </h3>
-                <ul className="list-disc list-inside text-yellow-800">
+                <ul className="list-disc list-inside text-foreground">
                   {result.inactiveRules.map(rule => (
                     <li key={rule}>{rule}</li>
                   ))}
@@ -222,11 +222,11 @@ const ValidationCheck: React.FC = () => {
 
             {result.mappingIssues.length > 0 && (
               <div>
-                <h3 className="text-lg font-medium text-red-900 mb-2 flex items-center">
+                <h3 className="text-section font-semibold text-destructive mb-2 flex items-center">
                   <XCircle className="w-5 h-5 mr-2" />
                   Field Mapping Issues ({result.mappingIssues.length})
                 </h3>
-                <ul className="list-disc list-inside text-red-800">
+                <ul className="list-disc list-inside text-destructive">
                   {result.mappingIssues.map(issue => (
                     <li key={issue}>{issue}</li>
                   ))}
@@ -237,27 +237,27 @@ const ValidationCheck: React.FC = () => {
         )}
 
         {/* All Rules */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">All Validation Rules</h2>
+        <div className="bg-card border border-border rounded-lg p-6">
+          <h2 className="text-section font-semibold text-foreground mb-4">All Validation Rules</h2>
 
           {result.allRules.length === 0 ? (
-            <p className="text-gray-600">No validation rules found in database.</p>
+            <p className="text-muted-foreground">No validation rules found in database.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rule Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Active</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Error Message</th>
+                  <tr className="bg-muted/50">
+                    <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Rule Name</th>
+                    <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Type</th>
+                    <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Active</th>
+                    <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Error Message</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {result.allRules.map(rule => (
-                    <tr key={rule.id} className={!rule.is_active ? 'bg-gray-50' : ''}>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{rule.rule_name}</td>
+                    <tr key={rule.id} className={!rule.is_active ? 'bg-muted/50' : ''}>
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">{rule.rule_name}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{rule.rule_type}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{rule.category}</td>
                       <td className="px-4 py-3 text-sm">

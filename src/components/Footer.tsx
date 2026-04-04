@@ -22,10 +22,10 @@ const Footer: React.FC = () => {
                 <img
                   src={orgLogo}
                   alt={`${orgName} Logo`}
-                  className="w-10 h-10 object-contain rounded-lg bg-white p-1"
+                  className="w-10 h-10 object-contain rounded-lg bg-background p-1"
                 />
               ) : (
-                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-800 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-lg">L</span>
                 </div>
               )}

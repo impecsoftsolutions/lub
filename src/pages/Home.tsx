@@ -14,7 +14,7 @@ const Home: React.FC = () => {
           <div className="text-center space-y-8">
             <h1 className="text-4xl md:text-6xl font-bold leading-tight">
               Empowering India's
-              <span className="block text-orange-400">MSMEs</span>
+              <span className="block text-orange-400 font-bold">MSMEs</span>
             </h1>
             <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto">
               Supporting Micro, Small and Medium Enterprises across India with comprehensive 

@@ -367,16 +367,16 @@ const AdminLocationManagement: React.FC = () => {
     <PermissionGate
       permission="locations.districts.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center justify-center p-8">
           <div className="text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view location management.</p>
+            <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view location management.</p>
           </div>
         </div>
       }
     >
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -389,7 +389,7 @@ const AdminLocationManagement: React.FC = () => {
         <div className="mb-6">
           <button
             onClick={() => navigate('/admin/state-management')}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to State Management
@@ -400,16 +400,16 @@ const AdminLocationManagement: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <MapPin className="w-8 h-8 mr-3 text-blue-600" />
+              <h1 className="text-xl font-semibold text-foreground flex items-center">
+                <MapPin className="w-8 h-8 mr-3 text-primary" />
                 Location Management
               </h1>
-              <p className="text-gray-600 mt-2">{decodedStateName}</p>
+              <p className="text-muted-foreground mt-2">{decodedStateName}</p>
             </div>
             <div className="flex gap-3">
               {canManageDistricts && (
               <button
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 onClick={() => setIsAddDistrictOpen(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -434,27 +434,27 @@ const AdminLocationManagement: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Districts Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
+          <div className="bg-card rounded-lg shadow-sm border border-border">
+            <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+                <h2 className="text-section font-semibold text-foreground flex items-center">
+                  <Building2 className="w-5 h-5 mr-2 text-primary" />
                   Districts in {decodedStateName}
                 </h2>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   {districts.length} district{districts.length !== 1 ? 's' : ''}
                 </span>
               </div>
               
               {/* Search */}
               <div className="relative">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder="Search districts..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
             </div>
@@ -462,16 +462,16 @@ const AdminLocationManagement: React.FC = () => {
             <div className="max-h-96 overflow-y-auto">
               {isLoadingDistricts ? (
                 <div className="p-6 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-                  <p className="text-gray-600">Loading districts...</p>
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                  <p className="text-muted-foreground">Loading districts...</p>
                 </div>
               ) : filteredDistricts.length === 0 ? (
                 <div className="p-6 text-center">
-                  <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-sm font-medium text-foreground mb-2">
                     {searchTerm ? 'No districts found' : 'No districts yet'}
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-muted-foreground">
                     {searchTerm 
                       ? 'Try adjusting your search criteria'
                       : 'Districts will appear here once added to the system'
@@ -479,25 +479,25 @@ const AdminLocationManagement: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-border">
                   {filteredDistricts.map((district) => (
                     <div
                       key={district.district_id}
-                      className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
+                      className={`p-4 cursor-pointer transition-colors hover:bg-muted/30 ${
                         selectedDistrict?.district_id === district.district_id
-                          ? 'bg-blue-50 border-r-4 border-blue-500'
+                          ? 'bg-primary/5 border-r-4 border-primary'
                           : ''
                       }`}
                       onClick={() => handleDistrictSelect(district)}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-medium text-gray-900">{district.district_name}</h3>
+                          <h3 className="font-medium text-foreground">{district.district_name}</h3>
                         </div>
                         {canManageDistricts && (
                         <div className="flex items-center space-x-2">
                           <button
-                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            className="p-1 text-muted-foreground hover:text-primary transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditDistrict(district);
@@ -506,7 +506,7 @@ const AdminLocationManagement: React.FC = () => {
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteDistrict(district);
@@ -525,14 +525,14 @@ const AdminLocationManagement: React.FC = () => {
           </div>
 
           {/* Cities Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+          <div className="bg-card rounded-lg shadow-sm border border-border">
+            <div className="p-6 border-b border-border">
+              <h2 className="text-section font-semibold text-foreground flex items-center">
                 <Users className="w-5 h-5 mr-2 text-green-600" />
                 Cities in {selectedDistrict ? selectedDistrict.district_name : 'Select District'}
               </h2>
               {selectedDistrict && (
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {cities.length} cit{cities.length !== 1 ? 'ies' : 'y'}
                 </p>
               )}
@@ -541,47 +541,47 @@ const AdminLocationManagement: React.FC = () => {
             <div className="max-h-96 overflow-y-auto">
               {!selectedDistrict ? (
                 <div className="p-6 text-center">
-                  <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Select a District</h3>
-                  <p className="text-gray-600">Choose a district from the left panel to view its cities</p>
+                  <MapPin className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-sm font-medium text-foreground mb-2">Select a District</h3>
+                  <p className="text-muted-foreground">Choose a district from the left panel to view its cities</p>
                 </div>
               ) : isLoadingCities ? (
                 <div className="p-6 text-center">
                   <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
-                  <p className="text-gray-600">Loading cities...</p>
+                  <p className="text-muted-foreground">Loading cities...</p>
                 </div>
               ) : cities.length === 0 ? (
                 <div className="p-6 text-center">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No cities yet</h3>
-                  <p className="text-gray-600">Cities will appear here once added to this district</p>
+                  <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-sm font-medium text-foreground mb-2">No cities yet</h3>
+                  <p className="text-muted-foreground">Cities will appear here once added to this district</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-border">
                   {cities.map((city) => (
-                    <div key={city.city_id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div key={city.city_id} className="p-4 hover:bg-muted/30 transition-colors">
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="flex items-center">
-                            <h3 className="font-medium text-gray-900">{city.city_name}</h3>
+                            <h3 className="font-medium text-foreground">{city.city_name}</h3>
                             {city.is_popular && (
                               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 Popular
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500">ID: {city.city_id}</p>
+                          <p className="text-sm text-muted-foreground">ID: {city.city_id}</p>
                         </div>
                         {canManageCities && (
                         <div className="flex items-center space-x-2">
                           <button
-                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            className="p-1 text-muted-foreground hover:text-primary transition-colors"
                             onClick={() => showToast('success', 'Edit city feature coming soon!')}
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                             onClick={() => showToast('success', 'Delete city feature coming soon!')}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -598,22 +598,22 @@ const AdminLocationManagement: React.FC = () => {
         </div>
 
         {/* Summary Stats */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Summary</h3>
+        <div className="mt-8 bg-card rounded-lg shadow-sm border border-border p-6">
+          <h3 className="text-section font-semibold text-foreground mb-4">Location Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{districts.length}</div>
-              <div className="text-sm text-gray-600">Total Districts</div>
+              <div className="text-2xl font-semibold text-primary">{districts.length}</div>
+              <div className="text-sm text-muted-foreground">Total Districts</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{cities.length}</div>
-              <div className="text-sm text-gray-600">Cities in Selected District</div>
+              <div className="text-2xl font-semibold text-green-600">{cities.length}</div>
+              <div className="text-sm text-muted-foreground">Cities in Selected District</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-semibold text-primary">
                 {cities.filter(city => city.is_popular).length}
               </div>
-              <div className="text-sm text-gray-600">Popular Cities</div>
+              <div className="text-sm text-muted-foreground">Popular Cities</div>
             </div>
           </div>
         </div>
@@ -621,13 +621,13 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Add District Modal */}
       {isAddDistrictOpen && canManageDistricts && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add New District</h3>
+              <h3 className="text-section font-semibold text-foreground">Add New District</h3>
               <button
                 onClick={() => setIsAddDistrictOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -635,7 +635,7 @@ const AdminLocationManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   District Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -643,7 +643,7 @@ const AdminLocationManagement: React.FC = () => {
                   value={newDistrictName}
                   onChange={(e) => setNewDistrictName(e.target.value)}
                   placeholder="Enter district name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {newDistrictName.trim().length > 0 && newDistrictName.trim().length < 2 && (
                   <p className="text-red-500 text-sm mt-1">District name must be at least 2 characters long</p>
@@ -656,9 +656,9 @@ const AdminLocationManagement: React.FC = () => {
                   id="newDistrictIsActive"
                   checked={newDistrictIsActive}
                   onChange={(e) => setNewDistrictIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="newDistrictIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="newDistrictIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active district
                 </label>
               </div>
@@ -667,14 +667,14 @@ const AdminLocationManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setIsAddDistrictOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddDistrict}
                 disabled={isAddingDistrict || !newDistrictName.trim() || newDistrictName.trim().length < 2}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAddingDistrict ? 'Adding...' : 'Add District'}
               </button>
@@ -685,27 +685,27 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Add City Modal */}
       {isAddCityOpen && selectedDistrict && canManageCities && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add New City</h3>
+              <h3 className="text-section font-semibold text-foreground">Add New City</h3>
               <button
                 onClick={() => setIsAddCityOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
+            <div className="mb-4 p-3 bg-primary/5 rounded-lg">
+              <p className="text-sm text-foreground">
                 <strong>District:</strong> {selectedDistrict.district_name}
               </p>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   City Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -713,7 +713,7 @@ const AdminLocationManagement: React.FC = () => {
                   value={newCityName}
                   onChange={(e) => setNewCityName(e.target.value)}
                   placeholder="Enter city name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {newCityName.trim().length > 0 && newCityName.trim().length < 2 && (
                   <p className="text-red-500 text-sm mt-1">City name must be at least 2 characters long</p>
@@ -726,9 +726,9 @@ const AdminLocationManagement: React.FC = () => {
                   id="newCityIsPopular"
                   checked={newCityIsPopular}
                   onChange={(e) => setNewCityIsPopular(e.target.checked)}
-                  className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                  className="w-4 h-4 text-green-600 bg-muted border-border rounded focus:ring-green-500 focus:ring-2"
                 />
-                <label htmlFor="newCityIsPopular" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="newCityIsPopular" className="ml-2 text-sm font-medium text-foreground">
                   Mark as popular city
                 </label>
               </div>
@@ -739,9 +739,9 @@ const AdminLocationManagement: React.FC = () => {
                   id="newCityIsActive"
                   checked={newCityIsActive}
                   onChange={(e) => setNewCityIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="newCityIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="newCityIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active city
                 </label>
               </div>
@@ -750,7 +750,7 @@ const AdminLocationManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setIsAddCityOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
@@ -768,13 +768,13 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Edit District Modal */}
       {isEditDistrictOpen && editingDistrict && canManageDistricts && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit District</h3>
+              <h3 className="text-section font-semibold text-foreground">Edit District</h3>
               <button
                 onClick={() => setIsEditDistrictOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -782,7 +782,7 @@ const AdminLocationManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   District Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -790,7 +790,7 @@ const AdminLocationManagement: React.FC = () => {
                   value={editDistrictName}
                   onChange={(e) => setEditDistrictName(e.target.value)}
                   placeholder="Enter district name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {editDistrictName.trim().length > 0 && editDistrictName.trim().length < 3 && (
                   <p className="text-red-500 text-sm mt-1">District name must be at least 3 characters long</p>
@@ -803,9 +803,9 @@ const AdminLocationManagement: React.FC = () => {
                   id="editDistrictIsActive"
                   checked={editDistrictIsActive}
                   onChange={(e) => setEditDistrictIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="editDistrictIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="editDistrictIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active district
                 </label>
               </div>
@@ -814,14 +814,14 @@ const AdminLocationManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setIsEditDistrictOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateDistrict}
                 disabled={isUpdatingDistrict || !editDistrictName.trim() || editDistrictName.trim().length < 3}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isUpdatingDistrict ? 'Updating...' : 'Update District'}
               </button>
@@ -832,14 +832,14 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Delete District Confirmation Dialog */}
       {deleteConfirmOpen && deletingDistrict && canManageDistricts && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center mb-4">
               <AlertCircle className="w-6 h-6 text-orange-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Cannot Delete District</h3>
+              <h3 className="text-section font-semibold text-foreground">Cannot Delete District</h3>
             </div>
             
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
               This district has cities mapped to it. You cannot delete it now.
               You can either disable it or first delete/move its cities.
             </p>
@@ -850,7 +850,7 @@ const AdminLocationManagement: React.FC = () => {
                   setDeleteConfirmOpen(false);
                   setDeletingDistrict(null);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>

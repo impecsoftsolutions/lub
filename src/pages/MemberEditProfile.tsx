@@ -960,10 +960,10 @@ const MemberEditProfile: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading profile editor...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading profile editor...</p>
         </div>
       </div>
     );
@@ -971,14 +971,14 @@ const MemberEditProfile: React.FC = () => {
 
   if (!member) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-900 font-medium mb-2">Unable to load your profile</p>
-          <p className="text-gray-600 mb-4">Please try again or contact support</p>
+          <p className="text-foreground font-medium mb-2">Unable to load your profile</p>
+          <p className="text-muted-foreground mb-4">Please try again or contact support</p>
           <Link
             to="/dashboard"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-block"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 inline-block"
           >
             Back to Dashboard
           </Link>
@@ -988,7 +988,7 @@ const MemberEditProfile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen py-8">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -1000,16 +1000,16 @@ const MemberEditProfile: React.FC = () => {
         <div className="mb-6">
           <button
             onClick={() => navigate('/dashboard/profile')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Profile
           </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-card rounded-lg shadow-md overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-6">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-white flex items-center gap-2">
               <User className="w-6 h-6" />
               Edit Profile
             </h1>
@@ -1019,13 +1019,13 @@ const MemberEditProfile: React.FC = () => {
           <form onSubmit={handleSubmit} className="p-6 space-y-8">
             {/* Section 1: Personal Information */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-2 border-b border-gray-200">
-                <User className="w-5 h-5 text-blue-600" />
+              <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
+                <User className="w-5 h-5 text-primary" />
                 Personal Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="full_name" className="block text-sm font-medium text-foreground mb-1">
                     Full Name {isFieldRequired('full_name') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1034,8 +1034,8 @@ const MemberEditProfile: React.FC = () => {
                     name="full_name"
                     value={formData.full_name}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.full_name ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.full_name ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('full_name')}
                   />
@@ -1043,7 +1043,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="gender" className="block text-sm font-medium text-foreground mb-1">
                     Gender {isFieldRequired('gender') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1051,8 +1051,8 @@ const MemberEditProfile: React.FC = () => {
                     name="gender"
                     value={formData.gender}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.gender ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.gender ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('gender')}
                   >
@@ -1064,7 +1064,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="date_of_birth" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="date_of_birth" className="block text-sm font-medium text-foreground mb-1">
                     Date of Birth {isFieldRequired('date_of_birth') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1073,8 +1073,8 @@ const MemberEditProfile: React.FC = () => {
                     name="date_of_birth"
                     value={formData.date_of_birth}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.date_of_birth ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.date_of_birth ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('date_of_birth')}
                   />
@@ -1083,7 +1083,7 @@ const MemberEditProfile: React.FC = () => {
 
                 {/* Profile Photo */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     <Camera className="w-4 h-4 inline mr-1" />
                     Profile Photo (Optional)
                   </label>
@@ -1099,12 +1099,12 @@ const MemberEditProfile: React.FC = () => {
                       />
                       <label
                         htmlFor="profile-photo-input"
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="inline-flex items-center px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors"
                       >
                         <Upload className="w-4 h-4 mr-2" />
                         Choose Photo
                       </label>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         Upload a profile photo (JPG, JPEG, or PNG). You'll be able to crop it to fit.
                       </p>
                     </div>
@@ -1114,7 +1114,7 @@ const MemberEditProfile: React.FC = () => {
                         <img
                           src={profilePhotoPreview}
                           alt="Profile preview"
-                          className="w-32 h-40 object-cover rounded-lg border-2 border-gray-200"
+                          className="w-32 h-40 object-cover rounded-lg border-2 border-border"
                         />
                       </div>
                       <div className="flex-1">
@@ -1122,7 +1122,7 @@ const MemberEditProfile: React.FC = () => {
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Photo ready
                         </p>
-                        <p className="text-xs text-gray-600 mb-3">
+                        <p className="text-xs text-muted-foreground mb-3">
                           Your profile photo has been cropped and will be uploaded with your profile changes.
                         </p>
                         <div className="flex gap-2">
@@ -1135,7 +1135,7 @@ const MemberEditProfile: React.FC = () => {
                           />
                           <label
                             htmlFor="profile-photo-input"
-                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors cursor-pointer"
                           >
                             <Upload className="w-4 h-4 mr-1" />
                             Upload New
@@ -1155,7 +1155,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-2">
                     <Mail className="w-4 h-4" />
                     Email Address {isFieldRequired('email') && <span className="text-red-500">*</span>}
                   </label>
@@ -1167,19 +1167,19 @@ const MemberEditProfile: React.FC = () => {
                         value={formData.email}
                         onChange={handleChange}
                         disabled={!isEmailEditable}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          !isEmailEditable ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''
-                        } ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          !isEmailEditable ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : ''
+                        } ${errors.email ? 'border-red-500' : 'border-border'}`}
                         required={isFieldRequired('email')}
                       />
                       {!isEmailEditable && (
-                        <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowEmailModal(true)}
-                      className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700"
+                      className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       <Unlock className="w-4 h-4" />
                       Change
@@ -1187,12 +1187,12 @@ const MemberEditProfile: React.FC = () => {
                   </div>
                   {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
                   {!isEmailEditable && (
-                    <p className="text-xs text-gray-500 mt-1">Click "Change" to edit email</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit email</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-2">
                     <Phone className="w-4 h-4" />
                     Mobile Number {isFieldRequired('mobile_number') && <span className="text-red-500">*</span>}
                   </label>
@@ -1204,19 +1204,19 @@ const MemberEditProfile: React.FC = () => {
                         value={formData.mobile_number}
                         onChange={handleMobileChange}
                         disabled={!isMobileEditable}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          !isMobileEditable ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''
-                        } ${errors.mobile_number ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          !isMobileEditable ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : ''
+                        } ${errors.mobile_number ? 'border-red-500' : 'border-border'}`}
                         required={isFieldRequired('mobile_number')}
                       />
                       {!isMobileEditable && (
-                        <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowMobileModal(true)}
-                      className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700"
+                      className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       <Unlock className="w-4 h-4" />
                       Change
@@ -1224,7 +1224,7 @@ const MemberEditProfile: React.FC = () => {
                   </div>
                   {errors.mobile_number && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
                   {!isMobileEditable && (
-                    <p className="text-xs text-gray-500 mt-1">Click "Change" to edit mobile</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit mobile</p>
                   )}
                 </div>
               </div>
@@ -1232,13 +1232,13 @@ const MemberEditProfile: React.FC = () => {
 
             {/* Section 2: Company Information */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-2 border-b border-gray-200">
-                <Building className="w-5 h-5 text-blue-600" />
+              <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
+                <Building className="w-5 h-5 text-primary" />
                 Company Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="company_name" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="company_name" className="block text-sm font-medium text-foreground mb-1">
                     Company Name {isFieldRequired('company_name') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1247,8 +1247,8 @@ const MemberEditProfile: React.FC = () => {
                     name="company_name"
                     value={formData.company_name}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.company_name ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.company_name ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('company_name')}
                   />
@@ -1256,7 +1256,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="company_designation_id" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="company_designation_id" className="block text-sm font-medium text-foreground mb-1">
                     Designation {isFieldRequired('company_designation_id') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1264,8 +1264,8 @@ const MemberEditProfile: React.FC = () => {
                     name="company_designation_id"
                     value={formData.company_designation_id}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.company_designation_id ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.company_designation_id ? 'border-red-500' : 'border-border'
                     }`}
                     disabled={isLoadingDesignations}
                   >
@@ -1278,7 +1278,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label htmlFor="company_address" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="company_address" className="block text-sm font-medium text-foreground mb-1">
                     Company Address {isFieldRequired('company_address') && <span className="text-red-500">*</span>}
                   </label>
                   <textarea
@@ -1287,8 +1287,8 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.company_address}
                     onChange={handleChange}
                     rows={3}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.company_address ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.company_address ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('company_address')}
                   />
@@ -1296,7 +1296,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="state" className="block text-sm font-medium text-foreground mb-1">
                     State {isFieldRequired('state') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1304,8 +1304,8 @@ const MemberEditProfile: React.FC = () => {
                     name="state"
                     value={formData.state}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.state ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.state ? 'border-red-500' : 'border-border'
                     }`}
                     disabled={isLoadingStates}
                     required={isFieldRequired('state')}
@@ -1319,7 +1319,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="district" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="district" className="block text-sm font-medium text-foreground mb-1">
                     District {isFieldRequired('district') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1327,8 +1327,8 @@ const MemberEditProfile: React.FC = () => {
                     name="district"
                     value={formData.district}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.district ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.district ? 'border-red-500' : 'border-border'
                     }`}
                     disabled={!formData.state || isLoadingDistricts}
                     required={isFieldRequired('district')}
@@ -1342,7 +1342,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="city" className="block text-sm font-medium text-foreground mb-1">
                     City {isFieldRequired('city') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1350,8 +1350,8 @@ const MemberEditProfile: React.FC = () => {
                     name="city"
                     value={formData.city}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.city ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.city ? 'border-red-500' : 'border-border'
                     }`}
                     disabled={!selectedDistrictId || isLoadingCities}
                     required={isFieldRequired('city')}
@@ -1367,7 +1367,7 @@ const MemberEditProfile: React.FC = () => {
 
                 {showOtherCity && (
                   <div>
-                    <label htmlFor="other_city_name" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="other_city_name" className="block text-sm font-medium text-foreground mb-1">
                       City Name {isFieldRequired('other_city_name') && <span className="text-red-500">*</span>}
                     </label>
                     <input
@@ -1376,8 +1376,8 @@ const MemberEditProfile: React.FC = () => {
                       name="other_city_name"
                       value={formData.other_city_name}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.other_city_name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.other_city_name ? 'border-red-500' : 'border-border'
                       }`}
                       placeholder="Enter city name"
                       required={isFieldRequired('other_city_name')}
@@ -1387,7 +1387,7 @@ const MemberEditProfile: React.FC = () => {
                 )}
 
                 <div>
-                  <label htmlFor="pin_code" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="pin_code" className="block text-sm font-medium text-foreground mb-1">
                     PIN Code {isFieldRequired('pin_code') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1396,8 +1396,8 @@ const MemberEditProfile: React.FC = () => {
                     name="pin_code"
                     value={formData.pin_code}
                     onChange={handleMobileChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.pin_code ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.pin_code ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('pin_code')}
                   />
@@ -1408,13 +1408,13 @@ const MemberEditProfile: React.FC = () => {
 
             {/* Section 3: Business Details */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-2 border-b border-gray-200">
-                <FileText className="w-5 h-5 text-blue-600" />
+              <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
+                <FileText className="w-5 h-5 text-primary" />
                 Business Details
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="industry" className="block text-sm font-medium text-foreground mb-1">
                     Industry {isFieldRequired('industry') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1422,8 +1422,8 @@ const MemberEditProfile: React.FC = () => {
                     name="industry"
                     value={formData.industry}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.industry ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.industry ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('industry')}
                   >
@@ -1436,7 +1436,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="activity_type" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="activity_type" className="block text-sm font-medium text-foreground mb-1">
                     Activity Type {isFieldRequired('activity_type') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1444,8 +1444,8 @@ const MemberEditProfile: React.FC = () => {
                     name="activity_type"
                     value={formData.activity_type}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.activity_type ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.activity_type ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('activity_type')}
                   >
@@ -1458,7 +1458,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="constitution" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="constitution" className="block text-sm font-medium text-foreground mb-1">
                     Industry Constitution {isFieldRequired('constitution') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1466,8 +1466,8 @@ const MemberEditProfile: React.FC = () => {
                     name="constitution"
                     value={formData.constitution}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.constitution ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.constitution ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('constitution')}
                   >
@@ -1480,7 +1480,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="annual_turnover" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="annual_turnover" className="block text-sm font-medium text-foreground mb-1">
                     Annual Turnover {isFieldRequired('annual_turnover') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1488,8 +1488,8 @@ const MemberEditProfile: React.FC = () => {
                     name="annual_turnover"
                     value={formData.annual_turnover}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.annual_turnover ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.annual_turnover ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('annual_turnover')}
                   >
@@ -1502,7 +1502,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="number_of_employees" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="number_of_employees" className="block text-sm font-medium text-foreground mb-1">
                     Number of Employees {isFieldRequired('number_of_employees') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1510,8 +1510,8 @@ const MemberEditProfile: React.FC = () => {
                     name="number_of_employees"
                     value={formData.number_of_employees}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.number_of_employees ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.number_of_employees ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('number_of_employees')}
                   >
@@ -1524,7 +1524,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label htmlFor="products_services" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="products_services" className="block text-sm font-medium text-foreground mb-1">
                     Products & Services {isFieldRequired('products_services') && <span className="text-red-500">*</span>}
                   </label>
                   <textarea
@@ -1533,8 +1533,8 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.products_services}
                     onChange={handleChange}
                     rows={3}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.products_services ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.products_services ? 'border-red-500' : 'border-border'
                     }`}
                     placeholder="Describe your products and services"
                     required={isFieldRequired('products_services')}
@@ -1543,7 +1543,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="brand_names" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="brand_names" className="block text-sm font-medium text-foreground mb-1">
                     Brand Names {isFieldRequired('brand_names') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1552,13 +1552,13 @@ const MemberEditProfile: React.FC = () => {
                     name="brand_names"
                     value={formData.brand_names}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     placeholder="Enter brand names"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="website" className="block text-sm font-medium text-foreground mb-1">
                     Website {isFieldRequired('website') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1567,8 +1567,8 @@ const MemberEditProfile: React.FC = () => {
                     name="website"
                     value={formData.website}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.website ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.website ? 'border-red-500' : 'border-border'
                     }`}
                     placeholder="https://example.com"
                   />
@@ -1579,13 +1579,13 @@ const MemberEditProfile: React.FC = () => {
 
             {/* Section 4: Registration Details */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-2 border-b border-gray-200">
-                <FileText className="w-5 h-5 text-blue-600" />
+              <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
+                <FileText className="w-5 h-5 text-primary" />
                 Registration Details
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="gst_registered" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="gst_registered" className="block text-sm font-medium text-foreground mb-1">
                     GST Registered {isFieldRequired('gst_registered') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1593,8 +1593,8 @@ const MemberEditProfile: React.FC = () => {
                     name="gst_registered"
                     value={formData.gst_registered}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.gst_registered ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.gst_registered ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('gst_registered')}
                   >
@@ -1607,7 +1607,7 @@ const MemberEditProfile: React.FC = () => {
 
                 {formData.gst_registered === 'yes' && (
                   <div>
-                    <label htmlFor="gst_number" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="gst_number" className="block text-sm font-medium text-foreground mb-1">
                       GST Number {isFieldRequired('gst_number') && <span className="text-red-500">*</span>}
                     </label>
                     <input
@@ -1616,8 +1616,8 @@ const MemberEditProfile: React.FC = () => {
                       name="gst_number"
                       value={formData.gst_number}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.gst_number ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.gst_number ? 'border-red-500' : 'border-border'
                       }`}
                       placeholder="22AAAAA0000A1Z5"
                       required={formData.gst_registered === 'yes'}
@@ -1627,7 +1627,7 @@ const MemberEditProfile: React.FC = () => {
                 )}
 
                 <div>
-                  <label htmlFor="pan_company" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="pan_company" className="block text-sm font-medium text-foreground mb-1">
                     PAN (Company) {isFieldRequired('pan_company') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1636,8 +1636,8 @@ const MemberEditProfile: React.FC = () => {
                     name="pan_company"
                     value={formData.pan_company}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.pan_company ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.pan_company ? 'border-red-500' : 'border-border'
                     }`}
                     placeholder="AAAAA0000A"
                     required={isFieldRequired('pan_company')}
@@ -1646,7 +1646,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="esic_registered" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="esic_registered" className="block text-sm font-medium text-foreground mb-1">
                     ESIC Registered {isFieldRequired('esic_registered') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1654,8 +1654,8 @@ const MemberEditProfile: React.FC = () => {
                     name="esic_registered"
                     value={formData.esic_registered}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.esic_registered ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.esic_registered ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('esic_registered')}
                   >
@@ -1667,7 +1667,7 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="epf_registered" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="epf_registered" className="block text-sm font-medium text-foreground mb-1">
                     EPF Registered {isFieldRequired('epf_registered') && <span className="text-red-500">*</span>}
                   </label>
                   <select
@@ -1675,8 +1675,8 @@ const MemberEditProfile: React.FC = () => {
                     name="epf_registered"
                     value={formData.epf_registered}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.epf_registered ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.epf_registered ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('epf_registered')}
                   >
@@ -1689,7 +1689,7 @@ const MemberEditProfile: React.FC = () => {
 
                 {/* Field 1: Member ID (Read-only) */}
                 <div>
-                  <label htmlFor="member_id" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="member_id" className="block text-sm font-medium text-foreground mb-1">
                     Member ID
                   </label>
                   <input
@@ -1699,13 +1699,13 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.member_id || ''}
                     disabled
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
 
                 {/* Field 2: Referred By (Editable) */}
                 <div>
-                  <label htmlFor="referred_by" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="referred_by" className="block text-sm font-medium text-foreground mb-1">
                     Referred By {isFieldRequired('referred_by') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1715,8 +1715,8 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.referred_by}
                     onChange={handleChange}
                     placeholder="Name of the person who referred you"
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.referred_by ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.referred_by ? 'border-red-500' : 'border-border'
                     }`}
                     required={isFieldRequired('referred_by')}
                   />
@@ -1725,7 +1725,7 @@ const MemberEditProfile: React.FC = () => {
 
                 {/* Field 3: Amount Paid (Read-only) */}
                 <div>
-                  <label htmlFor="amount_paid" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="amount_paid" className="block text-sm font-medium text-foreground mb-1">
                     Amount Paid
                   </label>
                   <input
@@ -1735,13 +1735,13 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.amount_paid || ''}
                     disabled
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
 
                 {/* Field 4: Payment Date (Read-only) */}
                 <div>
-                  <label htmlFor="payment_date" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="payment_date" className="block text-sm font-medium text-foreground mb-1">
                     Payment Date
                   </label>
                   <input
@@ -1751,13 +1751,13 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.payment_date || ''}
                     disabled
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
 
                 {/* Field 5: Payment Mode (Read-only) */}
                 <div>
-                  <label htmlFor="payment_mode" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="payment_mode" className="block text-sm font-medium text-foreground mb-1">
                     Payment Mode
                   </label>
                   <input
@@ -1767,13 +1767,13 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.payment_mode || ''}
                     disabled
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
 
                 {/* Field 6: Transaction ID / Reference (Read-only) */}
                 <div>
-                  <label htmlFor="transaction_id" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="transaction_id" className="block text-sm font-medium text-foreground mb-1">
                     Transaction ID / Reference
                   </label>
                   <input
@@ -1783,13 +1783,13 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.transaction_id || ''}
                     disabled
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
 
                 {/* Field 7: Bank Reference (Read-only) */}
                 <div>
-                  <label htmlFor="bank_reference" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="bank_reference" className="block text-sm font-medium text-foreground mb-1">
                     Bank Reference
                   </label>
                   <input
@@ -1799,7 +1799,7 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.bank_reference || ''}
                     disabled
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -1807,13 +1807,13 @@ const MemberEditProfile: React.FC = () => {
 
             {/* Section 5: Alternate Contact */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-2 border-b border-gray-200">
-                <Users className="w-5 h-5 text-blue-600" />
+              <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
+                <Users className="w-5 h-5 text-primary" />
                 Alternate Contact Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="alternate_contact_name" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="alternate_contact_name" className="block text-sm font-medium text-foreground mb-1">
                     Contact Name {isFieldRequired('alternate_contact_name') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1822,13 +1822,13 @@ const MemberEditProfile: React.FC = () => {
                     name="alternate_contact_name"
                     value={formData.alternate_contact_name}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     placeholder="Enter alternate contact name"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="alternate_mobile" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="alternate_mobile" className="block text-sm font-medium text-foreground mb-1">
                     Mobile Number {isFieldRequired('alternate_mobile') && <span className="text-red-500">*</span>}
                   </label>
                   <input
@@ -1837,8 +1837,8 @@ const MemberEditProfile: React.FC = () => {
                     name="alternate_mobile"
                     value={formData.alternate_mobile}
                     onChange={handleMobileChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.alternate_mobile ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.alternate_mobile ? 'border-red-500' : 'border-border'
                     }`}
                     placeholder="10 digit mobile number"
                   />
@@ -1848,10 +1848,10 @@ const MemberEditProfile: React.FC = () => {
             </div>
 
             {/* Form Actions */}
-            <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-4 pt-6 border-t border-border">
               <Link
                 to="/dashboard/profile"
-                className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-6 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </Link>
@@ -1861,8 +1861,8 @@ const MemberEditProfile: React.FC = () => {
                 disabled={isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
                   isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
                 {isSaving ? (
@@ -1883,7 +1883,7 @@ const MemberEditProfile: React.FC = () => {
                 disabled={isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
                   isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-emerald-600 text-white hover:bg-emerald-700'
                 }`}
               >

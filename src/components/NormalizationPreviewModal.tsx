@@ -45,23 +45,23 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center">
-            <AlertCircle className="w-6 h-6 text-blue-600 mr-3" />
+            <AlertCircle className="w-6 h-6 text-primary mr-3" />
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Review Normalized Data</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-xl font-bold text-foreground">Review Normalized Data</h2>
+              <p className="text-sm text-muted-foreground">
                 {changedFields.length === 0
                   ? 'No automatic corrections were made. You may still review and confirm.'
                   : `We've suggested ${changedFields.length} improvement(s). Please review:`}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -70,8 +70,8 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-4">
             {fieldsToCheck.map(field => (
-              <div key={field.key} className="border rounded-lg p-4 bg-gray-50">
-                <label className="block font-semibold text-gray-900 mb-3">
+              <div key={field.key} className="border border-border rounded-lg p-4 bg-muted/30">
+                <label className="block font-semibold text-foreground mb-3">
                   {field.label}
                 </label>
 
@@ -79,7 +79,7 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
 
                   {/* Original */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-2 flex items-center">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center">
                       <X className="w-4 h-4 text-red-500 mr-1" /> Original
                     </p>
                     <div className="bg-red-50 border border-red-200 rounded p-3 text-sm">
@@ -89,7 +89,7 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
 
                   {/* Normalized - Editable */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-2 flex items-center">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center">
                       <CheckCircle className="w-4 h-4 text-green-500 mr-1" />
                       Normalized (Editable)
                     </p>
@@ -110,22 +110,22 @@ const NormalizationPreviewModal: React.FC<NormalizationPreviewModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            className="px-6 py-2 border border-border rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors"
           >
             Close
           </button>
           <button
             onClick={onSubmitOriginal}
-            className="px-6 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+            className="px-6 py-2 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors"
           >
             Submit Original
           </button>
           <button
             onClick={() => onAcceptNormalized({ ...original, ...editedData })}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center"
           >
             <CheckCircle className="w-5 h-5 mr-2" />
             Accept Normalized

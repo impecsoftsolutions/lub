@@ -259,23 +259,23 @@ const Leadership: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="mb-12">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Leadership</h1>
-          <p className="text-xl text-gray-600">LUB Leadership committees and their members</p>
+          <h1 className="text-xl font-semibold text-foreground mb-4">Leadership</h1>
+          <p className="text-muted-foreground">LUB Leadership committees and their members</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Committee</h2>
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 space-y-6">
+          <h2 className="text-section font-semibold text-foreground mb-4">Select Committee</h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Committee Year <span className="text-red-500">*</span>
               </label>
               <select
                 value={committeeYear}
                 onChange={(e) => setCommitteeYear(e.target.value)}
                 disabled={isLoadingCommitteeYears || !!committeeYearsError || availableCommitteeYears.length === 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
               >
                 <option value="">Select Committee Year</option>
                 {availableCommitteeYears.map(year => (
@@ -283,23 +283,23 @@ const Leadership: React.FC = () => {
                 ))}
               </select>
               {committeeYearsError && (
-                <p className="mt-1 text-xs text-red-600">{committeeYearsError}</p>
+                <p className="mt-1 text-xs text-destructive">{committeeYearsError}</p>
               )}
               {!committeeYearsError && !isLoadingCommitteeYears && availableCommitteeYears.length === 0 && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   No committee years available yet. Please add member role assignments first.
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Level <span className="text-red-500">*</span>
               </label>
               <select
                 value={level}
                 onChange={(e) => setLevel(e.target.value as 'national' | 'state' | 'district')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
               >
                 <option value="">Select Level</option>
                 <option value="national">National</option>
@@ -310,18 +310,18 @@ const Leadership: React.FC = () => {
 
             {(level === 'state' || level === 'district') && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                   State <span className="text-red-500">*</span>
                 </label>
                 {isLoadingStates ? (
-                  <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                  <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                     Loading states...
                   </div>
                 ) : (
                   <select
                     value={stateName}
                     onChange={(e) => setStateName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select State</option>
                     {states.map((state) => (
@@ -336,18 +336,18 @@ const Leadership: React.FC = () => {
 
             {level === 'district' && stateName && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                   District <span className="text-red-500">*</span>
                 </label>
                 {isLoadingDistricts ? (
-                  <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                  <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                     Loading districts...
                   </div>
                 ) : (
                   <select
                     value={districtName}
                     onChange={(e) => setDistrictName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select District</option>
                     {districts.map((district) => (
@@ -364,7 +364,7 @@ const Leadership: React.FC = () => {
               <button
                 onClick={handleLoadCommittee}
                 disabled={isLoadButtonDisabled() || isLoadingAssignments}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {isLoadingAssignments ? (
                   <>
@@ -384,11 +384,11 @@ const Leadership: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-8 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="mb-8 bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-medium text-red-800">Error</h3>
-            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <h3 className="text-sm font-medium text-destructive">Error</h3>
+            <p className="text-sm text-destructive mt-1">{error}</p>
           </div>
         </div>
       )}
@@ -396,20 +396,20 @@ const Leadership: React.FC = () => {
       {hasLoaded && !isLoadingAssignments && (
         <div>
           {assignments.length === 0 ? (
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">No Active Assignments</h3>
-              <p className="text-gray-600">No active leadership assignments found for the selected committee.</p>
+            <div className="bg-muted/50 rounded-lg p-8 text-center">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-section font-semibold text-foreground mb-1">No Active Assignments</h3>
+              <p className="text-muted-foreground">No active leadership assignments found for the selected committee.</p>
             </div>
           ) : (
             <div>
               <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                  <MapPin className="w-8 h-8 text-blue-600" />
+                <h2 className="text-xl font-semibold text-foreground mb-2 flex items-center gap-3">
+                  <MapPin className="w-8 h-8 text-primary" />
                   {committeeName} – {committeeYear}
                 </h2>
                 {committeePeriod && (
-                  <p className="text-lg text-gray-600 ml-11">
+                  <p className="text-muted-foreground ml-11">
                     ({committeePeriod})
                   </p>
                 )}
@@ -417,8 +417,8 @@ const Leadership: React.FC = () => {
 
               <div className="space-y-8">
                 {groupedRoles.map((roleGroup) => (
-                  <div key={roleGroup.roleName} className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-200">
+                  <div key={roleGroup.roleName} className="bg-card rounded-lg shadow-sm border border-border p-6">
+                    <h3 className="text-section font-semibold text-foreground mb-4 pb-3 border-b border-border">
                       {roleGroup.roleName}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -429,7 +429,7 @@ const Leadership: React.FC = () => {
                         return (
                           <div
                             key={idx}
-                            className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                            className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
                           >
                             <div className="flex-shrink-0">
                               {member.member_profile_photo_url ? (
@@ -439,27 +439,27 @@ const Leadership: React.FC = () => {
                                   className="w-16 h-16 rounded-lg object-cover"
                                 />
                               ) : (
-                                <div className="w-16 h-16 rounded-lg bg-blue-100 flex items-center justify-center">
-                                  <User className="w-8 h-8 text-blue-600" />
+                                <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                                  <User className="w-8 h-8 text-primary" />
                                 </div>
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-gray-900 text-base mb-1 truncate">
+                              <h4 className="font-semibold text-foreground text-base mb-1 truncate">
                                 {displayName}
                               </h4>
-                              <p className="text-sm text-gray-600 mb-1">
+                              <p className="text-sm text-muted-foreground mb-1">
                                 {roleGroup.roleName}
                               </p>
                               {district && (
-                                <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
                                   <MapPin className="w-3 h-3" />
                                   {district}
                                 </p>
                               )}
                               <a
                                 href={`tel:${member.member_mobile_number}`}
-                                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
                               >
                                 <Phone className="w-4 h-4" />
                                 <span>{member.member_mobile_number}</span>

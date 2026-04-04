@@ -134,10 +134,10 @@ const MemberDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -145,14 +145,14 @@ const MemberDashboard: React.FC = () => {
 
   if (!member) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-900 font-medium mb-2">Unable to load your profile</p>
-          <p className="text-gray-600 mb-4">Please try again or contact support</p>
+          <p className="text-foreground font-medium mb-2">Unable to load your profile</p>
+          <p className="text-muted-foreground mb-4">Please try again or contact support</p>
           <button
             onClick={handleSignOut}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
             Back to Login
           </button>
@@ -240,7 +240,7 @@ const MemberDashboard: React.FC = () => {
           actions={
             <button
               onClick={refreshMember}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
@@ -248,13 +248,13 @@ const MemberDashboard: React.FC = () => {
           }
         />
 
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-5">
+          <div className="bg-card rounded-lg border border-border shadow-sm p-5">
+            <h2 className="text-section font-semibold text-foreground mb-5">
               {checkingRegistration || registrationLookupError || hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
             </h2>
 
             {checkingRegistration ? (
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+              <div className="p-4 bg-muted/50 border border-border rounded-lg text-sm text-muted-foreground">
                 Checking registration status...
               </div>
             ) : registrationLookupError ? (
@@ -278,18 +278,18 @@ const MemberDashboard: React.FC = () => {
                 </div>
 
                 {statusInfo && (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
                     <div className="flex-shrink-0">{statusInfo.icon}</div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">{statusInfo.title}</h3>
-                      <p className="text-gray-600 mb-3">{statusInfo.description}</p>
+                      <h3 className="text-section font-medium text-foreground mb-2">{statusInfo.title}</h3>
+                      <p className="text-muted-foreground mb-3">{statusInfo.description}</p>
                       {statusInfo.approvalDate && (
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           Approved on: {formatDate(statusInfo.approvalDate)}
                         </p>
                       )}
                       {member.reapplication_count > 0 && (
-                        <p className="text-sm text-gray-500 mt-2">
+                        <p className="text-sm text-muted-foreground mt-2">
                           Application attempts: {member.reapplication_count + 1}
                         </p>
                       )}
@@ -301,7 +301,7 @@ const MemberDashboard: React.FC = () => {
                   <div className="mt-6">
                     <Link
                       to="/dashboard/edit"
-                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       <RefreshCw className="w-5 h-5 mr-2" />
                       Edit Profile
@@ -311,56 +311,56 @@ const MemberDashboard: React.FC = () => {
               </>
             ) : hasRegistrationRecord === false ? (
               <div className="space-y-6">
-                <p className="text-gray-600 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Complete these two simple steps to become a LUB member:
                 </p>
 
-                <div className="flex items-start gap-4 p-5 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                <div className="flex items-start gap-4 p-5 border-2 border-border rounded-lg hover:border-primary/40 transition-colors">
                   <div className="flex-shrink-0 mt-1">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100">
-                      <span className="text-blue-600 font-semibold">1</span>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
+                      <span className="text-primary font-semibold">1</span>
                     </div>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-section font-semibold text-foreground mb-2">
                       Step 1: View Payment Details
                     </h3>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-muted-foreground mb-4">
                       Review the membership fee and payment methods available.
                     </p>
                     <Link
                       to="/payment"
-                      className="inline-flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      className="inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
                     >
                       View Payment Details
                     </Link>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4 p-5 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                <div className="flex items-start gap-4 p-5 border-2 border-border rounded-lg hover:border-primary/40 transition-colors">
                   <div className="flex-shrink-0 mt-1">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100">
-                      <span className="text-blue-600 font-semibold">2</span>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
+                      <span className="text-primary font-semibold">2</span>
                     </div>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-section font-semibold text-foreground mb-2">
                       Step 2: Submit Registration Form
                     </h3>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-muted-foreground mb-4">
                       Fill out your complete business details and submit supporting documents along with payment proof.
                     </p>
                     <Link
                       to="/join"
-                      className="inline-flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      className="inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
                     >
                       Complete Registration
                     </Link>
                   </div>
                 </div>
 
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
+                <div className="mt-4 p-4 bg-primary/5 border border-border rounded-lg">
+                  <p className="text-sm text-foreground">
                     <strong>Note:</strong> Make your payment first, then submit the registration form with payment proof.
                   </p>
                 </div>
@@ -368,33 +368,33 @@ const MemberDashboard: React.FC = () => {
             ) : null}
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Your Information</h2>
+          <div className="bg-card rounded-lg border border-border shadow-sm p-5">
+            <h2 className="text-section font-semibold text-foreground mb-4">Your Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium text-gray-900">{member.email}</p>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium text-foreground">{member.email}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Mobile Number</p>
-                <p className="font-medium text-gray-900">{member.mobile_number}</p>
+                <p className="text-sm text-muted-foreground">Mobile Number</p>
+                <p className="font-medium text-foreground">{member.mobile_number}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Company</p>
-                <p className="font-medium text-gray-900">{companyName}</p>
+                <p className="text-sm text-muted-foreground">Company</p>
+                <p className="font-medium text-foreground">{companyName}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Member Since</p>
-                <p className="font-medium text-gray-900">{formatDate(member.created_at)}</p>
+                <p className="text-sm text-muted-foreground">Member Since</p>
+                <p className="font-medium text-foreground">{formatDate(member.created_at)}</p>
               </div>
             </div>
           </div>
 
           {member.member_id && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Member ID</p>
-              <p className="text-2xl font-semibold text-gray-900">{member.member_id}</p>
-              <p className="text-xs text-gray-400 mt-1">Your unique member identifier</p>
+            <div className="bg-card rounded-lg border border-border shadow-sm p-5">
+              <p className="text-label font-medium text-muted-foreground uppercase tracking-wider mb-1">Member ID</p>
+              <p className="text-2xl font-semibold text-foreground">{member.member_id}</p>
+              <p className="text-xs text-muted-foreground mt-1">Your unique member identifier</p>
             </div>
           )}
       </div>

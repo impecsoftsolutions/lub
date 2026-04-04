@@ -24,7 +24,7 @@ const AdminDashboardOverview: React.FC = () => {
         <div className="min-h-screen bg-muted flex items-center justify-center">
           <div className="text-center">
             <Lock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
             <p className="text-muted-foreground">You don't have permission to view the dashboard.</p>
           </div>
         </div>
@@ -70,8 +70,8 @@ const AdminDashboardOverview: React.FC = () => {
           title="Total Approved Members"
           value={metrics?.approvedMembers ?? '--'}
           icon={Users}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-50"
+          iconColor="text-primary"
+          iconBg="bg-primary/10"
           isLoading={isLoading}
           onClick={() => navigate('/admin/registrations')}
           delay={0}

@@ -1,12 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme-preset="ocean-breeze">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LUB MSME Support Website</title>
+    <!-- Restore persisted theme and dark mode before first paint to avoid flash -->
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('lub_theme_preset');
+          var mode = localStorage.getItem('lub_color_mode');
+          if (theme !== null) {
+            document.documentElement.setAttribute('data-theme-preset', theme);
+          }
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (mode === 'dark' || (mode === 'system' && prefersDark)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body data-theme-preset="ocean-breeze">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

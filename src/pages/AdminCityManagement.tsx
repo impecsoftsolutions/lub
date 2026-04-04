@@ -257,11 +257,11 @@ export default function AdminCityManagement() {
     <PermissionGate
       permission="locations.cities.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center justify-center p-8">
           <div className="text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view city management.</p>
+            <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view city management.</p>
           </div>
         </div>
       }
@@ -274,7 +274,7 @@ export default function AdminCityManagement() {
           actions={canManageCities ? (
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add City
@@ -282,26 +282,26 @@ export default function AdminCityManagement() {
           ) : undefined}
         />
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Search Cities
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search by city name..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-border bg-background rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Status
               </label>
               <select
@@ -309,7 +309,7 @@ export default function AdminCityManagement() {
                 onChange={(e) =>
                   setStatusFilter(e.target.value as 'all' | 'approved' | 'pending' | 'rejected')
                 }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border bg-background rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary"
               >
                 <option value="all">All Status</option>
                 <option value="approved">Approved</option>
@@ -319,13 +319,13 @@ export default function AdminCityManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 District
               </label>
               <select
                 value={districtFilter}
                 onChange={(e) => setDistrictFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border bg-background rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary"
               >
                 <option value="">All Districts</option>
                 {districts.map(district => (
@@ -340,57 +340,57 @@ export default function AdminCityManagement() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Loading cities...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="mt-2 text-muted-foreground">Loading cities...</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       City Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       District
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       State
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Source
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {filteredCities.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                         No cities found
                       </td>
                     </tr>
                   ) : (
                     filteredCities.map((city) => (
-                      <tr key={city.id} className="hover:bg-gray-50">
+                      <tr key={city.id} className="hover:bg-muted/50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-sm font-medium text-gray-900">
+                            <MapPin className="w-4 h-4 text-muted-foreground mr-2" />
+                            <span className="text-sm font-medium text-foreground">
                               {city.city_name}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {city.district?.district_name || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {city.state?.state_name || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -404,7 +404,7 @@ export default function AdminCityManagement() {
                             {city.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {city.submission_source.replace('_', ' ')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -416,7 +416,7 @@ export default function AdminCityManagement() {
                                     setEditingCity(city);
                                     setShowEditModal(true);
                                   }}
-                                  className="text-blue-600 hover:text-blue-900"
+                                  className="text-primary hover:text-primary/80"
                                   title="Edit"
                                 >
                                   <Edit2 className="w-4 h-4" />
@@ -439,8 +439,8 @@ export default function AdminCityManagement() {
               </table>
             </div>
 
-            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
+            <div className="bg-muted/50 px-6 py-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
                 Showing {filteredCities.length} of {cities.length} cities
               </p>
             </div>
@@ -448,32 +448,32 @@ export default function AdminCityManagement() {
         )}
 
         {showAddModal && canManageCities && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Add New City</h3>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-border">
+                <h3 className="text-section font-semibold text-foreground">Add New City</h3>
               </div>
               <div className="px-6 py-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     City Name *
                   </label>
                   <input
                     type="text"
                     value={newCity.city_name}
                     onChange={(e) => setNewCity({ ...newCity, city_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     placeholder="Enter city name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     State *
                   </label>
                   <select
                     value={newCity.state_id}
                     onChange={(e) => setNewCity({ ...newCity, state_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select State</option>
                     {states.map(state => (
@@ -484,13 +484,13 @@ export default function AdminCityManagement() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     District *
                   </label>
                   <select
                     value={newCity.district_id}
                     onChange={(e) => setNewCity({ ...newCity, district_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select District</option>
                     {districts.map(district => (
@@ -501,31 +501,31 @@ export default function AdminCityManagement() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Notes
                   </label>
                   <textarea
                     value={newCity.notes}
                     onChange={(e) => setNewCity({ ...newCity, notes: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     placeholder="Optional notes"
                   />
                 </div>
               </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
+              <div className="px-6 py-4 bg-muted/50 border-t border-border flex justify-end gap-3 rounded-b-lg">
                 <button
                   onClick={() => {
                     setShowAddModal(false);
                     setNewCity({ city_name: '', district_id: '', state_id: '', notes: '' });
                   }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-foreground bg-card border border-border rounded-lg hover:bg-muted/50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddCity}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                 >
                   Add City
                 </button>
@@ -535,31 +535,31 @@ export default function AdminCityManagement() {
         )}
 
         {showEditModal && editingCity && canManageCities && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Edit City</h3>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-border">
+                <h3 className="text-section font-semibold text-foreground">Edit City</h3>
               </div>
               <div className="px-6 py-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     City Name *
                   </label>
                   <input
                     type="text"
                     value={editingCity.city_name}
                     onChange={(e) => setEditingCity({ ...editingCity, city_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     State *
                   </label>
                   <select
                     value={editingCity.state_id}
                     onChange={(e) => setEditingCity({ ...editingCity, state_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     {states.map(state => (
                       <option key={state.id} value={state.id}>
@@ -569,13 +569,13 @@ export default function AdminCityManagement() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     District *
                   </label>
                   <select
                     value={editingCity.district_id}
                     onChange={(e) => setEditingCity({ ...editingCity, district_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     {districts.map(district => (
                       <option key={district.id} value={district.id}>
@@ -585,30 +585,30 @@ export default function AdminCityManagement() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Notes
                   </label>
                   <textarea
                     value={editingCity.notes || ''}
                     onChange={(e) => setEditingCity({ ...editingCity, notes: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   />
                 </div>
               </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
+              <div className="px-6 py-4 bg-muted/50 border-t border-border flex justify-end gap-3 rounded-b-lg">
                 <button
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingCity(null);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-foreground bg-card border border-border rounded-lg hover:bg-muted/50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdateCity}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                 >
                   Update City
                 </button>

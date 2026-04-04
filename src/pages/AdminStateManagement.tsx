@@ -125,11 +125,11 @@ const AdminStateManagement: React.FC = () => {
     <PermissionGate
       permission="locations.states.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-muted/50 flex items-center justify-center">
           <div className="text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view state management.</p>
+            <Lock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view state management.</p>
           </div>
         </div>
       }
@@ -149,7 +149,7 @@ const AdminStateManagement: React.FC = () => {
           actions={canManageStates ? (
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add State
@@ -157,32 +157,32 @@ const AdminStateManagement: React.FC = () => {
           ) : undefined}
         />
         {/* Search */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search states..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-border bg-background rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary"
             />
           </div>
         </div>
 
         {/* States Table */}
         {isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading states...</p>
+          <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading states...</p>
           </div>
         ) : filteredStates.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+            <MapPin className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+            <h3 className="text-sm font-medium text-foreground mb-2">
               {searchTerm ? 'No states found' : 'No states yet'}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-muted-foreground mb-4">
               {searchTerm 
                 ? 'Try adjusting your search criteria'
                 : 'Click "Add State" to start managing states'
@@ -191,7 +191,7 @@ const AdminStateManagement: React.FC = () => {
             {!searchTerm && canManageStates && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add State
@@ -199,35 +199,35 @@ const AdminStateManagement: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       State Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Created
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Updated
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {filteredStates.map((state) => (
-                    <tr key={state.id} className="hover:bg-gray-50">
+                    <tr key={state.id} className="hover:bg-muted/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="font-medium text-gray-900">{state.state_name}</span>
+                          <MapPin className="w-4 h-4 text-muted-foreground mr-2" />
+                          <span className="text-sm font-medium text-foreground">{state.state_name}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -237,7 +237,7 @@ const AdminStateManagement: React.FC = () => {
                             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                               state.is_active
                                 ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
                             }`}
                           >
                             {state.is_active ? (
@@ -256,7 +256,7 @@ const AdminStateManagement: React.FC = () => {
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                             state.is_active
                               ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
+                              : 'bg-muted text-muted-foreground'
                           }`}>
                             {state.is_active ? (
                               <>
@@ -272,16 +272,16 @@ const AdminStateManagement: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(state.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(state.updated_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <Link
                           to={`/admin/locations/states/${encodeURIComponent(state.state_name)}/locations`}
-                          className="inline-flex items-center px-3 py-1 text-sm font-medium text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
+                          className="inline-flex items-center px-3 py-1 text-sm font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
                         >
                           <MapPin className="w-3 h-3 mr-1" />
                           Manage Locations
@@ -298,13 +298,13 @@ const AdminStateManagement: React.FC = () => {
 
       {/* Add State Modal */}
       {showAddModal && canManageStates && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add New State</h3>
+              <h3 className="text-section font-semibold text-foreground">Add New State</h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -312,7 +312,7 @@ const AdminStateManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   State Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -320,7 +320,7 @@ const AdminStateManagement: React.FC = () => {
                   value={newStateName}
                   onChange={(e) => setNewStateName(e.target.value)}
                   placeholder="Enter state name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {newStateName.trim().length > 0 && newStateName.trim().length < 3 && (
                   <p className="text-red-500 text-sm mt-1">State name must be at least 3 characters long</p>
@@ -333,9 +333,9 @@ const AdminStateManagement: React.FC = () => {
                   id="newIsActive"
                   checked={newIsActive}
                   onChange={(e) => setNewIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="newIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="newIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active state
                 </label>
               </div>
@@ -344,14 +344,14 @@ const AdminStateManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddState}
                 disabled={isSaving || !newStateName.trim() || newStateName.trim().length < 3}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSaving ? 'Adding...' : 'Add State'}
               </button>

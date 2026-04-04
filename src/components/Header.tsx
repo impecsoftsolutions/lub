@@ -141,7 +141,7 @@ const Header: React.FC = () => {
   const shouldShowJoinOptions = !isAnyUserAuthenticated || (isMemberAuthenticated && !isMemberApproved);
 
   return (
-    <header className="bg-white border-b-2 border-blue-100 sticky top-0 z-50 shadow-sm">
+    <header className="bg-card border-b-2 border-border sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center space-x-3">
@@ -152,7 +152,7 @@ const Header: React.FC = () => {
                 className="w-10 h-10 object-contain rounded-lg"
               />
             ) : (
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">L</span>
               </div>
             )}
@@ -164,10 +164,10 @@ const Header: React.FC = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`text-sm font-medium transition-colors duration-200 hover:text-blue-600 ${
+                className={`text-sm font-medium transition-colors duration-200 hover:text-primary ${
                   isActiveLink(link.path)
-                    ? 'text-blue-600 border-b-2 border-blue-600 pb-1'
-                    : 'text-gray-700'
+                    ? 'text-primary border-b-2 border-primary pb-1'
+                    : 'text-foreground'
                 }`}
               >
                 {link.label}
@@ -180,21 +180,21 @@ const Header: React.FC = () => {
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
               >
-                <button className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors duration-200 flex items-center gap-1">
+                <button className="text-sm font-medium text-foreground hover:text-primary transition-colors duration-200 flex items-center gap-1">
                   Join
                   <ChevronDown className="w-4 h-4" />
                 </button>
                 {isJoinDropdownOpen && (
-                  <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <div className="absolute left-0 mt-2 w-48 bg-card rounded-lg shadow-lg border border-border py-2 z-50">
                     <Link
                       to="/membership-benefits"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
                     >
                       Membership Benefits
                     </Link>
                     <Link
                       to="/signup"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
                     >
                       Register
                     </Link>
@@ -210,8 +210,8 @@ const Header: React.FC = () => {
                 to="/dashboard"
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
                   isActiveLink('/dashboard')
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-foreground hover:bg-muted'
                 }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -223,7 +223,7 @@ const Header: React.FC = () => {
               <div className="relative" ref={userDropdownRef}>
                 <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors"
                 >
                   {member.profile_photo_url ? (
                     <img
@@ -239,23 +239,23 @@ const Header: React.FC = () => {
                       {getInitials(member.full_name)}
                     </div>
                   )}
-                  <span className="text-sm font-medium text-gray-900 max-w-[120px] truncate">
+                  <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
                     {getFirstName(member.full_name)}
                   </span>
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </button>
 
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="text-sm font-semibold text-gray-900">{member.full_name}</p>
-                      <p className="text-xs text-gray-500 truncate">{member.email}</p>
+                  <div className="absolute right-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border py-2 z-50">
+                    <div className="px-4 py-3 border-b border-border">
+                      <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                     </div>
 
                     <Link
                       to="/dashboard/profile"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
                     >
                       <User className="w-4 h-4" />
                       My Profile
@@ -264,7 +264,7 @@ const Header: React.FC = () => {
                     <Link
                       to="/dashboard/settings"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
                     >
                       <Key className="w-4 h-4" />
                       Settings
@@ -276,7 +276,7 @@ const Header: React.FC = () => {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => setIsUserDropdownOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
                       >
                         <Shield className="w-4 h-4" />
                         Admin Panel
@@ -286,7 +286,7 @@ const Header: React.FC = () => {
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <LogOut className="w-4 h-4" />
                       {isLoggingOut ? 'Logging out...' : 'Logout'}
@@ -297,7 +297,7 @@ const Header: React.FC = () => {
             ) : (
               <Link
                 to="/signin"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
               >
                 Sign In
               </Link>
@@ -306,14 +306,14 @@ const Header: React.FC = () => {
 
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 py-4">
+          <div className="md:hidden border-t border-border py-4">
             <div className="flex flex-col space-y-3">
               {navLinks.map((link) => (
                 <Link
@@ -322,8 +322,8 @@ const Header: React.FC = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`px-3 py-2 text-base font-medium transition-colors duration-200 ${
                     isActiveLink(link.path)
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-700 hover:text-blue-600'
+                      ? 'text-primary bg-primary/10'
+                      : 'text-foreground hover:text-primary'
                   }`}
                 >
                   {link.label}
@@ -336,7 +336,7 @@ const Header: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="px-3 py-2 text-base font-medium transition-colors duration-200 flex items-center gap-2 text-gray-700 hover:text-blue-600"
+                  className="px-3 py-2 text-base font-medium transition-colors duration-200 flex items-center gap-2 text-foreground hover:text-primary"
                 >
                   <Shield className="w-4 h-4" />
                   Admin Panel
@@ -349,8 +349,8 @@ const Header: React.FC = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`px-3 py-2 text-base font-medium transition-colors duration-200 flex items-center gap-2 ${
                     isActiveLink('/dashboard')
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-700 hover:text-blue-600'
+                      ? 'text-primary bg-primary/10'
+                      : 'text-foreground hover:text-primary'
                   }`}
                 >
                   <LayoutDashboard className="w-4 h-4" />
@@ -360,7 +360,7 @@ const Header: React.FC = () => {
 
               {shouldShowJoinOptions && (
                 <>
-                  <div className="px-3 py-2 text-base font-medium text-gray-900 border-t border-gray-200 mt-2 pt-4">
+                  <div className="px-3 py-2 text-base font-medium text-foreground border-t border-border mt-2 pt-4">
                     Join
                   </div>
                   <Link
@@ -368,8 +368,8 @@ const Header: React.FC = () => {
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`px-6 py-2 text-base font-medium transition-colors duration-200 ${
                       isActiveLink('/membership-benefits')
-                        ? 'text-blue-600 bg-blue-50'
-                        : 'text-gray-700 hover:text-blue-600'
+                        ? 'text-primary bg-primary/10'
+                        : 'text-foreground hover:text-primary'
                     }`}
                   >
                     Membership Benefits
@@ -379,8 +379,8 @@ const Header: React.FC = () => {
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`px-6 py-2 text-base font-medium transition-colors duration-200 ${
                       isActiveLink('/signup')
-                        ? 'text-blue-600 bg-blue-50'
-                        : 'text-gray-700 hover:text-blue-600'
+                        ? 'text-primary bg-primary/10'
+                        : 'text-foreground hover:text-primary'
                     }`}
                   >
                     Register
@@ -388,10 +388,10 @@ const Header: React.FC = () => {
                 </>
               )}
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+              <div className="flex items-center justify-between pt-3 border-t border-border">
                 {isAnyUserAuthenticated && member ? (
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
                       {member.profile_photo_url ? (
                         <img
                           src={member.profile_photo_url}
@@ -407,14 +407,14 @@ const Header: React.FC = () => {
                         </div>
                       )}
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">{member.full_name}</p>
-                        <p className="text-xs text-gray-500 truncate">{member.email}</p>
+                        <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                       </div>
                     </div>
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <LogOut className="w-4 h-4" />
                       {isLoggingOut ? 'Logging out...' : 'Logout'}
@@ -424,7 +424,7 @@ const Header: React.FC = () => {
                   <Link
                     to="/signin"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
                   >
                     Sign In
                   </Link>

@@ -103,10 +103,10 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-gray-50 border-t border-gray-200">
+      <div className="p-6 bg-muted/50 border-t border-border">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading details...</span>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <span className="ml-3 text-muted-foreground">Loading details...</span>
         </div>
       </div>
     );
@@ -140,12 +140,12 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
   };
 
   return (
-    <div className="bg-gray-50 border-t border-gray-200 animate-slideDown">
+    <div className="bg-muted/30 border-t border-border animate-slideDown">
       <div className="p-6 space-y-6">
         {/* Profile Photo */}
         {isFieldVisible('profile_photo') && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+          <div className="bg-card rounded-lg p-4 border border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
               <User className="w-4 h-4 mr-2 text-blue-600" />
               Profile Photo
             </h3>
@@ -155,15 +155,15 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
                   <img
                     src={member.profile_photo_url}
                     alt={`${member.full_name} profile`}
-                    className="w-24 h-32 object-cover rounded-lg border-2 border-gray-200"
+                    className="w-24 h-32 object-cover rounded-lg border-2 border-border"
                   />
                   <div className="flex-1">
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       Member profile photo
                     </p>
                     <button
                       onClick={handleDownloadPhoto}
-                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
                     >
                       <Download className="w-4 h-4 mr-1" />
                       Download Photo
@@ -172,17 +172,17 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
                 </>
               ) : (
                 <div className="flex items-start gap-4">
-                  <div className="w-24 h-32 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+                  <div className="w-24 h-32 bg-gradient-to-br from-muted to-muted/60 rounded-lg border-2 border-border flex items-center justify-center">
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2 mx-auto">
-                        <span className="text-2xl font-bold text-gray-400">
+                      <div className="w-16 h-16 bg-card rounded-full flex items-center justify-center mb-2 mx-auto">
+                        <span className="text-2xl font-bold text-muted-foreground">
                           {getInitials(member.full_name)}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       No profile photo available
                     </p>
                   </div>
@@ -195,15 +195,15 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
         {/* Products & Services - Always visible if setting allows */}
         {isFieldVisible('products_services') && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-              <Briefcase className="w-4 h-4 mr-2 text-blue-600" />
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+              <Briefcase className="w-4 h-4 mr-2 text-primary" />
               Products & Services
             </h3>
             <div className="flex flex-wrap gap-2">
               {formatProductsServices(member.products_services).map((product, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
                 >
                   {product}
                 </span>
@@ -215,20 +215,20 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
         {/* Contact Information Section */}
         {(isFieldVisible('phone_number') || isFieldVisible('email') || isFieldVisible('website')) && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-              <Phone className="w-4 h-4 mr-2 text-blue-600" />
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+              <Phone className="w-4 h-4 mr-2 text-primary" />
               Contact Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {isFieldVisible('phone_number') && (
                 <div className="flex items-center">
-                  <Phone className="w-4 h-4 text-gray-400 mr-3" />
+                  <Phone className="w-4 h-4 text-muted-foreground mr-3" />
                   <div>
-                    <p className="text-xs font-medium text-gray-500">Mobile Number</p>
+                    <p className="text-xs font-medium text-muted-foreground">Mobile Number</p>
                     <a
                       href={`tel:+91${member.mobile_number}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-sm text-gray-900 hover:text-blue-600"
+                      className="text-sm text-foreground hover:text-primary"
                     >
                       +91 {member.mobile_number}
                     </a>
@@ -237,13 +237,13 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
               )}
               {isFieldVisible('email') && (
                 <div className="flex items-center">
-                  <Mail className="w-4 h-4 text-gray-400 mr-3" />
+                  <Mail className="w-4 h-4 text-muted-foreground mr-3" />
                   <div>
-                    <p className="text-xs font-medium text-gray-500">Email</p>
+                    <p className="text-xs font-medium text-muted-foreground">Email</p>
                     <a
                       href={`mailto:${member.email}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-sm text-gray-900 hover:text-blue-600 truncate"
+                      className="text-sm text-foreground hover:text-primary truncate"
                     >
                       {member.email}
                     </a>
@@ -253,15 +253,15 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
             </div>
             {isFieldVisible('website') && member.website && (
               <div className="flex items-center mt-4">
-                <Globe className="w-4 h-4 text-gray-400 mr-3" />
+                <Globe className="w-4 h-4 text-muted-foreground mr-3" />
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Website</p>
+                  <p className="text-xs font-medium text-muted-foreground">Website</p>
                   <a
                     href={member.website.startsWith('http') ? member.website : `https://${member.website}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                    className="text-sm text-primary hover:text-primary/80 flex items-center"
                   >
                     {member.website}
                     <ExternalLink className="w-3 h-3 ml-1" />
@@ -275,36 +275,36 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
         {/* Location Information */}
         {(isFieldVisible('full_address') || isFieldVisible('city') || isFieldVisible('district') || isFieldVisible('state')) && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-              <MapPin className="w-4 h-4 mr-2 text-blue-600" />
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+              <MapPin className="w-4 h-4 mr-2 text-primary" />
               Location
             </h3>
             {isFieldVisible('full_address') && (
               <div className="flex items-start mb-3">
-                <Building2 className="w-4 h-4 text-gray-400 mr-3 mt-0.5" />
+                <Building2 className="w-4 h-4 text-muted-foreground mr-3 mt-0.5" />
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Company Address</p>
-                  <p className="text-sm text-gray-900">{member.company_address}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Company Address</p>
+                  <p className="text-sm text-foreground">{member.company_address}</p>
                 </div>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {isFieldVisible('city') && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">City/Town</p>
-                  <p className="text-sm text-gray-900">{formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}</p>
+                  <p className="text-xs font-medium text-muted-foreground">City/Town</p>
+                  <p className="text-sm text-foreground">{formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}</p>
                 </div>
               )}
               {isFieldVisible('district') && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">District</p>
-                  <p className="text-sm text-gray-900">{member.district}</p>
+                  <p className="text-xs font-medium text-muted-foreground">District</p>
+                  <p className="text-sm text-foreground">{member.district}</p>
                 </div>
               )}
               {isFieldVisible('state') && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">State</p>
-                  <p className="text-sm text-gray-900">{member.state}</p>
+                  <p className="text-xs font-medium text-muted-foreground">State</p>
+                  <p className="text-sm text-foreground">{member.state}</p>
                 </div>
               )}
             </div>
@@ -314,21 +314,21 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
         {/* Business Information */}
         {(isFieldVisible('designation') || (isFieldVisible('member_id') && member.member_id)) && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-              <Briefcase className="w-4 h-4 mr-2 text-blue-600" />
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+              <Briefcase className="w-4 h-4 mr-2 text-primary" />
               Business Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {isFieldVisible('designation') && member.company_designations && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Designation</p>
-                  <p className="text-sm text-gray-900">{member.company_designations.designation_name}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Designation</p>
+                  <p className="text-sm text-foreground">{member.company_designations.designation_name}</p>
                 </div>
               )}
               {isFieldVisible('member_id') && member.member_id && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Member ID</p>
-                  <p className="text-sm text-gray-900 font-mono">{member.member_id}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Member ID</p>
+                  <p className="text-sm text-foreground font-mono">{member.member_id}</p>
                 </div>
               )}
             </div>
@@ -339,8 +339,8 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
         {(isFieldVisible('gst_number') || isFieldVisible('udyam_number')) &&
          (member.gst_certificate_url || member.udyam_certificate_url) && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-              <FileText className="w-4 h-4 mr-2 text-blue-600" />
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+              <FileText className="w-4 h-4 mr-2 text-primary" />
               Certificates
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -350,7 +350,7 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors border border-blue-200"
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-full hover:bg-primary/20 transition-colors border border-primary/20"
                 >
                   <FileText className="w-3 h-3 mr-1" />
                   GST Certificate
@@ -375,7 +375,7 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
         {/* Admin-Only Documents */}
         {userRole.isAdmin && member.payment_proof_url && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
               <FileText className="w-4 h-4 mr-2 text-red-600" />
               Admin Only - Payment Documents
             </h3>
@@ -396,8 +396,8 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
 
         {/* Member Since */}
         {isFieldVisible('member_since') && (
-          <div className="pt-4 border-t border-gray-200 text-center">
-            <div className="flex items-center justify-center text-xs text-gray-500">
+          <div className="pt-4 border-t border-border text-center">
+            <div className="flex items-center justify-center text-xs text-muted-foreground">
               <Calendar className="w-3 h-3 mr-1" />
               Member since {formatMemberSince(member.created_at)}
             </div>

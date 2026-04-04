@@ -54,9 +54,9 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
   const getAccountTypeBadge = () => {
     const colors = {
       admin: 'bg-red-100 text-red-800',
-      member: 'bg-blue-100 text-blue-800',
+      member: 'bg-primary/10 text-primary',
       both: 'bg-purple-100 text-purple-800',
-      general_user: 'bg-gray-100 text-gray-800'
+      general_user: 'bg-muted text-muted-foreground'
     };
 
     const labels = {
@@ -145,15 +145,15 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          className="fixed inset-0 transition-opacity bg-black/50"
           onClick={handleClose}
         />
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
 
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className={`flex items-center justify-center w-10 h-10 ${iconColor} rounded-full`}>
@@ -164,13 +164,13 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
                   )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{getTitle()}</h3>
+                  <h3 className="text-section font-semibold text-foreground">{getTitle()}</h3>
                 </div>
               </div>
               <button
                 onClick={handleClose}
                 disabled={isProcessing}
-                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -198,12 +198,12 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
 
             <div className="mb-4 space-y-3">
               <div className="flex items-center gap-2 text-sm">
-                <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-600 font-medium">Email:</span>
-                <span className="text-gray-900">{user.email}</span>
+                <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground font-medium">Email:</span>
+                <span className="text-foreground">{user.email}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-600 font-medium">Account Type:</span>
+                <span className="text-muted-foreground font-medium">Account Type:</span>
                 {getAccountTypeBadge()}
               </div>
             </div>
@@ -227,7 +227,7 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
             <button
               onClick={handleConfirm}
               disabled={isProcessing || success}
@@ -254,7 +254,7 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
               type="button"
               onClick={handleClose}
               disabled={isProcessing}
-              className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-3 w-full inline-flex justify-center rounded-lg border border-border shadow-sm px-4 py-2 bg-card text-base font-medium text-foreground hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>

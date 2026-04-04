@@ -152,11 +152,11 @@ const AdminDeletedMembers: React.FC = () => {
     <PermissionGate
       permission="members.restore"
       fallback={
-        <div className="min-h-screen bg-gray-50 py-8">
+        <div className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
             <Lock className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h2>
-            <p className="text-gray-600">Only users with restore permissions can access the deleted members archive.</p>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground">Only users with restore permissions can access the deleted members archive.</p>
           </div>
         </div>
       }
@@ -174,68 +174,68 @@ const AdminDeletedMembers: React.FC = () => {
           title="Deleted Members Archive"
           subtitle="View and restore deleted member records (Super Admin Only)"
           actions={
-            <span className="text-sm text-gray-500">{deletedMembers.length} total</span>
+            <span className="text-sm text-muted-foreground">{deletedMembers.length} total</span>
           }
         />
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
           <div className="relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search by name, email, mobile number, or company..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
             />
           </div>
-          <div className="mt-4 text-sm text-gray-600">
+          <div className="mt-4 text-sm text-muted-foreground">
             Showing {filteredMembers.length} of {deletedMembers.length} deleted members
           </div>
         </div>
 
         {isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading deleted members...</p>
+          <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading deleted members...</p>
           </div>
         ) : filteredMembers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <Trash2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No deleted members found</h3>
-            <p className="text-gray-600">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+            <Trash2 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="text-sm font-medium text-foreground mb-2">No deleted members found</h3>
+            <p className="text-muted-foreground">
               {searchTerm ? 'Try adjusting your search criteria' : 'No members have been deleted yet'}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {filteredMembers.map((member) => (
-              <div key={member.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div key={member.id} className="bg-card rounded-lg shadow-sm border border-border p-6">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex-1 mb-4 lg:mb-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">{member.full_name}</h3>
-                        <p className="text-sm text-gray-600">{member.email}</p>
-                        <p className="text-sm text-gray-600">{member.mobile_number}</p>
+                        <h3 className="text-section font-semibold text-foreground">{member.full_name}</h3>
+                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                        <p className="text-sm text-muted-foreground">{member.mobile_number}</p>
                       </div>
 
                       <div>
-                        <p className="font-medium text-gray-900">{member.company_name}</p>
-                        <p className="text-sm text-gray-600">{member.district}</p>
-                        <p className="text-sm text-gray-600">{member.state}</p>
+                        <p className="font-medium text-foreground">{member.company_name}</p>
+                        <p className="text-sm text-muted-foreground">{member.district}</p>
+                        <p className="text-sm text-muted-foreground">{member.state}</p>
                       </div>
 
                       <div>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mb-2">
                           Deleted
                         </span>
-                        <p className="text-xs text-gray-500 flex items-center">
+                        <p className="text-xs text-muted-foreground flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
                           {formatDate(member.deleted_at)}
                         </p>
                         {member.deleted_by_email && (
-                          <p className="text-xs text-gray-500 flex items-center mt-1">
+                          <p className="text-xs text-muted-foreground flex items-center mt-1">
                             <User className="w-3 h-3 mr-1" />
                             By: {member.deleted_by_email}
                           </p>
@@ -274,16 +274,16 @@ const AdminDeletedMembers: React.FC = () => {
       </div>
 
       {restoreDialog.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center mb-4">
               <AlertTriangle className="w-6 h-6 text-green-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-section font-semibold text-foreground">
                 Confirm Restoration
               </h3>
             </div>
 
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
               Are you sure you want to restore <span className="font-semibold">{restoreDialog.memberName}</span>?
               This member will be moved back to the active members list.
             </p>
@@ -293,7 +293,7 @@ const AdminDeletedMembers: React.FC = () => {
                 onClick={() =>
                   setRestoreDialog({ isOpen: false, memberId: '', memberName: '' })
                 }
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>

@@ -215,7 +215,7 @@ const AdminUserManagement: React.FC = () => {
             <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Lock className="w-10 h-10 text-destructive" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
             <p className="text-muted-foreground mb-6">
               You don't have permission to view admin user management.
             </p>
@@ -271,7 +271,7 @@ const AdminUserManagement: React.FC = () => {
         ) : filteredUsers.length === 0 ? (
           <div className="bg-card rounded-lg border p-12 text-center">
             <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">No admin users found</h3>
+            <h3 className="text-sm font-medium text-foreground mb-2">No admin users found</h3>
             <p className="text-muted-foreground">
               {searchTerm ? 'Try adjusting your search criteria' : 'No admin users have been added yet'}
             </p>

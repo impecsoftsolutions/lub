@@ -111,7 +111,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: Settings,
       children: [
         { label: "Form Configuration", path: "/admin/settings/forms/join-lub" },
-        { label: "Validation Settings", path: "/admin/settings/validation" }
+        { label: "Validation Settings", path: "/admin/settings/validation" },
+        { label: "Appearance", path: "/admin/settings/appearance" }
       ]
     },
     {

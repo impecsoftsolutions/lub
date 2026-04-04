@@ -138,11 +138,11 @@ const MemberProfile: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading member profile...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading member profile...</p>
           </div>
         </div>
       </div>
@@ -151,17 +151,17 @@ const MemberProfile: React.FC = () => {
 
   if (notFound || !member) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
-            <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Member Not Found</h1>
-            <p className="text-gray-600 mb-6">
+            <AlertCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h1 className="text-2xl font-semibold text-foreground mb-2">Member Not Found</h1>
+            <p className="text-muted-foreground mb-6">
               The member profile you're looking for doesn't exist or is not approved yet.
             </p>
             <Link
               to="/members"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Directory
@@ -173,13 +173,13 @@ const MemberProfile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button */}
         <div className="mb-6">
           <Link
             to="/members"
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            className="inline-flex items-center text-primary hover:text-primary/80 font-medium transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Directory
@@ -187,31 +187,31 @@ const MemberProfile: React.FC = () => {
         </div>
 
         {/* Member Profile Card */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
           {/* Header Section */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-8 text-white">
+          <div className="border-b border-border px-8 py-6 bg-card">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center mb-2">
-                  <User className="w-8 h-8 mr-3" />
-                  <h1 className="text-3xl font-bold">{member.full_name}</h1>
+                <div className="flex items-center mb-2 text-foreground">
+                  <User className="w-7 h-7 mr-3 text-primary" />
+                  <h1 className="text-xl font-semibold text-foreground">{member.full_name}</h1>
                 </div>
-                <div className="flex items-center text-blue-100 mb-2">
-                  <Building2 className="w-5 h-5 mr-2" />
-                  <span className="text-lg font-medium">{member.company_name}</span>
+                <div className="flex items-center text-muted-foreground mb-2">
+                  <Building2 className="w-5 h-5 mr-2 text-primary" />
+                  <span className="text-section font-semibold text-foreground">{member.company_name}</span>
                 </div>
                 {member.company_designations && (
-                  <p className="text-blue-100">{member.company_designations.designation_name}</p>
+                  <p className="text-sm text-muted-foreground">{member.company_designations.designation_name}</p>
                 )}
-                <div className="flex items-center text-blue-100 mt-2">
-                  <MapPin className="w-4 h-4 mr-2" />
+                <div className="flex items-center text-sm text-muted-foreground mt-2">
+                  <MapPin className="w-4 h-4 mr-2 text-primary" />
                   <span>{member.district}, {member.state}</span>
                 </div>
               </div>
               
               {/* Role Indicator */}
               <div className="text-right">
-                <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20 text-white">
+                <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
                   {userRole.isAdmin ? (
                     <>
                       <Eye className="w-4 h-4 mr-1" />
@@ -237,16 +237,16 @@ const MemberProfile: React.FC = () => {
           <div className="p-8 space-y-8">
             {/* Products & Services */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+              <h2 className="text-section font-semibold text-foreground mb-4 flex items-center">
+                <Building2 className="w-5 h-5 mr-2 text-primary" />
                 Products & Services
               </h2>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-muted/50 rounded-lg p-4">
                 <div className="flex flex-wrap gap-2">
                   {formatProductsServices(member.products_services).map((product, index) => (
                     <span
                       key={index}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary"
                     >
                       {product}
                     </span>
@@ -258,35 +258,35 @@ const MemberProfile: React.FC = () => {
             {/* Contact Information - Role-based visibility */}
             {userRole.isLoggedIn ? (
               <section>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <Phone className="w-5 h-5 mr-2 text-blue-600" />
+                <h2 className="text-section font-semibold text-foreground mb-4 flex items-center">
+                  <Phone className="w-5 h-5 mr-2 text-primary" />
                   Contact Information
                 </h2>
-                <div className="bg-gray-50 rounded-lg p-6">
+                <div className="bg-muted/50 rounded-lg p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-center">
-                      <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                      <Phone className="w-5 h-5 text-muted-foreground mr-3" />
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Mobile Number</p>
-                        <p className="text-gray-900">+91 {member.mobile_number}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Mobile Number</p>
+                        <p className="text-foreground">+91 {member.mobile_number}</p>
                       </div>
                     </div>
                     <div className="flex items-center">
-                      <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                      <Mail className="w-5 h-5 text-muted-foreground mr-3" />
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Email</p>
-                        <p className="text-gray-900">{member.email}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Email</p>
+                        <p className="text-foreground">{member.email}</p>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="mt-6">
                     <div className="flex items-start">
-                      <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-1" />
+                      <MapPin className="w-5 h-5 text-muted-foreground mr-3 mt-1" />
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Company Address</p>
-                        <p className="text-gray-900">{member.company_address}</p>
-                        <p className="text-gray-600">{member.is_custom_city && member.other_city_name ? member.other_city_name : member.city}, {member.district}, {member.state}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Company Address</p>
+                        <p className="text-foreground">{member.company_address}</p>
+                        <p className="text-muted-foreground">{member.is_custom_city && member.other_city_name ? member.other_city_name : member.city}, {member.district}, {member.state}</p>
                       </div>
                     </div>
                   </div>
@@ -294,14 +294,14 @@ const MemberProfile: React.FC = () => {
                   {member.website && (
                     <div className="mt-6">
                       <div className="flex items-center">
-                        <Globe className="w-5 h-5 text-gray-400 mr-3" />
+                        <Globe className="w-5 h-5 text-muted-foreground mr-3" />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Website</p>
-                          <a 
+                          <p className="text-sm font-medium text-muted-foreground">Website</p>
+                          <a
                             href={`https://${member.website}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 flex items-center"
+                            className="text-primary hover:text-primary/80 flex items-center"
                           >
                             {member.website}
                             <ExternalLink className="w-4 h-4 ml-1" />
@@ -315,19 +315,19 @@ const MemberProfile: React.FC = () => {
             ) : (
               /* Public View - Contact Hidden */
               <section>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <EyeOff className="w-5 h-5 mr-2 text-gray-400" />
+                <h2 className="text-section font-semibold text-foreground mb-4 flex items-center">
+                  <EyeOff className="w-5 h-5 mr-2 text-muted-foreground" />
                   Contact Information
                 </h2>
-                <div className="bg-gray-50 rounded-lg p-6 text-center">
-                  <EyeOff className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Contact Details Hidden</h3>
-                  <p className="text-gray-600 mb-4">
+                <div className="bg-muted/50 rounded-lg p-6 text-center">
+                  <EyeOff className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-section font-semibold text-foreground mb-2">Contact Details Hidden</h3>
+                  <p className="text-muted-foreground mb-4">
                     Sign in to your LUB member account to view contact information
                   </p>
                   <Link
                     to="/signin"
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
                   >
                     Sign In to View Details
                   </Link>
@@ -338,18 +338,18 @@ const MemberProfile: React.FC = () => {
             {/* Admin-only Documents */}
             {userRole.isAdmin && (
               <section>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                <h2 className="text-section font-semibold text-foreground mb-4 flex items-center">
+                  <FileText className="w-5 h-5 mr-2 text-primary" />
                   Documents (Admin Only)
                 </h2>
-                <div className="bg-gray-50 rounded-lg p-6">
+                <div className="bg-muted/50 rounded-lg p-6">
                   <div className="flex flex-wrap gap-3">
                     {member.gst_certificate_url && (
                       <a
                         href={member.gst_certificate_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
                       >
                         <FileText className="w-4 h-4 mr-2" />
                         GST Certificate
@@ -361,7 +361,7 @@ const MemberProfile: React.FC = () => {
                         href={member.udyam_certificate_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
                       >
                         <FileText className="w-4 h-4 mr-2" />
                         UDYAM Certificate
@@ -373,7 +373,7 @@ const MemberProfile: React.FC = () => {
                         href={member.payment_proof_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
                       >
                         <FileText className="w-4 h-4 mr-2" />
                         Payment Proof
@@ -382,7 +382,7 @@ const MemberProfile: React.FC = () => {
                     )}
                   </div>
                   {!member.gst_certificate_url && !member.udyam_certificate_url && !member.payment_proof_url && (
-                    <p className="text-gray-500 text-center">No documents available</p>
+                    <p className="text-muted-foreground text-center">No documents available</p>
                   )}
                 </div>
               </section>
@@ -390,8 +390,8 @@ const MemberProfile: React.FC = () => {
 
             {/* Member Since */}
             <section>
-              <div className="text-center py-4 border-t border-gray-200">
-                <p className="text-sm text-gray-500">
+              <div className="text-center py-4 border-t border-border">
+                <p className="text-sm text-muted-foreground">
                   LUB Member since {new Date(member.created_at).toLocaleDateString('en-IN', {
                     year: 'numeric',
                     month: 'long'
@@ -406,7 +406,7 @@ const MemberProfile: React.FC = () => {
         <div className="mt-8 text-center">
           <Link
             to="/members"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Directory

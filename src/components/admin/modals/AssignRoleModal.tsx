@@ -143,40 +143,40 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          className="fixed inset-0 transition-opacity bg-black/50"
           onClick={handleClose}
         />
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-                  <Shield className="w-5 h-5 text-blue-600" />
+                <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full">
+                  <Shield className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Assign Role</h3>
-                  <p className="text-sm text-gray-600">Choose the admin role for this user</p>
+                  <h3 className="text-section font-semibold text-foreground">Assign Role</h3>
+                  <p className="text-sm text-muted-foreground">Choose the admin role for this user</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mb-4 space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/50 p-4">
               <div className="text-sm">
-                <span className="font-medium text-gray-700">User:</span>{' '}
-                <span className="text-gray-900">{user.email}</span>
+                <span className="font-medium text-foreground">User:</span>{' '}
+                <span className="text-foreground">{user.email}</span>
               </div>
               <div className="text-sm">
-                <span className="font-medium text-gray-700">Current role:</span>{' '}
-                <span className="text-gray-900">{formatRoleLabel(currentRole?.role)}</span>
+                <span className="font-medium text-foreground">Current role:</span>{' '}
+                <span className="text-foreground">{formatRoleLabel(currentRole?.role)}</span>
               </div>
             </div>
 
@@ -191,7 +191,7 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="assign-role-select" className="mb-1 block text-sm font-medium text-gray-700">
+                <label htmlFor="assign-role-select" className="mb-1 block text-sm font-medium text-foreground">
                   Role
                 </label>
                 <select
@@ -201,7 +201,7 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
                     setSelectedRole(e.target.value as RoleSelection);
                     setError('');
                   }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-ring focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Select a role</option>
                   {ROLE_OPTIONS.map((option) => (
@@ -216,7 +216,7 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
               </div>
 
               {selectedRoleMeta && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                <div className="rounded-lg border border-border bg-primary/5 p-3 text-sm text-foreground">
                   {selectedRoleMeta.description}
                 </div>
               )}
@@ -229,12 +229,12 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
+          <div className="bg-muted/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="w-full inline-flex justify-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm"
+              className="w-full inline-flex justify-center rounded-lg border border-transparent bg-primary px-4 py-2 text-base font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm"
             >
               {isSubmitting ? (
                 <span className="inline-flex items-center gap-2">
@@ -252,7 +252,7 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="mt-3 inline-flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm"
+              className="mt-3 inline-flex w-full justify-center rounded-lg border border-border bg-card px-4 py-2 text-base font-medium text-foreground shadow-sm hover:bg-muted/50 sm:mt-0 sm:w-auto sm:text-sm"
             >
               Close
             </button>

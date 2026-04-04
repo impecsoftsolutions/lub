@@ -200,29 +200,29 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          className="fixed inset-0 transition-opacity bg-black/50"
           onClick={handleClose}
         />
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
 
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-                  <Mail className="w-5 h-5 text-blue-600" />
+                <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full">
+                  <Mail className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Edit User</h3>
-                  <p className="text-sm text-gray-600">Update email and mobile number</p>
+                  <h3 className="text-section font-semibold text-foreground">Edit User</h3>
+                  <p className="text-sm text-muted-foreground">Update email and mobile number</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -249,11 +249,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
             <form onSubmit={handleSubmit} className="space-y-4">
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
                   Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="email"
                     id="email"
@@ -261,8 +261,8 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                     value={formData.email}
                     onChange={handleChange}
                     onBlur={() => handleBlur('email')}
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent ${
+                      validationErrors.email ? 'border-red-500' : 'border-border'
                     }`}
                     placeholder="user@example.com"
                     disabled={isSubmitting || success || validationLoading}
@@ -275,11 +275,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="mobile_number" className="block text-sm font-medium text-foreground mb-1">
                   Mobile Number <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="tel"
                     id="mobile_number"
@@ -287,8 +287,8 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                     value={formData.mobile_number}
                     onChange={handleChange}
                     onBlur={() => handleBlur('mobile_number')}
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      validationErrors.mobile_number ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent ${
+                      validationErrors.mobile_number ? 'border-red-500' : 'border-border'
                     }`}
                     placeholder="10-digit mobile number"
                     disabled={isSubmitting || success || validationLoading}
@@ -303,11 +303,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
             </form>
           </div>
 
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
             <button
               onClick={handleSubmit}
               disabled={isSubmitting || success || validationLoading}
-              className="w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
@@ -330,7 +330,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-3 w-full inline-flex justify-center rounded-lg border border-border shadow-sm px-4 py-2 bg-card text-base font-medium text-foreground hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>

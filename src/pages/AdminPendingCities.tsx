@@ -176,11 +176,11 @@ export default function AdminPendingCities() {
     <PermissionGate
       permission="locations.cities.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center justify-center p-8">
           <div className="text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view pending cities.</p>
+            <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view pending cities.</p>
           </div>
         </div>
       }
@@ -194,19 +194,19 @@ export default function AdminPendingCities() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Loading pending cities...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="mt-2 text-muted-foreground">Loading pending cities...</p>
           </div>
         ) : pendingError ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-8 text-center">
             <AlertCircle className="w-10 h-10 text-amber-600 mx-auto mb-3" />
-            <p className="text-gray-700">{pendingError}</p>
+            <p className="text-foreground">{pendingError}</p>
           </div>
         ) : pendingCities.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Cities</h3>
-            <p className="text-gray-600">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+            <MapPin className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-sm font-medium text-foreground mb-2">No Pending Cities</h3>
+            <p className="text-muted-foreground">
               All submitted cities have been reviewed. New submissions will appear here.
             </p>
           </div>
@@ -221,12 +221,12 @@ export default function AdminPendingCities() {
               return (
                 <div
                   key={city.key}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+                  className="bg-card rounded-lg shadow-sm border border-border p-6"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-section font-semibold text-foreground">
                           {city.other_city_name_display}
                         </h3>
                         <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
@@ -234,7 +234,7 @@ export default function AdminPendingCities() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-muted-foreground">
                         <div>
                           <span className="font-medium">District:</span>{' '}
                           {city.district_name || 'N/A'}
@@ -267,10 +267,10 @@ export default function AdminPendingCities() {
                   </div>
 
                   {canApprovePending && (
-                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
                       <button
                         onClick={() => openAssociationsModal(city)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                        className="flex items-center gap-2 px-4 py-2 rounded-md bg-card text-foreground border border-border hover:bg-muted/50"
                       >
                         View Associated Records
                       </button>
@@ -280,7 +280,7 @@ export default function AdminPendingCities() {
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
                           canAssign && city.pending_city_id
                             ? 'bg-amber-600 text-white hover:bg-amber-700'
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-muted text-muted-foreground cursor-not-allowed'
                         }`}
                       >
                         <GitMerge className="w-4 h-4" />
@@ -294,45 +294,45 @@ export default function AdminPendingCities() {
           </div>
         )}
         {showAssociationsModal && selectedPending && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full">
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full">
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Associated Records</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <h3 className="text-section font-semibold text-foreground">Associated Records</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
                     Pending city: "{selectedPending.other_city_name_display}"
                   </p>
                 </div>
               </div>
               <div className="px-6 py-4 max-h-[60vh] overflow-auto">
                 {isLoadingAssociations ? (
-                  <p className="text-gray-600">Loading associated records...</p>
+                  <p className="text-muted-foreground">Loading associated records...</p>
                 ) : associationsError ? (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                     {associationsError}
                   </div>
                 ) : associations.length === 0 ? (
-                  <p className="text-gray-600">No linked registrations found.</p>
+                  <p className="text-muted-foreground">No linked registrations found.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-border">
+                      <thead className="bg-muted/50">
                         <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Registration ID</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Registration ID</th>
+                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Email</th>
+                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Mobile</th>
+                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Company</th>
+                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-card divide-y divide-border">
                         {associations.map((record) => (
                           <tr key={record.registration_id}>
-                            <td className="px-3 py-2 text-xs text-gray-700">{record.registration_id}</td>
-                            <td className="px-3 py-2 text-sm text-gray-700">{record.email || 'N/A'}</td>
-                            <td className="px-3 py-2 text-sm text-gray-700">{record.mobile_number || 'N/A'}</td>
-                            <td className="px-3 py-2 text-sm text-gray-700">{record.company_name || 'N/A'}</td>
-                            <td className="px-3 py-2 text-sm text-gray-700">{record.status || 'N/A'}</td>
+                            <td className="px-3 py-2 text-xs text-foreground">{record.registration_id}</td>
+                            <td className="px-3 py-2 text-sm text-foreground">{record.email || 'N/A'}</td>
+                            <td className="px-3 py-2 text-sm text-foreground">{record.mobile_number || 'N/A'}</td>
+                            <td className="px-3 py-2 text-sm text-foreground">{record.company_name || 'N/A'}</td>
+                            <td className="px-3 py-2 text-sm text-foreground">{record.status || 'N/A'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -340,14 +340,14 @@ export default function AdminPendingCities() {
                   </div>
                 )}
               </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
+              <div className="px-6 py-4 bg-muted/50 border-t border-border flex justify-end gap-3 rounded-b-lg">
                 <button
                   onClick={() => {
                     setShowAssociationsModal(false);
                     setAssociations([]);
                     setAssociationsError(null);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-foreground bg-card border border-border rounded-md hover:bg-muted/50"
                 >
                   Close
                 </button>
@@ -356,17 +356,17 @@ export default function AdminPendingCities() {
           </div>
         )}
         {showAssignModal && selectedPending && canApprovePending && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Assign Approved City</h3>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-border">
+                <h3 className="text-section font-semibold text-foreground">Assign Approved City</h3>
               </div>
               <div className="px-6 py-4 space-y-4">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Edit and resolve "{selectedPending.other_city_name_display}" into an approved city:
                 </p>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Final City Name *
                   </label>
                   <input
@@ -374,21 +374,21 @@ export default function AdminPendingCities() {
                     value={finalCityName}
                     onChange={(e) => setFinalCityName(e.target.value)}
                     placeholder="Enter final city name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     If this matches an existing approved city in the same district, it will be assigned. Otherwise a new approved city will be created.
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Select Existing Approved City (Optional)
                   </label>
                   <select
                     value={selectedApprovedCityId}
                     onChange={(e) => handleApprovedCitySelection(e.target.value)}
                     disabled={isLoadingApprovedCities}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="">{isLoadingApprovedCities ? 'Loading...' : 'Choose a city to autofill...'}</option>
                     {approvedCities.map((city) => (
@@ -398,14 +398,14 @@ export default function AdminPendingCities() {
                     ))}
                   </select>
                 </div>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
+                <div className="p-3 bg-primary/5 rounded-lg">
+                  <p className="text-sm text-foreground">
                     <span className="font-medium">District:</span>{' '}
                     {selectedPending.district_name}
                   </p>
                 </div>
               </div>
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
+              <div className="px-6 py-4 bg-muted/50 border-t border-border flex justify-end gap-3 rounded-b-lg">
                 <button
                   onClick={() => {
                     setShowAssignModal(false);
@@ -413,7 +413,7 @@ export default function AdminPendingCities() {
                     setSelectedApprovedCityId('');
                     setFinalCityName('');
                   }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 text-foreground bg-card border border-border rounded-lg hover:bg-muted/50"
                 >
                   Cancel
                 </button>

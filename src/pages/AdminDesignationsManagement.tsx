@@ -849,7 +849,7 @@ const AdminDesignationsManagement: React.FC = () => {
       district: 'bg-green-100 text-green-800',
       city: 'bg-orange-100 text-orange-800'
     };
-    return colors[level as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[level as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
 
@@ -868,15 +868,15 @@ const AdminDesignationsManagement: React.FC = () => {
           subtitle="Manage company roles, LUB roles, and member assignments"
         />
         {/* Main Tabs */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="border-b border-gray-200">
+        <div className="bg-card rounded-lg shadow-sm border border-border mb-6">
+          <div className="border-b border-border">
             <nav className="flex space-x-8 px-6">
               <button
                 onClick={() => setActiveTab('company')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'company'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
                 <Building2 className="w-4 h-4 inline mr-2" />
@@ -886,8 +886,8 @@ const AdminDesignationsManagement: React.FC = () => {
                 onClick={() => setActiveTab('lub')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'lub'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
                 <Shield className="w-4 h-4 inline mr-2" />
@@ -902,8 +902,8 @@ const AdminDesignationsManagement: React.FC = () => {
               permission="organization.designations.view"
               fallback={
                 <div className="p-6 text-center">
-                  <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">You don't have permission to view company roles.</p>
+                  <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                  <p className="text-muted-foreground">You don't have permission to view company roles.</p>
                 </div>
               }
             >
@@ -911,19 +911,19 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Search and Add Button */}
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="Search company roles..."
                     value={searchTermCompany}
                     onChange={(e) => setSearchTermCompany(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   />
                 </div>
                 {canManageDesignations && (
                   <button
                     onClick={() => setShowAddCompanyModal(true)}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Company Role
@@ -934,44 +934,44 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Company Designations Table */}
               {isLoadingCompany ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading company roles...</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading company roles...</p>
                 </div>
               ) : filteredCompanyDesignations.length === 0 ? (
                 <div className="text-center py-12">
-                  <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No company roles found</h3>
-                  <p className="text-gray-600">
+                  <Building2 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-sm font-medium text-foreground mb-2">No company roles found</h3>
+                  <p className="text-muted-foreground">
                     {searchTermCompany ? 'Try adjusting your search criteria' : 'No company roles have been added yet'}
                   </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-border">
+                    <thead className="bg-muted/50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Role Name
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Status
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Created
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Updated
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                       {filteredCompanyDesignations.map((designation) => (
-                        <tr key={designation.id} className="hover:bg-gray-50">
+                        <tr key={designation.id} className="hover:bg-muted/30">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="font-medium text-gray-900">{designation.designation_name}</span>
+                            <span className="font-medium text-foreground">{designation.designation_name}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {canManageDesignations ? (
@@ -980,7 +980,7 @@ const AdminDesignationsManagement: React.FC = () => {
                                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                                   designation.is_active
                                     ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                 }`}
                               >
                                 {designation.is_active ? (
@@ -999,16 +999,16 @@ const AdminDesignationsManagement: React.FC = () => {
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                 designation.is_active
                                   ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-800'
+                                  : 'bg-muted text-muted-foreground'
                               }`}>
                                 {designation.is_active ? 'Active' : 'Inactive'}
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {formatDate(designation.created_at)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                             {formatDate(designation.updated_at)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1017,7 +1017,7 @@ const AdminDesignationsManagement: React.FC = () => {
                                 <>
                                   <button
                                     onClick={() => handleEditCompanyDesignation(designation)}
-                                    className="text-blue-600 hover:text-blue-900 transition-colors"
+                                    className="text-primary hover:text-primary/80 transition-colors"
                                   >
                                     <Edit3 className="w-4 h-4" />
                                   </button>
@@ -1045,14 +1045,14 @@ const AdminDesignationsManagement: React.FC = () => {
           {activeTab === 'lub' && (
             <div>
               {/* LUB Roles Sub-tabs */}
-              <div className="border-b border-gray-200">
+              <div className="border-b border-border">
                 <nav className="flex space-x-8 px-6">
                   <button
                     onClick={() => setLubRolesSubTab('roles')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                       lubRolesSubTab === 'roles'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                     }`}
                   >
                     <Shield className="w-4 h-4 inline mr-2" />
@@ -1062,8 +1062,8 @@ const AdminDesignationsManagement: React.FC = () => {
                     onClick={() => setLubRolesSubTab('assignments')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                       lubRolesSubTab === 'assignments'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                     }`}
                   >
                     <Users className="w-4 h-4 inline mr-2" />
@@ -1078,8 +1078,8 @@ const AdminDesignationsManagement: React.FC = () => {
                   permission="organization.designations.view"
                   fallback={
                     <div className="p-6 text-center">
-                      <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">You don't have permission to view LUB roles.</p>
+                      <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                      <p className="text-muted-foreground">You don't have permission to view LUB roles.</p>
                     </div>
                   }
                 >
@@ -1087,19 +1087,19 @@ const AdminDesignationsManagement: React.FC = () => {
                   {/* Search and Add Button */}
                   <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
                     <div className="relative flex-1 max-w-md">
-                      <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                       <input
                         type="text"
                         placeholder="Search LUB roles..."
                         value={searchTermLubRoles}
                         onChange={(e) => setSearchTermLubRoles(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       />
                     </div>
                     {canManageDesignations && (
                       <button
                         onClick={() => setShowAddLubRoleModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add LUB Role
@@ -1109,8 +1109,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
                   {/* Info Message */}
                   {lubRolesSortOrder === 'custom' && filteredLubRoles.length > 0 && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-800">
+                    <div className="mb-4 p-3 bg-primary/5 border border-border rounded-lg">
+                      <p className="text-sm text-foreground">
                         <GripVertical className="w-4 h-4 inline mr-1" />
                         Drag and drop rows to reorder roles. Click "Role Name" to sort alphabetically.
                       </p>
@@ -1128,53 +1128,53 @@ const AdminDesignationsManagement: React.FC = () => {
                   {/* LUB Roles Table */}
                   {isLoadingLubRoles ? (
                     <div className="text-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Loading LUB roles...</p>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading LUB roles...</p>
                     </div>
                   ) : filteredLubRoles.length === 0 ? (
                     <div className="text-center py-12">
-                      <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No LUB roles found</h3>
-                      <p className="text-gray-600">
+                      <Shield className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                      <h3 className="text-sm font-medium text-foreground mb-2">No LUB roles found</h3>
+                      <p className="text-muted-foreground">
                         {searchTermLubRoles ? 'Try adjusting your search criteria' : 'No LUB roles have been added yet'}
                       </p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y divide-border">
+                        <thead className="bg-muted/50">
                           <tr>
-                            <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                            <th className="px-2 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-12">
                               {/* Drag handle column */}
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               <button
                                 onClick={handleToggleLubRolesSort}
-                                className="inline-flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                                className="inline-flex items-center space-x-1 hover:text-foreground transition-colors"
                               >
                                 <span>Role Name</span>
                                 {lubRolesSortOrder === 'asc' && <ArrowUp className="w-4 h-4" />}
                                 {lubRolesSortOrder === 'desc' && <ArrowDown className="w-4 h-4" />}
                                 {lubRolesSortOrder === 'custom' && (
-                                  <span className="text-xs text-gray-400">(Custom)</span>
+                                  <span className="text-xs text-muted-foreground">(Custom)</span>
                                 )}
                               </button>
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Status
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Created
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Updated
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                           {filteredLubRoles.map((role) => (
                             <tr
                               key={role.id}
@@ -1188,17 +1188,17 @@ const AdminDesignationsManagement: React.FC = () => {
                                 draggedRole?.id === role.id
                                   ? 'opacity-50'
                                   : dragOverRole === role.id
-                                  ? 'bg-blue-50 border-t-2 border-blue-400'
-                                  : 'hover:bg-gray-50'
+                                  ? 'bg-primary/5 border-t-2 border-primary'
+                                  : 'hover:bg-muted/30'
                               } ${lubRolesSortOrder === 'custom' && !isReordering ? 'cursor-move' : ''}`}
                             >
-                              <td className="px-2 py-4 whitespace-nowrap text-gray-400">
+                              <td className="px-2 py-4 whitespace-nowrap text-muted-foreground">
                                 {lubRolesSortOrder === 'custom' && !isReordering && (
                                   <GripVertical className="w-5 h-5" />
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="font-medium text-gray-900">{role.role_name}</span>
+                                <span className="font-medium text-foreground">{role.role_name}</span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {canManageDesignations ? (
@@ -1207,7 +1207,7 @@ const AdminDesignationsManagement: React.FC = () => {
                                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                                       role.is_active
                                         ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                     }`}
                                   >
                                     {role.is_active ? (
@@ -1226,16 +1226,16 @@ const AdminDesignationsManagement: React.FC = () => {
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                     role.is_active
                                       ? 'bg-green-100 text-green-800'
-                                      : 'bg-gray-100 text-gray-800'
+                                      : 'bg-muted text-muted-foreground'
                                   }`}>
                                     {role.is_active ? 'Active' : 'Inactive'}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(role.created_at)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(role.updated_at)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1244,7 +1244,7 @@ const AdminDesignationsManagement: React.FC = () => {
                                     <>
                                       <button
                                         onClick={() => handleEditLubRole(role)}
-                                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                                        className="text-primary hover:text-primary/80 transition-colors"
                                       >
                                         <Edit3 className="w-4 h-4" />
                                       </button>
@@ -1274,8 +1274,8 @@ const AdminDesignationsManagement: React.FC = () => {
                   permission="organization.designations.view"
                   fallback={
                     <div className="p-6 text-center">
-                      <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">You don't have permission to view member role assignments.</p>
+                      <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                      <p className="text-muted-foreground">You don't have permission to view member role assignments.</p>
                     </div>
                   }
                 >
@@ -1283,13 +1283,13 @@ const AdminDesignationsManagement: React.FC = () => {
                   {/* Search and Add Button */}
                   <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4">
                     <div className="relative flex-1 max-w-md">
-                      <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                       <input
                         type="text"
                         placeholder="Search member assignments..."
                         value={searchTermAssignments}
                         onChange={(e) => setSearchTermAssignments(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       />
                     </div>
                     {canManageDesignations && (
@@ -1304,15 +1304,15 @@ const AdminDesignationsManagement: React.FC = () => {
                   </div>
 
                   {/* Geographic Filters */}
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
                     <div className="flex items-center gap-2 mb-3">
-                      <MapPin className="w-4 h-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-700">Filter by Geographic Scope</h3>
+                      <MapPin className="w-4 h-4 text-muted-foreground" />
+                      <h3 className="text-sm font-medium text-foreground">Filter by Geographic Scope</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       {/* Committee Year Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Committee Year</label>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Committee Year</label>
                         <select
                           value={assignmentFilters.committeeYear}
                           onChange={(e) => {
@@ -1321,7 +1321,7 @@ const AdminDesignationsManagement: React.FC = () => {
                               committeeYear: e.target.value
                             }));
                           }}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                         >
                           <option value="">All Years</option>
                           {committeeYearOptions.map(year => (
@@ -1332,7 +1332,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
                       {/* Level Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Level</label>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Level</label>
                         <select
                           value={assignmentFilters.level}
                           onChange={(e) => {
@@ -1344,7 +1344,7 @@ const AdminDesignationsManagement: React.FC = () => {
                               committeeYear: assignmentFilters.committeeYear
                             });
                           }}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                         >
                           <option value="all">All Levels</option>
                           <option value="national">National</option>
@@ -1356,7 +1356,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
                       {/* State Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">State</label>
                         <select
                           value={assignmentFilters.state}
                           onChange={(e) => {
@@ -1367,7 +1367,7 @@ const AdminDesignationsManagement: React.FC = () => {
                             }));
                           }}
                           disabled={assignmentFilters.level === 'all' || assignmentFilters.level === 'national'}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted disabled:cursor-not-allowed"
                         >
                           <option value="">All States</option>
                           {assignmentStates.map(state => (
@@ -1380,7 +1380,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
                       {/* District Filter */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">District</label>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">District</label>
                         <select
                           value={assignmentFilters.district}
                           onChange={(e) => {
@@ -1390,7 +1390,7 @@ const AdminDesignationsManagement: React.FC = () => {
                             }));
                           }}
                           disabled={assignmentFilters.level !== 'district' && assignmentFilters.level !== 'city'}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted disabled:cursor-not-allowed"
                         >
                           <option value="">All Districts</option>
                           {assignmentDistricts.map(district => (
@@ -1407,59 +1407,59 @@ const AdminDesignationsManagement: React.FC = () => {
                   {isLoadingAssignments ? (
                     <div className="text-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Loading member assignments...</p>
+                      <p className="text-muted-foreground">Loading member assignments...</p>
                     </div>
                   ) : filteredMemberAssignments.length === 0 ? (
                     <div className="text-center py-12">
-                      <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No member assignments found</h3>
-                      <p className="text-gray-600">
+                      <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                      <h3 className="text-sm font-medium text-foreground mb-2">No member assignments found</h3>
+                      <p className="text-muted-foreground">
                         {searchTermAssignments ? 'Try adjusting your search criteria' : 'No member role assignments have been added yet'}
                       </p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y divide-border">
+                        <thead className="bg-muted/50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Member
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Role
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Level
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Geographic Scope
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Created
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                           {filteredMemberAssignments.map((assignment) => (
-                            <tr key={assignment.id} className="hover:bg-gray-50">
+                            <tr key={assignment.id} className="hover:bg-muted/30">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
-                                  <div className="font-medium text-gray-900">{assignment.member_name}</div>
-                                  <div className="text-sm text-gray-500">{assignment.member_email}</div>
+                                  <div className="font-medium text-foreground">{assignment.member_name}</div>
+                                  <div className="text-sm text-muted-foreground">{assignment.member_email}</div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="font-medium text-gray-900">{assignment.role_name}</span>
+                                <span className="font-medium text-foreground">{assignment.role_name}</span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLevelColor(assignment.level)}`}>
                                   {getLevelLabel(assignment.level)}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {assignment.level === 'national' ? (
                                   <span className="text-purple-600 font-medium">All India</span>
                                 ) : (
@@ -1474,7 +1474,7 @@ const AdminDesignationsManagement: React.FC = () => {
                                   </div>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(assignment.created_at)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1483,7 +1483,7 @@ const AdminDesignationsManagement: React.FC = () => {
                                     <>
                                       <button
                                         onClick={() => handleEditAssignment(assignment)}
-                                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                                        className="text-primary hover:text-primary/80 transition-colors"
                                       >
                                         <Edit3 className="w-4 h-4" />
                                       </button>
@@ -1513,13 +1513,13 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Add Company Designation Modal */}
       {showAddCompanyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Company Role</h3>
+              <h3 className="text-section font-semibold text-foreground">Add Company Role</h3>
               <button
                 onClick={() => setShowAddCompanyModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1527,7 +1527,7 @@ const AdminDesignationsManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Role Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1535,7 +1535,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   value={newCompanyDesignationName}
                   onChange={(e) => setNewCompanyDesignationName(e.target.value)}
                   placeholder="Enter role name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
 
@@ -1545,9 +1545,9 @@ const AdminDesignationsManagement: React.FC = () => {
                   id="newCompanyIsActive"
                   checked={newCompanyIsActive}
                   onChange={(e) => setNewCompanyIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="newCompanyIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="newCompanyIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active role
                 </label>
               </div>
@@ -1556,14 +1556,14 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setShowAddCompanyModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddCompanyDesignation}
                 disabled={isSavingCompany || !newCompanyDesignationName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingCompany ? 'Adding...' : 'Add Role'}
               </button>
@@ -1574,13 +1574,13 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Edit Company Designation Modal */}
       {showEditCompanyModal && editingCompanyDesignation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Company Role</h3>
+              <h3 className="text-section font-semibold text-foreground">Edit Company Role</h3>
               <button
                 onClick={() => setShowEditCompanyModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1588,7 +1588,7 @@ const AdminDesignationsManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Role Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1596,7 +1596,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   value={editCompanyDesignationName}
                   onChange={(e) => setEditCompanyDesignationName(e.target.value)}
                   placeholder="Enter role name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
 
@@ -1606,9 +1606,9 @@ const AdminDesignationsManagement: React.FC = () => {
                   id="editCompanyIsActive"
                   checked={editCompanyIsActive}
                   onChange={(e) => setEditCompanyIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="editCompanyIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="editCompanyIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active role
                 </label>
               </div>
@@ -1617,14 +1617,14 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setShowEditCompanyModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateCompanyDesignation}
                 disabled={isSavingCompany || !editCompanyDesignationName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingCompany ? 'Updating...' : 'Update Role'}
               </button>
@@ -1635,13 +1635,13 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Add LUB Role Modal */}
       {showAddLubRoleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add LUB Role</h3>
+              <h3 className="text-section font-semibold text-foreground">Add LUB Role</h3>
               <button
                 onClick={() => setShowAddLubRoleModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1649,7 +1649,7 @@ const AdminDesignationsManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Role Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1657,7 +1657,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   value={newLubRoleName}
                   onChange={(e) => setNewLubRoleName(e.target.value)}
                   placeholder="Enter LUB role name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
 
@@ -1667,9 +1667,9 @@ const AdminDesignationsManagement: React.FC = () => {
                   id="newLubRoleIsActive"
                   checked={newLubRoleIsActive}
                   onChange={(e) => setNewLubRoleIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="newLubRoleIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="newLubRoleIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active role
                 </label>
               </div>
@@ -1678,14 +1678,14 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setShowAddLubRoleModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddLubRole}
                 disabled={isSavingLubRole || !newLubRoleName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingLubRole ? 'Adding...' : 'Add Role'}
               </button>
@@ -1696,13 +1696,13 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Edit LUB Role Modal */}
       {showEditLubRoleModal && editingLubRole && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit LUB Role</h3>
+              <h3 className="text-section font-semibold text-foreground">Edit LUB Role</h3>
               <button
                 onClick={() => setShowEditLubRoleModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1710,7 +1710,7 @@ const AdminDesignationsManagement: React.FC = () => {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Role Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1718,7 +1718,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   value={editLubRoleName}
                   onChange={(e) => setEditLubRoleName(e.target.value)}
                   placeholder="Enter LUB role name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
 
@@ -1728,9 +1728,9 @@ const AdminDesignationsManagement: React.FC = () => {
                   id="editLubRoleIsActive"
                   checked={editLubRoleIsActive}
                   onChange={(e) => setEditLubRoleIsActive(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
-                <label htmlFor="editLubRoleIsActive" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="editLubRoleIsActive" className="ml-2 text-sm font-medium text-foreground">
                   Set as active role
                 </label>
               </div>
@@ -1739,14 +1739,14 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setShowEditLubRoleModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateLubRole}
                 disabled={isSavingLubRole || !editLubRoleName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingLubRole ? 'Updating...' : 'Update Role'}
               </button>
@@ -1757,16 +1757,16 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Add Member Assignment Modal */}
       {showAddAssignmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Member Role Assignment</h3>
+              <h3 className="text-section font-semibold text-foreground">Add Member Role Assignment</h3>
               <button
                 onClick={() => {
                   setShowAddAssignmentModal(false);
                   resetAssignmentForm();
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1775,7 +1775,7 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="space-y-6">
               {/* Member Search */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Member <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -1784,27 +1784,27 @@ const AdminDesignationsManagement: React.FC = () => {
                     value={memberSearchTerm}
                     onChange={(e) => handleMemberSearchChange(e.target.value)}
                     placeholder="Search by name or email..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   />
                   {isSearchingMembers && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                     </div>
                   )}
                 </div>
                 
                 {/* Search Results */}
                 {memberSearchResults.length > 0 && (
-                  <div className="mt-2 border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
+                  <div className="mt-2 border border-border rounded-lg max-h-60 overflow-y-auto">
                     {memberSearchResults.map((member) => (
                       <button
                         key={member.id}
                         onClick={() => handleMemberSelect(member)}
-                        className="w-full text-left px-3 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                        className="w-full text-left px-3 py-3 hover:bg-muted/30 border-b border-border last:border-b-0"
                       >
-                        <div className="font-medium text-gray-900 mb-1">{member.full_name}</div>
-                        <div className="text-sm text-gray-600 mb-0.5">{member.company_name} • {member.city}, {member.district}</div>
-                        <div className="text-sm text-gray-500">{member.email}</div>
+                        <div className="font-medium text-foreground mb-1">{member.full_name}</div>
+                        <div className="text-sm text-muted-foreground mb-0.5">{member.company_name} • {member.city}, {member.district}</div>
+                        <div className="text-sm text-muted-foreground">{member.email}</div>
                       </button>
                     ))}
                   </div>
@@ -1812,11 +1812,11 @@ const AdminDesignationsManagement: React.FC = () => {
                 
                 {/* Selected Member */}
                 {selectedMember && (
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="mt-2 p-3 bg-primary/5 border border-border rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium text-blue-900">{selectedMember.full_name}</div>
-                        <div className="text-sm text-blue-700">{selectedMember.email}</div>
+                        <div className="font-medium text-foreground">{selectedMember.full_name}</div>
+                        <div className="text-sm text-muted-foreground">{selectedMember.email}</div>
                       </div>
                       <button
                         onClick={() => {
@@ -1824,7 +1824,7 @@ const AdminDesignationsManagement: React.FC = () => {
                           setAssignmentForm(prev => ({ ...prev, member_id: '' }));
                           setMemberSearchTerm('');
                         }}
-                        className="text-blue-600 hover:text-blue-800"
+                        className="text-primary hover:text-primary/80"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1835,13 +1835,13 @@ const AdminDesignationsManagement: React.FC = () => {
 
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   LUB Role <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={assignmentForm.role_id}
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, role_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 >
                   <option value="">Select LUB Role</option>
                   {lubRoles.filter(role => role.is_active).map(role => (
@@ -1852,7 +1852,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
               {/* Level Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Level <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -1863,7 +1863,7 @@ const AdminDesignationsManagement: React.FC = () => {
                     state: e.target.value === 'national' ? '' : prev.state,
                     district: e.target.value === 'national' || e.target.value === 'state' ? '' : prev.district
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 >
                   <option value="">Select Level</option>
                   <option value="national">National</option>
@@ -1876,18 +1876,18 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* State Selection */}
               {(assignmentForm.level === 'state' || assignmentForm.level === 'district' || assignmentForm.level === 'city') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     State <span className="text-red-500">*</span>
                   </label>
                   {isLoadingStates ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                       Loading states...
                     </div>
                   ) : (
                     <select
                       value={assignmentForm.state}
                       onChange={(e) => setAssignmentForm(prev => ({ ...prev, state: e.target.value, district: '' }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     >
                       <option value="">Select State</option>
                       {allStates.map(state => (
@@ -1901,18 +1901,18 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* District Selection */}
               {(assignmentForm.level === 'district' || assignmentForm.level === 'city') && assignmentForm.state && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     District <span className="text-red-500">*</span>
                   </label>
                   {isLoadingDistricts ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                       Loading districts...
                     </div>
                   ) : (
                     <select
                       value={assignmentForm.district}
                       onChange={(e) => setAssignmentForm(prev => ({ ...prev, district: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     >
                       <option value="">Select District</option>
                       {availableDistricts.map(district => (
@@ -1927,7 +1927,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
               {/* Committee Year */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Committee Year <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1936,44 +1936,44 @@ const AdminDesignationsManagement: React.FC = () => {
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, committee_year: e.target.value }))}
                   placeholder="2025"
                   maxLength={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
 
               {/* Period From Date */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Period From <span className="text-gray-400">(optional)</span>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Period From <span className="text-muted-foreground">(optional)</span>
                 </label>
                 <input
                   type="date"
                   value={assignmentForm.role_start_date}
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, role_start_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
 
               {/* Period To Date */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Period To <span className="text-gray-400">(optional)</span>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Period To <span className="text-muted-foreground">(optional)</span>
                 </label>
                 <input
                   type="date"
                   value={assignmentForm.role_end_date}
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, role_end_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-gray-200">
+            <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-border">
               <button
                 onClick={() => {
                   setShowAddAssignmentModal(false);
                   resetAssignmentForm();
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
@@ -1991,17 +1991,17 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Edit Member Assignment Modal */}
       {showEditAssignmentModal && editingAssignment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Member Role Assignment</h3>
+              <h3 className="text-section font-semibold text-foreground">Edit Member Role Assignment</h3>
               <button
                 onClick={() => {
                   setShowEditAssignmentModal(false);
                   setEditingAssignment(null);
                   resetAssignmentForm();
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2010,24 +2010,24 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="space-y-6">
               {/* Member Info (Read-only) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Member
                 </label>
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="font-medium text-gray-900">{editingAssignment.member_name}</div>
-                  <div className="text-sm text-gray-500">{editingAssignment.member_email}</div>
+                <div className="p-3 bg-muted/50 border border-border rounded-lg">
+                  <div className="font-medium text-foreground">{editingAssignment.member_name}</div>
+                  <div className="text-sm text-muted-foreground">{editingAssignment.member_email}</div>
                 </div>
               </div>
 
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   LUB Role <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={assignmentForm.role_id}
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, role_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 >
                   <option value="">Select LUB Role</option>
                   {lubRoles.filter(role => role.is_active).map(role => (
@@ -2038,7 +2038,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
               {/* Level Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Level <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -2049,7 +2049,7 @@ const AdminDesignationsManagement: React.FC = () => {
                     state: e.target.value === 'national' ? '' : prev.state,
                     district: e.target.value === 'national' || e.target.value === 'state' ? '' : prev.district
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 >
                   <option value="">Select Level</option>
                   <option value="national">National</option>
@@ -2062,18 +2062,18 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* State Selection */}
               {(assignmentForm.level === 'state' || assignmentForm.level === 'district' || assignmentForm.level === 'city') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     State <span className="text-red-500">*</span>
                   </label>
                   {isLoadingStates ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                       Loading states...
                     </div>
                   ) : (
                     <select
                       value={assignmentForm.state}
                       onChange={(e) => setAssignmentForm(prev => ({ ...prev, state: e.target.value, district: '' }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     >
                       <option value="">Select State</option>
                       {allStates.map(state => (
@@ -2087,18 +2087,18 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* District Selection */}
               {(assignmentForm.level === 'district' || assignmentForm.level === 'city') && assignmentForm.state && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     District <span className="text-red-500">*</span>
                   </label>
                   {isLoadingDistricts ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                       Loading districts...
                     </div>
                   ) : (
                     <select
                       value={assignmentForm.district}
                       onChange={(e) => setAssignmentForm(prev => ({ ...prev, district: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     >
                       <option value="">Select District</option>
                       {availableDistricts.map(district => (
@@ -2112,21 +2112,21 @@ const AdminDesignationsManagement: React.FC = () => {
               )}
             </div>
             
-            <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-gray-200">
+            <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-border">
               <button
                 onClick={() => {
                   setShowEditAssignmentModal(false);
                   setEditingAssignment(null);
                   resetAssignmentForm();
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateAssignment}
                 disabled={isSavingAssignment || !assignmentForm.role_id || !assignmentForm.level}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingAssignment ? 'Updating...' : 'Update Assignment'}
               </button>

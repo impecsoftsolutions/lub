@@ -907,7 +907,7 @@ const Join: React.FC = () => {
     }
 
     try {
-      setIsVerifying(true);
+      setIsSubmitting(true);
       console.log('[Join.tsx] Checking for duplicate email and mobile...');
 
       // Check for duplicate email/mobile
@@ -1009,7 +1009,7 @@ const Join: React.FC = () => {
         showToast('error', 'An unexpected error occurred. Please try again');
       }
     } finally {
-      setIsVerifying(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -1074,7 +1074,7 @@ const Join: React.FC = () => {
     }
 
     try {
-      setIsSubmitting(true);
+      setIsVerifying(true);
 
       const normalizationPayload = { ...formData };
       delete normalizationPayload.email;
@@ -1149,10 +1149,10 @@ const Join: React.FC = () => {
   // Show loading state while checking authentication or existing registration
   if (isLoadingConfig || isLoadingValidation || isLoadingAuth || isCheckingExisting) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen py-8">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">
             {isLoadingAuth ? 'Checking authentication...' :
              isCheckingExisting ? 'Checking registration status...' :
              'Loading form...'}
@@ -1163,7 +1163,7 @@ const Join: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen py-8">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -1174,12 +1174,12 @@ const Join: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Join LUB</h1>
-          <p className="text-gray-600">Complete your membership registration</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Join LUB</h1>
+          <p className="text-muted-foreground">Complete your membership registration</p>
         </div>
 
         {/* Registration Form */}
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="bg-card rounded-lg shadow-md p-8">
           {/* Form Error Banner */}
           {formErrorMessage && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
@@ -1191,7 +1191,7 @@ const Join: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Personal Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <User className="w-5 h-5 mr-2 text-blue-600" />
                 Personal Information
               </h2>
@@ -1199,7 +1199,7 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isFieldVisible('full_name') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Full Name{isFieldRequired('full_name') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1208,8 +1208,8 @@ const Join: React.FC = () => {
                       value={formData.full_name}
                       onChange={handleInputChange}
                       onBlur={() => validateField('full_name')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.full_name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.full_name ? 'border-red-500' : 'border-border'
                       }`}
                       placeholder="Enter your full name"
                       required={isFieldRequired('full_name')}
@@ -1221,7 +1221,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('gender') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Gender{isFieldRequired('gender') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
@@ -1229,8 +1229,8 @@ const Join: React.FC = () => {
                       value={formData.gender}
                       onChange={handleInputChange}
                       required={isFieldRequired('gender')}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.gender ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                      errors.gender ? 'border-red-500' : 'border-border'
                     }`}
                   >
                     <option value="">Select Gender</option>
@@ -1243,7 +1243,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('date_of_birth') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Date of Birth{isFieldRequired('date_of_birth') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1251,8 +1251,8 @@ const Join: React.FC = () => {
                       name="date_of_birth"
                       value={formData.date_of_birth}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.date_of_birth ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.date_of_birth ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('date_of_birth')}
                     />
@@ -1261,7 +1261,7 @@ const Join: React.FC = () => {
                 )}
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     <Camera className="w-4 h-4 inline mr-1" />
                     Profile Photo (Optional)
                   </label>
@@ -1277,12 +1277,12 @@ const Join: React.FC = () => {
                       />
                       <label
                         htmlFor="profile-photo-input"
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="inline-flex items-center px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors"
                       >
                         <Upload className="w-4 h-4 mr-2" />
                         Choose Photo
                       </label>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         Upload a profile photo (JPG, JPEG, or PNG). You'll be able to crop it to fit.
                       </p>
                     </div>
@@ -1292,7 +1292,7 @@ const Join: React.FC = () => {
                         <img
                           src={profilePhotoPreview}
                           alt="Profile preview"
-                          className="w-32 h-40 object-cover rounded-lg border-2 border-gray-200"
+                          className="w-32 h-40 object-cover rounded-lg border-2 border-border"
                         />
                       </div>
                       <div className="flex-1">
@@ -1300,7 +1300,7 @@ const Join: React.FC = () => {
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Photo ready
                         </p>
-                        <p className="text-xs text-gray-600 mb-3">
+                        <p className="text-xs text-muted-foreground mb-3">
                           Your profile photo has been cropped and will be uploaded with your registration.
                         </p>
                         <button
@@ -1318,7 +1318,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('email') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Email Address{isFieldRequired('email') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1328,9 +1328,9 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       onBlur={() => validateField('email')}
                       readOnly={isAuthenticated}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.email ? 'border-red-500' : 'border-gray-300'
-                      } ${isAuthenticated ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.email ? 'border-red-500' : 'border-border'
+                      } ${isAuthenticated ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                       required={isFieldRequired('email')}
                   />
                   {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
@@ -1339,7 +1339,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('mobile_number') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Mobile Number{isFieldRequired('mobile_number') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1350,9 +1350,9 @@ const Join: React.FC = () => {
                       onBlur={() => validateField('mobile_number')}
                       placeholder="10-digit mobile number"
                       readOnly={isAuthenticated}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.mobile_number ? 'border-red-500' : 'border-gray-300'
-                      } ${isAuthenticated ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.mobile_number ? 'border-red-500' : 'border-border'
+                      } ${isAuthenticated ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                       required={isFieldRequired('mobile_number')}
                   />
                   {errors.mobile_number && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
@@ -1363,7 +1363,7 @@ const Join: React.FC = () => {
 
             {/* Payment Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <Phone className="w-5 h-5 mr-2 text-blue-600" />
                 Payment Information
               </h2>
@@ -1371,7 +1371,7 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isFieldVisible('amount_paid') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Amount Paid{isFieldRequired('amount_paid') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1381,8 +1381,8 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       placeholder="Select state and gender first"
                       disabled
-                      className={`w-full px-3 py-2 border rounded-lg bg-gray-50 cursor-not-allowed ${
-                        errors.amount_paid ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg bg-muted/50 cursor-not-allowed ${
+                        errors.amount_paid ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {errors.amount_paid && <p className="text-red-500 text-sm mt-1">{errors.amount_paid}</p>}
@@ -1391,7 +1391,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('payment_date') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Payment Date{isFieldRequired('payment_date') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1399,8 +1399,8 @@ const Join: React.FC = () => {
                       name="payment_date"
                       value={formData.payment_date}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.payment_date ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.payment_date ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('payment_date')}
                     />
@@ -1410,15 +1410,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('payment_mode') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Payment Mode{isFieldRequired('payment_mode') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="payment_mode"
                       value={formData.payment_mode}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.payment_mode ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.payment_mode ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('payment_mode')}
                     >
@@ -1435,7 +1435,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('transaction_id') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Transaction ID / Reference{isFieldRequired('transaction_id') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1444,7 +1444,7 @@ const Join: React.FC = () => {
                       value={formData.transaction_id}
                       onChange={handleInputChange}
                       placeholder="Transaction ID or reference number"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       required={isFieldRequired('transaction_id')}
                     />
                   </div>
@@ -1452,7 +1452,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('bank_reference') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Bank Reference{isFieldRequired('bank_reference') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1461,7 +1461,7 @@ const Join: React.FC = () => {
                       value={formData.bank_reference}
                       onChange={handleInputChange}
                       placeholder="Bank reference number (if any)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       required={isFieldRequired('bank_reference')}
                     />
                   </div>
@@ -1469,18 +1469,18 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('payment_proof_url') && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Payment Proof{isFieldRequired('payment_proof_url') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('paymentProof', e.target.files?.[0] || null)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.payment_proof ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.payment_proof ? 'border-red-500' : 'border-border'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Upload screenshot or receipt of your membership fee payment</p>
+                    <p className="text-xs text-muted-foreground mt-1">Upload screenshot or receipt of your membership fee payment</p>
                     {errors.payment_proof && <p className="text-red-500 text-sm mt-1">{errors.payment_proof}</p>}
                   </div>
                 )}
@@ -1489,7 +1489,7 @@ const Join: React.FC = () => {
 
             {/* Company Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <Building2 className="w-5 h-5 mr-2 text-blue-600" />
                 Company Information
               </h2>
@@ -1497,7 +1497,7 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isFieldVisible('company_name') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Company Name{isFieldRequired('company_name') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1505,8 +1505,8 @@ const Join: React.FC = () => {
                       name="company_name"
                       value={formData.company_name}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.company_name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.company_name ? 'border-red-500' : 'border-border'
                       }`}
                       placeholder="Enter your company name"
                       required={isFieldRequired('company_name')}
@@ -1517,11 +1517,11 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('company_designation_id') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Designation{isFieldRequired('company_designation_id') && <span className="text-red-500 ml-1">*</span>}
                   </label>
                   {isLoadingDesignations ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Loading designations...
                     </div>
@@ -1530,8 +1530,8 @@ const Join: React.FC = () => {
                       name="company_designation_id"
                       value={formData.company_designation_id}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.company_designation_id ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.company_designation_id ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('company_designation_id')}
                     >
@@ -1551,7 +1551,7 @@ const Join: React.FC = () => {
 
             {/* Location Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <MapPin className="w-5 h-5 mr-2 text-blue-600" />
                 Location Information
               </h2>
@@ -1560,11 +1560,11 @@ const Join: React.FC = () => {
                 {/* State Dropdown */}
                 {isFieldVisible('state') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       State{isFieldRequired('state') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     {isLoadingStates ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Loading states...
                     </div>
@@ -1573,8 +1573,8 @@ const Join: React.FC = () => {
                       name="state"
                       value={formData.state}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.state ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.state ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('state')}
                     >
@@ -1593,11 +1593,11 @@ const Join: React.FC = () => {
                 {/* District Dropdown */}
                 {isFieldVisible('district') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       District{isFieldRequired('district') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                   {isLoadingDistricts ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Loading districts...
                     </div>
@@ -1607,8 +1607,8 @@ const Join: React.FC = () => {
                       value={formData.district}
                       onChange={handleDistrictChange}
                       disabled={!formData.state}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed ${
-                        errors.district ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed ${
+                        errors.district ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('district')}
                     >
@@ -1629,11 +1629,11 @@ const Join: React.FC = () => {
                 {/* City Dropdown */}
                 {isFieldVisible('city') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       City/Town/Village{isFieldRequired('city') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                   {isLoadingCities ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Loading cities...
                     </div>
@@ -1643,8 +1643,8 @@ const Join: React.FC = () => {
                       value={showOtherCity ? 'Other' : formData.city}
                       onChange={handleCityChange}
                       disabled={!selectedDistrictId}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed ${
-                        errors.city ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed ${
+                        errors.city ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('city')}
                     >
@@ -1666,7 +1666,7 @@ const Join: React.FC = () => {
                 {/* Other City Text Input */}
                 {showOtherCity && isFieldVisible('city') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Enter City/Town/Village{isFieldRequired('city') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1674,19 +1674,19 @@ const Join: React.FC = () => {
                       value={otherCityText}
                       onChange={handleOtherCityChange}
                       placeholder="Enter your city, town, or village"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.city ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.city ? 'border-red-500' : 'border-border'
                       }`}
                       required={formData.city === 'Other'}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Enter your city, town, or village name</p>
+                    <p className="text-xs text-muted-foreground mt-1">Enter your city, town, or village name</p>
                     {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('pin_code') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       PIN Code{isFieldRequired('pin_code') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1696,8 +1696,8 @@ const Join: React.FC = () => {
                       onChange={handlePinCodeChange}
                       onBlur={() => validateField('pin_code')}
                       placeholder="6-digit PIN code"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.pin_code ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.pin_code ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('pin_code')}
                     />
@@ -1707,7 +1707,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('company_address') && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Company Address{isFieldRequired('company_address') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <textarea
@@ -1715,8 +1715,8 @@ const Join: React.FC = () => {
                       value={formData.company_address}
                       onChange={handleInputChange}
                       rows={3}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.company_address ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.company_address ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('company_address')}
                     />
@@ -1728,7 +1728,7 @@ const Join: React.FC = () => {
 
             {/* Business Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <Building2 className="w-5 h-5 mr-2 text-blue-600" />
                 Business Information
               </h2>
@@ -1736,15 +1736,15 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isFieldVisible('industry') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Industry{isFieldRequired('industry') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="industry"
                       value={formData.industry}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.industry ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.industry ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('industry')}
                     >
@@ -1759,15 +1759,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('activity_type') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Activity Type{isFieldRequired('activity_type') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="activity_type"
                       value={formData.activity_type}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.activity_type ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.activity_type ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('activity_type')}
                     >
@@ -1782,15 +1782,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('constitution') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Industry Constitution{isFieldRequired('constitution') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="constitution"
                       value={formData.constitution}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.constitution ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.constitution ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('constitution')}
                     >
@@ -1808,15 +1808,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('annual_turnover') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Annual Turnover{isFieldRequired('annual_turnover') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="annual_turnover"
                       value={formData.annual_turnover}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.annual_turnover ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.annual_turnover ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('annual_turnover')}
                     >
@@ -1834,15 +1834,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('number_of_employees') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Number of Employees{isFieldRequired('number_of_employees') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="number_of_employees"
                       value={formData.number_of_employees}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.number_of_employees ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.number_of_employees ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('number_of_employees')}
                     >
@@ -1861,7 +1861,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('products_services') && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Products & Services{isFieldRequired('products_services') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <textarea
@@ -1870,8 +1870,8 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       rows={3}
                       placeholder="Describe your main products and services"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.products_services ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.products_services ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('products_services')}
                     />
@@ -1881,7 +1881,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('brand_names') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Brand Names{isFieldRequired('brand_names') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1890,7 +1890,7 @@ const Join: React.FC = () => {
                       value={formData.brand_names}
                       onChange={handleInputChange}
                       placeholder="Your brand names (if any)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       required={isFieldRequired('brand_names')}
                     />
                   </div>
@@ -1898,7 +1898,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('website') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Website{isFieldRequired('website') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1908,8 +1908,8 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       onBlur={() => validateField('website')}
                       placeholder="www.yourcompany.com"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.website ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.website ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('website')}
                     />
@@ -1921,7 +1921,7 @@ const Join: React.FC = () => {
 
             {/* Registration Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <FileText className="w-5 h-5 mr-2 text-blue-600" />
                 Registration Information
               </h2>
@@ -1929,15 +1929,15 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isFieldVisible('gst_registered') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       GST Registered{isFieldRequired('gst_registered') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="gst_registered"
                       value={formData.gst_registered}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.gst_registered ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.gst_registered ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('gst_registered')}
                     >
@@ -1951,7 +1951,7 @@ const Join: React.FC = () => {
 
                 {formData.gst_registered === 'yes' && isFieldVisible('gst_number') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       GST Number{isFieldRequired('gst_number') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1961,8 +1961,8 @@ const Join: React.FC = () => {
                       onChange={handleGstChange}
                       onBlur={() => validateField('gst_number')}
                       placeholder="22AAAAA0000A1Z5"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.gst_number ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.gst_number ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('gst_number')}
                     />
@@ -1972,7 +1972,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('pan_company') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       PAN (Company){isFieldRequired('pan_company') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -1982,8 +1982,8 @@ const Join: React.FC = () => {
                       onChange={handlePanChange}
                       onBlur={() => validateField('pan_company')}
                       placeholder="10 alphanumeric characters"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.pan_company ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.pan_company ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('pan_company')}
                     />
@@ -1993,15 +1993,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('esic_registered') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       ESIC Registered{isFieldRequired('esic_registered') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="esic_registered"
                       value={formData.esic_registered}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.esic_registered ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.esic_registered ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('esic_registered')}
                     >
@@ -2015,15 +2015,15 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('epf_registered') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       EPF Registered{isFieldRequired('epf_registered') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <select
                       name="epf_registered"
                       value={formData.epf_registered}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.epf_registered ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.epf_registered ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('epf_registered')}
                     >
@@ -2039,7 +2039,7 @@ const Join: React.FC = () => {
 
             {/* Document Uploads */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <Upload className="w-5 h-5 mr-2 text-blue-600" />
                 Document Uploads
               </h2>
@@ -2047,31 +2047,31 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {formData.gst_registered === 'yes' && isFieldVisible('gst_certificate_url') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       GST Certificate{isFieldRequired('gst_certificate_url') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('gstCertificate', e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
-                    <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Max 10MB)</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG (Max 10MB)</p>
                   </div>
                 )}
 
                 {isFieldVisible('udyam_certificate_url') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       UDYAM Certificate{isFieldRequired('udyam_certificate_url') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('udyamCertificate', e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
-                    <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Max 10MB)</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG (Max 10MB)</p>
                   </div>
                 )}
 
@@ -2080,7 +2080,7 @@ const Join: React.FC = () => {
 
             {/* Additional Information */}
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <User className="w-5 h-5 mr-2 text-blue-600" />
                 Additional Information
               </h2>
@@ -2088,7 +2088,7 @@ const Join: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isFieldVisible('alternate_contact_name') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Alternate Contact Name{isFieldRequired('alternate_contact_name') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -2097,7 +2097,7 @@ const Join: React.FC = () => {
                       value={formData.alternate_contact_name}
                       onChange={handleInputChange}
                       placeholder="Alternate contact person name"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       required={isFieldRequired('alternate_contact_name')}
                     />
                   </div>
@@ -2105,7 +2105,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('alternate_mobile') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Alternate Mobile{isFieldRequired('alternate_mobile') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -2115,8 +2115,8 @@ const Join: React.FC = () => {
                       onChange={handleMobileNumberChange}
                       onBlur={() => validateField('alternate_mobile')}
                       placeholder="Alternate mobile number"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.alternate_mobile ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.alternate_mobile ? 'border-red-500' : 'border-border'
                       }`}
                       required={isFieldRequired('alternate_mobile')}
                     />
@@ -2126,7 +2126,7 @@ const Join: React.FC = () => {
 
                 {isFieldVisible('referred_by') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Referred By{isFieldRequired('referred_by') && <span className="text-red-500 ml-1">*</span>}
                     </label>
                     <input
@@ -2135,7 +2135,7 @@ const Join: React.FC = () => {
                       value={formData.referred_by}
                       onChange={handleInputChange}
                       placeholder="Name of the person who referred you"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                       required={isFieldRequired('referred_by')}
                     />
                   </div>
@@ -2144,10 +2144,10 @@ const Join: React.FC = () => {
             </section>
 
             {/* Submit Button */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-end pt-8 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row gap-4 justify-end pt-8 border-t border-border">
               <Link
                 to="/dashboard"
-                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200 sm:order-1"
+                className="inline-flex items-center justify-center px-6 py-3 border border-border text-base font-medium rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors duration-200 sm:order-1"
               >
                 Cancel
               </Link>
@@ -2158,8 +2158,8 @@ const Join: React.FC = () => {
                 disabled={isSubmitting || isVerifying || !isVerifiedForSubmit}
                 className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-2 ${
                   isSubmitting || isVerifying || !isVerifiedForSubmit
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-muted cursor-not-allowed'
+                    : 'bg-primary hover:bg-primary/90'
                 }`}
               >
                 {isSubmitting ? (
@@ -2180,7 +2180,7 @@ const Join: React.FC = () => {
                 disabled={isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()}
                 className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-3 ${
                   isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()
-                    ? 'bg-gray-400 cursor-not-allowed'
+                    ? 'bg-muted cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-700'
                 }`}
               >

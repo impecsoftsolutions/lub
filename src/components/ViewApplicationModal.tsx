@@ -327,9 +327,9 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     const isEmpty = formattedValue === 'Not provided';
 
     return (
-      <div className="py-3 border-b border-gray-100 last:border-0">
-        <dt className="text-sm font-medium text-gray-600 mb-1">{label}</dt>
-        <dd className={`text-sm ${isEmpty ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+      <div className="py-3 border-b border-border last:border-0">
+        <dt className="text-sm font-medium text-muted-foreground mb-1">{label}</dt>
+        <dd className={`text-sm ${isEmpty ? 'text-muted-foreground/60 italic' : 'text-foreground'}`}>
           {formattedValue}
         </dd>
       </div>
@@ -340,19 +340,19 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     const isExpanded = expandedSections.has(sectionId);
 
     return (
-      <div key={sectionId} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div key={sectionId} className="bg-card border border-border rounded-lg overflow-hidden">
         <button
           onClick={() => toggleSection(sectionId)}
-          className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+          className="w-full px-6 py-4 flex items-center justify-between bg-muted/50 hover:bg-muted transition-colors"
         >
           <div className="flex items-center">
             {section.icon}
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">{section.title}</h3>
+            <h3 className="text-section font-semibold text-foreground ml-3">{section.title}</h3>
           </div>
           {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-500" />
+            <ChevronUp className="w-5 h-5 text-muted-foreground" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-gray-500" />
+            <ChevronDown className="w-5 h-5 text-muted-foreground" />
           )}
         </button>
         {isExpanded && (
@@ -372,10 +372,10 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading application details...</p>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-card rounded-lg shadow-xl p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading application details...</p>
         </div>
       </div>
     );
@@ -387,7 +387,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
         <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
           <div className="flex items-center mb-4">
             <AlertCircle className="w-6 h-6 text-destructive mr-3" />
-            <h3 className="text-lg font-semibold text-foreground">Error Loading Application</h3>
+            <h3 className="text-section font-semibold text-foreground">Error Loading Application</h3>
           </div>
           <p className="text-muted-foreground mb-6">{error || 'Failed to load application details'}</p>
           <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
@@ -506,7 +506,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
         {/* Header */}
         <div className="sticky top-0 bg-card border-b px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Application Review</h2>
+            <h2 className="text-section font-semibold text-foreground">Application Review</h2>
             <p className="text-sm text-muted-foreground mt-1">
               {applicationData.full_name} - {applicationData.company_name}
             </p>
@@ -557,15 +557,15 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
           {/* Documents Section */}
           {(applicationData.gst_certificate_url || applicationData.udyam_certificate_url || applicationData.payment_proof_url || applicationData.profile_photo_url) && (
-            <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Uploaded Documents</h3>
+            <div className="mb-6 bg-muted/50 border border-border rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Uploaded Documents</h3>
               <div className="flex flex-wrap gap-3">
                 {applicationData.profile_photo_url && (
                   <a
                     href={applicationData.profile_photo_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <User className="w-4 h-4 mr-2" />
                     Profile Photo
@@ -577,7 +577,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
                     href={applicationData.gst_certificate_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     GST Certificate

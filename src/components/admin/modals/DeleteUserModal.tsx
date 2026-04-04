@@ -126,29 +126,29 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          className="fixed inset-0 transition-opacity bg-black/50"
           onClick={handleClose}
         />
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
 
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full">
                   <AlertTriangle className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete User Account</h3>
+                  <h3 className="text-section font-semibold text-foreground">Delete User Account</h3>
                   <p className="text-sm text-red-600 font-medium">This action cannot be undone</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
                 disabled={isDeleting}
-                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -196,14 +196,14 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
               <>
                 <div className="mb-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600 font-medium">Email:</span>
-                    <span className="text-gray-900">{user.email}</span>
+                    <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-muted-foreground font-medium">Email:</span>
+                    <span className="text-foreground">{user.email}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600 font-medium">Mobile:</span>
-                    <span className="text-gray-900">{user.mobile_number || 'Not provided'}</span>
+                    <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-muted-foreground font-medium">Mobile:</span>
+                    <span className="text-foreground">{user.mobile_number || 'Not provided'}</span>
                   </div>
                 </div>
 
@@ -219,7 +219,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-start gap-3 p-4 bg-muted/50 border border-border rounded-lg">
                   <input
                     type="checkbox"
                     id="confirm-delete"
@@ -229,11 +229,11 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
                       setError('');
                     }}
                     disabled={isDeleting || success}
-                    className="mt-1 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500 disabled:opacity-50"
+                    className="mt-1 w-4 h-4 text-red-600 border-border rounded focus:ring-red-500 disabled:opacity-50"
                   />
                   <label
                     htmlFor="confirm-delete"
-                    className="text-sm text-gray-700 font-medium cursor-pointer select-none"
+                    className="text-sm text-foreground font-medium cursor-pointer select-none"
                   >
                     I understand this action cannot be undone
                   </label>
@@ -242,7 +242,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
             )}
           </div>
 
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
             <button
               onClick={handleDelete}
               disabled={!isConfirmed || !isGeneralUser || isDeleting || success}
@@ -269,7 +269,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
               type="button"
               onClick={handleClose}
               disabled={isDeleting}
-              className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-3 w-full inline-flex justify-center rounded-lg border border-border shadow-sm px-4 py-2 bg-card text-base font-medium text-foreground hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>

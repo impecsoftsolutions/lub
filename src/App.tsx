@@ -35,6 +35,7 @@ import AdminDeletedMembers from './pages/AdminDeletedMembers';
 import AdminValidationSettings from './pages/AdminValidationSettings';
 import AdminDashboardOverview from './pages/AdminDashboardOverview';
 import PaymentSettings from './pages/AdminDashboard/PaymentSettings';
+import AdminAppearanceSettings from './pages/admin/AdminAppearanceSettings';
 import Styleguide from './pages/Styleguide';
 import Payment from './pages/Payment';
 import MemberProfile from './pages/MemberProfile';
@@ -42,6 +43,10 @@ import { MemberContextProvider } from './contexts/MemberContext';
 import { PermissionProvider } from './contexts/PermissionContext';
 import { AdminContextProvider } from './contexts/AdminContext';
 import { sessionManager } from './lib/sessionManager';
+import { applyStoredTheme } from './lib/themeManager';
+
+// Restore persisted theme and color mode before first render
+applyStoredTheme();
 
 const AdminLayoutLazy = React.lazy(() =>
   import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout }))
@@ -136,6 +141,7 @@ function App() {
             <Route path="/admin/settings/forms" element={<AdminFormsList />} />
             <Route path="/admin/settings/forms/join-lub" element={<AdminFormFieldConfiguration />} />
             <Route path="/admin/settings/validation" element={<AdminValidationSettings />} />
+            <Route path="/admin/settings/appearance" element={<AdminAppearanceSettings />} />
 
             <Route path="/admin/administration/users" element={<AdminUsers />} />
           </Route>

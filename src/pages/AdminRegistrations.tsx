@@ -11,7 +11,7 @@ import EditMemberModal from '../components/EditMemberModal';
 import AuditHistoryModal from '../components/AuditHistoryModal';
 import ViewApplicationModal from '../components/ViewApplicationModal';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -23,6 +23,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface MemberRegistration {
   id: string;
@@ -427,9 +428,9 @@ const AdminRegistrations: React.FC = () => {
       permission="members.view"
       fallback={
         <div className="p-6 text-center py-16">
-          <Lock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Access Denied</h2>
-          <p className="text-sm text-gray-500">You don't have permission to view member registrations.</p>
+          <Lock className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-1">Access Denied</h2>
+          <p className="text-sm text-muted-foreground">You don't have permission to view member registrations.</p>
         </div>
       }
     >
@@ -444,7 +445,7 @@ const AdminRegistrations: React.FC = () => {
       <PageHeader
         title="Member Registrations"
         subtitle="Manage and review membership applications"
-        actions={<span className="text-sm text-gray-500">{registrations.length} total</span>}
+        actions={<span className="text-sm text-muted-foreground">{registrations.length} total</span>}
       />
 
       {/* Filter bar */}
@@ -481,15 +482,15 @@ const AdminRegistrations: React.FC = () => {
 
       {/* Registrations Table */}
       {isLoading ? (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
+        <div className="bg-card rounded-lg border border-border shadow-sm p-12 text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-sm text-gray-500">Loading registrations...</p>
+          <p className="text-sm text-muted-foreground">Loading registrations...</p>
         </div>
       ) : filteredRegistrations.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
-          <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-sm font-medium text-gray-900 mb-1">No registrations found</h3>
-          <p className="text-sm text-gray-500">
+        <div className="bg-card rounded-lg border border-border shadow-sm p-12 text-center">
+          <Users className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+          <h3 className="text-sm font-medium text-foreground mb-1">No registrations found</h3>
+          <p className="text-sm text-muted-foreground">
             {searchTerm || statusFilter !== 'all'
               ? 'Try adjusting your search or filter criteria'
               : 'No member registrations have been submitted yet'}
@@ -592,10 +593,13 @@ const AdminRegistrations: React.FC = () => {
                           </Button>
                         )}
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm" className="h-7 w-7">
+                          <DropdownMenuTrigger
+                            className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}
+                          >
+                            <span className="sr-only">Open actions menu</span>
+                            <span aria-hidden="true">
                               <MoreHorizontal className="w-4 h-4" />
-                            </Button>
+                            </span>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {canEdit && (
@@ -639,7 +643,7 @@ const AdminRegistrations: React.FC = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                         {actionLoading === registration.id && (
-                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary" />
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-blue-600" />
                         )}
                       </div>
                     </TableCell>
@@ -673,7 +677,7 @@ const AdminRegistrations: React.FC = () => {
         <DialogContent showCloseIcon={false}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              <AlertTriangle className="w-5 h-5 text-primary" />
               Confirm {confirmDialog.action === 'approved' ? 'Approval' : 'Rejection'}
             </DialogTitle>
           </DialogHeader>
@@ -701,7 +705,7 @@ const AdminRegistrations: React.FC = () => {
 
           {actionLoading === confirmDialog.registrationId && (
             <div className="p-3 bg-primary/5 rounded-lg flex items-center text-sm text-primary">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
               Processing your request...
             </div>
           )}

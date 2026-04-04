@@ -163,7 +163,7 @@ const SignUp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -173,18 +173,18 @@ const SignUp: React.FC = () => {
 
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Create Your Account</h2>
-          <p className="mt-2 text-gray-600">Sign up with your email address, mobile number, and state</p>
+          <h2 className="text-xl font-semibold text-foreground">Create Your Account</h2>
+          <p className="mt-2 text-muted-foreground">Sign up with your email address, mobile number, and state</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Email Address <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <input
                   id="email"
                   name="email"
@@ -192,14 +192,14 @@ const SignUp: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring ${
+                    errors.email ? 'border-destructive' : 'border-border'
                   }`}
                   placeholder="your.email@example.com"
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
+                <p className="mt-1 text-sm text-destructive flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {errors.email}
                 </p>
@@ -207,11 +207,11 @@ const SignUp: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="mobile_number" className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Mobile Number <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Phone className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Phone className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <input
                   id="mobile_number"
                   name="mobile_number"
@@ -219,14 +219,14 @@ const SignUp: React.FC = () => {
                   required
                   value={formData.mobile_number}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.mobile_number ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring ${
+                    errors.mobile_number ? 'border-destructive' : 'border-border'
                   }`}
                   placeholder="10-digit mobile number"
                 />
               </div>
               {errors.mobile_number && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
+                <p className="mt-1 text-sm text-destructive flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {errors.mobile_number}
                 </p>
@@ -234,11 +234,11 @@ const SignUp: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="state" className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 State <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <MapPin className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <MapPin className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <select
                   id="state"
                   name="state"
@@ -246,9 +246,9 @@ const SignUp: React.FC = () => {
                   value={formData.state}
                   onChange={handleInputChange}
                   disabled={isLoadingStates}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.state ? 'border-red-500' : 'border-gray-300'
-                  } ${isLoadingStates ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring ${
+                    errors.state ? 'border-destructive' : 'border-border'
+                  } ${isLoadingStates ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                 >
                   <option value="">{isLoadingStates ? 'Loading states...' : 'Select State'}</option>
                   {availableStates.map(state => (
@@ -259,7 +259,7 @@ const SignUp: React.FC = () => {
                 </select>
               </div>
               {errors.state && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
+                <p className="mt-1 text-sm text-destructive flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {errors.state}
                 </p>
@@ -271,8 +271,8 @@ const SignUp: React.FC = () => {
               disabled={isSubmitting}
               className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
                 isSubmitting
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
               }`}
             >
               {isSubmitting ? (
@@ -287,9 +287,9 @@ const SignUp: React.FC = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link to="/signin" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link to="/signin" className="text-primary hover:text-primary/80 font-medium">
                 Sign In
               </Link>
             </p>
@@ -297,7 +297,7 @@ const SignUp: React.FC = () => {
         </div>
 
         <div className="text-center">
-          <Link to="/" className="text-sm text-gray-600 hover:text-gray-900">
+          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
             Back to Home
           </Link>
         </div>

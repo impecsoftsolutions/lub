@@ -18,7 +18,7 @@ const MemberNav: React.FC = () => {
   })();
 
   return (
-    <div className="bg-white border-b border-gray-200">
+    <div className="bg-card border-b border-border">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <nav className="flex items-center gap-1" aria-label="Member navigation">
@@ -30,8 +30,8 @@ const MemberNav: React.FC = () => {
                   to={link.path}
                   className={`px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
                     isActive
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                   }`}
                 >
                   {link.label}
@@ -40,7 +40,7 @@ const MemberNav: React.FC = () => {
             })}
           </nav>
           {displayName && (
-            <span className="text-xs text-gray-400 hidden sm:block">{displayName}</span>
+            <span className="text-xs text-muted-foreground hidden sm:block">{displayName}</span>
           )}
         </div>
       </div>

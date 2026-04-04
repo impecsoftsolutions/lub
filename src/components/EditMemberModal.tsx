@@ -1023,23 +1023,23 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
   if (isLoadingFieldConfig || isLoadingValidation) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading form configuration...</p>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-card rounded-lg shadow-xl p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading form configuration...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Edit Member Information</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+          <h2 className="text-section font-semibold text-foreground">Edit Member Information</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -1057,9 +1057,9 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
           )}
 
           {isSuperAdmin && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start">
-              <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-800">
+            <div className="mb-6 p-4 bg-primary/5 border border-border rounded-lg flex items-start">
+              <AlertCircle className="w-5 h-5 text-primary mr-3 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-foreground">
                 <p className="font-medium">Super Admin Mode</p>
                 <p className="mt-1">You can see and edit all fields, including those hidden in the registration form. Required fields match the registration form settings.</p>
               </div>
@@ -1068,11 +1068,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+              <h3 className="text-section font-medium text-foreground mb-4">Personal Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {shouldShowField('full_name') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Full Name {renderRequiredIndicator('full_name')}
                     </label>
                     <input
@@ -1080,8 +1080,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       name="full_name"
                       value={formData.full_name}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.full_name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.full_name ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.full_name && (
@@ -1092,7 +1092,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('email') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Email {renderRequiredIndicator('email')}
                     </label>
                     <input
@@ -1101,8 +1101,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.email}
                       onChange={handleChange}
                       onBlur={() => validateSingleField('email')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.email ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.email && (
@@ -1113,7 +1113,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('mobile_number') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Mobile Number {renderRequiredIndicator('mobile_number')}
                     </label>
                     <input
@@ -1122,8 +1122,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.mobile_number}
                       onChange={handleChange}
                       onBlur={() => validateSingleField('mobile_number')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.mobile_number ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.mobile_number ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.mobile_number && (
@@ -1134,15 +1134,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('gender') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Gender {renderRequiredIndicator('gender')}
                     </label>
                     <select
                       name="gender"
                       value={formData.gender}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.gender ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.gender ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="male">Male</option>
@@ -1156,7 +1156,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('date_of_birth') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Date of Birth {renderRequiredIndicator('date_of_birth')}
                     </label>
                     <input
@@ -1164,8 +1164,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       name="date_of_birth"
                       value={formData.date_of_birth}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.date_of_birth ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.date_of_birth ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.date_of_birth && (
@@ -1175,7 +1175,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                 )}
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     <Camera className="w-4 h-4 inline mr-1" />
                     Profile Photo (Optional)
                   </label>
@@ -1192,14 +1192,14 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       />
                       <label
                         htmlFor="edit-profile-photo-input"
-                        className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-colors ${
+                        className={`inline-flex items-center px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
                           isUploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
                         <Upload className="w-4 h-4 mr-2" />
                         {isUploadingPhoto ? 'Uploading...' : 'Upload Photo'}
                       </label>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         Upload a profile photo (JPG, JPEG, or PNG). You'll be able to crop it to fit.
                       </p>
                     </div>
@@ -1209,7 +1209,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         <img
                           src={profilePhotoPreview}
                           alt="Profile preview"
-                          className="w-32 h-40 object-cover rounded-lg border-2 border-gray-200"
+                          className="w-32 h-40 object-cover rounded-lg border-2 border-border"
                         />
                       </div>
                       <div className="flex-1">
@@ -1217,7 +1217,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                           <CheckCircle className="w-4 h-4 mr-1" />
                           {profilePhoto ? 'New photo ready' : 'Current photo'}
                         </p>
-                        <p className="text-xs text-gray-600 mb-3">
+                        <p className="text-xs text-muted-foreground mb-3">
                           {profilePhoto
                             ? 'This photo will be uploaded when you save changes.'
                             : 'This is the current profile photo. You can replace or remove it.'}
@@ -1233,7 +1233,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                           />
                           <label
                             htmlFor="edit-replace-photo-input"
-                            className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 cursor-pointer transition-colors ${
+                            className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 cursor-pointer transition-colors ${
                               isUploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                           >
@@ -1257,7 +1257,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {isSuperAdmin && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Member ID (Certificate Number)
                     </label>
                     <input
@@ -1266,11 +1266,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.member_id}
                       onChange={handleChange}
                       placeholder="e.g., LUB-2024-001"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.member_id ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.member_id ? 'border-red-500' : 'border-border'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Certificate number printed on official certificates (optional, must be unique)
                     </p>
                     {validationErrors.member_id && (
@@ -1282,11 +1282,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Company Information</h3>
+              <h3 className="text-section font-medium text-foreground mb-4">Company Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {shouldShowField('company_name') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Company Name {renderRequiredIndicator('company_name')}
                     </label>
                     <input
@@ -1294,8 +1294,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       name="company_name"
                       value={formData.company_name}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.company_name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.company_name ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.company_name && (
@@ -1306,11 +1306,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('company_designation_id') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Designation {renderRequiredIndicator('company_designation_id')}
                     </label>
                     {isLoadingDesignations ? (
-                      <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                      <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         Loading designations...
                       </div>
@@ -1319,8 +1319,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="company_designation_id"
                         value={formData.company_designation_id}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.company_designation_id ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.company_designation_id ? 'border-red-500' : 'border-border'
                         }`}
                       >
                         <option value="">Select Designation</option>
@@ -1339,7 +1339,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('company_address') && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Company Address {renderRequiredIndicator('company_address')}
                     </label>
                     <textarea
@@ -1347,8 +1347,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.company_address}
                       onChange={handleChange}
                       rows={2}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.company_address ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.company_address ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.company_address && (
@@ -1359,11 +1359,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('state') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       State {renderRequiredIndicator('state')}
                     </label>
                     {isLoadingStates ? (
-                      <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                      <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         Loading states...
                       </div>
@@ -1372,8 +1372,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="state"
                         value={formData.state}
                         onChange={handleStateChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.state ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.state ? 'border-red-500' : 'border-border'
                         }`}
                       >
                         <option value="">Select State</option>
@@ -1392,11 +1392,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('district') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       District {renderRequiredIndicator('district')}
                     </label>
                     {isLoadingDistricts ? (
-                      <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                      <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         Loading districts...
                       </div>
@@ -1406,8 +1406,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         value={formData.district}
                         onChange={handleDistrictChange}
                         disabled={!formData.state}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed ${
-                          validationErrors.district ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed ${
+                          validationErrors.district ? 'border-red-500' : 'border-border'
                         }`}
                       >
                         <option value="">
@@ -1428,11 +1428,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('city') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       City {renderRequiredIndicator('city')}
                     </label>
                     {isLoadingCities ? (
-                      <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center">
+                      <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         Loading cities...
                       </div>
@@ -1442,8 +1442,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         value={showOtherCity ? 'Other' : (formData.city || '')}
                         onChange={handleCityChange}
                         disabled={!selectedDistrictId && !showOtherCity}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed ${
-                          validationErrors.city ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed ${
+                          validationErrors.city ? 'border-red-500' : 'border-border'
                         }`}
                       >
                         <option value="">
@@ -1465,7 +1465,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {showOtherCity && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Enter City/Town/Village {renderRequiredIndicator('city')}
                     </label>
                     <input
@@ -1473,11 +1473,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={otherCityText}
                       onChange={handleOtherCityChange}
                       placeholder="Enter your city, town, or village"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.city ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.city ? 'border-red-500' : 'border-border'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Enter your city, town, or village name</p>
+                    <p className="text-xs text-muted-foreground mt-1">Enter your city, town, or village name</p>
                     {validationErrors.city && (
                       <p className="text-red-600 text-xs mt-1">{validationErrors.city}</p>
                     )}
@@ -1486,7 +1486,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('pin_code') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       PIN Code {renderRequiredIndicator('pin_code')}
                     </label>
                     <input
@@ -1495,8 +1495,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.pin_code}
                       onChange={handleChange}
                       onBlur={() => validateSingleField('pin_code')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.pin_code ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.pin_code ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.pin_code && (
@@ -1507,7 +1507,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('products_services') && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Products & Services {renderRequiredIndicator('products_services')}
                     </label>
                     <textarea
@@ -1515,8 +1515,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.products_services}
                       onChange={handleChange}
                       rows={2}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.products_services ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.products_services ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.products_services && (
@@ -1527,7 +1527,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('website') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Website {renderRequiredIndicator('website')}
                     </label>
                     <input
@@ -1537,8 +1537,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       onChange={handleChange}
                       onBlur={() => validateSingleField('website')}
                       placeholder="www.yourcompany.com"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.website ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.website ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.website && (
@@ -1550,19 +1550,19 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Business Information</h3>
+              <h3 className="text-section font-medium text-foreground mb-4">Business Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {shouldShowField('industry') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Industry {renderRequiredIndicator('industry')}
                     </label>
                     <select
                       name="industry"
                       value={formData.industry}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.industry ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.industry ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select Industry</option>
@@ -1578,15 +1578,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('activity_type') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Activity Type {renderRequiredIndicator('activity_type')}
                     </label>
                     <select
                       name="activity_type"
                       value={formData.activity_type}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.activity_type ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.activity_type ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select Activity Type</option>
@@ -1602,15 +1602,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('constitution') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Industry Constitution {renderRequiredIndicator('constitution')}
                     </label>
                     <select
                       name="constitution"
                       value={formData.constitution}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.constitution ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.constitution ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select Industry Constitution</option>
@@ -1629,15 +1629,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('annual_turnover') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Annual Turnover {renderRequiredIndicator('annual_turnover')}
                     </label>
                     <select
                       name="annual_turnover"
                       value={formData.annual_turnover}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.annual_turnover ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.annual_turnover ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select Annual Turnover</option>
@@ -1656,15 +1656,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('number_of_employees') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Number of Employees {renderRequiredIndicator('number_of_employees')}
                     </label>
                     <select
                       name="number_of_employees"
                       value={formData.number_of_employees}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.number_of_employees ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.number_of_employees ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select Number of Employees</option>
@@ -1684,7 +1684,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('brand_names') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Brand Names {renderRequiredIndicator('brand_names')}
                     </label>
                     <input
@@ -1693,8 +1693,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.brand_names}
                       onChange={handleChange}
                       placeholder="Your brand names (if any)"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.brand_names ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.brand_names ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.brand_names && (
@@ -1706,19 +1706,19 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Registration Information</h3>
+              <h3 className="text-section font-medium text-foreground mb-4">Registration Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {shouldShowField('gst_registered') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       GST Registered {renderRequiredIndicator('gst_registered')}
                     </label>
                     <select
                       name="gst_registered"
                       value={formData.gst_registered}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.gst_registered ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.gst_registered ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select</option>
@@ -1733,7 +1733,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {formData.gst_registered === 'yes' && shouldShowField('gst_number') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       GST Number {renderRequiredIndicator('gst_number')}
                     </label>
                     <input
@@ -1743,8 +1743,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       onChange={handleGstChange}
                       onBlur={() => validateSingleField('gst_number')}
                       placeholder="22AAAAA0000A1Z5"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.gst_number ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.gst_number ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.gst_number && (
@@ -1755,7 +1755,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('pan_company') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       PAN (Company) {renderRequiredIndicator('pan_company')}
                     </label>
                     <input
@@ -1765,8 +1765,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       onChange={handlePanChange}
                       onBlur={() => validateSingleField('pan_company')}
                       placeholder="10 alphanumeric characters"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.pan_company ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.pan_company ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.pan_company && (
@@ -1777,15 +1777,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('esic_registered') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       ESIC Registered {renderRequiredIndicator('esic_registered')}
                     </label>
                     <select
                       name="esic_registered"
                       value={formData.esic_registered}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.esic_registered ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.esic_registered ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select</option>
@@ -1800,15 +1800,15 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('epf_registered') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       EPF Registered {renderRequiredIndicator('epf_registered')}
                     </label>
                     <select
                       name="epf_registered"
                       value={formData.epf_registered}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.epf_registered ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.epf_registered ? 'border-red-500' : 'border-border'
                       }`}
                     >
                       <option value="">Select</option>
@@ -1824,11 +1824,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
+              <h3 className="text-section font-medium text-foreground mb-4">Additional Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {shouldShowField('alternate_contact_name') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Alternate Contact Name {renderRequiredIndicator('alternate_contact_name')}
                     </label>
                     <input
@@ -1837,8 +1837,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.alternate_contact_name}
                       onChange={handleChange}
                       placeholder="Alternate contact person name"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.alternate_contact_name ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.alternate_contact_name ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.alternate_contact_name && (
@@ -1849,7 +1849,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('alternate_mobile') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Alternate Mobile {renderRequiredIndicator('alternate_mobile')}
                     </label>
                     <input
@@ -1859,8 +1859,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       onChange={handleAlternateMobileChange}
                       onBlur={() => validateSingleField('alternate_mobile')}
                       placeholder="10-digit mobile number"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.alternate_mobile ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.alternate_mobile ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.alternate_mobile && (
@@ -1871,7 +1871,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                 {shouldShowField('referred_by') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Referred By {renderRequiredIndicator('referred_by')}
                     </label>
                     <input
@@ -1880,8 +1880,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                       value={formData.referred_by}
                       onChange={handleChange}
                       placeholder="Name of the person who referred you"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        validationErrors.referred_by ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        validationErrors.referred_by ? 'border-red-500' : 'border-border'
                       }`}
                     />
                     {validationErrors.referred_by && (
@@ -1895,11 +1895,11 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
             {isSuperAdmin && (
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Information</h3>
+                <h3 className="text-section font-medium text-foreground mb-4">Payment Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {shouldShowField('amount_paid') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Amount Paid {renderRequiredIndicator('amount_paid')}
                       </label>
                       <input
@@ -1907,8 +1907,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="amount_paid"
                         value={formData.amount_paid}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.amount_paid ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.amount_paid ? 'border-red-500' : 'border-border'
                         }`}
                       />
                       {validationErrors.amount_paid && (
@@ -1919,7 +1919,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                   {shouldShowField('payment_date') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Payment Date {renderRequiredIndicator('payment_date')}
                       </label>
                       <input
@@ -1927,8 +1927,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="payment_date"
                         value={formData.payment_date}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.payment_date ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.payment_date ? 'border-red-500' : 'border-border'
                         }`}
                       />
                       {validationErrors.payment_date && (
@@ -1939,7 +1939,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                   {shouldShowField('payment_mode') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Payment Mode {renderRequiredIndicator('payment_mode')}
                       </label>
                       {console.log('[EditMemberModal] Dropdown rendering with value:', formData.payment_mode)}
@@ -1947,8 +1947,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="payment_mode"
                         value={formData.payment_mode}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.payment_mode ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.payment_mode ? 'border-red-500' : 'border-border'
                         }`}
                       >
                         <option value="">Select Payment Mode</option>
@@ -1966,7 +1966,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                   {shouldShowField('transaction_id') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Transaction ID {renderRequiredIndicator('transaction_id')}
                       </label>
                       <input
@@ -1974,8 +1974,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="transaction_id"
                         value={formData.transaction_id}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.transaction_id ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.transaction_id ? 'border-red-500' : 'border-border'
                         }`}
                       />
                       {validationErrors.transaction_id && (
@@ -1986,7 +1986,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
                   {shouldShowField('bank_reference') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         Bank Reference {renderRequiredIndicator('bank_reference')}
                       </label>
                       <input
@@ -1994,8 +1994,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
                         name="bank_reference"
                         value={formData.bank_reference}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          validationErrors.bank_reference ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                          validationErrors.bank_reference ? 'border-red-500' : 'border-border'
                         }`}
                       />
                       {validationErrors.bank_reference && (
@@ -2008,19 +2008,19 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
             )}
           </div>
 
-          <div className="flex gap-3 justify-end mt-6 pt-6 border-t border-gray-200">
+          <div className="flex gap-3 justify-end mt-6 pt-6 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || isLoadingFieldConfig}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>

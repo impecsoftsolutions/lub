@@ -77,10 +77,10 @@ const MemberViewProfile: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading your profile...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading your profile...</p>
         </div>
       </div>
     );
@@ -88,14 +88,14 @@ const MemberViewProfile: React.FC = () => {
 
   if (!member) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-900 font-medium mb-2">Unable to load your profile</p>
-          <p className="text-gray-600 mb-4">Please try again or contact support</p>
+          <p className="text-foreground font-medium mb-2">Unable to load your profile</p>
+          <p className="text-muted-foreground mb-4">Please try again or contact support</p>
           <Link
             to="/dashboard"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-block"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 inline-block"
           >
             Back to Dashboard
           </Link>
@@ -121,11 +121,11 @@ const MemberViewProfile: React.FC = () => {
       <MemberNav />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200">
+        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
                   {member.profile_photo_url ? (
                     <img
                       src={member.profile_photo_url}
@@ -133,19 +133,19 @@ const MemberViewProfile: React.FC = () => {
                       className="w-14 h-14 rounded-full object-cover"
                     />
                   ) : (
-                    <User className="w-7 h-7 text-gray-400" />
+                    <User className="w-7 h-7 text-muted-foreground" />
                   )}
                 </div>
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900">{displayName}</h1>
+                  <h1 className="text-section font-semibold text-foreground">{displayName}</h1>
                   {registration?.company_name && (
-                    <p className="text-sm text-gray-500 mt-0.5">{registration.company_name}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{registration.company_name}</p>
                   )}
                 </div>
               </div>
               <Link
                 to="/dashboard/edit"
-                className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-md hover:bg-muted/50 transition-colors"
               >
                 <Edit className="w-4 h-4" />
                 Edit Profile
@@ -157,37 +157,37 @@ const MemberViewProfile: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
                     Personal Information
                   </h2>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm text-gray-600 flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground flex items-center gap-2">
                         <Mail className="w-4 h-4" />
                         Email Address
                       </label>
-                      <p className="mt-1 text-gray-900 font-medium">{member.email}</p>
+                      <p className="mt-1 text-foreground font-medium">{member.email}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-600 flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground flex items-center gap-2">
                         <Phone className="w-4 h-4" />
                         Mobile Number
                       </label>
-                      <p className="mt-1 text-gray-900 font-medium">{member.mobile_number}</p>
+                      <p className="mt-1 text-foreground font-medium">{member.mobile_number}</p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Building className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Building className="w-5 h-5 text-primary" />
                     Company Information
                   </h2>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm text-gray-600">Company Name</label>
-                      <p className="mt-1 text-gray-900 font-medium">{registration?.company_name}</p>
+                      <label className="text-sm text-muted-foreground">Company Name</label>
+                      <p className="mt-1 text-foreground font-medium">{registration?.company_name}</p>
                     </div>
                   </div>
                 </div>
@@ -195,8 +195,8 @@ const MemberViewProfile: React.FC = () => {
 
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-primary" />
                     Membership Details
                   </h2>
                   {effectiveStatus === 'pending' && (
@@ -222,30 +222,30 @@ const MemberViewProfile: React.FC = () => {
                   <div className="space-y-4">
                     {member.member_id && (
                       <div>
-                        <label className="text-sm text-gray-600">Member ID</label>
-                        <p className="mt-1 text-gray-900 font-bold text-lg">{member.member_id}</p>
+                        <label className="text-sm text-muted-foreground">Member ID</label>
+                        <p className="mt-1 text-foreground font-semibold text-sm">{member.member_id}</p>
                       </div>
                     )}
 
                     <div>
-                      <label className="text-sm text-gray-600 flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         Member Since
                       </label>
-                      <p className="mt-1 text-gray-900 font-medium">{formatDate(member.created_at)}</p>
+                      <p className="mt-1 text-foreground font-medium">{formatDate(member.created_at)}</p>
                     </div>
 
                     {member.approval_date && (
                       <div>
-                        <label className="text-sm text-gray-600">Approval Date</label>
-                        <p className="mt-1 text-gray-900 font-medium">{formatDate(member.approval_date)}</p>
+                        <label className="text-sm text-muted-foreground">Approval Date</label>
+                        <p className="mt-1 text-foreground font-medium">{formatDate(member.approval_date)}</p>
                       </div>
                     )}
 
                     {member.reapplication_count > 0 && (
                       <div>
-                        <label className="text-sm text-gray-600">Application Attempts</label>
-                        <p className="mt-1 text-gray-900 font-medium">{member.reapplication_count + 1}</p>
+                        <label className="text-sm text-muted-foreground">Application Attempts</label>
+                        <p className="mt-1 text-foreground font-medium">{member.reapplication_count + 1}</p>
                       </div>
                     )}
                   </div>
@@ -267,4 +267,3 @@ const MemberViewProfile: React.FC = () => {
 };
 
 export default MemberViewProfile;
-

@@ -60,14 +60,14 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Crop Profile Photo</h2>
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
+      <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-section font-semibold text-foreground">Crop Profile Photo</h2>
           <button
             onClick={onClose}
             disabled={isProcessing}
-            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             <X className="w-6 h-6" />
           </button>
@@ -91,13 +91,13 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
           />
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200">
+        <div className="px-6 py-4 border-t border-border">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Zoom
             </label>
             <div className="flex items-center gap-3">
-              <ZoomOut className="w-4 h-4 text-gray-500" />
+              <ZoomOut className="w-4 h-4 text-muted-foreground" />
               <input
                 type="range"
                 min="1"
@@ -106,17 +106,17 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
                 disabled={isProcessing}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${((zoom - 1) / 2) * 100}%, #E5E7EB ${((zoom - 1) / 2) * 100}%, #E5E7EB 100%)`,
                 }}
               />
-              <ZoomIn className="w-4 h-4 text-gray-500" />
+              <ZoomIn className="w-4 h-4 text-muted-foreground" />
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-blue-800">
+          <div className="bg-primary/5 border border-border rounded-lg p-3 mb-4">
+            <p className="text-sm text-foreground">
               <strong>Tip:</strong> Drag the image to reposition it within the crop area. Use the zoom slider to adjust the size.
             </p>
           </div>
@@ -126,7 +126,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isProcessing}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
@@ -134,7 +134,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
               type="button"
               onClick={handleSave}
               disabled={isProcessing}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isProcessing ? (
                 <>

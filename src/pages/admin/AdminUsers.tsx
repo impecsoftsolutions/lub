@@ -273,7 +273,7 @@ const AdminUsers: React.FC = () => {
 
     if (user.account_type === 'general_user') {
       return (
-        <span className={`${baseClasses} bg-gray-100 text-gray-800`}>
+        <span className={`${baseClasses} bg-muted text-muted-foreground`}>
           <Users className="w-3 h-3 mr-1" />
           {displayText}
         </span>
@@ -282,7 +282,7 @@ const AdminUsers: React.FC = () => {
 
     if (user.account_type === 'admin' || user.account_type === 'both') {
       return (
-        <span className={`${baseClasses} bg-blue-100 text-blue-800`}>
+        <span className={`${baseClasses} bg-primary/10 text-primary`}>
           <Shield className="w-3 h-3 mr-1" />
           {displayText}
         </span>
@@ -291,7 +291,7 @@ const AdminUsers: React.FC = () => {
 
     if (user.account_type === 'member') {
       return (
-        <span className={`${baseClasses} bg-green-100 text-green-800`}>
+        <span className={`${baseClasses} bg-secondary text-secondary-foreground`}>
           <Users className="w-3 h-3 mr-1" />
           {displayText}
         </span>
@@ -305,18 +305,18 @@ const AdminUsers: React.FC = () => {
     <PermissionGate
       permission="users.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center justify-center p-8">
           <div className="text-center">
-            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Lock className="w-10 h-10 text-red-600" />
+            <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Lock className="w-10 h-10 text-destructive" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground mb-6">
               You don't have permission to view users.
             </p>
             <button
               onClick={() => navigate('/admin/dashboard')}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               Back to Dashboard
             </button>
@@ -337,32 +337,32 @@ const AdminUsers: React.FC = () => {
             title="Users"
             subtitle="View all registered users in the system"
             actions={
-              <span className="text-sm text-gray-500">{users.length} total</span>
+              <span className="text-sm text-muted-foreground">{users.length} total</span>
             }
           />
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="Search by email or mobile number..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-border bg-background rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
               </div>
 
               <div className="sm:w-48">
                 <div className="relative">
-                  <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                   <select
                     value={accountTypeFilter}
                     onChange={(e) => setAccountTypeFilter(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary appearance-none bg-card"
                   >
                     <option value="all">All Types</option>
                     <option value="general_user">General User</option>
@@ -374,34 +374,34 @@ const AdminUsers: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-4 text-sm text-gray-600">
+            <div className="mt-4 text-sm text-muted-foreground">
               Showing {filteredUsers.length} of {users.length} users
             </div>
           </div>
 
           {isLoading ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading users...</p>
+            <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading users...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-              <p className="text-gray-600">
+            <div className="bg-card rounded-lg shadow-sm border border-border p-12 text-center">
+              <Users className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+              <h3 className="text-sm font-medium text-foreground mb-2">No users found</h3>
+              <p className="text-muted-foreground">
                 {searchTerm || accountTypeFilter !== 'all'
                   ? 'Try adjusting your search or filter criteria'
                   : 'No users have been registered yet'}
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="w-full divide-y divide-border">
+                  <thead className="bg-muted/50">
                     <tr>
                       <th
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors w-[30%]"
+                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[30%]"
                         onClick={() => handleSort('email')}
                       >
                         <div className="flex items-center justify-between">
@@ -413,11 +413,11 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[14%]">
                         Mobile Number
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors w-[16%]"
+                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[16%]"
                         onClick={() => handleSort('account_type')}
                       >
                         <div className="flex items-center justify-between">
@@ -429,30 +429,30 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[12%]">
                         Created Date
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[16%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[16%]">
                         Role
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[12%]">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-card divide-y divide-border">
                     {filteredUsers.map((user) => (
-                      <tr key={user.id} className={`hover:bg-gray-50 transition-colors ${user.is_frozen ? 'opacity-50 bg-gray-50' : ''}`}>
+                      <tr key={user.id} className={`hover:bg-muted/50 transition-colors ${user.is_frozen ? 'opacity-50 bg-muted/50' : ''}`}>
                         <td className="px-4 py-4 max-w-0">
                           <div className="flex items-center min-w-0">
-                            <Mail className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-                            <span className="text-sm text-gray-900 truncate" title={user.email}>{user.email}</span>
+                            <Mail className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
+                            <span className="text-sm text-foreground truncate" title={user.email}>{user.email}</span>
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <Phone className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-                            <span className="text-sm text-gray-900">
+                            <Phone className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
+                            <span className="text-sm text-foreground">
                               {user.mobile_number || '-'}
                             </span>
                           </div>
@@ -461,7 +461,7 @@ const AdminUsers: React.FC = () => {
                           <div className="flex gap-2 items-center">
                             {getAccountTypeBadge(user)}
                             {user.is_frozen && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
                                 Frozen
                               </span>
                             )}
@@ -469,8 +469,8 @@ const AdminUsers: React.FC = () => {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <Calendar className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-                            <span className="text-sm text-gray-900">
+                            <Calendar className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
+                            <span className="text-sm text-foreground">
                               {formatDate(user.created_at)}
                             </span>
                           </div>
@@ -482,7 +482,7 @@ const AdminUsers: React.FC = () => {
                                 {user.roles.map((role) => (
                                   <span
                                     key={role.id}
-                                    className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
+                                    className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
                                   >
                                     {formatRoleName(role.role)}
                                   </span>
@@ -499,7 +499,7 @@ const AdminUsers: React.FC = () => {
                               </>
                             ) : (
                               <>
-                                <span className="text-sm text-gray-500">No role assigned</span>
+                                <span className="text-sm text-muted-foreground">No role assigned</span>
                                 {canAssignRoles && (
                                   <button
                                     onClick={() => handleAssignRoleClick(user)}
@@ -518,7 +518,7 @@ const AdminUsers: React.FC = () => {
                             {canEdit && (
                               <button
                                 onClick={() => handleEditClick(user)}
-                                className="text-blue-600 hover:text-blue-900"
+                                className="text-primary hover:text-primary/80"
                                 title="Edit user"
                               >
                                 Edit
@@ -531,8 +531,8 @@ const AdminUsers: React.FC = () => {
                                 disabled={user.account_type !== 'general_user'}
                                 className={
                                   user.account_type !== 'general_user'
-                                    ? 'text-gray-400 opacity-50 cursor-not-allowed'
-                                    : 'text-red-600 hover:text-red-900'
+                                    ? 'text-muted-foreground opacity-50 cursor-not-allowed'
+                                    : 'text-destructive hover:text-destructive/80'
                                 }
                                 title={user.account_type !== 'general_user' ? 'Cannot delete non-general user accounts' : 'Delete user'}
                               >
@@ -543,7 +543,7 @@ const AdminUsers: React.FC = () => {
                             {canBlock && (
                               <button
                                 onClick={() => handleBlockClick(user, user.is_frozen ? 'unblock' : 'block')}
-                                className={user.is_frozen ? 'text-green-600 hover:text-green-900' : 'text-orange-600 hover:text-orange-900'}
+                                className={user.is_frozen ? 'text-primary hover:text-primary/80' : 'text-destructive hover:text-destructive/80'}
                                 title={user.is_frozen ? 'Unblock user' : 'Block user'}
                               >
                                 {user.is_frozen ? 'Unblock' : 'Block'}

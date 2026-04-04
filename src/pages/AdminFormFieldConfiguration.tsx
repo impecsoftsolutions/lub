@@ -230,11 +230,11 @@ const AdminFormFieldConfiguration: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="p-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <span className="ml-3 text-gray-600">Loading configuration...</span>
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="ml-3 text-muted-foreground">Loading configuration...</span>
           </div>
         </div>
       </div>
@@ -247,16 +247,16 @@ const AdminFormFieldConfiguration: React.FC = () => {
     <PermissionGate
       permission="settings.forms.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center justify-center p-8">
           <div className="text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view form field configuration.</p>
+            <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view form field configuration.</p>
           </div>
         </div>
       }
     >
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="p-8">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -268,7 +268,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
         <div className="mb-6">
           <button
             onClick={() => navigate('/admin/settings/forms')}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Form Configuration
@@ -278,17 +278,17 @@ const AdminFormFieldConfiguration: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Join LUB Form - Field Configuration</h1>
-              <p className="text-gray-600 mt-2">Configure which fields appear in the member registration form</p>
+              <h1 className="text-xl font-semibold text-foreground">Join LUB Form - Field Configuration</h1>
+              <p className="text-muted-foreground mt-2">Configure which fields appear in the member registration form</p>
             </div>
 
             <div className="text-right">
-              <div className="text-sm text-gray-500">Total Statistics</div>
+              <div className="text-sm text-muted-foreground">Total Statistics</div>
               <div className="flex items-center gap-4 mt-1">
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-foreground">
                   {totalStats.visible} of {totalStats.total} visible
                 </span>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-foreground">
                   {totalStats.required} required
                 </span>
               </div>
@@ -306,19 +306,19 @@ const AdminFormFieldConfiguration: React.FC = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-md mb-6">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-card rounded-lg shadow-md mb-6">
+          <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Configuration Actions</h2>
-                <p className="text-sm text-gray-600 mt-1">Save your changes or reset to defaults</p>
+                <h2 className="text-section font-semibold text-foreground">Configuration Actions</h2>
+                <p className="text-sm text-muted-foreground mt-1">Save your changes or reset to defaults</p>
               </div>
               {canManageFormConfig && (
                 <div className="flex gap-3">
                   <button
                     onClick={handleResetToDefaults}
                     disabled={isSaving}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                    className="inline-flex items-center px-4 py-2 border border-border rounded-lg text-foreground bg-card hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Reset to Defaults
@@ -326,7 +326,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                   <button
                     onClick={handleSaveChanges}
                     disabled={isSaving || !hasChanges}
-                    className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                    className="inline-flex items-center px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
                     {isSaving ? (
                       <>
@@ -352,56 +352,56 @@ const AdminFormFieldConfiguration: React.FC = () => {
             const isExpanded = expandedSections[sectionName];
 
             return (
-              <div key={sectionName} className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div key={sectionName} className="bg-card rounded-lg shadow-md overflow-hidden">
                 <button
                   onClick={() => toggleSection(sectionName)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors duration-200"
                 >
                   <div className="flex items-center gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 text-left">{sectionName}</h3>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <h3 className="text-section font-semibold text-foreground text-left">{sectionName}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
                         {stats.visible} of {stats.total} visible · {stats.required} required
                       </p>
                     </div>
                   </div>
                   {isExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
                   )}
                 </button>
 
                 {isExpanded && (
-                  <div className="border-t border-gray-200">
+                  <div className="border-t border-border">
                     <table className="w-full">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-muted/50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Field
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Database Column
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Validation Rule
                           </th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Visible
                           </th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Required
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {fields.map((field) => (
-                          <tr key={field.field_name} className="hover:bg-gray-50">
+                          <tr key={field.field_name} className="hover:bg-muted/30">
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{field.field_label}</div>
+                              <div className="text-sm font-medium text-foreground">{field.field_label}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <code className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                              <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                                 {field.field_name}
                               </code>
                             </td>
@@ -413,7 +413,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                   sectionName,
                                   e.target.value || null
                                 )}
-                                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                                 disabled={isLoadingRules || !canManageFormConfig}
                               >
                                 <option value="">No Validation</option>
@@ -426,7 +426,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                               {field.validation_rule && (
                                 <div className="flex items-start gap-1 mt-1">
                                   <Shield className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
-                                  <p className="text-xs text-gray-600">{field.validation_rule.description}</p>
+                                  <p className="text-xs text-muted-foreground">{field.validation_rule.description}</p>
                                 </div>
                               )}
                             </td>
@@ -437,7 +437,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                   className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
                                     field.is_visible
                                       ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                   }`}
                                 >
                                   {field.is_visible ? (
@@ -456,7 +456,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                                   field.is_visible
                                     ? 'bg-green-100 text-green-800'
-                                    : 'bg-gray-100 text-gray-800'
+                                    : 'bg-muted text-muted-foreground'
                                 }`}>
                                   {field.is_visible ? (
                                     <>
@@ -479,10 +479,10 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                   disabled={!field.is_visible}
                                   className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
                                     !field.is_visible
-                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
                                       : field.is_required
                                       ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                      : 'bg-primary/10 text-primary hover:bg-primary/20'
                                   }`}
                                 >
                                   {field.is_required ? (
@@ -500,10 +500,10 @@ const AdminFormFieldConfiguration: React.FC = () => {
                               ) : (
                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                                   !field.is_visible
-                                    ? 'bg-gray-100 text-gray-400'
+                                    ? 'bg-muted text-muted-foreground'
                                     : field.is_required
                                     ? 'bg-red-100 text-red-800'
-                                    : 'bg-blue-100 text-blue-800'
+                                    : 'bg-primary/10 text-primary'
                                 }`}>
                                   {field.is_required ? (
                                     <>

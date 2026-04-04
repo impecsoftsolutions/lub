@@ -2,6 +2,18 @@
 
 @plugin "tailwindcss-animate";
 
+/* ─── Typography scale ────────────────────────────────────────────────────────
+   Two tokens that fill the gaps in Tailwind's default scale for admin/dashboard
+   surfaces. All admin and member-dashboard pages use these via shared components.
+   Public pages are unrestricted.
+     text-section  15px  card titles, modal headings, section labels
+     text-label    13px  form labels, table column headers, sidebar nav items
+
+   These are defined as plain CSS custom properties (not @theme) so they can be
+   overridden at runtime by the Appearance > Typography settings. Tailwind v4
+   @theme compiles font-size tokens as static values; plain CSS vars stay live.
+──────────────────────────────────────────────────────────────────────────── */
+
 @custom-variant dark (&:is(.dark *));
 
 /* ─── Base colour scale (neutral) ─── */
@@ -53,6 +65,28 @@
   --sidebar-ring: var(--base-800);
 
   --display-weight: 700;
+
+  /* ── Custom font-size tokens (overridden by Typography settings) ── */
+  --text-section: 0.9375rem;
+  --text-section--line-height: 1.4;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.3;
+
+  /* ── Typography weight tokens (overridden by Typography settings) ── */
+  --typ-page-title-weight: 600;
+  --typ-section-weight:    600;
+  --typ-body-weight:       400;
+  --typ-label-weight:      500;
+  --typ-caption-weight:    400;
+
+  /* ── Table style tokens (overridden by Table Style settings) ── */
+  --table-border-width:    1px;
+  --table-shadow:          0 1px 2px 0 rgb(0 0 0 / 0.05);
+  /* Table spacing & scrollbar tokens */
+  --table-cell-px:         1.5rem;   /* horizontal cell padding  (= px-6)  */
+  --table-header-py:       0.75rem;  /* header-row vertical padding (= py-3) */
+  --table-row-py:          1rem;     /* data-row vertical padding    (= py-4) */
+  --table-scrollbar-size:  6px;      /* height of horizontal scrollbars */
 }
 
 .dark {
@@ -202,6 +236,303 @@
   }
 }
 
+/* ─── Forest theme ─── */
+[data-theme-preset="forest"] {
+  --primary-50: oklch(0.97 0.0123 145);
+  --primary-100: oklch(0.932 0.0281 145);
+  --primary-200: oklch(0.882 0.0518 145);
+  --primary-300: oklch(0.809 0.0922 145);
+  --primary-400: oklch(0.707 0.1449 145);
+  --primary-500: oklch(0.623 0.188 145);
+  --primary-600: oklch(0.5461 0.2152 145);
+  --primary-700: oklch(0.488 0.2134 145);
+  --primary-800: oklch(0.424 0.1748 145);
+  --primary-900: oklch(0.379 0.1282 145);
+  --primary-950: oklch(0.282 0.0799 145);
+  --primary-1000: oklch(0.219 0.0483 145);
+
+  --secondary-50: oklch(0.962 0.0158 170);
+  --secondary-100: oklch(0.93 0.0298 170);
+  --secondary-200: oklch(0.87 0.0569 170);
+  --secondary-300: oklch(0.785 0.1007 170);
+  --secondary-400: oklch(0.673 0.1594 170);
+  --secondary-500: oklch(0.5854 0.2041 170);
+  --secondary-600: oklch(0.511 0.2295 170);
+  --secondary-700: oklch(0.457 0.2102 170);
+  --secondary-800: oklch(0.398 0.1708 170);
+  --secondary-900: oklch(0.359 0.1261 170);
+  --secondary-950: oklch(0.257 0.0788 170);
+  --secondary-1000: oklch(0.191 0.0482 170);
+
+  --background: var(--color-white);
+  --foreground: var(--base-800);
+  --card: var(--color-white);
+  --card-foreground: var(--base-800);
+  --popover: var(--color-white);
+  --popover-foreground: var(--base-800);
+  --primary: var(--primary-600);
+  --primary-foreground: var(--color-white);
+  --secondary: var(--secondary-500);
+  --secondary-foreground: var(--color-white);
+  --muted: var(--base-50);
+  --muted-foreground: var(--base-600);
+  --accent: var(--base-100);
+  --accent-foreground: var(--base-800);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--base-200);
+  --input: var(--base-300);
+  --ring: var(--primary-600);
+  --chart-1: var(--primary-600);
+  --chart-2: var(--secondary-500);
+  --chart-3: var(--primary-300);
+  --chart-4: var(--secondary-300);
+  --chart-5: var(--primary-100);
+  --radius: 0.375rem;
+  --sidebar: var(--base-100);
+  --sidebar-foreground: var(--base-800);
+  --sidebar-primary: var(--primary-600);
+  --sidebar-primary-foreground: var(--color-white);
+  --sidebar-accent: var(--primary);
+  --sidebar-accent-foreground: var(--color-white);
+  --sidebar-border: var(--base-200);
+  --sidebar-ring: var(--primary-600);
+  --display-weight: 700;
+}
+
+[data-theme-preset="forest"] {
+  @variant dark {
+    --background: var(--base-950);
+    --foreground: var(--base-200);
+    --card: var(--base-950);
+    --card-foreground: var(--base-200);
+    --popover: var(--base-950);
+    --popover-foreground: var(--base-200);
+    --primary: var(--primary-600);
+    --primary-foreground: var(--color-white);
+    --secondary: var(--secondary-500);
+    --secondary-foreground: var(--color-black);
+    --muted: var(--base-900);
+    --muted-foreground: var(--base-400);
+    --accent: var(--base-900);
+    --accent-foreground: var(--base-200);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: var(--base-800);
+    --input: var(--base-700);
+    --ring: var(--primary-600);
+    --chart-1: var(--primary-600);
+    --chart-2: var(--secondary-500);
+    --chart-3: var(--primary-300);
+    --chart-4: var(--secondary-300);
+    --chart-5: var(--primary-100);
+    --sidebar: var(--base-900);
+    --sidebar-foreground: var(--base-200);
+    --sidebar-primary: var(--primary-600);
+    --sidebar-primary-foreground: var(--color-white);
+    --sidebar-accent: var(--primary);
+    --sidebar-accent-foreground: var(--color-white);
+    --sidebar-border: var(--base-800);
+    --sidebar-ring: var(--primary-600);
+  }
+}
+
+/* ─── Sunset theme ─── */
+[data-theme-preset="sunset"] {
+  --primary-50: oklch(0.97 0.0123 40);
+  --primary-100: oklch(0.932 0.0281 40);
+  --primary-200: oklch(0.882 0.0518 40);
+  --primary-300: oklch(0.809 0.0922 40);
+  --primary-400: oklch(0.707 0.1449 40);
+  --primary-500: oklch(0.623 0.188 40);
+  --primary-600: oklch(0.5461 0.2152 40);
+  --primary-700: oklch(0.488 0.2134 40);
+  --primary-800: oklch(0.424 0.1748 40);
+  --primary-900: oklch(0.379 0.1282 40);
+  --primary-950: oklch(0.282 0.0799 40);
+  --primary-1000: oklch(0.219 0.0483 40);
+
+  --secondary-50: oklch(0.962 0.0158 25);
+  --secondary-100: oklch(0.93 0.0298 25);
+  --secondary-200: oklch(0.87 0.0569 25);
+  --secondary-300: oklch(0.785 0.1007 25);
+  --secondary-400: oklch(0.673 0.1594 25);
+  --secondary-500: oklch(0.5854 0.2041 25);
+  --secondary-600: oklch(0.511 0.2295 25);
+  --secondary-700: oklch(0.457 0.2102 25);
+  --secondary-800: oklch(0.398 0.1708 25);
+  --secondary-900: oklch(0.359 0.1261 25);
+  --secondary-950: oklch(0.257 0.0788 25);
+  --secondary-1000: oklch(0.191 0.0482 25);
+
+  --background: var(--color-white);
+  --foreground: var(--base-800);
+  --card: var(--color-white);
+  --card-foreground: var(--base-800);
+  --popover: var(--color-white);
+  --popover-foreground: var(--base-800);
+  --primary: var(--primary-600);
+  --primary-foreground: var(--color-white);
+  --secondary: var(--secondary-500);
+  --secondary-foreground: var(--color-white);
+  --muted: var(--base-50);
+  --muted-foreground: var(--base-600);
+  --accent: var(--base-100);
+  --accent-foreground: var(--base-800);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--base-200);
+  --input: var(--base-300);
+  --ring: var(--primary-600);
+  --chart-1: var(--primary-600);
+  --chart-2: var(--secondary-500);
+  --chart-3: var(--primary-300);
+  --chart-4: var(--secondary-300);
+  --chart-5: var(--primary-100);
+  --radius: 0.5rem;
+  --sidebar: var(--base-100);
+  --sidebar-foreground: var(--base-800);
+  --sidebar-primary: var(--primary-600);
+  --sidebar-primary-foreground: var(--color-white);
+  --sidebar-accent: var(--primary);
+  --sidebar-accent-foreground: var(--color-white);
+  --sidebar-border: var(--base-200);
+  --sidebar-ring: var(--primary-600);
+  --display-weight: 700;
+}
+
+[data-theme-preset="sunset"] {
+  @variant dark {
+    --background: var(--base-950);
+    --foreground: var(--base-200);
+    --card: var(--base-950);
+    --card-foreground: var(--base-200);
+    --popover: var(--base-950);
+    --popover-foreground: var(--base-200);
+    --primary: var(--primary-600);
+    --primary-foreground: var(--color-white);
+    --secondary: var(--secondary-500);
+    --secondary-foreground: var(--color-black);
+    --muted: var(--base-900);
+    --muted-foreground: var(--base-400);
+    --accent: var(--base-900);
+    --accent-foreground: var(--base-200);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: var(--base-800);
+    --input: var(--base-700);
+    --ring: var(--primary-600);
+    --chart-1: var(--primary-600);
+    --chart-2: var(--secondary-500);
+    --chart-3: var(--primary-300);
+    --chart-4: var(--secondary-300);
+    --chart-5: var(--primary-100);
+    --sidebar: var(--base-900);
+    --sidebar-foreground: var(--base-200);
+    --sidebar-primary: var(--primary-600);
+    --sidebar-primary-foreground: var(--color-white);
+    --sidebar-accent: var(--primary);
+    --sidebar-accent-foreground: var(--color-white);
+    --sidebar-border: var(--base-800);
+    --sidebar-ring: var(--primary-600);
+  }
+}
+
+/* ─── Grape theme ─── */
+[data-theme-preset="grape"] {
+  --primary-50: oklch(0.97 0.0123 295);
+  --primary-100: oklch(0.932 0.0281 295);
+  --primary-200: oklch(0.882 0.0518 295);
+  --primary-300: oklch(0.809 0.0922 295);
+  --primary-400: oklch(0.707 0.1449 295);
+  --primary-500: oklch(0.623 0.188 295);
+  --primary-600: oklch(0.5461 0.2152 295);
+  --primary-700: oklch(0.488 0.2134 295);
+  --primary-800: oklch(0.424 0.1748 295);
+  --primary-900: oklch(0.379 0.1282 295);
+  --primary-950: oklch(0.282 0.0799 295);
+  --primary-1000: oklch(0.219 0.0483 295);
+
+  --secondary-50: oklch(0.962 0.0158 315);
+  --secondary-100: oklch(0.93 0.0298 315);
+  --secondary-200: oklch(0.87 0.0569 315);
+  --secondary-300: oklch(0.785 0.1007 315);
+  --secondary-400: oklch(0.673 0.1594 315);
+  --secondary-500: oklch(0.5854 0.2041 315);
+  --secondary-600: oklch(0.511 0.2295 315);
+  --secondary-700: oklch(0.457 0.2102 315);
+  --secondary-800: oklch(0.398 0.1708 315);
+  --secondary-900: oklch(0.359 0.1261 315);
+  --secondary-950: oklch(0.257 0.0788 315);
+  --secondary-1000: oklch(0.191 0.0482 315);
+
+  --background: var(--color-white);
+  --foreground: var(--base-800);
+  --card: var(--color-white);
+  --card-foreground: var(--base-800);
+  --popover: var(--color-white);
+  --popover-foreground: var(--base-800);
+  --primary: var(--primary-600);
+  --primary-foreground: var(--color-white);
+  --secondary: var(--secondary-500);
+  --secondary-foreground: var(--color-white);
+  --muted: var(--base-50);
+  --muted-foreground: var(--base-600);
+  --accent: var(--base-100);
+  --accent-foreground: var(--base-800);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--base-200);
+  --input: var(--base-300);
+  --ring: var(--primary-600);
+  --chart-1: var(--primary-600);
+  --chart-2: var(--secondary-500);
+  --chart-3: var(--primary-300);
+  --chart-4: var(--secondary-300);
+  --chart-5: var(--primary-100);
+  --radius: 0.5rem;
+  --sidebar: var(--base-100);
+  --sidebar-foreground: var(--base-800);
+  --sidebar-primary: var(--primary-600);
+  --sidebar-primary-foreground: var(--color-white);
+  --sidebar-accent: var(--primary);
+  --sidebar-accent-foreground: var(--color-white);
+  --sidebar-border: var(--base-200);
+  --sidebar-ring: var(--primary-600);
+  --display-weight: 700;
+}
+
+[data-theme-preset="grape"] {
+  @variant dark {
+    --background: var(--base-950);
+    --foreground: var(--base-200);
+    --card: var(--base-950);
+    --card-foreground: var(--base-200);
+    --popover: var(--base-950);
+    --popover-foreground: var(--base-200);
+    --primary: var(--primary-600);
+    --primary-foreground: var(--color-white);
+    --secondary: var(--secondary-500);
+    --secondary-foreground: var(--color-black);
+    --muted: var(--base-900);
+    --muted-foreground: var(--base-400);
+    --accent: var(--base-900);
+    --accent-foreground: var(--base-200);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: var(--base-800);
+    --input: var(--base-700);
+    --ring: var(--primary-600);
+    --chart-1: var(--primary-600);
+    --chart-2: var(--secondary-500);
+    --chart-3: var(--primary-300);
+    --chart-4: var(--secondary-300);
+    --chart-5: var(--primary-100);
+    --sidebar: var(--base-900);
+    --sidebar-foreground: var(--base-200);
+    --sidebar-primary: var(--primary-600);
+    --sidebar-primary-foreground: var(--color-white);
+    --sidebar-accent: var(--primary);
+    --sidebar-accent-foreground: var(--color-white);
+    --sidebar-border: var(--base-800);
+    --sidebar-ring: var(--primary-600);
+  }
+}
+
 /* ─── Tailwind v4 theme tokens ─── */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -246,13 +577,75 @@
   scrollbar-color: var(--border) transparent;
 }
 
+/* ─── Custom typography utility classes ───────────────────────────────────────
+   Defined in @layer utilities (not via @theme) so the underlying CSS custom
+   properties stay live and can be overridden at runtime by the settings page.
+──────────────────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .text-section {
+    font-size: var(--text-section, 0.9375rem);
+    line-height: var(--text-section--line-height, 1.4);
+  }
+  .text-label {
+    font-size: var(--text-label, 0.8125rem);
+    line-height: var(--text-label--line-height, 1.3);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
   }
+
+  /* ── Typography weight tokens ─────────────────────────────────────────────
+     !important in @layer base overrides non-important @layer utilities rules
+     (e.g. font-semibold, font-medium) because !important reverses layer order.
+  ── */
+  h1                                  { font-weight: var(--typ-page-title-weight) !important; }
+  .text-section                       { font-weight: var(--typ-section-weight)    !important; }
+  .text-label                         { font-weight: var(--typ-label-weight)      !important; }
+  .text-xs                            { font-weight: var(--typ-caption-weight)    !important; }
+  p, td, [data-slot="table-cell"]     { font-weight: var(--typ-body-weight)       !important; }
+
+  /* ── Table border width — overrides Tailwind's border-b (1px static) ──── */
+  [data-slot="table-row"]            { border-bottom-width: var(--table-border-width) !important; }
+  [data-slot="table-header"] tr      { border-bottom-width: var(--table-border-width) !important; }
+  [data-slot="table-footer"]         { border-top-width:    var(--table-border-width) !important; }
+
+  /* ── Table shadow ─────────────────────────────────────────────────────────
+     Two selectors cover both table variants:
+     1. shadcn <Table> — parent of div[data-slot="table-container"]
+     2. Native admin tables — outer div wrapping div.overflow-x-auto > table
+     :has() is supported Chrome 105+, Firefox 121+, Safari 15.4+              */
+  div:has(> [data-slot="table-container"]),
+  div:has(> .overflow-x-auto > table) {
+    box-shadow: var(--table-shadow) !important;
+  }
+
+  /* ── Native table cell padding (admin pages use plain <th>/<td>) ─────────
+     :not([data-slot]) guards avoid touching shadcn Table head/cell elements. */
+  table th:not([data-slot]) {
+    padding-top:    var(--table-header-py) !important;
+    padding-bottom: var(--table-header-py) !important;
+    padding-left:   var(--table-cell-px)   !important;
+    padding-right:  var(--table-cell-px)   !important;
+  }
+  table td:not([data-slot]) {
+    padding-top:    var(--table-row-py)  !important;
+    padding-bottom: var(--table-row-py)  !important;
+    padding-left:   var(--table-cell-px) !important;
+    padding-right:  var(--table-cell-px) !important;
+  }
+
+  /* ── Horizontal scrollbar in overflow-x containers ──────────────────────── */
+  .overflow-x-auto::-webkit-scrollbar              { height: var(--table-scrollbar-size); }
+  .overflow-x-auto::-webkit-scrollbar-track        { background: transparent; }
+  .overflow-x-auto::-webkit-scrollbar-thumb        { background-color: var(--border); border-radius: 9999px; }
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover  { background-color: var(--muted-foreground); }
 
   [data-slot="button"],
   [data-slot="dialog-trigger"],

@@ -125,26 +125,26 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       onClick={handleBackdropClick}
       onKeyDown={handleKeyDown}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-200">
+        <div className="flex items-start justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-              <Icon className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full">
+              <Icon className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-              <p className="text-sm text-gray-600">Update your {isEmail ? 'email address' : 'mobile number'}</p>
+              <h3 className="text-section font-semibold text-foreground">{title}</h3>
+              <p className="text-sm text-muted-foreground">Update your {isEmail ? 'email address' : 'mobile number'}</p>
             </div>
           </div>
           <button
             onClick={handleClose}
             disabled={loading}
-            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -174,20 +174,20 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
 
           {/* Current Value (Read-only) */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               {currentLabel}
             </label>
             <input
               type="text"
               value={currentValue}
               readOnly
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground cursor-not-allowed"
             />
           </div>
 
           {/* New Value Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               {newLabel} <span className="text-red-500">*</span>
             </label>
             <input
@@ -220,29 +220,29 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
               }}
               placeholder={placeholder}
               disabled={loading || showSuccess}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                error || validationError ? 'border-red-500' : 'border-gray-300'
-              } disabled:bg-gray-50 disabled:cursor-not-allowed`}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent ${
+                error || validationError ? 'border-red-500' : 'border-border'
+              } disabled:bg-muted/50 disabled:cursor-not-allowed`}
             />
             {validationError && (
               <p className="mt-1 text-xs text-red-600">{validationError}</p>
             )}
             {!validationError && isEmail && (
-              <p className="mt-1 text-xs text-gray-500">Enter a valid email address</p>
+              <p className="mt-1 text-xs text-muted-foreground">Enter a valid email address</p>
             )}
             {!validationError && !isEmail && (
-              <p className="mt-1 text-xs text-gray-500">Enter a 10-digit mobile number</p>
+              <p className="mt-1 text-xs text-muted-foreground">Enter a 10-digit mobile number</p>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 justify-end p-6 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+        <div className="flex gap-3 justify-end p-6 bg-muted/50 border-t border-border rounded-b-lg">
           <button
             type="button"
             onClick={handleClose}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -250,7 +250,7 @@ const ChangeCredentialModal: React.FC<ChangeCredentialModalProps> = ({
             type="button"
             onClick={handleSave}
             disabled={loading || showSuccess || !!validationError}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

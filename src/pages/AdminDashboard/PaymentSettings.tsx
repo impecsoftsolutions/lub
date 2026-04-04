@@ -349,8 +349,8 @@ const PaymentSettings: React.FC = () => {
   if (isLoading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading payment settings...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Loading payment settings...</p>
       </div>
     );
   }
@@ -359,11 +359,11 @@ const PaymentSettings: React.FC = () => {
     <PermissionGate
       permission="settings.payment.view"
       fallback={
-        <div className="min-h-screen bg-gray-50 py-8">
+        <div className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
-            <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">You don't have permission to view payment settings.</p>
+            <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to view payment settings.</p>
           </div>
         </div>
       }
@@ -379,16 +379,16 @@ const PaymentSettings: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-            <MapPin className="w-6 h-6 mr-2 text-blue-600" />
+          <h2 className="text-xl font-semibold text-foreground flex items-center">
+            <MapPin className="w-6 h-6 mr-2 text-primary" />
             State Payment Settings
           </h2>
-          <p className="text-gray-600 mt-1">Manage payment settings for different states</p>
+          <p className="text-muted-foreground mt-1">Manage payment settings for different states</p>
         </div>
         {canManagePayment && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add New State
@@ -397,15 +397,15 @@ const PaymentSettings: React.FC = () => {
       </div>
 
       {/* Payment Settings Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         {paymentSettings.length === 0 ? (
           <div className="text-center py-12">
-            <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Payment Settings Found</h3>
-            <p className="text-gray-600 mb-4">Add payment settings for your first state</p>
+            <MapPin className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="text-sm font-medium text-foreground mb-2">No Payment Settings Found</h3>
+            <p className="text-muted-foreground mb-4">Add payment settings for your first state</p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Payment Settings
@@ -413,33 +413,33 @@ const PaymentSettings: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                     State
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                     Bank Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                     Fees
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                     QR Code
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {paymentSettings.map((settings) => (
-                  <tr key={settings.state} className="hover:bg-gray-50">
+                  <tr key={settings.state} className="hover:bg-muted/30">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="font-medium text-gray-900">{settings.state}</span>
+                        <MapPin className="w-4 h-4 text-muted-foreground mr-2" />
+                        <span className="text-sm font-medium text-foreground">{settings.state}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -450,44 +450,44 @@ const PaymentSettings: React.FC = () => {
                             value={editForm.account_holder_name || ''}
                             onChange={(e) => handleEditInputChange('account_holder_name', e.target.value)}
                             placeholder="Account Holder Name"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                           />
                           <input
                             type="text"
                             value={editForm.bank_name || ''}
                             onChange={(e) => handleEditInputChange('bank_name', e.target.value)}
                             placeholder="Bank Name"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                           />
                           <input
                             type="text"
                             value={editForm.branch || ''}
                             onChange={(e) => handleEditInputChange('branch', e.target.value)}
                             placeholder="Branch"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                           />
                           <input
                             type="text"
                             value={editForm.account_number || ''}
                             onChange={(e) => handleEditInputChange('account_number', e.target.value)}
                             placeholder="Account Number"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                           />
                           <input
                             type="text"
                             value={editForm.ifsc_code || ''}
                             onChange={(e) => handleEditInputChange('ifsc_code', e.target.value)}
                             placeholder="IFSC Code"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                           />
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           <div className="font-medium">{settings.account_holder_name}</div>
-                          <div className="text-gray-600">{settings.bank_name}</div>
-                          <div className="text-gray-600">{settings.branch}</div>
-                          <div className="text-gray-600">A/c: {settings.account_number}</div>
-                          <div className="text-gray-600">IFSC: {settings.ifsc_code}</div>
+                          <div className="text-muted-foreground">{settings.bank_name}</div>
+                          <div className="text-muted-foreground">{settings.branch}</div>
+                          <div className="text-muted-foreground">A/c: {settings.account_number}</div>
+                          <div className="text-muted-foreground">IFSC: {settings.ifsc_code}</div>
                         </div>
                       )}
                     </td>
@@ -495,39 +495,39 @@ const PaymentSettings: React.FC = () => {
                       {editingState === settings.state ? (
                         <div className="space-y-2">
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">Male:</span>
+                            <span className="text-xs text-muted-foreground">Male:</span>
                             <input
                               type="number"
                               value={editForm.male_fee || ''}
                               onChange={(e) => handleEditInputChange('male_fee', e.target.value)}
-                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                              className="w-20 px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                             />
                           </div>
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">Female:</span>
+                            <span className="text-xs text-muted-foreground">Female:</span>
                             <input
                               type="number"
                               value={editForm.female_fee || ''}
                               onChange={(e) => handleEditInputChange('female_fee', e.target.value)}
-                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                              className="w-20 px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                             />
                           </div>
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">Validity:</span>
+                            <span className="text-xs text-muted-foreground">Validity:</span>
                             <input
                               type="number"
                               value={editForm.validity_years || ''}
                               onChange={(e) => handleEditInputChange('validity_years', e.target.value)}
-                              className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                              className="w-16 px-2 py-1 text-sm border border-border rounded focus:ring-1 focus:ring-ring focus:border-ring"
                             />
-                            <span className="text-xs text-gray-500">years</span>
+                            <span className="text-xs text-muted-foreground">years</span>
                           </div>
                         </div>
                       ) : (
                         <div className="text-sm">
-                          <div className="text-gray-900">Male: ₹{settings.male_fee.toLocaleString()}</div>
-                          <div className="text-gray-900">Female: ₹{settings.female_fee.toLocaleString()}</div>
-                          <div className="text-gray-600">{settings.validity_years} years</div>
+                          <div className="text-foreground">Male: ₹{settings.male_fee.toLocaleString()}</div>
+                          <div className="text-foreground">Female: ₹{settings.female_fee.toLocaleString()}</div>
+                          <div className="text-muted-foreground">{settings.validity_years} years</div>
                         </div>
                       )}
                     </td>
@@ -549,7 +549,7 @@ const PaymentSettings: React.FC = () => {
                             />
                             <label
                               htmlFor={`qr-upload-${settings.state}`}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded cursor-pointer hover:bg-blue-100"
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-primary bg-primary/10 rounded cursor-pointer hover:bg-primary/20"
                             >
                               <Upload className="w-3 h-3 mr-1" />
                               Upload
@@ -570,7 +570,7 @@ const PaymentSettings: React.FC = () => {
                           <button
                             onClick={() => handleDeleteSettings(settings.state)}
                             disabled={isSaving}
-                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-destructive-foreground bg-destructive rounded-md hover:bg-destructive/90 disabled:opacity-50"
                           >
                             <Trash2 className="w-3 h-3 mr-1" />
                             Delete
@@ -578,7 +578,7 @@ const PaymentSettings: React.FC = () => {
                           <button
                             onClick={handleSaveEdit}
                             disabled={isSaving}
-                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50"
                           >
                             <Save className="w-3 h-3 mr-1" />
                             {isSaving ? 'Saving...' : 'Save'}
@@ -586,7 +586,7 @@ const PaymentSettings: React.FC = () => {
                           <button
                             onClick={handleCancelEdit}
                             disabled={isSaving}
-                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 disabled:opacity-50"
                           >
                             <X className="w-3 h-3 mr-1" />
                             Cancel
@@ -596,7 +596,7 @@ const PaymentSettings: React.FC = () => {
                         canManagePayment && (
                           <button
                             onClick={() => handleEdit(settings)}
-                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20"
                           >
                             <Edit3 className="w-3 h-3 mr-1" />
                             Edit
@@ -632,14 +632,14 @@ const PaymentSettings: React.FC = () => {
 
       {/* Add New State Modal */}
       {showAddModal && canManagePayment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Add New State Payment Settings</h3>
+                <h3 className="text-section font-semibold text-foreground">Add New State Payment Settings</h3>
                 <button
                   onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -648,18 +648,18 @@ const PaymentSettings: React.FC = () => {
               <div className="space-y-6">
                 {/* State Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     State <span className="text-red-500">*</span>
                   </label>
                   {isLoadingStates ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
                       Loading states...
                     </div>
                   ) : (
                     <select
                       value={addForm.state || ''}
                       onChange={(e) => handleAddInputChange('state', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     >
                       <option value="">Select State or Union Territory</option>
                       {getAvailableStatesForAdd().length === 0 ? (
@@ -680,58 +680,58 @@ const PaymentSettings: React.FC = () => {
                 {/* Bank Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Account Holder Name
                     </label>
                     <input
                       type="text"
                       value={addForm.account_holder_name || ''}
                       onChange={(e) => handleAddInputChange('account_holder_name', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Bank Name
                     </label>
                     <input
                       type="text"
                       value={addForm.bank_name || ''}
                       onChange={(e) => handleAddInputChange('bank_name', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Branch
                     </label>
                     <input
                       type="text"
                       value={addForm.branch || ''}
                       onChange={(e) => handleAddInputChange('branch', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Account Number
                     </label>
                     <input
                       type="text"
                       value={addForm.account_number || ''}
                       onChange={(e) => handleAddInputChange('account_number', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       IFSC Code
                     </label>
                     <input
                       type="text"
                       value={addForm.ifsc_code || ''}
                       onChange={(e) => handleAddInputChange('ifsc_code', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                 </div>
@@ -739,43 +739,43 @@ const PaymentSettings: React.FC = () => {
                 {/* Fees */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Male Fee (₹)
                     </label>
                     <input
                       type="number"
                       value={addForm.male_fee || ''}
                       onChange={(e) => handleAddInputChange('male_fee', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Female Fee (₹)
                     </label>
                     <input
                       type="number"
                       value={addForm.female_fee || ''}
                       onChange={(e) => handleAddInputChange('female_fee', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Validity (Years)
                     </label>
                     <input
                       type="number"
                       value={addForm.validity_years || ''}
                       onChange={(e) => handleAddInputChange('validity_years', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                 </div>
 
                 {/* QR Code */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     QR Code
                   </label>
                   <div className="flex items-start space-x-4">
@@ -787,8 +787,8 @@ const PaymentSettings: React.FC = () => {
                       />
                     )}
                     {!addForm.qr_code_image_url && (
-                      <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded flex items-center justify-center">
-                        <QrCode className="w-8 h-8 text-gray-400" />
+                      <div className="w-24 h-24 border-2 border-dashed border-border rounded flex items-center justify-center">
+                        <QrCode className="w-8 h-8 text-muted-foreground" />
                       </div>
                     )}
                     <div className="flex-1">
@@ -801,12 +801,12 @@ const PaymentSettings: React.FC = () => {
                       />
                       <label
                         htmlFor="qr-upload-new"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20"
                       >
                         <Upload className="w-4 h-4 mr-2" />
                         Upload QR Code
                       </label>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         Upload a QR code image for this state's payments
                       </p>
                     </div>
@@ -814,17 +814,17 @@ const PaymentSettings: React.FC = () => {
                 </div>
               </div>
               
-              <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-gray-200">
+              <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-border">
                 <button
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddNew}
                   disabled={isSaving || !isAddFormValid() || getAvailableStatesForAdd().length === 0}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSaving ? 'Adding...' : 'Add Payment Settings'}
                 </button>

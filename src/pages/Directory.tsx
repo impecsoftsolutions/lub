@@ -466,23 +466,23 @@ const Directory: React.FC = () => {
     };
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         <div
           className="p-6 hover:shadow-md transition-all duration-200 cursor-pointer group"
           onClick={handleCardClick}
         >
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+            <h3 className="text-section font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
               {member.full_name}
             </h3>
-            <p className="text-base font-semibold text-blue-600 mb-1">
+            <p className="text-sm font-medium text-primary mb-1">
               {member.company_name}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center text-sm text-gray-500 mb-4">
+        <div className="flex items-center text-sm text-muted-foreground mb-4">
           <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
           <span>{member.district}, {formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}</span>
         </div>
@@ -491,51 +491,51 @@ const Directory: React.FC = () => {
           <>
             {member.company_designations && (
               <div className="mb-3">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {member.company_designations.designation_name}
                 </p>
               </div>
             )}
 
-            <div className="flex items-center text-xs text-gray-500 mb-4">
+            <div className="flex items-center text-xs text-muted-foreground mb-4">
               <Calendar className="w-3 h-3 mr-1" />
               Member since {formatMemberSince(member.created_at)}
             </div>
 
-            <div className="border-t border-gray-100 pt-4 space-y-2">
-              <div className="flex items-center text-sm text-gray-700">
-                <Phone className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+            <div className="border-t border-border pt-4 space-y-2">
+              <div className="flex items-center text-sm text-foreground">
+                <Phone className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
                 <a
                   href={`tel:+91${member.mobile_number}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="hover:text-blue-600"
+                  className="hover:text-primary"
                 >
                   +91 {member.mobile_number}
                 </a>
               </div>
-              <div className="flex items-center text-sm text-gray-700">
-                <Mail className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+              <div className="flex items-center text-sm text-foreground">
+                <Mail className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
                 <a
                   href={`mailto:${member.email}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="hover:text-blue-600 truncate"
+                  className="hover:text-primary truncate"
                 >
                   {member.email}
                 </a>
               </div>
-              <div className="flex items-start text-sm text-gray-700">
-                <Building2 className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start text-sm text-foreground">
+                <Building2 className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0 mt-0.5" />
                 <span className="line-clamp-2">{member.company_address}</span>
               </div>
               {member.website && (
                 <div className="flex items-center text-sm">
-                  <ExternalLink className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                  <ExternalLink className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
                   <a
                     href={member.website.startsWith('http') ? member.website : `https://${member.website}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-blue-600 hover:text-blue-800 truncate"
+                    className="text-primary hover:text-primary/80 truncate"
                   >
                     {member.website}
                   </a>
@@ -543,8 +543,8 @@ const Directory: React.FC = () => {
               )}
 
               {userRole.isAdmin && (member.gst_certificate_url || member.udyam_certificate_url || member.payment_proof_url) && (
-                <div className="border-t border-gray-100 pt-3 mt-3">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Documents:</p>
+                <div className="border-t border-border pt-3 mt-3">
+                  <p className="text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">Documents</p>
                   <div className="flex flex-wrap gap-2">
                     {member.gst_certificate_url && (
                       <a
@@ -552,7 +552,7 @@ const Directory: React.FC = () => {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-primary bg-primary/10 rounded-full hover:bg-primary/20 transition-colors"
                       >
                         <FileText className="w-3 h-3 mr-1" />
                         GST
@@ -564,7 +564,7 @@ const Directory: React.FC = () => {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition-colors"
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-primary bg-primary/10 rounded-full hover:bg-primary/20 transition-colors"
                       >
                         <FileText className="w-3 h-3 mr-1" />
                         UDYAM
@@ -608,31 +608,31 @@ const Directory: React.FC = () => {
     return (
       <>
         <tr
-          className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+          className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
           onClick={handleRowClick}
         >
         <td className="px-6 py-4">
           <div className="flex flex-col">
-            <span className="font-semibold text-gray-900 hover:text-blue-600">
+            <span className="font-semibold text-foreground hover:text-primary">
               {member.full_name}
             </span>
             {member.company_designations && (
-              <span className="text-xs text-gray-500 mt-1">
+              <span className="text-xs text-muted-foreground mt-1">
                 {member.company_designations.designation_name}
               </span>
             )}
           </div>
         </td>
         <td className="px-6 py-4">
-          <span className="text-gray-900 font-medium">{member.company_name}</span>
+          <span className="text-foreground font-medium">{member.company_name}</span>
         </td>
         <td className="px-6 py-4">
-          <div className="flex items-center text-gray-700">
+          <div className="flex items-center text-foreground">
             <span>{formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}</span>
           </div>
         </td>
         <td className="px-6 py-4">
-          <span className="text-gray-700">{member.district}</span>
+          <span className="text-foreground">{member.district}</span>
         </td>
         </tr>
         {isExpanded && (
@@ -647,15 +647,15 @@ const Directory: React.FC = () => {
   };
 
   const StateHeader: React.FC<{ state: string; count: number }> = ({ state, count }) => (
-    <div className="col-span-full bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4 mb-4">
+    <div className="col-span-full bg-muted/50 border border-border rounded-lg p-4 mb-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          <MapPin className="w-5 h-5 text-blue-600 mr-2" />
-          <h2 className="text-xl font-bold text-gray-900">{state}</h2>
+          <MapPin className="w-5 h-5 text-primary mr-2" />
+          <h2 className="text-section font-semibold text-foreground">{state}</h2>
         </div>
-        <div className="flex items-center px-3 py-1 bg-white rounded-full border border-blue-300">
-          <Users className="w-4 h-4 text-blue-600 mr-2" />
-          <span className="text-sm font-semibold text-gray-700">
+        <div className="flex items-center px-3 py-1 bg-card rounded-full border border-border">
+          <Users className="w-4 h-4 text-primary mr-2" />
+          <span className="text-sm font-semibold text-foreground">
             {count} {count === 1 ? 'member' : 'members'} on this page
           </span>
         </div>
@@ -695,11 +695,11 @@ const Directory: React.FC = () => {
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Show:</span>
+          <span className="text-sm text-muted-foreground">Show:</span>
           <select
             value={recordsPerPage}
             onChange={(e) => handleRecordsPerPageChange(Number(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
           >
             {RECORDS_PER_PAGE_OPTIONS.map(option => (
               <option key={option} value={option}>{option} per page</option>
@@ -711,7 +711,7 @@ const Directory: React.FC = () => {
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-2 border border-border rounded-lg hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -719,15 +719,15 @@ const Directory: React.FC = () => {
           <div className="flex items-center gap-1">
             {getPageNumbers().map((page, index) => (
               page === '...' ? (
-                <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">...</span>
+                <span key={`ellipsis-${index}`} className="px-3 py-2 text-muted-foreground">...</span>
               ) : (
                 <button
                   key={page}
                   onClick={() => handlePageChange(page as number)}
                   className={`min-w-[40px] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     currentPage === page
-                      ? 'bg-blue-600 text-white'
-                      : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'border border-border text-foreground hover:bg-muted/50'
                   }`}
                 >
                   {page}
@@ -739,7 +739,7 @@ const Directory: React.FC = () => {
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-2 border border-border rounded-lg hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -750,14 +750,14 @@ const Directory: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <div className="text-red-600 text-lg font-semibold mb-2">Error Loading Members</div>
-            <p className="text-red-700 mb-4">{error}</p>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
+            <div className="text-destructive text-section font-semibold mb-2">Error Loading Members</div>
+            <p className="text-destructive mb-4">{error}</p>
             <button
               onClick={loadMembers}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors"
             >
               Retry
             </button>
@@ -768,23 +768,23 @@ const Directory: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Users className="w-10 h-10 text-blue-600 mr-3" />
-            <h1 className="text-4xl font-bold text-gray-900">Members Directory</h1>
+            <Users className="w-10 h-10 text-primary mr-3" />
+            <h1 className="text-xl font-semibold text-foreground">Members Directory</h1>
           </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-muted-foreground max-w-3xl mx-auto">
             Connect with our network of approved MSME entrepreneurs across India
           </p>
 
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="flex-1 relative">
-              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search by name, company, location, or products..."
@@ -793,12 +793,12 @@ const Directory: React.FC = () => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-3 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -806,13 +806,13 @@ const Directory: React.FC = () => {
             </div>
             <div className="flex gap-2">
               {!isMobile && (
-                <div className="inline-flex border border-gray-300 rounded-lg overflow-hidden bg-white">
+                <div className="inline-flex border border-border rounded-lg overflow-hidden bg-card">
                   <button
                     onClick={() => handleViewModeChange('list')}
                     className={`px-4 py-3 transition-colors ${
                       viewMode === 'list'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-foreground hover:bg-muted/50'
                     }`}
                     title="List View"
                   >
@@ -822,8 +822,8 @@ const Directory: React.FC = () => {
                     onClick={() => handleViewModeChange('card')}
                     className={`px-4 py-3 transition-colors ${
                       viewMode === 'card'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-foreground hover:bg-muted/50'
                     }`}
                     title="Card View"
                   >
@@ -833,7 +833,7 @@ const Directory: React.FC = () => {
               )}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center px-6 py-3 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center px-6 py-3 border border-border rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors"
               >
                 <Filter className="w-5 h-5 mr-2" />
                 Filters
@@ -843,10 +843,10 @@ const Directory: React.FC = () => {
           </div>
 
           {showFilters && (
-            <div className="border-t border-gray-200 pt-4">
+            <div className="border-t border-border pt-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                  <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">State</label>
                   <select
                     value={selectedState}
                     onChange={(e) => {
@@ -855,7 +855,7 @@ const Directory: React.FC = () => {
                       setSelectedCity('');
                       setCurrentPage(1);
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                   >
                     <option value="">All States</option>
                     {uniqueStates.map(state => (
@@ -864,7 +864,7 @@ const Directory: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                  <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">District</label>
                   <select
                     value={selectedDistrict}
                     onChange={(e) => {
@@ -872,7 +872,7 @@ const Directory: React.FC = () => {
                       setSelectedCity('');
                       setCurrentPage(1);
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
                     disabled={!selectedState}
                   >
                     <option value="">{selectedState ? 'All Districts' : 'Select a state first'}</option>
@@ -882,14 +882,14 @@ const Directory: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                  <label className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">City</label>
                   <select
                     value={selectedCity}
                     onChange={(e) => {
                       setSelectedCity(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
                     disabled={!selectedDistrict}
                   >
                     <option value="">{selectedDistrict ? 'All Cities' : 'Select a district first'}</option>
@@ -901,7 +901,7 @@ const Directory: React.FC = () => {
                 <div className="flex items-end">
                   <button
                     onClick={clearFilters}
-                    className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="w-full px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
                   >
                     Clear Filters
                   </button>
@@ -911,17 +911,17 @@ const Directory: React.FC = () => {
           )}
 
           <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="text-gray-600">
+            <span className="text-muted-foreground">
               Showing <span className="font-semibold">{startRecord}-{endRecord}</span> of{' '}
               <span className="font-semibold">{filteredMembers.length}</span> members
               {filteredMembers.length !== members.length && (
-                <span className="text-gray-500"> (filtered from {members.length} total)</span>
+                <span className="text-muted-foreground"> (filtered from {members.length} total)</span>
               )}
             </span>
             {(searchTerm || selectedState || selectedDistrict || selectedCity) && (
               <button
                 onClick={clearFilters}
-                className="text-blue-600 hover:text-blue-800 font-medium"
+                className="text-primary hover:text-primary/80 font-medium"
               >
                 Clear all filters
               </button>
@@ -931,14 +931,14 @@ const Directory: React.FC = () => {
 
         {isLoading ? (
           <div className="text-center py-16">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading members...</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading members...</p>
           </div>
         ) : filteredMembers.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-            <Users className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No members found</h3>
-            <p className="text-gray-600 mb-6">
+          <div className="text-center py-16 bg-card rounded-lg border border-border">
+            <Users className="w-20 h-20 text-muted-foreground/40 mx-auto mb-4" />
+            <h3 className="text-section font-semibold text-foreground mb-2">No members found</h3>
+            <p className="text-muted-foreground mb-6">
               {selectedCity && selectedDistrict
                 ? `No members found in ${selectedCity}. Try selecting a different city or clear filters.`
                 : selectedDistrict && selectedState
@@ -950,7 +950,7 @@ const Directory: React.FC = () => {
             {(searchTerm || selectedState || selectedDistrict || selectedCity) && (
               <button
                 onClick={clearFilters}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Clear all filters
               </button>
@@ -972,16 +972,16 @@ const Directory: React.FC = () => {
             ) : (
               <div className="space-y-6">
                 {paginatedStateGroups.map((group) => (
-                  <div key={group.state} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200 px-6 py-4">
+                  <div key={group.state} className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+                    <div className="bg-muted/50 border-b border-border px-6 py-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <MapPin className="w-5 h-5 text-blue-600 mr-2" />
-                          <h2 className="text-xl font-bold text-gray-900">{group.state}</h2>
+                          <MapPin className="w-5 h-5 text-primary mr-2" />
+                          <h2 className="text-section font-semibold text-foreground">{group.state}</h2>
                         </div>
-                        <div className="flex items-center px-3 py-1 bg-white rounded-full border border-blue-300">
-                          <Users className="w-4 h-4 text-blue-600 mr-2" />
-                          <span className="text-sm font-semibold text-gray-700">
+                        <div className="flex items-center px-3 py-1 bg-card rounded-full border border-border">
+                          <Users className="w-4 h-4 text-primary mr-2" />
+                          <span className="text-sm font-semibold text-foreground">
                             {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'} on this page
                           </span>
                         </div>
@@ -989,23 +989,23 @@ const Directory: React.FC = () => {
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-muted/50 border-b border-border">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Member Name
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Company Name
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               City/Town
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               District
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-card divide-y divide-border">
                           {group.members.map((member) => (
                             <MemberTableRow key={member.id} member={member} />
                           ))}
@@ -1018,13 +1018,13 @@ const Directory: React.FC = () => {
             )}
 
             {!userRole.isLoggedIn && filteredMembers.length > 0 && (
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="mt-6 bg-primary/10 border border-primary/20 rounded-lg p-4">
                 <div className="flex items-center justify-center text-center">
-                  <EyeOff className="w-5 h-5 mr-2 text-blue-600" />
-                  <span className="text-sm text-blue-900">
+                  <EyeOff className="w-5 h-5 mr-2 text-primary" />
+                  <span className="text-sm text-foreground">
                     Contact details are hidden. <button
                       onClick={() => navigate('/signin')}
-                      className="font-semibold underline hover:text-blue-700"
+                      className="font-semibold underline hover:text-primary/80"
                     >
                       Sign in
                     </button> to view full details
