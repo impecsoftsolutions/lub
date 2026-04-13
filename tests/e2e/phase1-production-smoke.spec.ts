@@ -136,7 +136,7 @@ async function buildRouteLoadDiagnostics(page: Page, diagnostics: Diagnostics): 
 async function expectJoinLubFormConfigRoute(page: Page): Promise<void> {
   await expectAdminRoute(page, '/admin/settings/forms/join-lub', { timeoutMs: 75_000 });
 
-  const heading = page.getByRole('heading', { name: /Join LUB Form - Field Configuration/i }).first();
+  const heading = page.getByRole('heading', { name: /(Join LUB Form|Member Registration Form) - Field Configuration/i }).first();
   const loadingMarker = page.getByText(/Loading configuration\.\.\./i).first();
   const markerVisible = await Promise.any([
     heading.waitFor({ state: 'visible', timeout: 75_000 }).then(() => 'heading'),
@@ -144,7 +144,7 @@ async function expectJoinLubFormConfigRoute(page: Page): Promise<void> {
   ]).catch(() => null);
 
   if (!markerVisible) {
-    throw new Error('Join LUB form configuration markers were not visible (heading/loading).');
+    throw new Error('Member registration form configuration markers were not visible (heading/loading).');
   }
 }
 
@@ -2920,7 +2920,7 @@ async function findFormFieldRowByNameOrLabel(page: Page, nameOrLabel: string): P
 }
 
 async function chooseRuntimeFormField(page: Page, preferredFieldName?: string): Promise<RuntimeFormFieldTarget> {
-  await expect(page.getByRole('heading', { name: /Join LUB Form - Field Configuration/i }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: /(Join LUB Form|Member Registration Form) - Field Configuration/i }).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
   const preferred = preferredFieldName?.trim();

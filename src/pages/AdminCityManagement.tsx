@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase, locationsService, citiesService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
-import { Search, Plus, CreditCard as Edit2, Trash2, MapPin, Lock } from 'lucide-react';
+import { Search, Plus, MapPin, Lock, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -349,22 +352,22 @@ export default function AdminCityManagement() {
               <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       City Name
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       District
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       State
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Source
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -372,14 +375,14 @@ export default function AdminCityManagement() {
                 <tbody className="bg-card divide-y divide-border">
                   {filteredCities.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                      <td colSpan={6} className="text-center text-muted-foreground">
                         No cities found
                       </td>
                     </tr>
                   ) : (
                     filteredCities.map((city) => (
                       <tr key={city.id} className="hover:bg-muted/50">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="whitespace-nowrap">
                           <div className="flex items-center">
                             <MapPin className="w-4 h-4 text-muted-foreground mr-2" />
                             <span className="text-sm font-medium text-foreground">
@@ -387,50 +390,44 @@ export default function AdminCityManagement() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="whitespace-nowrap text-sm text-foreground">
                           {city.district?.district_name || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="whitespace-nowrap text-sm text-foreground">
                           {city.state?.state_name || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             city.status === 'approved'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-primary/10 text-primary'
                               : city.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-muted text-foreground'
+                              : 'bg-destructive/10 text-destructive'
                           }`}>
                             {city.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="whitespace-nowrap text-sm text-foreground">
                           {city.submission_source.replace('_', ' ')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center gap-2">
-                            {canManageCities && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setEditingCity(city);
-                                    setShowEditModal(true);
-                                  }}
-                                  className="text-primary hover:text-primary/80"
-                                  title="Edit"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteCity(city.id)}
-                                  className="text-red-600 hover:text-red-900"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
+                        <td className="whitespace-nowrap text-sm font-medium px-4 py-3">
+                          {canManageCities && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}>
+                                <span className="sr-only">Open actions menu</span>
+                                <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => { setEditingCity(city); setShowEditModal(true); }}>
+                                  <Edit3 className="w-4 h-4" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem variant="destructive" onClick={() => handleDeleteCity(city.id)}>
+                                  <Trash2 className="w-4 h-4" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -448,8 +445,8 @@ export default function AdminCityManagement() {
         )}
 
         {showAddModal && canManageCities && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-sm max-w-md w-full">
               <div className="px-6 py-4 border-b border-border">
                 <h3 className="text-section font-semibold text-foreground">Add New City</h3>
               </div>
@@ -535,8 +532,8 @@ export default function AdminCityManagement() {
         )}
 
         {showEditModal && editingCity && canManageCities && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-sm max-w-md w-full">
               <div className="px-6 py-4 border-b border-border">
                 <h3 className="text-section font-semibold text-foreground">Edit City</h3>
               </div>
@@ -621,3 +618,6 @@ export default function AdminCityManagement() {
     </PermissionGate>
   );
 }
+
+
+

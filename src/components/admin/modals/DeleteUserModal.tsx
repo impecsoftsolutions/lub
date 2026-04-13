@@ -123,26 +123,27 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div className="fixed inset-0 z-[80] overflow-y-auto">
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-6 text-center sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-black/50"
+          className="fixed inset-0 bg-black/60 backdrop-blur-[1px]"
           onClick={handleClose}
         />
 
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-
-        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div
+          className="relative z-10 inline-block w-full max-w-lg transform overflow-hidden rounded-xl border border-border bg-card text-left shadow-2xl ring-1 ring-border/50 transition-all"
+          onClick={(e) => e.stopPropagation()}
+        >
 
           <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                <div className="flex items-center justify-center w-10 h-10 bg-destructive/15 rounded-full">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
                   <h3 className="text-section font-semibold text-foreground">Delete User Account</h3>
-                  <p className="text-sm text-red-600 font-medium">This action cannot be undone</p>
+                  <p className="text-sm text-destructive font-medium">This action cannot be undone</p>
                 </div>
               </div>
               <button
@@ -155,12 +156,12 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
             </div>
 
             {!isGeneralUser && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-red-800">Cannot Delete This User</p>
-                    <p className="text-sm text-red-700 mt-1">
+                    <p className="text-sm font-medium text-destructive">Cannot Delete This User</p>
+                    <p className="text-sm text-destructive/90 mt-1">
                       This user has account type <span className="font-semibold">{user.account_type}</span>.
                       Only general user accounts can be deleted from this interface.
                     </p>
@@ -170,13 +171,13 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
             )}
 
             {success && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="mb-4 p-4 bg-success/10 border border-success/20 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <CheckCircle className="w-5 h-5 text-success" />
                   <div>
-                    <p className="text-sm font-medium text-green-800">User deleted successfully!</p>
+                    <p className="text-sm font-medium text-success">User deleted successfully!</p>
                     {purgedCount > 0 && (
-                      <p className="text-xs text-green-700 mt-1">Purged {purgedCount} deleted member record{purgedCount !== 1 ? 's' : ''}</p>
+                      <p className="text-xs text-success/90 mt-1">Purged {purgedCount} deleted member record{purgedCount !== 1 ? 's' : ''}</p>
                     )}
                   </div>
                 </div>
@@ -184,10 +185,10 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
             )}
 
             {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                  <p className="text-sm font-medium text-red-800">{error}</p>
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  <p className="text-sm font-medium text-destructive">{error}</p>
                 </div>
               </div>
             )}
@@ -207,12 +208,12 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
                   </div>
                 </div>
 
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-red-800">Warning</p>
-                      <p className="text-sm text-red-700 mt-1">
+                      <p className="text-sm font-medium text-destructive">Warning</p>
+                      <p className="text-sm text-destructive/90 mt-1">
                         This will permanently delete the user account and all associated data.
                       </p>
                     </div>
@@ -229,7 +230,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
                       setError('');
                     }}
                     disabled={isDeleting || success}
-                    className="mt-1 w-4 h-4 text-red-600 border-border rounded focus:ring-red-500 disabled:opacity-50"
+                    className="mt-1 w-4 h-4 accent-destructive border-border rounded focus:ring-ring disabled:opacity-50"
                   />
                   <label
                     htmlFor="confirm-delete"
@@ -242,11 +243,11 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
             )}
           </div>
 
-          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3 border-t border-border">
             <button
               onClick={handleDelete}
               disabled={!isConfirmed || !isGeneralUser || isDeleting || success}
-              className="w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent shadow-sm px-4 py-2 bg-destructive text-destructive-foreground text-base font-medium hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDeleting ? (
                 <>

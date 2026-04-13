@@ -393,7 +393,7 @@ const MemberDashboard: React.FC = () => {
           {member.member_id && (
             <div className="bg-card rounded-lg border border-border shadow-sm p-5">
               <p className="text-label font-medium text-muted-foreground uppercase tracking-wider mb-1">Member ID</p>
-              <p className="text-2xl font-semibold text-foreground">{member.member_id}</p>
+              <p className="text-xl font-semibold text-foreground">{member.member_id}</p>
               <p className="text-xs text-muted-foreground mt-1">Your unique member identifier</p>
             </div>
           )}

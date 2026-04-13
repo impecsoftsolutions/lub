@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Palette, Moon, Sun, Monitor, CheckCircle2, Pipette, RotateCcw, RectangleHorizontal, Paintbrush, Type } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Palette, Moon, Sun, Monitor, CheckCircle2, Pipette, RotateCcw, RectangleHorizontal, Paintbrush, Type, ArrowLeft } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,11 +27,14 @@ import {
   resetTypographySettings,
   TABLE_BORDER_OPTIONS,
   TABLE_SHADOW_OPTIONS,
+  CARD_SHADOW_OPTIONS,
   TABLE_DENSITY_OPTIONS,
   getTableBorder,
   setTableBorder,
   getTableShadow,
   setTableShadow,
+  getCardShadow,
+  setCardShadow,
   getTableDensity,
   setTableDensity,
   getTableScrollbarSize,
@@ -42,6 +46,7 @@ import {
   type TypographySizeId,
   type TableBorderOption,
   type TableShadowOption,
+  type CardShadowOption,
   type TableDensityOption,
 } from '@/lib/themeManager';
 
@@ -164,6 +169,7 @@ const AdminAppearanceSettings: React.FC = () => {
 
   const [activeTableBorder, setActiveTableBorder] = useState<TableBorderOption>(getTableBorder);
   const [activeTableShadow, setActiveTableShadow] = useState<TableShadowOption>(getTableShadow);
+  const [activeCardShadow,  setActiveCardShadow]  = useState<CardShadowOption>(getCardShadow);
   const [activeTableDensity, setActiveTableDensity] = useState<TableDensityOption>(getTableDensity);
   const [tableScrollbarPx, setTableScrollbarPxState] = useState<number>(getTableScrollbarSize);
 
@@ -174,6 +180,10 @@ const AdminAppearanceSettings: React.FC = () => {
   const handleTableShadowChange = (id: TableShadowOption) => {
     setActiveTableShadow(id);
     setTableShadow(id);
+  };
+  const handleCardShadowChange = (id: CardShadowOption) => {
+    setActiveCardShadow(id);
+    setCardShadow(id);
   };
   const handleTableDensityChange = (id: TableDensityOption) => {
     setActiveTableDensity(id);
@@ -193,9 +203,19 @@ const AdminAppearanceSettings: React.FC = () => {
   return (
     <div className="p-6 max-w-4xl">
       <PageHeader
-        title="Appearance"
+        title="Theme"
         subtitle="Customise the colour theme, brand colour, corner style, and display mode for the admin portal"
       />
+
+      <div className="mb-4">
+        <Link
+          to="/admin/settings"
+          className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Settings Hub
+        </Link>
+      </div>
 
       {/* ── 1. Quick theme presets ── */}
       <Card className="mb-6">
@@ -226,15 +246,15 @@ const AdminAppearanceSettings: React.FC = () => {
                   {/* Colour swatches */}
                   <div className="flex gap-1.5">
                     <span
-                      className="h-7 w-7 rounded-full border border-black/10 shadow-sm"
+                      className="h-7 w-7 rounded-full border border-border shadow-sm"
                       style={{ background: theme.swatches.primary }}
                     />
                     <span
-                      className="h-7 w-7 rounded-full border border-black/10 shadow-sm"
+                      className="h-7 w-7 rounded-full border border-border shadow-sm"
                       style={{ background: theme.swatches.secondary }}
                     />
                     <span
-                      className="h-7 w-7 rounded-full border border-black/10 shadow-sm"
+                      className="h-7 w-7 rounded-full border border-border shadow-sm"
                       style={{ background: theme.swatches.base }}
                     />
                   </div>
@@ -332,7 +352,7 @@ const AdminAppearanceSettings: React.FC = () => {
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
                 <span
-                  className="inline-block h-4 w-4 rounded-full border border-black/10 shadow-sm shrink-0"
+                  className="inline-block h-4 w-4 rounded-full border border-border shadow-sm shrink-0"
                   style={{ background: previewSwatch }}
                 />
                 <span className="text-sm font-mono font-medium text-foreground">
@@ -679,7 +699,7 @@ const AdminAppearanceSettings: React.FC = () => {
           {/* Table shadow */}
           <div>
             <p className="text-sm font-semibold text-foreground mb-1">Table Shadow</p>
-            <p className="text-xs text-muted-foreground mb-3">Depth of the shadow on the table card wrapper.</p>
+            <p className="text-xs text-muted-foreground mb-3">Depth of the shadow on data table wrappers.</p>
             <div className="flex flex-wrap gap-3">
               {TABLE_SHADOW_OPTIONS.map((opt) => {
                 const isActive = activeTableShadow === opt.id;
@@ -695,6 +715,36 @@ const AdminAppearanceSettings: React.FC = () => {
                     )}
                   >
                     {/* Visual preview: a card with this shadow */}
+                    <div
+                      className="w-10 h-7 rounded-md bg-card border border-border"
+                      style={{ boxShadow: opt.value === 'none' ? 'none' : opt.value }}
+                    />
+                    <span className="text-sm font-medium">{opt.label}</span>
+                    <span className="text-xs text-muted-foreground">{opt.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Card shadow */}
+          <div>
+            <p className="text-sm font-semibold text-foreground mb-1">Card Shadow</p>
+            <p className="text-xs text-muted-foreground mb-3">Depth of the shadow on page cards and content panels.</p>
+            <div className="flex flex-wrap gap-3">
+              {CARD_SHADOW_OPTIONS.map((opt) => {
+                const isActive = activeCardShadow === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleCardShadowChange(opt.id)}
+                    className={cn(
+                      'flex flex-col items-center gap-2.5 rounded-xl border-2 px-5 py-3.5 transition-all',
+                      isActive
+                        ? 'border-primary bg-primary/5 shadow-sm ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/40 hover:bg-muted'
+                    )}
+                  >
                     <div
                       className="w-10 h-7 rounded-md bg-card border border-border"
                       style={{ boxShadow: opt.value === 'none' ? 'none' : opt.value }}
@@ -829,3 +879,4 @@ const AdminAppearanceSettings: React.FC = () => {
 };
 
 export default AdminAppearanceSettings;
+

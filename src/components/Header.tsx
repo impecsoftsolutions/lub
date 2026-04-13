@@ -205,20 +205,6 @@ const Header: React.FC = () => {
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
-            {isMemberAuthenticated && (
-              <Link
-                to="/dashboard"
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                  isActiveLink('/dashboard')
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground hover:bg-muted'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
-              </Link>
-            )}
-
             {isAnyUserAuthenticated && member ? (
               <div className="relative" ref={userDropdownRef}>
                 <button
@@ -251,6 +237,15 @@ const Header: React.FC = () => {
                       <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
                       <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                     </div>
+
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setIsUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      Dashboard
+                    </Link>
 
                     <Link
                       to="/dashboard/profile"
@@ -341,21 +336,6 @@ const Header: React.FC = () => {
                   <Shield className="w-4 h-4" />
                   Admin Panel
                 </a>
-              )}
-
-              {isMemberAuthenticated && (
-                <Link
-                  to="/dashboard"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`px-3 py-2 text-base font-medium transition-colors duration-200 flex items-center gap-2 ${
-                    isActiveLink('/dashboard')
-                      ? 'text-primary bg-primary/10'
-                      : 'text-foreground hover:text-primary'
-                  }`}
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Link>
               )}
 
               {shouldShowJoinOptions && (

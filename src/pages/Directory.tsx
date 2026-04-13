@@ -646,19 +646,11 @@ const Directory: React.FC = () => {
     );
   };
 
-  const StateHeader: React.FC<{ state: string; count: number }> = ({ state, count }) => (
+  const StateHeader: React.FC<{ state: string }> = ({ state }) => (
     <div className="col-span-full bg-muted/50 border border-border rounded-lg p-4 mb-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <MapPin className="w-5 h-5 text-primary mr-2" />
-          <h2 className="text-section font-semibold text-foreground">{state}</h2>
-        </div>
-        <div className="flex items-center px-3 py-1 bg-card rounded-full border border-border">
-          <Users className="w-4 h-4 text-primary mr-2" />
-          <span className="text-sm font-semibold text-foreground">
-            {count} {count === 1 ? 'member' : 'members'} on this page
-          </span>
-        </div>
+      <div className="flex items-center">
+        <MapPin className="w-5 h-5 text-primary mr-2" />
+        <h2 className="text-section font-semibold text-foreground">{state}</h2>
       </div>
     </div>
   );
@@ -962,7 +954,7 @@ const Directory: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {paginatedStateGroups.map((group) => (
                   <React.Fragment key={group.state}>
-                    <StateHeader state={group.state} count={group.memberCount} />
+                    <StateHeader state={group.state} />
                     {group.members.map((member) => (
                       <MemberCard key={member.id} member={member} />
                     ))}
@@ -974,17 +966,9 @@ const Directory: React.FC = () => {
                 {paginatedStateGroups.map((group) => (
                   <div key={group.state} className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
                     <div className="bg-muted/50 border-b border-border px-6 py-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <MapPin className="w-5 h-5 text-primary mr-2" />
-                          <h2 className="text-section font-semibold text-foreground">{group.state}</h2>
-                        </div>
-                        <div className="flex items-center px-3 py-1 bg-card rounded-full border border-border">
-                          <Users className="w-4 h-4 text-primary mr-2" />
-                          <span className="text-sm font-semibold text-foreground">
-                            {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'} on this page
-                          </span>
-                        </div>
+                      <div className="flex items-center">
+                        <MapPin className="w-5 h-5 text-primary mr-2" />
+                        <h2 className="text-section font-semibold text-foreground">{group.state}</h2>
                       </div>
                     </div>
                     <div className="overflow-x-auto">

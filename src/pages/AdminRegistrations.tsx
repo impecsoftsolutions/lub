@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Eye as ViewIcon, Lock, MoreHorizontal } from 'lucide-react';
+import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -14,9 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from '@/components/ui/table';
-import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle
 } from '@/components/ui/dialog';
 import {
@@ -24,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { useAdmin } from '../contexts/useAdmin';
 
 interface MemberRegistration {
   id: string;
@@ -102,6 +100,8 @@ const AdminRegistrations: React.FC = () => {
   const canApprove = useHasPermission('members.approve');
   const canEdit = useHasPermission('members.edit');
   const canDelete = useHasPermission('members.delete');
+  const { refreshCounts } = useAdmin();
+  const [returnToViewOnEditClose, setReturnToViewOnEditClose] = useState(false);
 
 
   const loadRegistrations = useCallback(async () => {
@@ -145,13 +145,14 @@ const AdminRegistrations: React.FC = () => {
       }));
 
       setRegistrations(transformedData);
+      refreshCounts();
     } catch (error) {
       console.error('[AdminRegistrations] Error loading registrations:', error);
       showToast('error', 'Failed to load registrations');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [refreshCounts]);
 
   const filterRegistrations = useCallback(() => {
     let filtered = registrations;
@@ -246,6 +247,7 @@ const AdminRegistrations: React.FC = () => {
             : reg
         )
       );
+      refreshCounts();
 
       // Send welcome email if approved
       if (newStatus === 'approved' && registrationData) {
@@ -307,6 +309,9 @@ const AdminRegistrations: React.FC = () => {
   };
 
   const handleEditMember = (member: MemberRegistration) => {
+    setReturnToViewOnEditClose(false);
+    setViewingApplicationId('');
+    setShowViewModal(false);
     setEditingMember(member);
     setShowEditModal(true);
   };
@@ -323,6 +328,7 @@ const AdminRegistrations: React.FC = () => {
   };
 
   const handleEditFromView = (applicationData: MemberRegistration) => {
+    setReturnToViewOnEditClose(true);
     setShowViewModal(false);
     setEditingMember(applicationData);
     setShowEditModal(true);
@@ -366,6 +372,7 @@ const AdminRegistrations: React.FC = () => {
 
       if (result.success) {
         setRegistrations(prev => prev.filter(reg => reg.id !== deleteDialog.memberId));
+        refreshCounts();
         showToast('success', 'Member deleted successfully');
         setDeleteDialog({ isOpen: false, memberId: '', memberName: '' });
         setDeletionReason('');
@@ -385,6 +392,15 @@ const AdminRegistrations: React.FC = () => {
       action,
       memberName
     });
+  };
+
+  const openDeleteDialog = (memberId: string, memberName: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      memberId,
+      memberName
+    });
+    setDeletionReason('');
   };
 
   const getStatusBadge = (status: string) => {
@@ -483,7 +499,7 @@ const AdminRegistrations: React.FC = () => {
       {/* Registrations Table */}
       {isLoading ? (
         <div className="bg-card rounded-lg border border-border shadow-sm p-12 text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-sm text-muted-foreground">Loading registrations...</p>
         </div>
       ) : filteredRegistrations.length === 0 ? (
@@ -498,38 +514,56 @@ const AdminRegistrations: React.FC = () => {
         </div>
       ) : (
         <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Docs</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left text-label text-muted-foreground uppercase tracking-wider">Member</th>
+                  <th className="text-left text-label text-muted-foreground uppercase tracking-wider">Company</th>
+                  <th className="text-left text-label text-muted-foreground uppercase tracking-wider">Status</th>
+                  <th className="text-left text-label text-muted-foreground uppercase tracking-wider">Docs</th>
+                  <th className="text-right text-label text-muted-foreground uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-card divide-y divide-border">
               {filteredRegistrations.map((registration) => (
                 <React.Fragment key={registration.id}>
-                  <TableRow>
+                  <tr className="hover:bg-muted/50">
                     {/* Member */}
-                    <TableCell>
-                      <p className="text-sm font-medium leading-tight">{registration.full_name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{registration.email}</p>
-                      <p className="text-xs text-muted-foreground">{registration.mobile_number}</p>
-                      {registration.member_id && (
-                        <p className="text-xs font-medium text-primary mt-0.5">ID: {registration.member_id}</p>
-                      )}
-                    </TableCell>
+                    <td className="align-top">
+                      <div className="space-y-0.5">
+                        {canViewMembers ? (
+                          <button
+                            type="button"
+                            onClick={() => handleViewApplication(registration.id)}
+                            className={cn(
+                              'leading-tight text-left text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors',
+                              registration.status === 'pending' ? 'font-semibold' : 'font-normal'
+                            )}
+                          >
+                            {registration.full_name}
+                          </button>
+                        ) : (
+                          <p className={cn('leading-tight text-foreground', registration.status === 'pending' ? 'font-semibold' : 'font-normal')}>
+                            {registration.full_name}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground leading-tight">{registration.email}</p>
+                        <p className="text-muted-foreground leading-tight">{registration.mobile_number}</p>
+                        {registration.member_id && (
+                          <p className="text-primary mt-1">ID: {registration.member_id}</p>
+                        )}
+                      </div>
+                    </td>
                     {/* Company */}
-                    <TableCell>
-                      <p className="text-sm leading-tight">{registration.company_name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                    <td className="align-top">
+                      <p className="leading-tight text-foreground">{registration.company_name}</p>
+                      <p className="text-muted-foreground mt-0.5 leading-tight">
                         {registration.company_designations?.designation_name || '—'} · {registration.district}
                       </p>
-                    </TableCell>
+                    </td>
                     {/* Status */}
-                    <TableCell>
+                    <td className="align-top">
                       <div className="flex items-center gap-1.5">
                         {getStatusBadge(registration.status)}
                         {registration.is_active === false && registration.status === 'approved' && (
@@ -538,10 +572,10 @@ const AdminRegistrations: React.FC = () => {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">{formatDate(registration.created_at)}</p>
-                    </TableCell>
+                      <p className="text-muted-foreground mt-1">{formatDate(registration.created_at)}</p>
+                    </td>
                     {/* Documents */}
-                    <TableCell>
+                    <td className="align-top">
                       <div className="flex gap-1 flex-wrap">
                         {registration.gst_certificate_url && (
                           <a href={registration.gst_certificate_url} target="_blank" rel="noopener noreferrer">
@@ -565,31 +599,21 @@ const AdminRegistrations: React.FC = () => {
                           </a>
                         )}
                         {!registration.gst_certificate_url && !registration.udyam_certificate_url && !registration.payment_proof_url && (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </div>
-                    </TableCell>
+                    </td>
                     {/* Actions */}
-                    <TableCell>
+                    <td className="align-top">
                       <div className="flex items-center justify-end gap-1">
                         {registration.status === 'pending' && canApprove && (
                           <Button
                             size="sm"
                             onClick={() => openConfirmDialog(registration.id, 'approved', registration.full_name)}
                             disabled={actionLoading === registration.id}
-                            className="h-7 px-2 text-xs gap-1"
+                            className="h-7 px-2 gap-1"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />Approve
-                          </Button>
-                        )}
-                        {canViewMembers && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewApplication(registration.id)}
-                            className="h-7 px-2 text-xs gap-1"
-                          >
-                            <ViewIcon className="w-3.5 h-3.5" />View
                           </Button>
                         )}
                         <DropdownMenu>
@@ -643,24 +667,25 @@ const AdminRegistrations: React.FC = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                         {actionLoading === registration.id && (
-                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-blue-600" />
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary" />
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                   {registration.rejection_reason && registration.status === 'rejected' && (
-                    <TableRow className="bg-destructive/5">
-                      <TableCell colSpan={5} className="py-2">
-                        <p className="text-xs text-destructive">
-                          <span className="font-medium">Rejection reason:</span> {registration.rejection_reason}
+                    <tr className="bg-destructive/5">
+                      <td colSpan={5}>
+                        <p className="text-destructive">
+                          <span>Rejection reason:</span> {registration.rejection_reason}
                         </p>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   )}
                 </React.Fragment>
               ))}
-            </TableBody>
-          </Table>
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -705,7 +730,7 @@ const AdminRegistrations: React.FC = () => {
 
           {actionLoading === confirmDialog.registrationId && (
             <div className="p-3 bg-primary/5 rounded-lg flex items-center text-sm text-primary">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
               Processing your request...
             </div>
           )}
@@ -799,18 +824,22 @@ const AdminRegistrations: React.FC = () => {
           onClose={() => {
             setShowEditModal(false);
             setEditingMember(null);
-            // If we came from the view modal, return to it
-            if (viewingApplicationId) {
+            if (returnToViewOnEditClose && viewingApplicationId) {
               setShowViewModal(true);
+            } else {
+              setViewingApplicationId('');
             }
+            setReturnToViewOnEditClose(false);
           }}
           onSuccess={() => {
             loadRegistrations();
             showToast('success', 'Member updated successfully');
-            // If we came from the view modal, return to it
-            if (viewingApplicationId) {
+            if (returnToViewOnEditClose && viewingApplicationId) {
               setShowViewModal(true);
+            } else {
+              setViewingApplicationId('');
             }
+            setReturnToViewOnEditClose(false);
           }}
           onError={(message) => showToast('error', message)}
         />

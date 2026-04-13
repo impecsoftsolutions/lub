@@ -194,75 +194,82 @@ export const validationService = {
     }
   },
 
-  async validateByFieldName(fieldName: string, value: string): Promise<ValidationResult> {
+  async validateByFieldName(
+    fieldName: string,
+    value: string,
+    formKey: string = 'join_lub'
+  ): Promise<ValidationResult> {
     try {
-      console.log('[Validation] validateByFieldName called with:', { fieldName, value: value.substring(0, 20) + '...' });
+      console.log('[Validation] validateByFieldName called with:', {
+        formKey,
+        fieldName,
+        value: value.substring(0, 20) + '...'
+      });
 
-      // Step 1: Query form_field_configurations to get validation_rule_id for the field_name
+      // Prefer Builder live mapping for form runtime.
+      const { data: liveRuleData, error: liveRuleError } = await supabase.rpc(
+        'get_form_field_validation_rule_v2',
+        {
+          p_form_key: formKey,
+          p_field_key: fieldName
+        }
+      );
+
+      if (!liveRuleError) {
+        const liveRule = Array.isArray(liveRuleData) ? liveRuleData[0] : null;
+
+        if (liveRule) {
+          if (!liveRule.validation_rule_id) {
+            return { isValid: true, message: '' };
+          }
+
+          // If mapped rule is inactive/missing, do not block submission.
+          if (!liveRule.validation_pattern) {
+            return { isValid: true, message: '' };
+          }
+
+          const regex = new RegExp(liveRule.validation_pattern);
+          const isValid = regex.test(value);
+          return {
+            isValid,
+            message: isValid ? '' : (liveRule.error_message || 'Invalid value'),
+            matchedPattern: liveRule.validation_pattern
+          };
+        }
+      }
+
+      // Legacy fallback remains only for Join form compatibility in older environments.
+      if (formKey !== 'join_lub') {
+        return { isValid: true, message: '' };
+      }
+
       const { data: fieldConfig, error: fieldError } = await supabase
         .from('form_field_configurations')
         .select('validation_rule_id')
         .eq('field_name', fieldName)
         .maybeSingle();
 
-      if (fieldError) {
-        console.error('[Validation] Error fetching field configuration:', fieldError);
-        return {
-          isValid: false,
-          message: 'Error fetching field configuration'
-        };
+      if (fieldError || !fieldConfig) {
+        return { isValid: true, message: '' };
       }
 
-      if (!fieldConfig) {
-        console.error('[Validation] Field configuration not found for:', fieldName);
-        return {
-          isValid: false,
-          message: `Field configuration not found for "${fieldName}"`
-        };
-      }
-
-      // If no validation rule is assigned, consider the field valid (no validation required)
       if (!fieldConfig.validation_rule_id) {
-        console.log('[Validation] No validation rule assigned for field:', fieldName);
-        return {
-          isValid: true,
-          message: ''
-        };
+        return { isValid: true, message: '' };
       }
 
-      // Step 2: Query validation_rules table using the validation_rule_id
       const { data: validationRule, error: ruleError } = await supabase
         .from('validation_rules')
-        .select('validation_pattern, error_message, rule_name')
+        .select('validation_pattern, error_message')
         .eq('id', fieldConfig.validation_rule_id)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (ruleError) {
-        console.error('[Validation] Error fetching validation rule:', ruleError);
-        return {
-          isValid: false,
-          message: 'Error fetching validation rule'
-        };
+      if (ruleError || !validationRule) {
+        return { isValid: true, message: '' };
       }
 
-      if (!validationRule) {
-        console.error('[Validation] Validation rule not found for ID:', fieldConfig.validation_rule_id);
-        return {
-          isValid: false,
-          message: 'Validation rule not found or inactive'
-        };
-      }
-
-      console.log('[Validation] Found validation rule:', validationRule.rule_name, '- Pattern:', validationRule.validation_pattern);
-
-      // Step 3: Apply validation pattern
       const regex = new RegExp(validationRule.validation_pattern);
       const isValid = regex.test(value);
-
-      console.log('[Validation] Validation result for', fieldName, ':', isValid ? 'VALID' : 'INVALID');
-
-      // Step 4: Return result with error_message if validation fails
       return {
         isValid,
         message: isValid ? '' : validationRule.error_message,

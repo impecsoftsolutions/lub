@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MapPin, Plus, Search, ArrowLeft, Building2, CreditCard as Edit3, Trash2, Users, AlertCircle, Loader2, X, Lock } from 'lucide-react';
+import { MapPin, Plus, Search, ArrowLeft, Building2, Users, AlertCircle, Loader2, X, Lock, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 import { locationsService, DistrictOption, CityOption, statesService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
@@ -418,7 +421,7 @@ const AdminLocationManagement: React.FC = () => {
             )}
               {selectedDistrict && canManageCities && (
                 <button
-                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                   onClick={() => {
                     setSelectedDistrictId(selectedDistrict.district_id);
                     setIsAddCityOpen(true);
@@ -495,26 +498,21 @@ const AdminLocationManagement: React.FC = () => {
                           <h3 className="font-medium text-foreground">{district.district_name}</h3>
                         </div>
                         {canManageDistricts && (
-                        <div className="flex items-center space-x-2">
-                          <button
-                            className="p-1 text-muted-foreground hover:text-primary transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditDistrict(district);
-                            }}
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteDistrict(district);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}>
+                              <span className="sr-only">Open actions menu</span>
+                              <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditDistrict(district)}>
+                                <Edit3 className="w-4 h-4" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem variant="destructive" onClick={() => handleDeleteDistrict(district)}>
+                                <Trash2 className="w-4 h-4" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </div>
@@ -528,7 +526,7 @@ const AdminLocationManagement: React.FC = () => {
           <div className="bg-card rounded-lg shadow-sm border border-border">
             <div className="p-6 border-b border-border">
               <h2 className="text-section font-semibold text-foreground flex items-center">
-                <Users className="w-5 h-5 mr-2 text-green-600" />
+                <Users className="w-5 h-5 mr-2 text-primary" />
                 Cities in {selectedDistrict ? selectedDistrict.district_name : 'Select District'}
               </h2>
               {selectedDistrict && (
@@ -547,7 +545,7 @@ const AdminLocationManagement: React.FC = () => {
                 </div>
               ) : isLoadingCities ? (
                 <div className="p-6 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
                   <p className="text-muted-foreground">Loading cities...</p>
                 </div>
               ) : cities.length === 0 ? (
@@ -565,7 +563,7 @@ const AdminLocationManagement: React.FC = () => {
                           <div className="flex items-center">
                             <h3 className="font-medium text-foreground">{city.city_name}</h3>
                             {city.is_popular && (
-                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                                 Popular
                               </span>
                             )}
@@ -575,16 +573,10 @@ const AdminLocationManagement: React.FC = () => {
                         {canManageCities && (
                         <div className="flex items-center space-x-2">
                           <button
-                            className="p-1 text-muted-foreground hover:text-primary transition-colors"
-                            onClick={() => showToast('success', 'Edit city feature coming soon!')}
+                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => showToast('success', 'City actions coming soon!')}
                           >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                            onClick={() => showToast('success', 'Delete city feature coming soon!')}
-                          >
-                            <Trash2 className="w-4 h-4" />
+                            <MoreHorizontal className="w-4 h-4" />
                           </button>
                         </div>
                         )}
@@ -602,15 +594,15 @@ const AdminLocationManagement: React.FC = () => {
           <h3 className="text-section font-semibold text-foreground mb-4">Location Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-2xl font-semibold text-primary">{districts.length}</div>
+              <div className="text-xl font-semibold text-primary">{districts.length}</div>
               <div className="text-sm text-muted-foreground">Total Districts</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-semibold text-green-600">{cities.length}</div>
+              <div className="text-xl font-semibold text-primary">{cities.length}</div>
               <div className="text-sm text-muted-foreground">Cities in Selected District</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-semibold text-primary">
+              <div className="text-xl font-semibold text-primary">
                 {cities.filter(city => city.is_popular).length}
               </div>
               <div className="text-sm text-muted-foreground">Popular Cities</div>
@@ -621,8 +613,8 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Add District Modal */}
       {isAddDistrictOpen && canManageDistricts && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Add New District</h3>
               <button
@@ -636,7 +628,7 @@ const AdminLocationManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  District Name <span className="text-red-500">*</span>
+                  District Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -646,7 +638,7 @@ const AdminLocationManagement: React.FC = () => {
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {newDistrictName.trim().length > 0 && newDistrictName.trim().length < 2 && (
-                  <p className="text-red-500 text-sm mt-1">District name must be at least 2 characters long</p>
+                  <p className="text-destructive text-sm mt-1">District name must be at least 2 characters long</p>
                 )}
               </div>
 
@@ -685,8 +677,8 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Add City Modal */}
       {isAddCityOpen && selectedDistrict && canManageCities && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Add New City</h3>
               <button
@@ -706,7 +698,7 @@ const AdminLocationManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  City Name <span className="text-red-500">*</span>
+                  City Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -716,7 +708,7 @@ const AdminLocationManagement: React.FC = () => {
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {newCityName.trim().length > 0 && newCityName.trim().length < 2 && (
-                  <p className="text-red-500 text-sm mt-1">City name must be at least 2 characters long</p>
+                  <p className="text-destructive text-sm mt-1">City name must be at least 2 characters long</p>
                 )}
               </div>
 
@@ -726,7 +718,7 @@ const AdminLocationManagement: React.FC = () => {
                   id="newCityIsPopular"
                   checked={newCityIsPopular}
                   onChange={(e) => setNewCityIsPopular(e.target.checked)}
-                  className="w-4 h-4 text-green-600 bg-muted border-border rounded focus:ring-green-500 focus:ring-2"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-ring focus:ring-2"
                 />
                 <label htmlFor="newCityIsPopular" className="ml-2 text-sm font-medium text-foreground">
                   Mark as popular city
@@ -757,7 +749,7 @@ const AdminLocationManagement: React.FC = () => {
               <button
                 onClick={handleAddCity}
                 disabled={isAddingCity || !newCityName.trim() || newCityName.trim().length < 2}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAddingCity ? 'Adding...' : 'Add City'}
               </button>
@@ -768,8 +760,8 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Edit District Modal */}
       {isEditDistrictOpen && editingDistrict && canManageDistricts && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Edit District</h3>
               <button
@@ -783,7 +775,7 @@ const AdminLocationManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  District Name <span className="text-red-500">*</span>
+                  District Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -793,7 +785,7 @@ const AdminLocationManagement: React.FC = () => {
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {editDistrictName.trim().length > 0 && editDistrictName.trim().length < 3 && (
-                  <p className="text-red-500 text-sm mt-1">District name must be at least 3 characters long</p>
+                  <p className="text-destructive text-sm mt-1">District name must be at least 3 characters long</p>
                 )}
               </div>
 
@@ -832,10 +824,10 @@ const AdminLocationManagement: React.FC = () => {
 
       {/* Delete District Confirmation Dialog */}
       {deleteConfirmOpen && deletingDistrict && canManageDistricts && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center mb-4">
-              <AlertCircle className="w-6 h-6 text-orange-500 mr-3" />
+              <AlertCircle className="w-6 h-6 text-primary mr-3" />
               <h3 className="text-section font-semibold text-foreground">Cannot Delete District</h3>
             </div>
             
@@ -857,7 +849,7 @@ const AdminLocationManagement: React.FC = () => {
               <button
                 onClick={handleDisableDistrict}
                 disabled={isDeletingDistrict}
-                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isDeletingDistrict ? 'Disabling...' : 'Disable District'}
               </button>
@@ -871,3 +863,6 @@ const AdminLocationManagement: React.FC = () => {
 };
 
 export default AdminLocationManagement;
+
+
+

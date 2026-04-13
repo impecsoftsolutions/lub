@@ -55,7 +55,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
         {isLoading ? (
           <Skeleton className="h-7 w-20" />
         ) : (
-          <p className="text-2xl font-semibold">{value}</p>
+          <p className="text-xl font-semibold">{value}</p>
         )}
       </CardContent>
     </Card>

@@ -89,7 +89,7 @@ const MemberReapply: React.FC = () => {
               <RefreshCw className="w-6 h-6" />
               Re-apply for Membership
             </h1>
-            <p className="text-orange-100 mt-1">Submit a new application for LUB membership</p>
+            <p className="text-white/70 mt-1">Submit a new application for LUB membership</p>
           </div>
 
           <div className="p-6 space-y-6">

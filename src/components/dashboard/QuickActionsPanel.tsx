@@ -21,7 +21,7 @@ const QuickActionsPanel: React.FC<QuickActionsPanelProps> = ({
     {
       title: 'Review Registrations',
       icon: UserPlus,
-      color: 'text-blue-600',
+      color: 'text-primary',
       bgColor: 'bg-primary/10',
       count: pendingRegistrations,
       path: '/admin/members/registrations'
@@ -29,16 +29,16 @@ const QuickActionsPanel: React.FC<QuickActionsPanelProps> = ({
     {
       title: 'Review Cities',
       icon: MapPin,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
       count: pendingCities,
       path: '/admin/locations/pending-cities'
     },
     {
       title: 'View Members',
       icon: Users,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
       count: approvedMembers,
       path: '/admin/members/registrations'
     },

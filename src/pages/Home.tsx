@@ -26,7 +26,7 @@ const Home: React.FC = () => {
                   to="/signup"
                   className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold text-lg transition-colors duration-200 flex items-center justify-center"
                 >
-                  Join LUB
+                  Member Registration
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
               )}

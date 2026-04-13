@@ -167,6 +167,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>('');
   const [showOtherCity, setShowOtherCity] = useState(false);
   const [otherCityText, setOtherCityText] = useState('');
+  const [cachedOtherCityText, setCachedOtherCityText] = useState('');
 
   // Loading states
   const [isLoadingStates, setIsLoadingStates] = useState(true);
@@ -335,11 +336,14 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
       if (isCustomCity) {
         console.log('[EditMemberModal] Member has custom city, showing custom city input');
         setShowOtherCity(true);
-        setOtherCityText(member.other_city_name || '');
+        const loadedCustomCity = member.other_city_name || '';
+        setOtherCityText(loadedCustomCity);
+        setCachedOtherCityText(loadedCustomCity);
       } else {
         console.log('[EditMemberModal] Member has standard city');
         setShowOtherCity(false);
         setOtherCityText('');
+        setCachedOtherCityText(member.other_city_name || '');
       }
 
       // Initialize profile photo preview if member has a photo
@@ -450,6 +454,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     setSelectedDistrictId('');
     setShowOtherCity(false);
     setOtherCityText('');
+    setCachedOtherCityText('');
 
     if (validationErrors.state) {
       setValidationErrors(prev => {
@@ -468,6 +473,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     setSelectedDistrictId(selectedDistrict?.district_id || '');
     setShowOtherCity(false);
     setOtherCityText('');
+    setCachedOtherCityText('');
 
     if (validationErrors.district) {
       setValidationErrors(prev => {
@@ -484,11 +490,17 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
     if (cityName === 'Other') {
       console.log('[EditMemberModal] "Other" city selected, enabling custom city input');
+      const restoredCustomCity = formData.other_city_name || cachedOtherCityText || '';
       setShowOtherCity(true);
-      setFormData(prev => ({ ...prev, city: '', other_city_name: '', is_custom_city: true }));
-      setOtherCityText('');
+      setFormData(prev => ({ ...prev, city: '', other_city_name: restoredCustomCity, is_custom_city: true }));
+      setOtherCityText(restoredCustomCity);
     } else {
       console.log('[EditMemberModal] Standard city selected');
+      if (formData.other_city_name?.trim()) {
+        setCachedOtherCityText(formData.other_city_name.trim());
+      } else if (otherCityText.trim()) {
+        setCachedOtherCityText(otherCityText.trim());
+      }
       setShowOtherCity(false);
       setOtherCityText('');
       setFormData(prev => ({ ...prev, city: cityName, other_city_name: '', is_custom_city: false }));
@@ -507,6 +519,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const value = e.target.value;
     console.log('[EditMemberModal] Custom city name changed to:', value);
     setOtherCityText(value);
+    setCachedOtherCityText(value);
 
     setFormData(prev => ({
       ...prev,
@@ -652,6 +665,9 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     }
 
     fieldsToValidate.forEach(fieldName => {
+      if (fieldName === 'city' && formData.is_custom_city) {
+        return;
+      }
       if (isFieldRequiredForUser(fieldName)) {
         const value = formData[fieldName];
         if (!value || (typeof value === 'string' && value.trim() === '')) {
@@ -665,7 +681,7 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     });
 
     // Validate that other_city_name is provided when is_custom_city is true
-    if (formData.is_custom_city) {
+    if (formData.is_custom_city && isFieldRequiredForUser('city')) {
       if (!formData.other_city_name || formData.other_city_name.trim() === '') {
         errors.city = 'Please enter a city/town/village name';
       }

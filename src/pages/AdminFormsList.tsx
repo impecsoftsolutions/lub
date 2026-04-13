@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Settings, Lock } from 'lucide-react';
+import { ArrowLeft, FileText, FilePlus2, Settings, Lock } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
 
@@ -21,15 +21,25 @@ const AdminFormsList: React.FC = () => {
     >
       <div className="p-6">
       <div>
+        <div className="mb-4">
+          <Link
+            to="/admin/settings"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Settings Hub
+          </Link>
+        </div>
+
         <PageHeader
           title="Form Configuration"
-          subtitle="Manage field visibility and requirements for registration forms"
+          subtitle="Manage forms and configure field visibility/requirements"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Link
             to="/admin/settings/forms/join-lub"
-            className="bg-card rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200 border border-border"
+            className="bg-card rounded-lg shadow-sm p-6 hover:shadow-sm transition-shadow duration-200 border border-border"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 bg-primary/10 rounded-lg">
@@ -37,7 +47,7 @@ const AdminFormsList: React.FC = () => {
               </div>
               <Settings className="w-5 h-5 text-muted-foreground" />
             </div>
-            <h2 className="text-section font-semibold text-foreground mb-2">Join LUB Form</h2>
+            <h2 className="text-section font-semibold text-foreground mb-2">Member Registration Form</h2>
             <p className="text-muted-foreground text-sm mb-4">
               Configure fields for member registration form
             </p>
@@ -47,21 +57,25 @@ const AdminFormsList: React.FC = () => {
             </div>
           </Link>
 
-          <div className="bg-card rounded-lg shadow-md p-6 border border-border opacity-50">
+          <Link
+            to="/admin/settings/forms/builder"
+            className="bg-card rounded-lg shadow-sm p-6 hover:shadow-sm transition-shadow duration-200 border border-border"
+          >
             <div className="flex items-start justify-between mb-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <FileText className="w-8 h-8 text-muted-foreground" />
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <FilePlus2 className="w-8 h-8 text-primary" />
               </div>
               <Settings className="w-5 h-5 text-muted-foreground" />
             </div>
-            <h2 className="text-section font-semibold text-foreground mb-2">More Forms</h2>
+            <h2 className="text-section font-semibold text-foreground mb-2">Form Builder</h2>
             <p className="text-muted-foreground text-sm mb-4">
-              Additional forms will appear here
+              Create forms and manage their fields in one centralized place
             </p>
-            <div className="flex items-center text-muted-foreground text-sm font-medium">
-              Coming Soon
+            <div className="flex items-center text-primary text-sm font-medium">
+              Open Builder
+              <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
             </div>
-          </div>
+          </Link>
         </div>
       </div>
       </div>
@@ -70,3 +84,4 @@ const AdminFormsList: React.FC = () => {
 };
 
 export default AdminFormsList;
+

@@ -82,6 +82,8 @@
   /* ── Table style tokens (overridden by Table Style settings) ── */
   --table-border-width:    1px;
   --table-shadow:          0 1px 2px 0 rgb(0 0 0 / 0.05);
+  /* ── Card shadow token (overridden by Card Shadow setting) ── */
+  --card-shadow:           0 1px 2px 0 rgb(0 0 0 / 0.05);
   /* Table spacing & scrollbar tokens */
   --table-cell-px:         1.5rem;   /* horizontal cell padding  (= px-6)  */
   --table-header-py:       0.75rem;  /* header-row vertical padding (= py-3) */
@@ -615,6 +617,22 @@
   [data-slot="table-row"]            { border-bottom-width: var(--table-border-width) !important; }
   [data-slot="table-header"] tr      { border-bottom-width: var(--table-border-width) !important; }
   [data-slot="table-footer"]         { border-top-width:    var(--table-border-width) !important; }
+  /* -- Unified shadcn table head/cell typography + spacing -- */
+  [data-slot="table-head"] {
+    font-size: var(--text-label, 0.8125rem) !important;
+    line-height: var(--text-label--line-height, 1.3) !important;
+    padding-top: var(--table-header-py) !important;
+    padding-bottom: var(--table-header-py) !important;
+    padding-left: var(--table-cell-px) !important;
+    padding-right: var(--table-cell-px) !important;
+  }
+  [data-slot="table-cell"] {
+    font-size: var(--text-sm, 0.875rem) !important;
+    padding-top: var(--table-row-py) !important;
+    padding-bottom: var(--table-row-py) !important;
+    padding-left: var(--table-cell-px) !important;
+    padding-right: var(--table-cell-px) !important;
+  }
 
   /* ── Table shadow ─────────────────────────────────────────────────────────
      Two selectors cover both table variants:
@@ -626,15 +644,25 @@
     box-shadow: var(--table-shadow) !important;
   }
 
+  /* Card surfaces use --card-shadow; table wrappers use --table-shadow via :has() below.
+     The :has() rules have higher specificity (0,1,1) than .shadow-sm (0,1,0) so table
+     wrappers that also carry shadow-sm still get --table-shadow. */
+  .shadow-sm {
+    box-shadow: var(--card-shadow) !important;
+  }
+
   /* ── Native table cell padding (admin pages use plain <th>/<td>) ─────────
      :not([data-slot]) guards avoid touching shadcn Table head/cell elements. */
   table th:not([data-slot]) {
+    font-size: var(--text-label, 0.8125rem) !important;
+    line-height: var(--text-label--line-height, 1.3) !important;
     padding-top:    var(--table-header-py) !important;
     padding-bottom: var(--table-header-py) !important;
     padding-left:   var(--table-cell-px)   !important;
     padding-right:  var(--table-cell-px)   !important;
   }
   table td:not([data-slot]) {
+    font-size: var(--text-sm, 0.875rem) !important;
     padding-top:    var(--table-row-py)  !important;
     padding-bottom: var(--table-row-py)  !important;
     padding-left:   var(--table-cell-px) !important;
@@ -708,3 +736,6 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+
+

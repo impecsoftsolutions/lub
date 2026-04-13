@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  ArrowLeft,
   CreditCard as Edit2,
   Check,
   X,
@@ -13,7 +15,8 @@ import {
   ChevronRight,
   ChevronDown,
   GripVertical,
-  Lock
+  Lock,
+  MoreHorizontal
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -21,6 +24,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, 
 import { validationRulesService, ValidationRule } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 
 const AdminValidationSettings: React.FC = () => {
   const [validationRules, setValidationRules] = useState<ValidationRule[]>([]);
@@ -28,6 +32,7 @@ const AdminValidationSettings: React.FC = () => {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [editedPattern, setEditedPattern] = useState('');
   const [editedMessage, setEditedMessage] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,12 +120,14 @@ const AdminValidationSettings: React.FC = () => {
     setEditingRuleId(rule.id);
     setEditedPattern(rule.validation_pattern);
     setEditedMessage(rule.error_message);
+    setEditedDescription(rule.description ?? '');
   };
 
   const handleCancelEdit = () => {
     setEditingRuleId(null);
     setEditedPattern('');
     setEditedMessage('');
+    setEditedDescription('');
   };
 
   const handleSaveEdit = async (ruleId: string) => {
@@ -141,7 +148,8 @@ const AdminValidationSettings: React.FC = () => {
 
       const result = await validationRulesService.updateValidationRule(ruleId, {
         validation_pattern: editedPattern,
-        error_message: editedMessage
+        error_message: editedMessage,
+        description: editedDescription
       });
 
       if (result.success) {
@@ -150,6 +158,7 @@ const AdminValidationSettings: React.FC = () => {
         setEditingRuleId(null);
         setEditedPattern('');
         setEditedMessage('');
+        setEditedDescription('');
       } else {
         showToast('error', result.error || 'Failed to update rule');
       }
@@ -453,9 +462,9 @@ const AdminValidationSettings: React.FC = () => {
       case 'Contact Validation':
         return <Shield className="w-5 h-5 text-primary" />;
       case 'Document Validation':
-        return <FileText className="w-5 h-5 text-green-600" />;
+        return <FileText className="w-5 h-5 text-primary" />;
       case 'Address Validation':
-        return <MapPin className="w-5 h-5 text-orange-600" />;
+        return <MapPin className="w-5 h-5 text-primary" />;
       default:
         return <Shield className="w-5 h-5 text-muted-foreground" />;
     }
@@ -515,6 +524,16 @@ const AdminValidationSettings: React.FC = () => {
       />
 
       <div>
+        <div className="mb-4">
+          <Link
+            to="/admin/settings"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Settings Hub
+          </Link>
+        </div>
+
         <PageHeader
           title="Validation Rules Management"
           subtitle="Configure validation patterns and error messages for form fields"
@@ -529,7 +548,7 @@ const AdminValidationSettings: React.FC = () => {
           ) : undefined}
         />
 
-        <div className="bg-card rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div className="flex items-center gap-4">
               <select
@@ -625,38 +644,54 @@ const AdminValidationSettings: React.FC = () => {
                                         <h3 className="text-base font-medium text-foreground">
                                           {rule.rule_name.replace(/_/g, ' ').toUpperCase()}
                                         </h3>
-                                        {canManageValidation ? (
+                                        <div className="inline-flex items-center gap-2">
                                           <button
-                                            onClick={() => handleToggleActive(rule.id, rule.is_active)}
-                                            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                                            type="button"
+                                            onClick={() => canManageValidation && handleToggleActive(rule.id, rule.is_active)}
+                                            disabled={!canManageValidation}
+                                            className={`inline-flex items-center justify-center w-11 h-6 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                                               rule.is_active
-                                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                            }`}
+                                                ? 'bg-primary border-primary hover:bg-primary/90'
+                                                : 'bg-muted/90 border-input hover:bg-muted'
+                                            } ${!canManageValidation ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                            role="switch"
+                                            aria-checked={rule.is_active}
+                                            aria-label={`${rule.rule_name.replace(/_/g, ' ')} status toggle`}
                                           >
-                                            {rule.is_active ? 'Active' : 'Inactive'}
+                                            <span
+                                              className={`block w-4 h-4 bg-background border border-border/60 rounded-full shadow-sm transition-transform ${
+                                                rule.is_active ? 'translate-x-2.5' : '-translate-x-2.5'
+                                              }`}
+                                            />
                                           </button>
-                                        ) : (
-                                          <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                                            rule.is_active
-                                              ? 'bg-green-100 text-green-800'
-                                              : 'bg-muted text-muted-foreground'
+                                          <span className={`text-xs font-medium ${
+                                            rule.is_active ? 'text-primary' : 'text-muted-foreground'
                                           }`}>
-                                            {rule.is_active ? 'Active' : 'Inactive'}
+                                            {rule.is_active ? 'ON' : 'OFF'}
                                           </span>
-                                        )}
+                                        </div>
                                       </div>
                                       <p className="text-sm text-muted-foreground mb-3">{rule.description}</p>
                                     </div>
 
                                     {editingRuleId !== rule.id && canManageValidation && (
-                                      <button
-                                        onClick={() => handleEditClick(rule)}
-                                        className="ml-4 p-2 text-primary hover:bg-primary/5 rounded-lg transition-colors"
-                                        title="Edit rule"
-                                      >
-                                        <Edit2 className="w-4 h-4" />
-                                      </button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <button
+                                            type="button"
+                                            className="ml-4 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                            aria-label={`Open actions for ${rule.rule_name.replace(/_/g, ' ')}`}
+                                          >
+                                            <MoreHorizontal className="w-4 h-4" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => handleEditClick(rule)}>
+                                            <Edit2 className="w-4 h-4" />
+                                            Edit
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     )}
                                   </div>
 
@@ -685,6 +720,19 @@ const AdminValidationSettings: React.FC = () => {
                                           rows={2}
                                           className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring text-sm"
                                           placeholder="Enter error message"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-foreground mb-1">
+                                          Description
+                                        </label>
+                                        <textarea
+                                          value={editedDescription}
+                                          onChange={(e) => setEditedDescription(e.target.value)}
+                                          rows={2}
+                                          className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring text-sm"
+                                          placeholder="Enter a short description of what this rule validates"
                                         />
                                       </div>
 
@@ -743,7 +791,7 @@ const AdminValidationSettings: React.FC = () => {
 
               <DragOverlay>
                 {activeRule ? (
-                  <div className="bg-card border-2 border-primary rounded-lg p-4 shadow-lg opacity-90">
+                <div className="bg-card border-2 border-primary rounded-lg p-4 shadow-sm opacity-90">
                     <div className="flex items-center gap-3">
                       <GripVertical className="w-5 h-5 text-muted-foreground" />
                       <div>
@@ -760,7 +808,7 @@ const AdminValidationSettings: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-card rounded-lg shadow-md p-6">
+        <div className="bg-card rounded-lg shadow-sm p-6">
           <div className="flex items-center mb-4">
             <TestTube className="w-5 h-5 text-primary mr-2" />
             <h2 className="text-section font-semibold text-foreground">Test Validation Rules</h2>
@@ -816,7 +864,7 @@ const AdminValidationSettings: React.FC = () => {
                   <button
                     key={`valid-${idx}`}
                     onClick={() => setTestValue(example)}
-                    className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded hover:bg-green-200 transition-colors"
+                    className="px-3 py-1 text-xs bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
                   >
                     {example}
                   </button>
@@ -825,7 +873,7 @@ const AdminValidationSettings: React.FC = () => {
                   <button
                     key={`invalid-${idx}`}
                     onClick={() => setTestValue(example)}
-                    className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
+                    className="px-3 py-1 text-xs bg-destructive/10 text-destructive rounded hover:bg-destructive/20 transition-colors"
                   >
                     {example}
                   </button>
@@ -855,23 +903,23 @@ const AdminValidationSettings: React.FC = () => {
           {testResult && (
             <div className={`mt-4 p-4 rounded-lg border-2 ${
               testResult.isValid
-                ? 'bg-green-50 border-green-200'
-                : 'bg-red-50 border-red-200'
+                ? 'bg-primary/5 border-primary/30'
+                : 'bg-destructive/5 border-destructive/30'
             }`}>
               <div className="flex items-start">
                 {testResult.isValid ? (
-                  <Check className="w-5 h-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
+                  <Check className="w-5 h-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-destructive mr-2 flex-shrink-0 mt-0.5" />
                 )}
                 <div>
                   <p className={`font-medium ${
-                    testResult.isValid ? 'text-green-800' : 'text-red-800'
+                    testResult.isValid ? 'text-primary' : 'text-destructive'
                   }`}>
                     {testResult.isValid ? 'Validation Passed' : 'Validation Failed'}
                   </p>
                   <p className={`text-sm mt-1 ${
-                    testResult.isValid ? 'text-green-700' : 'text-red-700'
+                    testResult.isValid ? 'text-primary' : 'text-destructive'
                   }`}>
                     {testResult.message}
                   </p>
@@ -883,8 +931,8 @@ const AdminValidationSettings: React.FC = () => {
       </div>
 
       {showAddModal && canManageValidation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
               <h2 className="text-section font-semibold text-foreground">Add New Validation Rule</h2>
               <button
@@ -898,7 +946,7 @@ const AdminValidationSettings: React.FC = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Rule Name <span className="text-red-500">*</span>
+                  Rule Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -915,12 +963,12 @@ const AdminValidationSettings: React.FC = () => {
                   <p className="text-xs text-muted-foreground mt-1">Checking availability...</p>
                 )}
                 {nameCheckResult === 'available' && (
-                  <p className="text-xs text-green-600 mt-1 flex items-center">
+                  <p className="text-xs text-primary mt-1 flex items-center">
                     <Check className="w-3 h-3 mr-1" /> Available
                   </p>
                 )}
                 {nameCheckResult === 'taken' && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <p className="text-xs text-destructive mt-1 flex items-center">
                     <X className="w-3 h-3 mr-1" /> Already exists
                   </p>
                 )}
@@ -928,7 +976,7 @@ const AdminValidationSettings: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Rule Type <span className="text-red-500">*</span>
+                  Rule Type <span className="text-destructive">*</span>
                 </label>
                 <select
                   value={newRule.rule_type}
@@ -946,7 +994,7 @@ const AdminValidationSettings: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Category <span className="text-red-500">*</span>
+                  Category <span className="text-destructive">*</span>
                 </label>
                 {!isCreatingNewCategory ? (
                   <>
@@ -993,7 +1041,7 @@ const AdminValidationSettings: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Validation Pattern (Regex) <span className="text-red-500">*</span>
+                  Validation Pattern (Regex) <span className="text-destructive">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -1006,22 +1054,22 @@ const AdminValidationSettings: React.FC = () => {
                   {newRule.validation_pattern && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       {patternValid === true && (
-                        <Check className="w-5 h-5 text-green-600" />
+                        <Check className="w-5 h-5 text-primary" />
                       )}
                       {patternValid === false && (
-                        <X className="w-5 h-5 text-red-600" />
+                        <X className="w-5 h-5 text-destructive" />
                       )}
                     </div>
                   )}
                 </div>
                 {patternValid === false && (
-                  <p className="text-xs text-red-600 mt-1">Invalid regular expression</p>
+                  <p className="text-xs text-destructive mt-1">Invalid regular expression</p>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Error Message <span className="text-red-500">*</span>
+                  Error Message <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -1047,7 +1095,7 @@ const AdminValidationSettings: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Display Order <span className="text-red-500">*</span>
+                  Display Order <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="number"
@@ -1077,7 +1125,7 @@ const AdminValidationSettings: React.FC = () => {
                 </div>
                 {modalTestResult && (
                   <div className={`p-3 rounded-lg ${
-                    modalTestResult.isValid ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                    modalTestResult.isValid ? 'bg-primary/5 text-primary' : 'bg-destructive/5 text-destructive'
                   }`}>
                     <p className="text-sm flex items-center">
                       {modalTestResult.isValid ? (
@@ -1127,3 +1175,4 @@ const AdminValidationSettings: React.FC = () => {
 };
 
 export default AdminValidationSettings;
+

@@ -197,16 +197,17 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div className="fixed inset-0 z-[80] overflow-y-auto">
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-6 text-center sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-black/50"
+          className="fixed inset-0 bg-black/60 backdrop-blur-[1px]"
           onClick={handleClose}
         />
 
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-
-        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div
+          className="relative z-10 inline-block w-full max-w-lg transform overflow-hidden rounded-xl border border-border bg-card text-left shadow-2xl ring-1 ring-border/50 transition-all"
+          onClick={(event) => event.stopPropagation()}
+        >
 
           <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">
@@ -229,19 +230,19 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
             </div>
 
             {success && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="mb-4 rounded-lg border border-success/20 bg-success/10 p-4">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <p className="text-sm font-medium text-green-800">User updated successfully!</p>
+                  <CheckCircle className="w-5 h-5 text-success" />
+                  <p className="text-sm font-medium text-success">User updated successfully!</p>
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                  <p className="text-sm font-medium text-red-800">{error}</p>
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  <p className="text-sm font-medium text-destructive">{error}</p>
                 </div>
               </div>
             )}
@@ -250,7 +251,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
-                  Email <span className="text-red-500">*</span>
+                  Email <span className="text-destructive">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -262,7 +263,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                     onChange={handleChange}
                     onBlur={() => handleBlur('email')}
                     className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent ${
-                      validationErrors.email ? 'border-red-500' : 'border-border'
+                      validationErrors.email ? 'border-destructive' : 'border-border'
                     }`}
                     placeholder="user@example.com"
                     disabled={isSubmitting || success || validationLoading}
@@ -270,13 +271,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                   />
                 </div>
                 {validationErrors.email && (
-                  <p className="mt-1 text-xs text-red-600">{validationErrors.email}</p>
+                  <p className="mt-1 text-xs text-destructive">{validationErrors.email}</p>
                 )}
               </div>
 
               <div>
                 <label htmlFor="mobile_number" className="block text-sm font-medium text-foreground mb-1">
-                  Mobile Number <span className="text-red-500">*</span>
+                  Mobile Number <span className="text-destructive">*</span>
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -288,7 +289,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                     onChange={handleChange}
                     onBlur={() => handleBlur('mobile_number')}
                     className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent ${
-                      validationErrors.mobile_number ? 'border-red-500' : 'border-border'
+                      validationErrors.mobile_number ? 'border-destructive' : 'border-border'
                     }`}
                     placeholder="10-digit mobile number"
                     disabled={isSubmitting || success || validationLoading}
@@ -296,14 +297,14 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                   />
                 </div>
                 {validationErrors.mobile_number && (
-                  <p className="mt-1 text-xs text-red-600">{validationErrors.mobile_number}</p>
+                  <p className="mt-1 text-xs text-destructive">{validationErrors.mobile_number}</p>
                 )}
               </div>
 
             </form>
           </div>
 
-          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+          <div className="bg-muted/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3 border-t border-border">
             <button
               onClick={handleSubmit}
               disabled={isSubmitting || success || validationLoading}
@@ -335,7 +336,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
               Cancel
             </button>
           </div>
-
         </div>
       </div>
     </div>

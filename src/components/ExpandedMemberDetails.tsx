@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Phone,
-  Mail,
   MapPin,
-  Building2,
-  Globe,
   ExternalLink,
   Calendar,
   Briefcase,
@@ -49,6 +46,31 @@ interface ExpandedMemberDetailsProps {
   userRole: UserRole;
   onClose?: () => void;
 }
+
+const SectionCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ icon, title, children, className = '' }) => (
+  <div className={`rounded-lg border border-border bg-card p-4 ${className}`}>
+    <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+      {icon}
+      {title}
+    </h3>
+    {children}
+  </div>
+);
+
+const LabelValue: React.FC<{
+  label: string;
+  children: React.ReactNode;
+}> = ({ label, children }) => (
+  <div>
+    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <div className="text-sm text-foreground mt-0.5">{children}</div>
+  </div>
+);
 
 const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
   member,
@@ -103,10 +125,10 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-muted/50 border-t border-border">
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-          <span className="ml-3 text-muted-foreground">Loading details...</span>
+      <div className="p-6 bg-muted/30 border-t border-border">
+        <div className="flex items-center justify-center gap-3">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
+          <span className="text-sm text-muted-foreground">Loading details…</span>
         </div>
       </div>
     );
@@ -114,7 +136,6 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
 
   const handleDownloadPhoto = async () => {
     if (!member.profile_photo_url) return;
-
     try {
       const response = await fetch(member.profile_photo_url);
       const blob = await response.blob();
@@ -139,210 +160,173 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
     return name.substring(0, 2).toUpperCase();
   };
 
+  const showContact = isFieldVisible('phone_number') || isFieldVisible('email') || isFieldVisible('website');
+  const showLocation = isFieldVisible('full_address') || isFieldVisible('city') || isFieldVisible('district') || isFieldVisible('state');
+  const showBusiness = isFieldVisible('designation') || (isFieldVisible('member_id') && !!member.member_id);
+  const showCerts = (isFieldVisible('gst_number') || isFieldVisible('udyam_number')) &&
+    (!!member.gst_certificate_url || !!member.udyam_certificate_url);
+
   return (
-    <div className="bg-muted/30 border-t border-border animate-slideDown">
-      <div className="p-6 space-y-6">
-        {/* Profile Photo */}
+    <div className="bg-muted/20 border-t border-border animate-slideDown">
+      <div className="p-5 space-y-4">
+
+        {/* Profile Photo — full width */}
         {isFieldVisible('profile_photo') && (
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <User className="w-4 h-4 mr-2 text-blue-600" />
-              Profile Photo
-            </h3>
+          <SectionCard icon={<User className="w-3.5 h-3.5" />} title="Profile Photo">
             <div className="flex items-start gap-4">
               {member.profile_photo_url ? (
                 <>
                   <img
                     src={member.profile_photo_url}
                     alt={`${member.full_name} profile`}
-                    className="w-24 h-32 object-cover rounded-lg border-2 border-border"
+                    className="w-20 h-28 object-cover rounded-lg border border-border shrink-0"
                   />
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Member profile photo
-                    </p>
+                  <div className="flex flex-col justify-between h-28">
+                    <p className="text-sm text-muted-foreground">Member profile photo</p>
                     <button
                       onClick={handleDownloadPhoto}
-                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 transition-colors w-fit"
                     >
-                      <Download className="w-4 h-4 mr-1" />
+                      <Download className="w-3.5 h-3.5" />
                       Download Photo
                     </button>
                   </div>
                 </>
               ) : (
-                <div className="flex items-start gap-4">
-                  <div className="w-24 h-32 bg-gradient-to-br from-muted to-muted/60 rounded-lg border-2 border-border flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-16 h-16 bg-card rounded-full flex items-center justify-center mb-2 mx-auto">
-                        <span className="text-2xl font-bold text-muted-foreground">
-                          {getInitials(member.full_name)}
-                        </span>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-28 bg-muted rounded-lg border border-border flex items-center justify-center shrink-0">
+                    <span className="text-lg font-semibold text-muted-foreground">
+                      {getInitials(member.full_name)}
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">
-                      No profile photo available
-                    </p>
-                  </div>
+                  <p className="text-sm text-muted-foreground">No profile photo available</p>
                 </div>
               )}
             </div>
-          </div>
+          </SectionCard>
         )}
 
-        {/* Products & Services - Always visible if setting allows */}
+        {/* Products & Services — full width */}
         {isFieldVisible('products_services') && (
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <Briefcase className="w-4 h-4 mr-2 text-primary" />
-              Products & Services
-            </h3>
+          <SectionCard icon={<Briefcase className="w-3.5 h-3.5" />} title="Products & Services">
             <div className="flex flex-wrap gap-2">
               {formatProductsServices(member.products_services).map((product, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
                 >
                   {product}
                 </span>
               ))}
             </div>
-          </div>
+          </SectionCard>
         )}
 
-        {/* Contact Information Section */}
-        {(isFieldVisible('phone_number') || isFieldVisible('email') || isFieldVisible('website')) && (
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <Phone className="w-4 h-4 mr-2 text-primary" />
-              Contact Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {isFieldVisible('phone_number') && (
-                <div className="flex items-center">
-                  <Phone className="w-4 h-4 text-muted-foreground mr-3" />
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Mobile Number</p>
-                    <a
-                      href={`tel:+91${member.mobile_number}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-sm text-foreground hover:text-primary"
-                    >
-                      +91 {member.mobile_number}
-                    </a>
-                  </div>
+        {/* Contact + Business — side by side on md+ */}
+        {(showContact || showBusiness) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {showContact && (
+              <SectionCard icon={<Phone className="w-3.5 h-3.5" />} title="Contact Information">
+                <div className="space-y-3">
+                  {isFieldVisible('phone_number') && (
+                    <LabelValue label="Mobile Number">
+                      <a
+                        href={`tel:+91${member.mobile_number}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="hover:text-primary transition-colors"
+                      >
+                        +91 {member.mobile_number}
+                      </a>
+                    </LabelValue>
+                  )}
+                  {isFieldVisible('email') && (
+                    <LabelValue label="Email">
+                      <a
+                        href={`mailto:${member.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="hover:text-primary transition-colors break-all"
+                      >
+                        {member.email}
+                      </a>
+                    </LabelValue>
+                  )}
+                  {isFieldVisible('website') && member.website && (
+                    <LabelValue label="Website">
+                      <a
+                        href={member.website.startsWith('http') ? member.website : `https://${member.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1 break-all"
+                      >
+                        {member.website}
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    </LabelValue>
+                  )}
                 </div>
-              )}
-              {isFieldVisible('email') && (
-                <div className="flex items-center">
-                  <Mail className="w-4 h-4 text-muted-foreground mr-3" />
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Email</p>
-                    <a
-                      href={`mailto:${member.email}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-sm text-foreground hover:text-primary truncate"
-                    >
-                      {member.email}
-                    </a>
-                  </div>
+              </SectionCard>
+            )}
+
+            {showBusiness && (
+              <SectionCard icon={<Briefcase className="w-3.5 h-3.5" />} title="Business Information">
+                <div className="space-y-3">
+                  {isFieldVisible('designation') && member.company_designations && (
+                    <LabelValue label="Designation">
+                      <span>{member.company_designations.designation_name}</span>
+                    </LabelValue>
+                  )}
+                  {isFieldVisible('member_id') && member.member_id && (
+                    <LabelValue label="Member ID">
+                      <span className="font-mono">{member.member_id}</span>
+                    </LabelValue>
+                  )}
                 </div>
-              )}
-            </div>
-            {isFieldVisible('website') && member.website && (
-              <div className="flex items-center mt-4">
-                <Globe className="w-4 h-4 text-muted-foreground mr-3" />
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Website</p>
-                  <a
-                    href={member.website.startsWith('http') ? member.website : `https://${member.website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-sm text-primary hover:text-primary/80 flex items-center"
-                  >
-                    {member.website}
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
-                </div>
-              </div>
+              </SectionCard>
             )}
           </div>
         )}
 
-        {/* Location Information */}
-        {(isFieldVisible('full_address') || isFieldVisible('city') || isFieldVisible('district') || isFieldVisible('state')) && (
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <MapPin className="w-4 h-4 mr-2 text-primary" />
-              Location
-            </h3>
-            {isFieldVisible('full_address') && (
-              <div className="flex items-start mb-3">
-                <Building2 className="w-4 h-4 text-muted-foreground mr-3 mt-0.5" />
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Company Address</p>
-                  <p className="text-sm text-foreground">{member.company_address}</p>
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {isFieldVisible('city') && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">City/Town</p>
-                  <p className="text-sm text-foreground">{formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}</p>
-                </div>
+        {/* Location — full width */}
+        {showLocation && (
+          <SectionCard icon={<MapPin className="w-3.5 h-3.5" />} title="Location">
+            <div className="space-y-3">
+              {isFieldVisible('full_address') && (
+                <LabelValue label="Company Address">
+                  <span>{member.company_address}</span>
+                </LabelValue>
               )}
-              {isFieldVisible('district') && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">District</p>
-                  <p className="text-sm text-foreground">{member.district}</p>
-                </div>
-              )}
-              {isFieldVisible('state') && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">State</p>
-                  <p className="text-sm text-foreground">{member.state}</p>
+              {(isFieldVisible('city') || isFieldVisible('district') || isFieldVisible('state')) && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                  {isFieldVisible('city') && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">City / Town</p>
+                      <p className="text-sm text-foreground mt-0.5">
+                        {formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}
+                      </p>
+                    </div>
+                  )}
+                  {isFieldVisible('district') && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">District</p>
+                      <p className="text-sm text-foreground mt-0.5">{member.district}</p>
+                    </div>
+                  )}
+                  {isFieldVisible('state') && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">State</p>
+                      <p className="text-sm text-foreground mt-0.5">{member.state}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          </div>
+          </SectionCard>
         )}
 
-        {/* Business Information */}
-        {(isFieldVisible('designation') || (isFieldVisible('member_id') && member.member_id)) && (
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <Briefcase className="w-4 h-4 mr-2 text-primary" />
-              Business Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {isFieldVisible('designation') && member.company_designations && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Designation</p>
-                  <p className="text-sm text-foreground">{member.company_designations.designation_name}</p>
-                </div>
-              )}
-              {isFieldVisible('member_id') && member.member_id && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Member ID</p>
-                  <p className="text-sm text-foreground font-mono">{member.member_id}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Documents Section - Visible to certain users */}
-        {(isFieldVisible('gst_number') || isFieldVisible('udyam_number')) &&
-         (member.gst_certificate_url || member.udyam_certificate_url) && (
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <FileText className="w-4 h-4 mr-2 text-primary" />
-              Certificates
-            </h3>
+        {/* Certificates — full width */}
+        {showCerts && (
+          <SectionCard icon={<FileText className="w-3.5 h-3.5" />} title="Certificates">
             <div className="flex flex-wrap gap-2">
               {isFieldVisible('gst_number') && member.gst_certificate_url && (
                 <a
@@ -350,10 +334,11 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-full hover:bg-primary/20 transition-colors border border-primary/20"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 transition-colors border border-primary/20"
                 >
-                  <FileText className="w-3 h-3 mr-1" />
+                  <FileText className="w-3.5 h-3.5" />
                   GST Certificate
+                  <ExternalLink className="w-3 h-3" />
                 </a>
               )}
               {isFieldVisible('udyam_number') && member.udyam_certificate_url && (
@@ -362,47 +347,49 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition-colors border border-green-200"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 transition-colors border border-primary/20"
                 >
-                  <FileText className="w-3 h-3 mr-1" />
+                  <FileText className="w-3.5 h-3.5" />
                   UDYAM Certificate
+                  <ExternalLink className="w-3 h-3" />
                 </a>
               )}
             </div>
-          </div>
+          </SectionCard>
         )}
 
-        {/* Admin-Only Documents */}
+        {/* Admin-Only Payment Documents */}
         {userRole.isAdmin && member.payment_proof_url && (
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-              <FileText className="w-4 h-4 mr-2 text-red-600" />
-              Admin Only - Payment Documents
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700 mb-3">
+              <FileText className="w-3.5 h-3.5" />
+              Payment Documents
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                Admin only
+              </span>
             </h3>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={member.payment_proof_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 rounded-full hover:bg-amber-100 transition-colors border border-amber-200"
-              >
-                <FileText className="w-3 h-3 mr-1" />
-                Payment Proof
-              </a>
-            </div>
+            <a
+              href={member.payment_proof_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-100 rounded-md hover:bg-amber-200 transition-colors border border-amber-200"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Payment Proof
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
         )}
 
-        {/* Member Since */}
+        {/* Member Since — footer row */}
         {isFieldVisible('member_since') && (
-          <div className="pt-4 border-t border-border text-center">
-            <div className="flex items-center justify-center text-xs text-muted-foreground">
-              <Calendar className="w-3 h-3 mr-1" />
-              Member since {formatMemberSince(member.created_at)}
-            </div>
+          <div className="pt-2 border-t border-border flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="w-3.5 h-3.5" />
+            Member since {formatMemberSince(member.created_at)}
           </div>
         )}
+
       </div>
     </div>
   );

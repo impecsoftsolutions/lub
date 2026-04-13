@@ -4,25 +4,25 @@ import { KeyRound } from 'lucide-react';
 
 const ForgotPassword: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-            <KeyRound className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+            <KeyRound className="w-8 h-8 text-foreground" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Password Reset Unavailable</h2>
-          <p className="mt-2 text-gray-600">
+          <h2 className="text-3xl font-bold text-foreground">Password Reset Unavailable</h2>
+          <p className="mt-2 text-muted-foreground">
             Password-based authentication is no longer supported on this portal.
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-8 text-center space-y-4">
-          <p className="text-sm text-gray-600">
+        <div className="bg-card rounded-lg border border-border shadow-sm p-8 text-center space-y-4">
+          <p className="text-sm text-muted-foreground">
             Sign in using your email address and 10-digit mobile number instead.
           </p>
           <Link
             to="/signin"
-            className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-center transition-colors"
+            className="block w-full py-3 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg text-center transition-colors"
           >
             Back to Sign In
           </Link>
@@ -33,3 +33,5 @@ const ForgotPassword: React.FC = () => {
 };
 
 export default ForgotPassword;
+
+

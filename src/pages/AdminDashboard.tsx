@@ -98,7 +98,7 @@ const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Link
                 to="/admin/profile-settings"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <User className="w-8 h-8 text-primary" />
@@ -111,7 +111,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/registrations"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <Users className="w-8 h-8 text-primary" />
@@ -124,7 +124,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/user-management"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <Shield className="w-8 h-8 text-primary" />
@@ -137,7 +137,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/state-management"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <Globe className="w-8 h-8 text-primary" />
@@ -150,7 +150,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/designations-management"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <Building2 className="w-8 h-8 text-primary" />
@@ -163,7 +163,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/directory-visibility"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <Shield className="w-8 h-8 text-primary" />
@@ -176,7 +176,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/city-management"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <MapPin className="w-8 h-8 text-primary" />
@@ -189,7 +189,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/pending-cities"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <MapPin className="w-8 h-8 text-primary" />
@@ -203,7 +203,7 @@ const AdminDashboard: React.FC = () => {
               {isSuperAdmin && (
                 <Link
                   to="/admin/deleted-members"
-                  className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                  className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
                 >
                   <div className="flex items-center">
                     <Trash2 className="w-8 h-8 text-destructive" />
@@ -217,7 +217,7 @@ const AdminDashboard: React.FC = () => {
 
               <Link
                 to="/admin/forms"
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center">
                   <Layout className="w-8 h-8 text-primary" />
@@ -231,7 +231,7 @@ const AdminDashboard: React.FC = () => {
               {isSuperAdmin && (
                 <Link
                   to="/admin/settings/validation"
-                  className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
+                  className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow"
                 >
                   <div className="flex items-center">
                     <Shield className="w-8 h-8 text-primary" />
@@ -245,7 +245,7 @@ const AdminDashboard: React.FC = () => {
 
               <button
                 onClick={() => handleTabClick('payment-settings')}
-                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-md transition-shadow text-left"
+                className="bg-card rounded-lg shadow-sm border border-border p-6 hover:shadow-sm transition-shadow text-left"
               >
                 <div className="flex items-center">
                   <MapPin className="w-8 h-8 text-primary" />
@@ -258,7 +258,7 @@ const AdminDashboard: React.FC = () => {
 
               <div className="bg-card rounded-lg shadow-sm border border-border p-6">
                 <div className="flex items-center">
-                  <BarChart3 className="w-8 h-8 text-orange-600" />
+                  <BarChart3 className="w-8 h-8 text-primary" />
                   <div className="ml-4">
                     <h3 className="text-section font-semibold text-foreground">Analytics</h3>
                     <p className="text-sm text-muted-foreground">Coming soon</p>
@@ -288,3 +288,6 @@ const AdminDashboard: React.FC = () => {
 };
 
 export default AdminDashboard;
+
+
+

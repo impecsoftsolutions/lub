@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Plus, Search, CreditCard as Edit3, Trash2, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock } from 'lucide-react';
+import { Building2, Plus, Search, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
@@ -16,6 +19,7 @@ type MemberSearchResult = {
 };
 
 const AdminDesignationsManagement: React.FC = () => {
+
   const [activeTab, setActiveTab] = useState<'company' | 'lub'>('company');
   const [lubRolesSubTab, setLubRolesSubTab] = useState<'roles' | 'assignments'>('roles');
   
@@ -844,10 +848,10 @@ const AdminDesignationsManagement: React.FC = () => {
 
   const getLevelColor = (level: string) => {
     const colors = {
-      national: 'bg-purple-100 text-purple-800',
-      state: 'bg-blue-100 text-blue-800',
-      district: 'bg-green-100 text-green-800',
-      city: 'bg-orange-100 text-orange-800'
+      national: 'bg-primary/10 text-primary',
+      state: 'bg-primary/10 text-primary',
+      district: 'bg-primary/10 text-primary',
+      city: 'bg-muted text-foreground'
     };
     return colors[level as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
@@ -950,19 +954,19 @@ const AdminDesignationsManagement: React.FC = () => {
                   <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted/50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Role Name
                         </th>
-                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Status
                         </th>
-                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Created
                         </th>
-                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Updated
                         </th>
-                        <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -970,16 +974,16 @@ const AdminDesignationsManagement: React.FC = () => {
                     <tbody className="divide-y divide-border">
                       {filteredCompanyDesignations.map((designation) => (
                         <tr key={designation.id} className="hover:bg-muted/30">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="whitespace-nowrap">
                             <span className="font-medium text-foreground">{designation.designation_name}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="whitespace-nowrap">
                             {canManageDesignations ? (
                               <button
                                 onClick={() => handleToggleCompanyActive(designation.id, designation.is_active)}
                                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                                   designation.is_active
-                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
                                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                 }`}
                               >
@@ -998,38 +1002,37 @@ const AdminDesignationsManagement: React.FC = () => {
                             ) : (
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                 designation.is_active
-                                  ? 'bg-green-100 text-green-800'
+                                  ? 'bg-primary/10 text-primary'
                                   : 'bg-muted text-muted-foreground'
                               }`}>
                                 {designation.is_active ? 'Active' : 'Inactive'}
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                          <td className="whitespace-nowrap text-sm text-muted-foreground">
                             {formatDate(designation.created_at)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                          <td className="whitespace-nowrap text-sm text-muted-foreground">
                             {formatDate(designation.updated_at)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex items-center space-x-2">
-                              {canManageDesignations && (
-                                <>
-                                  <button
-                                    onClick={() => handleEditCompanyDesignation(designation)}
-                                    className="text-primary hover:text-primary/80 transition-colors"
-                                  >
-                                    <Edit3 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteCompanyDesignation(designation.id)}
-                                    className="text-red-600 hover:text-red-900 transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                          <td className="whitespace-nowrap text-sm font-medium">
+                            {canManageDesignations && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}>
+                                  <span className="sr-only">Open actions menu</span>
+                                  <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditCompanyDesignation(designation)}>
+                                    <Edit3 className="w-4 h-4" />Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem variant="destructive" onClick={() => handleDeleteCompanyDesignation(designation.id)}>
+                                    <Trash2 className="w-4 h-4" />Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1118,8 +1121,8 @@ const AdminDesignationsManagement: React.FC = () => {
                   )}
 
                   {isReordering && (
-                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
+                    <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg">
+                      <p className="text-sm text-foreground">
                         Saving new order...
                       </p>
                     </div>
@@ -1144,10 +1147,10 @@ const AdminDesignationsManagement: React.FC = () => {
                       <table className="min-w-full divide-y divide-border">
                         <thead className="bg-muted/50">
                           <tr>
-                            <th className="px-2 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-12">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-12">
                               {/* Drag handle column */}
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               <button
                                 onClick={handleToggleLubRolesSort}
                                 className="inline-flex items-center space-x-1 hover:text-foreground transition-colors"
@@ -1160,16 +1163,16 @@ const AdminDesignationsManagement: React.FC = () => {
                                 )}
                               </button>
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Status
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Created
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Updated
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
@@ -1192,21 +1195,21 @@ const AdminDesignationsManagement: React.FC = () => {
                                   : 'hover:bg-muted/30'
                               } ${lubRolesSortOrder === 'custom' && !isReordering ? 'cursor-move' : ''}`}
                             >
-                              <td className="px-2 py-4 whitespace-nowrap text-muted-foreground">
+                              <td className="whitespace-nowrap text-muted-foreground">
                                 {lubRolesSortOrder === 'custom' && !isReordering && (
                                   <GripVertical className="w-5 h-5" />
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="whitespace-nowrap">
                                 <span className="font-medium text-foreground">{role.role_name}</span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="whitespace-nowrap">
                                 {canManageDesignations ? (
                                   <button
                                     onClick={() => handleToggleLubRoleActive(role.id, role.is_active)}
                                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                                       role.is_active
-                                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                        ? 'bg-primary/10 text-primary hover:bg-primary/20'
                                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                     }`}
                                   >
@@ -1225,38 +1228,37 @@ const AdminDesignationsManagement: React.FC = () => {
                                 ) : (
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                     role.is_active
-                                      ? 'bg-green-100 text-green-800'
+                                      ? 'bg-primary/10 text-primary'
                                       : 'bg-muted text-muted-foreground'
                                   }`}>
                                     {role.is_active ? 'Active' : 'Inactive'}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                              <td className="whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(role.created_at)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                              <td className="whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(role.updated_at)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex items-center space-x-2">
-                                  {canManageDesignations && (
-                                    <>
-                                      <button
-                                        onClick={() => handleEditLubRole(role)}
-                                        className="text-primary hover:text-primary/80 transition-colors"
-                                      >
-                                        <Edit3 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteLubRole(role.id)}
-                                        className="text-red-600 hover:text-red-900 transition-colors"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
+                              <td className="whitespace-nowrap text-sm font-medium">
+                                {canManageDesignations && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}>
+                                      <span className="sr-only">Open actions menu</span>
+                                      <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleEditLubRole(role)}>
+                                        <Edit3 className="w-4 h-4" />Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem variant="destructive" onClick={() => handleDeleteLubRole(role.id)}>
+                                        <Trash2 className="w-4 h-4" />Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -1295,7 +1297,7 @@ const AdminDesignationsManagement: React.FC = () => {
                     {canManageDesignations && (
                       <button
                         onClick={() => setShowAddAssignmentModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add Assignment
@@ -1406,7 +1408,7 @@ const AdminDesignationsManagement: React.FC = () => {
                   {/* Member Assignments Table */}
                   {isLoadingAssignments ? (
                     <div className="text-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                       <p className="text-muted-foreground">Loading member assignments...</p>
                     </div>
                   ) : filteredMemberAssignments.length === 0 ? (
@@ -1422,22 +1424,22 @@ const AdminDesignationsManagement: React.FC = () => {
                       <table className="min-w-full divide-y divide-border">
                         <thead className="bg-muted/50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Member
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Role
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Level
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Geographic Scope
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Created
                             </th>
-                            <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
@@ -1445,23 +1447,23 @@ const AdminDesignationsManagement: React.FC = () => {
                         <tbody className="divide-y divide-border">
                           {filteredMemberAssignments.map((assignment) => (
                             <tr key={assignment.id} className="hover:bg-muted/30">
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="whitespace-nowrap">
                                 <div>
                                   <div className="font-medium text-foreground">{assignment.member_name}</div>
                                   <div className="text-sm text-muted-foreground">{assignment.member_email}</div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="whitespace-nowrap">
                                 <span className="font-medium text-foreground">{assignment.role_name}</span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="whitespace-nowrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLevelColor(assignment.level)}`}>
                                   {getLevelLabel(assignment.level)}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                              <td className="whitespace-nowrap text-sm text-muted-foreground">
                                 {assignment.level === 'national' ? (
-                                  <span className="text-purple-600 font-medium">All India</span>
+                                  <span className="text-primary font-medium">All India</span>
                                 ) : (
                                   <div>
                                     {assignment.state && (
@@ -1474,28 +1476,27 @@ const AdminDesignationsManagement: React.FC = () => {
                                   </div>
                                 )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                              <td className="whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(assignment.created_at)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex items-center space-x-2">
-                                  {canManageDesignations && (
-                                    <>
-                                      <button
-                                        onClick={() => handleEditAssignment(assignment)}
-                                        className="text-primary hover:text-primary/80 transition-colors"
-                                      >
-                                        <Edit3 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteAssignment(assignment.id)}
-                                        className="text-red-600 hover:text-red-900 transition-colors"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
+                              <td className="whitespace-nowrap text-sm font-medium">
+                                {canManageDesignations && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}>
+                                      <span className="sr-only">Open actions menu</span>
+                                      <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleEditAssignment(assignment)}>
+                                        <Edit3 className="w-4 h-4" />Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem variant="destructive" onClick={() => handleDeleteAssignment(assignment.id)}>
+                                        <Trash2 className="w-4 h-4" />Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -1513,8 +1514,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Add Company Designation Modal */}
       {showAddCompanyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Add Company Role</h3>
               <button
@@ -1528,7 +1529,7 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Role Name <span className="text-red-500">*</span>
+                  Role Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -1574,8 +1575,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Edit Company Designation Modal */}
       {showEditCompanyModal && editingCompanyDesignation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Edit Company Role</h3>
               <button
@@ -1589,7 +1590,7 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Role Name <span className="text-red-500">*</span>
+                  Role Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -1635,8 +1636,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Add LUB Role Modal */}
       {showAddLubRoleModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Add LUB Role</h3>
               <button
@@ -1650,7 +1651,7 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Role Name <span className="text-red-500">*</span>
+                  Role Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -1696,8 +1697,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Edit LUB Role Modal */}
       {showEditLubRoleModal && editingLubRole && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Edit LUB Role</h3>
               <button
@@ -1711,7 +1712,7 @@ const AdminDesignationsManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Role Name <span className="text-red-500">*</span>
+                  Role Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -1757,8 +1758,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Add Member Assignment Modal */}
       {showAddAssignmentModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Add Member Role Assignment</h3>
               <button
@@ -1776,7 +1777,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Member Search */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Member <span className="text-red-500">*</span>
+                  Member <span className="text-destructive">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -1836,7 +1837,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Role Selection */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  LUB Role <span className="text-red-500">*</span>
+                  LUB Role <span className="text-destructive">*</span>
                 </label>
                 <select
                   value={assignmentForm.role_id}
@@ -1853,7 +1854,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Level Selection */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Level <span className="text-red-500">*</span>
+                  Level <span className="text-destructive">*</span>
                 </label>
                 <select
                   value={assignmentForm.level}
@@ -1877,7 +1878,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {(assignmentForm.level === 'state' || assignmentForm.level === 'district' || assignmentForm.level === 'city') && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    State <span className="text-red-500">*</span>
+                    State <span className="text-destructive">*</span>
                   </label>
                   {isLoadingStates ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
@@ -1902,7 +1903,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {(assignmentForm.level === 'district' || assignmentForm.level === 'city') && assignmentForm.state && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    District <span className="text-red-500">*</span>
+                    District <span className="text-destructive">*</span>
                   </label>
                   {isLoadingDistricts ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
@@ -1928,7 +1929,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Committee Year */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Committee Year <span className="text-red-500">*</span>
+                  Committee Year <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -1980,7 +1981,7 @@ const AdminDesignationsManagement: React.FC = () => {
               <button
                 onClick={handleAddAssignment}
                 disabled={isSavingAssignment || !assignmentForm.member_id || !assignmentForm.role_id || !assignmentForm.level || !assignmentForm.committee_year}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingAssignment ? 'Adding...' : 'Add Assignment'}
               </button>
@@ -1991,8 +1992,8 @@ const AdminDesignationsManagement: React.FC = () => {
 
       {/* Edit Member Assignment Modal */}
       {showEditAssignmentModal && editingAssignment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Edit Member Role Assignment</h3>
               <button
@@ -2022,7 +2023,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Role Selection */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  LUB Role <span className="text-red-500">*</span>
+                  LUB Role <span className="text-destructive">*</span>
                 </label>
                 <select
                   value={assignmentForm.role_id}
@@ -2039,7 +2040,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {/* Level Selection */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  Level <span className="text-red-500">*</span>
+                  Level <span className="text-destructive">*</span>
                 </label>
                 <select
                   value={assignmentForm.level}
@@ -2063,7 +2064,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {(assignmentForm.level === 'state' || assignmentForm.level === 'district' || assignmentForm.level === 'city') && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    State <span className="text-red-500">*</span>
+                    State <span className="text-destructive">*</span>
                   </label>
                   {isLoadingStates ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
@@ -2088,7 +2089,7 @@ const AdminDesignationsManagement: React.FC = () => {
               {(assignmentForm.level === 'district' || assignmentForm.level === 'city') && assignmentForm.state && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    District <span className="text-red-500">*</span>
+                    District <span className="text-destructive">*</span>
                   </label>
                   {isLoadingDistricts ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
@@ -2139,3 +2140,6 @@ const AdminDesignationsManagement: React.FC = () => {
 };
 
 export default AdminDesignationsManagement;
+
+
+

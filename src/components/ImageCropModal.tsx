@@ -73,7 +73,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
           </button>
         </div>
 
-        <div className="relative bg-gray-900 flex-1" style={{ minHeight: '400px' }}>
+        <div className="relative bg-black flex-1" style={{ minHeight: '400px' }}>
           <Cropper
             image={imageSrc}
             crop={crop}

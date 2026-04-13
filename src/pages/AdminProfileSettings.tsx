@@ -200,7 +200,7 @@ const AdminProfileSettings: React.FC = () => {
                   isSaving || isLoading
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : isEditing
-                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
                     : 'bg-primary hover:bg-primary/90 text-primary-foreground'
                 }`}
               >
@@ -287,7 +287,7 @@ const AdminProfileSettings: React.FC = () => {
                       </p>
                     </label>
                     {logoFile && (
-                      <p className="text-sm text-green-600 mt-2">Selected: {logoFile.name}</p>
+                      <p className="text-sm text-primary mt-2">Selected: {logoFile.name}</p>
                     )}
                   </div>
                 </div>
@@ -431,7 +431,7 @@ const AdminProfileSettings: React.FC = () => {
                         {isEditing && canEditProfile && (
                           <button
                             onClick={() => removeSocialMediaHandle(index)}
-                            className="w-full px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center"
+                            className="w-full px-3 py-2 text-sm font-medium text-destructive bg-destructive/5 rounded-lg hover:bg-destructive/10 transition-colors flex items-center justify-center"
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
                             Remove
@@ -458,3 +458,5 @@ const AdminProfileSettings: React.FC = () => {
 };
 
 export default AdminProfileSettings;
+
+

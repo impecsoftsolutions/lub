@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
@@ -16,7 +16,8 @@ import {
   X as XIcon,
   Camera,
   Upload,
-  CheckCircle
+  CheckCircle,
+  Eye
 } from 'lucide-react';
 import { useMember } from '../contexts/useMember';
 import Toast from '../components/Toast';
@@ -75,6 +76,9 @@ const EMPLOYEE_COUNT_OPTIONS = [
   'Above 151 employees'
 ];
 
+const ALLOWED_DOCUMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
 const correctionFieldLabels: Record<string, string> = {
   full_name: 'Full Name',
   company_name: 'Company Name',
@@ -84,13 +88,48 @@ const correctionFieldLabels: Record<string, string> = {
   referred_by: 'Referred By'
 };
 
+const MEMBER_EDIT_NON_VALIDATED_FIELDS = new Set<string>([
+  'is_custom_city',
+  'profile_photo_url',
+  'gst_certificate_url',
+  'udyam_certificate_url',
+  'payment_proof_url'
+]);
+
+const REQUIRED_MESSAGE_OVERRIDES: Record<string, string> = {
+  gst_registered: 'GST registration status is required',
+  esic_registered: 'ESIC registration status is required',
+  epf_registered: 'EPF registration status is required',
+  gst_number: 'GST number is required when GST registered',
+  gst_certificate_url: 'GST certificate is required',
+  udyam_certificate_url: 'UDYAM certificate is required',
+  payment_proof_url: 'Payment proof is required',
+  pin_code: 'PIN code is required',
+  products_services: 'Products & services is required'
+};
+
 const MemberEditProfile: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isPreviewMode = searchParams.get('preview') === '1';
+
   const { member, isAuthenticated, isLoading, refreshMember } = useMember();
   const {
     validateField: validateFieldByRule
-  } = useValidation();
-  const { isFieldRequired } = useFormFieldConfig();
+  } = useValidation({ formKey: 'member_edit' });
+  const {
+    isFieldVisible,
+    isFieldRequired,
+    getFieldLabel,
+    getFieldPlaceholder,
+    getFieldOptions,
+    getFieldMinLength,
+    getFieldMaxLength,
+    errorCode: fieldConfigErrorCode
+  } = useFormFieldConfig({
+    source: isPreviewMode ? 'builder_draft' : 'builder_live',
+    formKey: 'member_edit'
+  });
 
   // Profile photo state (same as Join.tsx)
   const [profilePhoto, setProfilePhoto] = useState<Blob | null>(null);
@@ -98,9 +137,17 @@ const MemberEditProfile: React.FC = () => {
   const [photoFileName, setPhotoFileName] = useState<string>('');
   const [photoImageSrc, setPhotoImageSrc] = useState<string>('');
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [documentFiles, setDocumentFiles] = useState<{
+    gstCertificate: File | null;
+    udyamCertificate: File | null;
+    paymentProof: File | null;
+  }>({
+    gstCertificate: null,
+    udyamCertificate: null,
+    paymentProof: null
+  });
 
-  // Form state with ALL fields
-  const [formData, setFormData] = useState({
+  const createEmptyFormData = () => ({
     // Personal Information
     full_name: '',
     gender: '',
@@ -132,9 +179,12 @@ const MemberEditProfile: React.FC = () => {
     // Registration Details
     gst_registered: '',
     gst_number: '',
+    gst_certificate_url: '',
     pan_company: '',
     esic_registered: '',
     epf_registered: '',
+    udyam_certificate_url: '',
+    payment_proof_url: '',
 
     // Membership & Payment Information
     member_id: '',
@@ -153,8 +203,11 @@ const MemberEditProfile: React.FC = () => {
     profile_photo_url: ''
   });
 
+  // Form state with ALL fields
+  const [formData, setFormData] = useState(createEmptyFormData);
+
   // Original data for comparison
-  const [originalData, setOriginalData] = useState(formData);
+  const [originalData, setOriginalData] = useState(createEmptyFormData);
 
   // Email/Mobile editing states
   const [isEmailEditable] = useState(false);
@@ -209,6 +262,53 @@ const MemberEditProfile: React.FC = () => {
     setToast(prev => ({ ...prev, isVisible: false }));
   }, []);
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+  const latestErrorsRef = useRef<Record<string, string>>({});
+
+  const scrollToFirstError = (errorMap: Record<string, string>) => {
+    for (const key of Object.keys(errorMap)) {
+      const el = document.getElementById(key);
+      if (el && el.offsetParent !== null) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+        return;
+      }
+    }
+  };
+
+  const isFieldApplicable = useCallback(
+    (fieldName: string, data: typeof formData = formData): boolean => {
+      if (!isFieldVisible(fieldName)) {
+        return false;
+      }
+
+      if ((fieldName === 'gst_number' || fieldName === 'gst_certificate_url') && data.gst_registered !== 'yes') {
+        return false;
+      }
+
+      return true;
+    },
+    [formData, isFieldVisible]
+  );
+
+  const resolveFieldLabel = useCallback(
+    (fieldKey: string, fallback: string) => getFieldLabel(fieldKey, fallback),
+    [getFieldLabel]
+  );
+
+  const resolveFieldPlaceholder = useCallback(
+    (fieldKey: string, fallback: string) => getFieldPlaceholder(fieldKey, fallback),
+    [getFieldPlaceholder]
+  );
+
+  const resolveFieldOptions = useCallback(
+    (fieldKey: string, fallback: string[]) => {
+      const configured = getFieldOptions(fieldKey)
+        .map(item => String(item).trim())
+        .filter(Boolean);
+      return configured.length > 0 ? configured : fallback;
+    },
+    [getFieldOptions]
+  );
 
   const getCorrectionFields = useCallback((result: NormalizationResult): FieldCorrectionStep[] => {
     return Object.entries(correctionFieldLabels)
@@ -233,10 +333,97 @@ const MemberEditProfile: React.FC = () => {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && !isAuthenticated && !isPreviewMode) {
       navigate('/signin');
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, isPreviewMode, navigate]);
+
+  // Preview gate: redirect to sign-in if no session
+  useEffect(() => {
+    if (isPreviewMode && fieldConfigErrorCode === 'no_session') {
+      navigate(`/signin?next=${encodeURIComponent('/dashboard/edit?preview=1')}`);
+    }
+  }, [isPreviewMode, fieldConfigErrorCode, navigate]);
+
+  // Preview mode must never load or display live member data.
+  useEffect(() => {
+    if (!isPreviewMode) {
+      return;
+    }
+
+    const emptyData = {
+      // Personal Information
+      full_name: '',
+      gender: '',
+      date_of_birth: '',
+      email: '',
+      mobile_number: '',
+
+      // Company Information
+      company_name: '',
+      company_designation_id: '',
+      company_address: '',
+      state: '',
+      district: '',
+      city: '',
+      pin_code: '',
+      other_city_name: '',
+      is_custom_city: false,
+
+      // Business Details
+      industry: '',
+      activity_type: '',
+      constitution: '',
+      annual_turnover: '',
+      number_of_employees: '',
+      products_services: '',
+      brand_names: '',
+      website: '',
+
+      // Registration Details
+      gst_registered: '',
+      gst_number: '',
+      gst_certificate_url: '',
+      pan_company: '',
+      esic_registered: '',
+      epf_registered: '',
+      udyam_certificate_url: '',
+      payment_proof_url: '',
+
+      // Membership & Payment Information
+      member_id: '',
+      referred_by: '',
+      amount_paid: '',
+      payment_date: '',
+      payment_mode: '',
+      transaction_id: '',
+      bank_reference: '',
+
+      // Alternate Contact
+      alternate_contact_name: '',
+      alternate_mobile: '',
+
+      // Profile Photo
+      profile_photo_url: ''
+    };
+
+    setFormData(emptyData);
+    setOriginalData(emptyData);
+    setProfilePhoto(null);
+    setProfilePhotoPreview('');
+    setPhotoFileName('');
+    setPhotoImageSrc('');
+    setDocumentFiles({
+      gstCertificate: null,
+      udyamCertificate: null,
+      paymentProof: null
+    });
+    setSelectedDistrictId('');
+    setShowOtherCity(false);
+    setMemberRegistrationId(null);
+    setErrors({});
+    setIsVerifiedForSubmit(false);
+  }, [isPreviewMode]);
 
   // Load complete member profile data from database
   const loadMemberProfile = useCallback(async () => {
@@ -294,9 +481,12 @@ const MemberEditProfile: React.FC = () => {
         website: data.website || '',
         gst_registered: data.gst_registered || '',
         gst_number: data.gst_number || '',
+        gst_certificate_url: data.gst_certificate_url || '',
         pan_company: data.pan_company || '',
         esic_registered: data.esic_registered || '',
         epf_registered: data.epf_registered || '',
+        udyam_certificate_url: data.udyam_certificate_url || '',
+        payment_proof_url: data.payment_proof_url || '',
         member_id: data.member_id || '',
         referred_by: data.referred_by || '',
         amount_paid: data.amount_paid || '',
@@ -392,10 +582,10 @@ const MemberEditProfile: React.FC = () => {
   }, [loadDesignations, loadStates]);
 
   useEffect(() => {
-    if (member?.id) {
+    if (!isPreviewMode && member?.id) {
       void loadMemberProfile();
     }
-  }, [loadMemberProfile, member?.id]);
+  }, [isPreviewMode, loadMemberProfile, member?.id]);
 
   useEffect(() => {
     console.log('[useEffect state] State changed to:', formData.state);
@@ -517,6 +707,32 @@ const MemberEditProfile: React.FC = () => {
     }
   };
 
+  const validateDocumentFile = (file: File): string | null => {
+    if (!ALLOWED_DOCUMENT_TYPES.includes(file.type)) {
+      return 'Only PDF, JPG, JPEG, and PNG files are allowed';
+    }
+    if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      return 'File size must be 10MB or less';
+    }
+    return null;
+  };
+
+  const handleDocumentFileChange = (fileType: keyof typeof documentFiles, file: File | null) => {
+    if (!file) {
+      setDocumentFiles(prev => ({ ...prev, [fileType]: null }));
+      return;
+    }
+
+    const validationError = validateDocumentFile(file);
+    if (validationError) {
+      showToast('error', validationError);
+      return;
+    }
+
+    setDocumentFiles(prev => ({ ...prev, [fileType]: file }));
+    setIsVerifiedForSubmit(false);
+  };
+
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -573,6 +789,9 @@ const MemberEditProfile: React.FC = () => {
   };
 
   const hasFormChanges = (): boolean => {
+    if (documentFiles.gstCertificate || documentFiles.udyamCertificate || documentFiles.paymentProof) {
+      return true;
+    }
     return JSON.stringify(formData) !== JSON.stringify(originalData);
   };
 
@@ -593,111 +812,205 @@ const MemberEditProfile: React.FC = () => {
       }
     });
 
+    if (documentFiles.gstCertificate) {
+      changed.push('gst_certificate_url');
+    }
+    if (documentFiles.udyamCertificate) {
+      changed.push('udyam_certificate_url');
+    }
+    if (documentFiles.paymentProof) {
+      changed.push('payment_proof_url');
+    }
+
     return changed;
   };
 
+  const fallbackFieldLabel = useCallback((fieldName: string): string => {
+    return fieldName
+      .split('_')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }, []);
+
+  const getRequiredValidationIssue = useCallback(
+    (fieldName: string, data: typeof formData = formData): { errorKey: string; message: string } | null => {
+      if (fieldName === 'is_custom_city' || fieldName === 'profile_photo_url' || fieldName === 'other_city_name') {
+        return null;
+      }
+
+      if (fieldName === 'city') {
+        if (!isFieldRequired('city') || !isFieldApplicable('city', data)) {
+          return null;
+        }
+
+        const usesOtherCity = Boolean(data.is_custom_city || showOtherCity);
+        if (usesOtherCity) {
+          if (!String(data.other_city_name ?? '').trim()) {
+            return { errorKey: 'other_city_name', message: 'City name is required' };
+          }
+          return null;
+        }
+
+        if (!String(data.city ?? '').trim()) {
+          return { errorKey: 'city', message: 'City is required' };
+        }
+        return null;
+      }
+
+      if (!isFieldRequired(fieldName) || !isFieldApplicable(fieldName, data)) {
+        return null;
+      }
+
+      if (fieldName === 'gst_certificate_url') {
+        const hasExisting = Boolean(String(data.gst_certificate_url ?? '').trim());
+        const hasSelected = Boolean(documentFiles.gstCertificate);
+        if (!hasExisting && !hasSelected) {
+          return { errorKey: 'gst_certificate_url', message: REQUIRED_MESSAGE_OVERRIDES.gst_certificate_url };
+        }
+        return null;
+      }
+
+      if (fieldName === 'udyam_certificate_url') {
+        const hasExisting = Boolean(String(data.udyam_certificate_url ?? '').trim());
+        const hasSelected = Boolean(documentFiles.udyamCertificate);
+        if (!hasExisting && !hasSelected) {
+          return { errorKey: 'udyam_certificate_url', message: REQUIRED_MESSAGE_OVERRIDES.udyam_certificate_url };
+        }
+        return null;
+      }
+
+      if (fieldName === 'payment_proof_url') {
+        const hasExisting = Boolean(String(data.payment_proof_url ?? '').trim());
+        const hasSelected = Boolean(documentFiles.paymentProof);
+        if (!hasExisting && !hasSelected) {
+          return { errorKey: 'payment_proof_url', message: REQUIRED_MESSAGE_OVERRIDES.payment_proof_url };
+        }
+        return null;
+      }
+
+      const rawValue = data[fieldName as keyof typeof formData];
+      if (String(rawValue ?? '').trim()) {
+        return null;
+      }
+
+      const fallbackLabel = fallbackFieldLabel(fieldName);
+      const label = resolveFieldLabel(fieldName, fallbackLabel);
+      return {
+        errorKey: fieldName,
+        message: REQUIRED_MESSAGE_OVERRIDES[fieldName] ?? `${label} is required`
+      };
+    },
+    [documentFiles.gstCertificate, documentFiles.paymentProof, documentFiles.udyamCertificate, fallbackFieldLabel, formData, isFieldApplicable, isFieldRequired, resolveFieldLabel, showOtherCity]
+  );
+
+  const validateFieldLive = useCallback(
+    async (fieldName: string, data: typeof formData = formData): Promise<{ errorKey: string; message: string }> => {
+      if (fieldName === 'other_city_name') {
+        const cityRequiredIssue = getRequiredValidationIssue('city', data);
+        if (cityRequiredIssue?.errorKey === 'other_city_name') {
+          return cityRequiredIssue;
+        }
+        return { errorKey: 'other_city_name', message: '' };
+      }
+
+      if (MEMBER_EDIT_NON_VALIDATED_FIELDS.has(fieldName)) {
+        return { errorKey: fieldName, message: '' };
+      }
+
+      if (!isFieldApplicable(fieldName, data)) {
+        return { errorKey: fieldName, message: '' };
+      }
+
+      const requiredIssue = getRequiredValidationIssue(fieldName, data);
+      if (requiredIssue) {
+        return requiredIssue;
+      }
+
+      const rawValue = data[fieldName as keyof typeof formData];
+      const value = String(rawValue ?? '').trim();
+      if (!value) {
+        return { errorKey: fieldName, message: '' };
+      }
+
+      const validationResult = await validateFieldByRule(fieldName, value);
+      return {
+        errorKey: fieldName,
+        message: validationResult.isValid ? '' : (validationResult.message || 'Invalid value')
+      };
+    },
+    [formData, getRequiredValidationIssue, isFieldApplicable, validateFieldByRule]
+  );
+
+  const handleFormBlurCapture = useCallback(
+    (event: React.FocusEvent<HTMLFormElement>) => {
+      const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+      const fieldName = target.name;
+      if (!fieldName) {
+        return;
+      }
+
+      if (fieldName !== 'other_city_name' && !Object.prototype.hasOwnProperty.call(formData, fieldName)) {
+        return;
+      }
+
+      void validateFieldLive(fieldName).then(({ errorKey, message }) => {
+        setErrors(prev => ({ ...prev, [errorKey]: message }));
+      });
+    },
+    [formData, validateFieldLive]
+  );
+
   const validateForm = async (): Promise<boolean> => {
     const newErrors: { [key: string]: string } = {};
+    const requiredCheckFields = new Set<string>(Object.keys(formData));
+    requiredCheckFields.add('city');
 
-    // Dynamic required field validation based on form configuration
-    if (isFieldRequired('full_name') && !formData.full_name.trim()) {
-      newErrors.full_name = 'Full name is required';
-    }
-    if (isFieldRequired('gender') && !formData.gender) {
-      newErrors.gender = 'Gender is required';
-    }
-    if (isFieldRequired('date_of_birth') && !formData.date_of_birth) {
-      newErrors.date_of_birth = 'Date of birth is required';
-    }
-    if (isFieldRequired('email') && !formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    }
-    if (isFieldRequired('mobile_number') && !formData.mobile_number.trim()) {
-      newErrors.mobile_number = 'Mobile number is required';
-    }
-    if (isFieldRequired('company_name') && !formData.company_name.trim()) {
-      newErrors.company_name = 'Company name is required';
-    }
-    if (isFieldRequired('company_address') && !formData.company_address.trim()) {
-      newErrors.company_address = 'Company address is required';
-    }
-    if (isFieldRequired('state') && !formData.state) {
-      newErrors.state = 'State is required';
-    }
-    if (isFieldRequired('district') && !formData.district) {
-      newErrors.district = 'District is required';
-    }
-    if (isFieldRequired('city')) {
-      if (showOtherCity) {
-        if (!formData.other_city_name.trim()) {
-          newErrors.other_city_name = 'City name is required';
-        }
-      } else if (!formData.city) {
-        newErrors.city = 'City is required';
+    for (const fieldName of requiredCheckFields) {
+      const issue = getRequiredValidationIssue(fieldName, formData);
+      if (issue && !newErrors[issue.errorKey]) {
+        newErrors[issue.errorKey] = issue.message;
       }
     }
-    if (isFieldRequired('pin_code') && !formData.pin_code.trim()) {
-      newErrors.pin_code = 'PIN code is required';
-    }
-    if (isFieldRequired('industry') && !formData.industry) {
-      newErrors.industry = 'Industry is required';
-    }
-    if (isFieldRequired('activity_type') && !formData.activity_type) {
-      newErrors.activity_type = 'Activity type is required';
-    }
-    if (isFieldRequired('constitution') && !formData.constitution) {
-      newErrors.constitution = 'Constitution is required';
-    }
-    if (isFieldRequired('annual_turnover') && !formData.annual_turnover) {
-      newErrors.annual_turnover = 'Annual turnover is required';
-    }
-    if (isFieldRequired('number_of_employees') && !formData.number_of_employees) {
-      newErrors.number_of_employees = 'Number of employees is required';
-    }
-    if (isFieldRequired('products_services') && !formData.products_services.trim()) {
-      newErrors.products_services = 'Products & services is required';
-    }
-    if (isFieldRequired('gst_registered') && !formData.gst_registered) {
-      newErrors.gst_registered = 'GST registration status is required';
-    }
-    if (formData.gst_registered === 'yes' && !formData.gst_number.trim()) {
-      newErrors.gst_number = 'GST number is required when GST registered';
-    }
-    if (isFieldRequired('pan_company') && !formData.pan_company.trim()) {
-      newErrors.pan_company = 'PAN is required';
-    }
-    if (isFieldRequired('esic_registered') && !formData.esic_registered) {
-      newErrors.esic_registered = 'ESIC registration status is required';
-    }
-    if (isFieldRequired('epf_registered') && !formData.epf_registered) {
-      newErrors.epf_registered = 'EPF registration status is required';
-    }
 
-    const formatValidatedFields: Array<{
-      fieldName: 'email' | 'mobile_number' | 'alternate_mobile' | 'pin_code' | 'gst_number' | 'pan_company' | 'website';
-      value: string;
-      errorKey?: string;
-    }> = [
-      { fieldName: 'email', value: formData.email },
-      { fieldName: 'mobile_number', value: formData.mobile_number },
-      { fieldName: 'alternate_mobile', value: formData.alternate_mobile },
-      { fieldName: 'pin_code', value: formData.pin_code },
-      { fieldName: 'gst_number', value: formData.gst_number },
-      { fieldName: 'pan_company', value: formData.pan_company },
-      { fieldName: 'website', value: formData.website }
-    ];
+    for (const fieldName of Object.keys(formData)) {
+      if (MEMBER_EDIT_NON_VALIDATED_FIELDS.has(fieldName)) {
+        continue;
+      }
 
-    for (const { fieldName, value, errorKey } of formatValidatedFields) {
-      if (!value.trim()) {
+      if (!isFieldApplicable(fieldName, formData)) {
+        continue;
+      }
+
+      if (newErrors[fieldName]) {
+        continue;
+      }
+
+      const rawValue = formData[fieldName as keyof typeof formData];
+      const value = String(rawValue ?? '').trim();
+      if (!value) {
+        continue;
+      }
+
+      const charCount = value.length;
+      const minLen = getFieldMinLength(fieldName);
+      const maxLen = getFieldMaxLength(fieldName);
+      const label = getFieldLabel(fieldName);
+
+      if (maxLen !== null && charCount > maxLen) {
+        newErrors[fieldName] = `${label} must be at most ${maxLen} characters`;
+        continue;
+      } else if (minLen !== null && charCount < minLen) {
+        newErrors[fieldName] = `${label} must be at least ${minLen} characters`;
         continue;
       }
 
       const validationResult = await validateFieldByRule(fieldName, value);
       if (!validationResult.isValid) {
-        newErrors[errorKey ?? fieldName] = validationResult.message || 'Invalid value';
+        newErrors[fieldName] = validationResult.message || 'Invalid value';
       }
     }
 
+    latestErrorsRef.current = newErrors;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -708,22 +1021,43 @@ const MemberEditProfile: React.FC = () => {
       return;
     }
 
-    const isValid = await validateForm();
-    if (!isValid) {
-      showToast('error', 'Please fix all validation errors before verifying');
-      return;
-    }
-
-    const changedFields = detectChangedFields();
-
-    if (changedFields.length === 0) {
-      showToast('error', 'No changes detected');
-      return;
-    }
-
+    setIsVerifying(true);
     try {
-      setIsVerifying(true);
-      const result = await normalizeMemberData(formData);
+      const isValid = await validateForm();
+      if (!isValid) {
+        showToast('error', 'Please fix all validation errors before verifying');
+        scrollToFirstError(latestErrorsRef.current);
+        return;
+      }
+
+      const changedFields = detectChangedFields();
+
+      if (changedFields.length === 0) {
+        showToast('error', 'No changes detected');
+        return;
+      }
+
+      const normalizationPayload: Record<string, string> = {};
+      const normalizationFields: Array<keyof typeof formData> = [
+        'full_name',
+        'company_name',
+        'company_address',
+        'products_services',
+        'alternate_contact_name',
+        'referred_by'
+      ];
+
+      normalizationFields.forEach((fieldName) => {
+        if (!isFieldApplicable(fieldName, formData)) {
+          return;
+        }
+        const value = String(formData[fieldName] ?? '').trim();
+        if (value) {
+          normalizationPayload[fieldName] = value;
+        }
+      });
+
+      const result = await normalizeMemberData(normalizationPayload);
       const correctedFields = getCorrectionFields(result);
 
       if (correctedFields.length > 0) {
@@ -769,6 +1103,9 @@ const MemberEditProfile: React.FC = () => {
       // Step 1: Handle profile photo upload if there's a new photo
       let finalPhotoUrl = dataToSave.profile_photo_url;
       let oldPhotoUrl: string | null = null;
+      let finalGstCertificateUrl = dataToSave.gst_certificate_url || null;
+      let finalUdyamCertificateUrl = dataToSave.udyam_certificate_url || null;
+      let finalPaymentProofUrl = dataToSave.payment_proof_url || null;
 
       if (dataToSave.profile_photo_url === '__NEW_PHOTO__' && profilePhoto && photoFileName) {
         console.log('[saveProfileData] New photo detected, uploading to storage...');
@@ -802,6 +1139,54 @@ const MemberEditProfile: React.FC = () => {
         finalPhotoUrl = originalData.profile_photo_url || null;
       }
 
+      const documentUploadQueue: Array<{
+        file: File | null;
+        prefix: string;
+        fieldLabel: string;
+        onSuccess: (url: string) => void;
+      }> = [
+        {
+          file: documentFiles.gstCertificate,
+          prefix: 'gst',
+          fieldLabel: 'GST certificate',
+          onSuccess: (url: string) => {
+            finalGstCertificateUrl = url;
+          }
+        },
+        {
+          file: documentFiles.udyamCertificate,
+          prefix: 'udyam',
+          fieldLabel: 'UDYAM certificate',
+          onSuccess: (url: string) => {
+            finalUdyamCertificateUrl = url;
+          }
+        },
+        {
+          file: documentFiles.paymentProof,
+          prefix: 'payment',
+          fieldLabel: 'Payment proof',
+          onSuccess: (url: string) => {
+            finalPaymentProofUrl = url;
+          }
+        }
+      ];
+
+      for (const uploadTask of documentUploadQueue) {
+        if (!uploadTask.file) {
+          continue;
+        }
+
+        const extension = uploadTask.file.name.includes('.')
+          ? uploadTask.file.name.split('.').pop()?.toLowerCase()
+          : null;
+        const fileName = `${uploadTask.prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${extension ? `.${extension}` : ''}`;
+        const uploadedUrl = await fileUploadService.uploadFile(uploadTask.file, fileName, 'registrations');
+        if (!uploadedUrl) {
+          throw new Error(`Failed to upload ${uploadTask.fieldLabel}`);
+        }
+        uploadTask.onSuccess(uploadedUrl);
+      }
+
       if (!memberRegistrationId) {
         showToast('error', 'Failed to load profile data');
         setIsSaving(false);
@@ -817,48 +1202,52 @@ const MemberEditProfile: React.FC = () => {
 
       const emailChanged = dataToSave.email !== originalData.email;
       const mobileChanged = dataToSave.mobile_number !== originalData.mobile_number;
+      const mergedData = { ...originalData, ...dataToSave };
 
       // Step 2: Call RPC function to update profile data
       const { data: rpcResult, error: rpcError } = await supabase.rpc('update_member_profile', {
         p_member_registration_id: memberRegistrationId,
         p_user_id: member!.id,
         p_data: {
-          full_name: dataToSave.full_name?.trim(),
-          email: emailChanged ? originalData.email?.trim() : dataToSave.email?.trim(),
-          mobile_number: mobileChanged ? originalData.mobile_number?.trim() : dataToSave.mobile_number?.trim(),
-          gender: dataToSave.gender || null,
-          date_of_birth: dataToSave.date_of_birth || null,
-          company_name: dataToSave.company_name?.trim(),
-          company_designation_id: dataToSave.company_designation_id || null,
-          company_address: dataToSave.company_address?.trim(),
-          state: dataToSave.state || null,
-          district: dataToSave.district || null,
-          city: dataToSave.city || null,
-          is_custom_city: dataToSave.is_custom_city || false,
-          other_city_name: dataToSave.other_city_name || null,
-          pin_code: dataToSave.pin_code || null,
-          industry: dataToSave.industry || null,
-          activity_type: dataToSave.activity_type || null,
-          constitution: dataToSave.constitution || null,
-          annual_turnover: dataToSave.annual_turnover || null,
-          number_of_employees: dataToSave.number_of_employees || null,
-          products_services: dataToSave.products_services?.trim(),
-          brand_names: dataToSave.brand_names || null,
-          website: dataToSave.website || null,
-          gst_registered: dataToSave.gst_registered || null,
-          gst_number: dataToSave.gst_number || null,
-          pan_company: dataToSave.pan_company?.trim(),
-          esic_registered: dataToSave.esic_registered || null,
-          epf_registered: dataToSave.epf_registered || null,
-          member_id: dataToSave.member_id || null,
-          referred_by: dataToSave.referred_by?.trim() || null,
-          amount_paid: dataToSave.amount_paid || null,
-          payment_date: dataToSave.payment_date || null,
-          payment_mode: dataToSave.payment_mode || null,
-          transaction_id: dataToSave.transaction_id || null,
-          bank_reference: dataToSave.bank_reference || null,
-          alternate_contact_name: dataToSave.alternate_contact_name || null,
-          alternate_mobile: dataToSave.alternate_mobile || null,
+          full_name: mergedData.full_name?.trim(),
+          email: emailChanged ? originalData.email?.trim() : mergedData.email?.trim(),
+          mobile_number: mobileChanged ? originalData.mobile_number?.trim() : mergedData.mobile_number?.trim(),
+          gender: mergedData.gender || null,
+          date_of_birth: mergedData.date_of_birth || null,
+          company_name: mergedData.company_name?.trim(),
+          company_designation_id: mergedData.company_designation_id || null,
+          company_address: mergedData.company_address?.trim(),
+          state: mergedData.state || null,
+          district: mergedData.district || null,
+          city: mergedData.city || null,
+          is_custom_city: mergedData.is_custom_city || false,
+          other_city_name: mergedData.other_city_name || null,
+          pin_code: mergedData.pin_code || null,
+          industry: mergedData.industry || null,
+          activity_type: mergedData.activity_type || null,
+          constitution: mergedData.constitution || null,
+          annual_turnover: mergedData.annual_turnover || null,
+          number_of_employees: mergedData.number_of_employees || null,
+          products_services: mergedData.products_services?.trim(),
+          brand_names: mergedData.brand_names || null,
+          website: mergedData.website || null,
+          gst_registered: mergedData.gst_registered || null,
+          gst_number: mergedData.gst_number || null,
+          gst_certificate_url: finalGstCertificateUrl,
+          pan_company: mergedData.pan_company?.trim(),
+          esic_registered: mergedData.esic_registered || null,
+          epf_registered: mergedData.epf_registered || null,
+          udyam_certificate_url: finalUdyamCertificateUrl,
+          member_id: mergedData.member_id || null,
+          referred_by: mergedData.referred_by?.trim() || null,
+          amount_paid: mergedData.amount_paid || null,
+          payment_date: mergedData.payment_date || null,
+          payment_mode: mergedData.payment_mode || null,
+          transaction_id: mergedData.transaction_id || null,
+          bank_reference: mergedData.bank_reference || null,
+          payment_proof_url: finalPaymentProofUrl,
+          alternate_contact_name: mergedData.alternate_contact_name || null,
+          alternate_mobile: mergedData.alternate_mobile || null,
           profile_photo_url: finalPhotoUrl || null
         }
       });
@@ -907,7 +1296,13 @@ const MemberEditProfile: React.FC = () => {
       }
 
       // Step 6: Success - update originalData and display the new photo
-      const updatedData = { ...dataToSave, profile_photo_url: finalPhotoUrl };
+      const updatedData = {
+        ...mergedData,
+        profile_photo_url: finalPhotoUrl || '',
+        gst_certificate_url: finalGstCertificateUrl || '',
+        udyam_certificate_url: finalUdyamCertificateUrl || '',
+        payment_proof_url: finalPaymentProofUrl || ''
+      };
       setOriginalData(updatedData);
       setFormData(updatedData);
 
@@ -916,6 +1311,11 @@ const MemberEditProfile: React.FC = () => {
       setProfilePhotoPreview(finalPhotoUrl || ''); // Show the newly uploaded photo
       setPhotoFileName('');
       setPhotoImageSrc('');
+      setDocumentFiles({
+        gstCertificate: null,
+        udyamCertificate: null,
+        paymentProof: null
+      });
 
       // Refresh MemberContext to update the cache and Header photo
       console.log('[saveProfileData] Refreshing MemberContext cache...');
@@ -969,17 +1369,47 @@ const MemberEditProfile: React.FC = () => {
     );
   }
 
-  if (!member) {
+  if (!member && !isPreviewMode) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
           <p className="text-foreground font-medium mb-2">Unable to load your profile</p>
           <p className="text-muted-foreground mb-4">Please try again or contact support</p>
           <Link
             to="/dashboard"
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 inline-block"
           >
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPreviewMode && fieldConfigErrorCode === 'access_denied') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md px-6">
+          <Lock className="w-12 h-12 text-muted-foreground/60 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">Admin Preview Only</h2>
+          <p className="text-muted-foreground mb-4">Draft form preview requires admin permissions. Sign in with an admin account to preview the member edit form.</p>
+          <Link to="/dashboard" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 inline-block">
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPreviewMode && fieldConfigErrorCode === 'load_failed') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md px-6">
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">Preview Unavailable</h2>
+          <p className="text-muted-foreground mb-4">Failed to load draft form configuration for preview.</p>
+          <Link to="/dashboard" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 inline-block">
             Back to Dashboard
           </Link>
         </div>
@@ -999,24 +1429,31 @@ const MemberEditProfile: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <button
-            onClick={() => navigate('/dashboard/profile')}
+            onClick={() => navigate(isPreviewMode ? '/admin/form-studio/member_edit' : '/dashboard/profile')}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back to Profile
+            {isPreviewMode ? 'Back to Studio' : 'Back to Profile'}
           </button>
         </div>
 
-        <div className="bg-card rounded-lg shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-6">
-            <h1 className="text-xl font-semibold text-white flex items-center gap-2">
+        <div className="bg-card rounded-lg shadow-sm overflow-hidden">
+          <div className="px-6 py-6 border-b border-border">
+            <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
               <User className="w-6 h-6" />
               Edit Profile
             </h1>
-            <p className="text-blue-100 mt-1">Update your profile information</p>
+            <p className="text-muted-foreground mt-1">Update your profile information</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-8">
+          {isPreviewMode && (
+            <div className="bg-muted/40 border-b border-border px-6 py-3 flex items-center gap-2 text-muted-foreground text-sm">
+              <Eye className="w-4 h-4 flex-shrink-0" />
+              <span><strong className="text-foreground">Draft Preview</strong> — Viewing draft field configuration. Changes cannot be saved in preview mode.</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="p-6 space-y-8">
             {/* Section 1: Personal Information */}
             <div>
               <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
@@ -1024,9 +1461,10 @@ const MemberEditProfile: React.FC = () => {
                 Personal Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isFieldVisible('full_name') && (
                 <div>
                   <label htmlFor="full_name" className="block text-sm font-medium text-foreground mb-1">
-                    Full Name {isFieldRequired('full_name') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('full_name', 'Full Name')} {isFieldRequired('full_name') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1034,17 +1472,21 @@ const MemberEditProfile: React.FC = () => {
                     name="full_name"
                     value={formData.full_name}
                     onChange={handleChange}
+                    placeholder={resolveFieldPlaceholder('full_name', 'Enter your full name')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.full_name ? 'border-red-500' : 'border-border'
+                      errors.full_name ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('full_name')}
+                    maxLength={getFieldMaxLength('full_name') ?? undefined}
                   />
-                  {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name}</p>}
+                  {errors.full_name && <p className="text-destructive text-sm mt-1">{errors.full_name}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('gender') && (
                 <div>
                   <label htmlFor="gender" className="block text-sm font-medium text-foreground mb-1">
-                    Gender {isFieldRequired('gender') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('gender', 'Gender')} {isFieldRequired('gender') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="gender"
@@ -1052,20 +1494,25 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.gender}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.gender ? 'border-red-500' : 'border-border'
+                      errors.gender ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('gender')}
                   >
-                    <option key="__placeholder" value="">Select Gender</option>
-                    <option key="male" value="male">Male</option>
-                    <option key="female" value="female">Female</option>
+                    <option key="__placeholder" value="">
+                      {resolveFieldPlaceholder('gender', 'Select Gender')}
+                    </option>
+                    {resolveFieldOptions('gender', ['Male', 'Female']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                   </select>
-                  {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
+                  {errors.gender && <p className="text-destructive text-sm mt-1">{errors.gender}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('date_of_birth') && (
                 <div>
                   <label htmlFor="date_of_birth" className="block text-sm font-medium text-foreground mb-1">
-                    Date of Birth {isFieldRequired('date_of_birth') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('date_of_birth', 'Date of Birth')} {isFieldRequired('date_of_birth') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="date"
@@ -1074,12 +1521,13 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.date_of_birth}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.date_of_birth ? 'border-red-500' : 'border-border'
+                      errors.date_of_birth ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('date_of_birth')}
                   />
-                  {errors.date_of_birth && <p className="text-red-500 text-sm mt-1">{errors.date_of_birth}</p>}
+                  {errors.date_of_birth && <p className="text-destructive text-sm mt-1">{errors.date_of_birth}</p>}
                 </div>
+                )}
 
                 {/* Profile Photo */}
                 <div className="md:col-span-2">
@@ -1118,7 +1566,7 @@ const MemberEditProfile: React.FC = () => {
                         />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-green-600 font-medium mb-2 flex items-center">
+                        <p className="text-sm text-primary font-medium mb-2 flex items-center">
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Photo ready
                         </p>
@@ -1143,7 +1591,7 @@ const MemberEditProfile: React.FC = () => {
                           <button
                             type="button"
                             onClick={handleRemovePhoto}
-                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-destructive bg-destructive/10 rounded-lg hover:bg-destructive/20 transition-colors"
                           >
                             <XIcon className="w-4 h-4 mr-1" />
                             Remove Photo
@@ -1157,7 +1605,7 @@ const MemberEditProfile: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-2">
                     <Mail className="w-4 h-4" />
-                    Email Address {isFieldRequired('email') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('email', 'Email Address')} {isFieldRequired('email') && <span className="text-destructive">*</span>}
                   </label>
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
@@ -1169,8 +1617,9 @@ const MemberEditProfile: React.FC = () => {
                         disabled={!isEmailEditable}
                         className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
                           !isEmailEditable ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : ''
-                        } ${errors.email ? 'border-red-500' : 'border-border'}`}
+                        } ${errors.email ? 'border-destructive' : 'border-border'}`}
                         required={isFieldRequired('email')}
+                        maxLength={getFieldMaxLength('email') ?? undefined}
                       />
                       {!isEmailEditable && (
                         <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1185,7 +1634,7 @@ const MemberEditProfile: React.FC = () => {
                       Change
                     </button>
                   </div>
-                  {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                  {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
                   {!isEmailEditable && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit email</p>
                   )}
@@ -1194,7 +1643,7 @@ const MemberEditProfile: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-2">
                     <Phone className="w-4 h-4" />
-                    Mobile Number {isFieldRequired('mobile_number') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('mobile_number', 'Mobile Number')} {isFieldRequired('mobile_number') && <span className="text-destructive">*</span>}
                   </label>
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
@@ -1206,8 +1655,9 @@ const MemberEditProfile: React.FC = () => {
                         disabled={!isMobileEditable}
                         className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
                           !isMobileEditable ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : ''
-                        } ${errors.mobile_number ? 'border-red-500' : 'border-border'}`}
+                        } ${errors.mobile_number ? 'border-destructive' : 'border-border'}`}
                         required={isFieldRequired('mobile_number')}
+                        maxLength={getFieldMaxLength('mobile_number') ?? undefined}
                       />
                       {!isMobileEditable && (
                         <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1222,7 +1672,7 @@ const MemberEditProfile: React.FC = () => {
                       Change
                     </button>
                   </div>
-                  {errors.mobile_number && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
+                  {errors.mobile_number && <p className="text-destructive text-sm mt-1">{errors.mobile_number}</p>}
                   {!isMobileEditable && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit mobile</p>
                   )}
@@ -1237,9 +1687,10 @@ const MemberEditProfile: React.FC = () => {
                 Company Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isFieldVisible('company_name') && (
                 <div>
                   <label htmlFor="company_name" className="block text-sm font-medium text-foreground mb-1">
-                    Company Name {isFieldRequired('company_name') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('company_name', 'Company Name')} {isFieldRequired('company_name') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1247,17 +1698,21 @@ const MemberEditProfile: React.FC = () => {
                     name="company_name"
                     value={formData.company_name}
                     onChange={handleChange}
+                    placeholder={resolveFieldPlaceholder('company_name', 'Enter company name')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.company_name ? 'border-red-500' : 'border-border'
+                      errors.company_name ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('company_name')}
+                    maxLength={getFieldMaxLength('company_name') ?? undefined}
                   />
-                  {errors.company_name && <p className="text-red-500 text-sm mt-1">{errors.company_name}</p>}
+                  {errors.company_name && <p className="text-destructive text-sm mt-1">{errors.company_name}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('company_designation_id') && (
                 <div>
                   <label htmlFor="company_designation_id" className="block text-sm font-medium text-foreground mb-1">
-                    Designation {isFieldRequired('company_designation_id') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('company_designation_id', 'Designation')} {isFieldRequired('company_designation_id') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="company_designation_id"
@@ -1265,21 +1720,25 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.company_designation_id}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.company_designation_id ? 'border-red-500' : 'border-border'
+                      errors.company_designation_id ? 'border-destructive' : 'border-border'
                     }`}
                     disabled={isLoadingDesignations}
                   >
-                    <option key="__placeholder" value="">Select Designation</option>
+                    <option key="__placeholder" value="">
+                      {resolveFieldPlaceholder('company_designation_id', 'Select Designation')}
+                    </option>
                     {availableDesignations.map(des => (
                       <option key={des.id} value={des.id}>{des.designation_name}</option>
                     ))}
                   </select>
-                  {errors.company_designation_id && <p className="text-red-500 text-sm mt-1">{errors.company_designation_id}</p>}
+                  {errors.company_designation_id && <p className="text-destructive text-sm mt-1">{errors.company_designation_id}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('company_address') && (
                 <div className="md:col-span-2">
                   <label htmlFor="company_address" className="block text-sm font-medium text-foreground mb-1">
-                    Company Address {isFieldRequired('company_address') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('company_address', 'Company Address')} {isFieldRequired('company_address') && <span className="text-destructive">*</span>}
                   </label>
                   <textarea
                     id="company_address"
@@ -1287,17 +1746,21 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.company_address}
                     onChange={handleChange}
                     rows={3}
+                    placeholder={resolveFieldPlaceholder('company_address', 'Enter company address')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.company_address ? 'border-red-500' : 'border-border'
+                      errors.company_address ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('company_address')}
+                    maxLength={getFieldMaxLength('company_address') ?? undefined}
                   />
-                  {errors.company_address && <p className="text-red-500 text-sm mt-1">{errors.company_address}</p>}
+                  {errors.company_address && <p className="text-destructive text-sm mt-1">{errors.company_address}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('state') && (
                 <div>
                   <label htmlFor="state" className="block text-sm font-medium text-foreground mb-1">
-                    State {isFieldRequired('state') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('state', 'State')} {isFieldRequired('state') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="state"
@@ -1305,22 +1768,24 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.state}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.state ? 'border-red-500' : 'border-border'
+                      errors.state ? 'border-destructive' : 'border-border'
                     }`}
                     disabled={isLoadingStates}
                     required={isFieldRequired('state')}
                   >
-                    <option key="__placeholder" value="">Select State</option>
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('state', 'Select State')}</option>
                     {availableStates.map(state => (
                       <option key={state.id} value={state.state}>{state.state}</option>
                     ))}
                   </select>
-                  {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
+                  {errors.state && <p className="text-destructive text-sm mt-1">{errors.state}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('district') && (
                 <div>
                   <label htmlFor="district" className="block text-sm font-medium text-foreground mb-1">
-                    District {isFieldRequired('district') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('district', 'District')} {isFieldRequired('district') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="district"
@@ -1328,22 +1793,24 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.district}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.district ? 'border-red-500' : 'border-border'
+                      errors.district ? 'border-destructive' : 'border-border'
                     }`}
                     disabled={!formData.state || isLoadingDistricts}
                     required={isFieldRequired('district')}
                   >
-                    <option key="__placeholder" value="">Select District</option>
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('district', 'Select District')}</option>
                     {availableDistricts.map(district => (
                       <option key={district.district_id} value={district.district_name}>{district.district_name}</option>
                     ))}
                   </select>
-                  {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
+                  {errors.district && <p className="text-destructive text-sm mt-1">{errors.district}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('city') && (
                 <div>
                   <label htmlFor="city" className="block text-sm font-medium text-foreground mb-1">
-                    City {isFieldRequired('city') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('city', 'City')} {isFieldRequired('city') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="city"
@@ -1351,24 +1818,25 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.city}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.city ? 'border-red-500' : 'border-border'
+                      errors.city ? 'border-destructive' : 'border-border'
                     }`}
                     disabled={!selectedDistrictId || isLoadingCities}
                     required={isFieldRequired('city')}
                   >
-                    <option key="__placeholder" value="">Select City</option>
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('city', 'Select City')}</option>
                     {availableCities.map(city => (
                       <option key={city.city_id} value={city.city_name}>{city.city_name}</option>
                     ))}
                     <option key="other" value="Other">Other</option>
                   </select>
-                  {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+                  {errors.city && <p className="text-destructive text-sm mt-1">{errors.city}</p>}
                 </div>
+                )}
 
-                {showOtherCity && (
+                {showOtherCity && isFieldVisible('city') && (
                   <div>
                     <label htmlFor="other_city_name" className="block text-sm font-medium text-foreground mb-1">
-                      City Name {isFieldRequired('other_city_name') && <span className="text-red-500">*</span>}
+                      {resolveFieldLabel('other_city_name', 'City Name')} {isFieldRequired('other_city_name') && <span className="text-destructive">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1377,18 +1845,19 @@ const MemberEditProfile: React.FC = () => {
                       value={formData.other_city_name}
                       onChange={handleChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.other_city_name ? 'border-red-500' : 'border-border'
+                        errors.other_city_name ? 'border-destructive' : 'border-border'
                       }`}
-                      placeholder="Enter city name"
+                      placeholder={resolveFieldPlaceholder('other_city_name', 'Enter city name')}
                       required={isFieldRequired('other_city_name')}
                     />
-                    {errors.other_city_name && <p className="text-red-500 text-sm mt-1">{errors.other_city_name}</p>}
+                    {errors.other_city_name && <p className="text-destructive text-sm mt-1">{errors.other_city_name}</p>}
                   </div>
                 )}
 
+                {isFieldVisible('pin_code') && (
                 <div>
                   <label htmlFor="pin_code" className="block text-sm font-medium text-foreground mb-1">
-                    PIN Code {isFieldRequired('pin_code') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('pin_code', 'PIN Code')} {isFieldRequired('pin_code') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1396,13 +1865,16 @@ const MemberEditProfile: React.FC = () => {
                     name="pin_code"
                     value={formData.pin_code}
                     onChange={handleMobileChange}
+                    placeholder={resolveFieldPlaceholder('pin_code', 'Enter PIN code')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.pin_code ? 'border-red-500' : 'border-border'
+                      errors.pin_code ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('pin_code')}
+                    maxLength={getFieldMaxLength('pin_code') ?? undefined}
                   />
-                  {errors.pin_code && <p className="text-red-500 text-sm mt-1">{errors.pin_code}</p>}
+                  {errors.pin_code && <p className="text-destructive text-sm mt-1">{errors.pin_code}</p>}
                 </div>
+                )}
               </div>
             </div>
 
@@ -1413,9 +1885,10 @@ const MemberEditProfile: React.FC = () => {
                 Business Details
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isFieldVisible('industry') && (
                 <div>
                   <label htmlFor="industry" className="block text-sm font-medium text-foreground mb-1">
-                    Industry {isFieldRequired('industry') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('industry', 'Industry')} {isFieldRequired('industry') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="industry"
@@ -1423,21 +1896,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.industry}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.industry ? 'border-red-500' : 'border-border'
+                      errors.industry ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('industry')}
                   >
-                    <option key="__placeholder" value="">Select Industry</option>
-                    {INDUSTRY_OPTIONS.map(option => (
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('industry', 'Select Industry')}</option>
+                    {resolveFieldOptions('industry', INDUSTRY_OPTIONS).map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  {errors.industry && <p className="text-red-500 text-sm mt-1">{errors.industry}</p>}
+                  {errors.industry && <p className="text-destructive text-sm mt-1">{errors.industry}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('activity_type') && (
                 <div>
                   <label htmlFor="activity_type" className="block text-sm font-medium text-foreground mb-1">
-                    Activity Type {isFieldRequired('activity_type') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('activity_type', 'Activity Type')} {isFieldRequired('activity_type') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="activity_type"
@@ -1445,21 +1920,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.activity_type}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.activity_type ? 'border-red-500' : 'border-border'
+                      errors.activity_type ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('activity_type')}
                   >
-                    <option key="__placeholder" value="">Select Activity Type</option>
-                    {ACTIVITY_TYPE_OPTIONS.map(option => (
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('activity_type', 'Select Activity Type')}</option>
+                    {resolveFieldOptions('activity_type', ACTIVITY_TYPE_OPTIONS).map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  {errors.activity_type && <p className="text-red-500 text-sm mt-1">{errors.activity_type}</p>}
+                  {errors.activity_type && <p className="text-destructive text-sm mt-1">{errors.activity_type}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('constitution') && (
                 <div>
                   <label htmlFor="constitution" className="block text-sm font-medium text-foreground mb-1">
-                    Industry Constitution {isFieldRequired('constitution') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('constitution', 'Industry Constitution')} {isFieldRequired('constitution') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="constitution"
@@ -1467,21 +1944,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.constitution}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.constitution ? 'border-red-500' : 'border-border'
+                      errors.constitution ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('constitution')}
                   >
-                    <option key="__placeholder" value="">Select Industry Constitution</option>
-                    {CONSTITUTION_OPTIONS.map(option => (
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('constitution', 'Select Industry Constitution')}</option>
+                    {resolveFieldOptions('constitution', CONSTITUTION_OPTIONS).map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  {errors.constitution && <p className="text-red-500 text-sm mt-1">{errors.constitution}</p>}
+                  {errors.constitution && <p className="text-destructive text-sm mt-1">{errors.constitution}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('annual_turnover') && (
                 <div>
                   <label htmlFor="annual_turnover" className="block text-sm font-medium text-foreground mb-1">
-                    Annual Turnover {isFieldRequired('annual_turnover') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('annual_turnover', 'Annual Turnover')} {isFieldRequired('annual_turnover') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="annual_turnover"
@@ -1489,21 +1968,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.annual_turnover}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.annual_turnover ? 'border-red-500' : 'border-border'
+                      errors.annual_turnover ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('annual_turnover')}
                   >
-                    <option key="__placeholder" value="">Select Annual Turnover</option>
-                    {ANNUAL_TURNOVER_OPTIONS.map(option => (
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('annual_turnover', 'Select Annual Turnover')}</option>
+                    {resolveFieldOptions('annual_turnover', ANNUAL_TURNOVER_OPTIONS).map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  {errors.annual_turnover && <p className="text-red-500 text-sm mt-1">{errors.annual_turnover}</p>}
+                  {errors.annual_turnover && <p className="text-destructive text-sm mt-1">{errors.annual_turnover}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('number_of_employees') && (
                 <div>
                   <label htmlFor="number_of_employees" className="block text-sm font-medium text-foreground mb-1">
-                    Number of Employees {isFieldRequired('number_of_employees') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('number_of_employees', 'Number of Employees')} {isFieldRequired('number_of_employees') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="number_of_employees"
@@ -1511,21 +1992,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.number_of_employees}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.number_of_employees ? 'border-red-500' : 'border-border'
+                      errors.number_of_employees ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('number_of_employees')}
                   >
-                    <option key="__placeholder" value="">Select Number of Employees</option>
-                    {EMPLOYEE_COUNT_OPTIONS.map(option => (
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('number_of_employees', 'Select Number of Employees')}</option>
+                    {resolveFieldOptions('number_of_employees', EMPLOYEE_COUNT_OPTIONS).map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  {errors.number_of_employees && <p className="text-red-500 text-sm mt-1">{errors.number_of_employees}</p>}
+                  {errors.number_of_employees && <p className="text-destructive text-sm mt-1">{errors.number_of_employees}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('products_services') && (
                 <div className="md:col-span-2">
                   <label htmlFor="products_services" className="block text-sm font-medium text-foreground mb-1">
-                    Products & Services {isFieldRequired('products_services') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('products_services', 'Products & Services')} {isFieldRequired('products_services') && <span className="text-destructive">*</span>}
                   </label>
                   <textarea
                     id="products_services"
@@ -1534,17 +2017,20 @@ const MemberEditProfile: React.FC = () => {
                     onChange={handleChange}
                     rows={3}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.products_services ? 'border-red-500' : 'border-border'
+                      errors.products_services ? 'border-destructive' : 'border-border'
                     }`}
-                    placeholder="Describe your products and services"
+                    placeholder={resolveFieldPlaceholder('products_services', 'Describe your products and services')}
                     required={isFieldRequired('products_services')}
+                    maxLength={getFieldMaxLength('products_services') ?? undefined}
                   />
-                  {errors.products_services && <p className="text-red-500 text-sm mt-1">{errors.products_services}</p>}
+                  {errors.products_services && <p className="text-destructive text-sm mt-1">{errors.products_services}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('brand_names') && (
                 <div>
                   <label htmlFor="brand_names" className="block text-sm font-medium text-foreground mb-1">
-                    Brand Names {isFieldRequired('brand_names') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('brand_names', 'Brand Names')} {isFieldRequired('brand_names') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1553,13 +2039,16 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.brand_names}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
-                    placeholder="Enter brand names"
+                    placeholder={resolveFieldPlaceholder('brand_names', 'Enter brand names')}
+                    maxLength={getFieldMaxLength('brand_names') ?? undefined}
                   />
                 </div>
+                )}
 
+                {isFieldVisible('website') && (
                 <div>
                   <label htmlFor="website" className="block text-sm font-medium text-foreground mb-1">
-                    Website {isFieldRequired('website') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('website', 'Website')} {isFieldRequired('website') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1568,12 +2057,14 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.website}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.website ? 'border-red-500' : 'border-border'
+                      errors.website ? 'border-destructive' : 'border-border'
                     }`}
-                    placeholder="https://example.com"
+                    placeholder={resolveFieldPlaceholder('website', 'https://example.com')}
+                    maxLength={getFieldMaxLength('website') ?? undefined}
                   />
-                  {errors.website && <p className="text-red-500 text-sm mt-1">{errors.website}</p>}
+                  {errors.website && <p className="text-destructive text-sm mt-1">{errors.website}</p>}
                 </div>
+                )}
               </div>
             </div>
 
@@ -1584,9 +2075,10 @@ const MemberEditProfile: React.FC = () => {
                 Registration Details
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isFieldVisible('gst_registered') && (
                 <div>
                   <label htmlFor="gst_registered" className="block text-sm font-medium text-foreground mb-1">
-                    GST Registered {isFieldRequired('gst_registered') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('gst_registered', 'GST Registered')} {isFieldRequired('gst_registered') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="gst_registered"
@@ -1594,21 +2086,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.gst_registered}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.gst_registered ? 'border-red-500' : 'border-border'
+                      errors.gst_registered ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('gst_registered')}
                   >
-                    <option key="__placeholder" value="">Select</option>
-                    <option key="yes" value="yes">Yes</option>
-                    <option key="no" value="no">No</option>
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('gst_registered', 'Select')}</option>
+                    {resolveFieldOptions('gst_registered', ['Yes', 'No']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                   </select>
-                  {errors.gst_registered && <p className="text-red-500 text-sm mt-1">{errors.gst_registered}</p>}
+                  {errors.gst_registered && <p className="text-destructive text-sm mt-1">{errors.gst_registered}</p>}
                 </div>
+                )}
 
-                {formData.gst_registered === 'yes' && (
+                {isFieldApplicable('gst_number') && (
                   <div>
                     <label htmlFor="gst_number" className="block text-sm font-medium text-foreground mb-1">
-                      GST Number {isFieldRequired('gst_number') && <span className="text-red-500">*</span>}
+                      {resolveFieldLabel('gst_number', 'GST Number')} {isFieldRequired('gst_number') && <span className="text-destructive">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1617,18 +2111,58 @@ const MemberEditProfile: React.FC = () => {
                       value={formData.gst_number}
                       onChange={handleChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.gst_number ? 'border-red-500' : 'border-border'
+                        errors.gst_number ? 'border-destructive' : 'border-border'
                       }`}
-                      placeholder="22AAAAA0000A1Z5"
-                      required={formData.gst_registered === 'yes'}
+                      placeholder={resolveFieldPlaceholder('gst_number', '22AAAAA0000A1Z5')}
+                      required={isFieldRequired('gst_number')}
+                      maxLength={getFieldMaxLength('gst_number') ?? undefined}
                     />
-                    {errors.gst_number && <p className="text-red-500 text-sm mt-1">{errors.gst_number}</p>}
+                    {errors.gst_number && <p className="text-destructive text-sm mt-1">{errors.gst_number}</p>}
                   </div>
                 )}
 
+                {isFieldApplicable('gst_certificate_url') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      {resolveFieldLabel('gst_certificate_url', 'GST Certificate')} {isFieldRequired('gst_certificate_url') && <span className="text-destructive">*</span>}
+                    </label>
+                    <input
+                      id="gst_certificate_url"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(event) => handleDocumentFileChange('gstCertificate', event.target.files?.[0] || null)}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="gst_certificate_url"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.gst_certificate_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {(formData.gst_certificate_url || documentFiles.gstCertificate) ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {documentFiles.gstCertificate && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.gstCertificate.name}</p>
+                    )}
+                    {!documentFiles.gstCertificate && formData.gst_certificate_url && (
+                      <a
+                        href={formData.gst_certificate_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline mt-1 inline-block"
+                      >
+                        View current GST certificate
+                      </a>
+                    )}
+                    {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('pan_company') && (
                 <div>
                   <label htmlFor="pan_company" className="block text-sm font-medium text-foreground mb-1">
-                    PAN (Company) {isFieldRequired('pan_company') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('pan_company', 'PAN (Company)')} {isFieldRequired('pan_company') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1637,17 +2171,20 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.pan_company}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.pan_company ? 'border-red-500' : 'border-border'
+                      errors.pan_company ? 'border-destructive' : 'border-border'
                     }`}
-                    placeholder="AAAAA0000A"
+                    placeholder={resolveFieldPlaceholder('pan_company', 'AAAAA0000A')}
                     required={isFieldRequired('pan_company')}
+                    maxLength={getFieldMaxLength('pan_company') ?? undefined}
                   />
-                  {errors.pan_company && <p className="text-red-500 text-sm mt-1">{errors.pan_company}</p>}
+                  {errors.pan_company && <p className="text-destructive text-sm mt-1">{errors.pan_company}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('esic_registered') && (
                 <div>
                   <label htmlFor="esic_registered" className="block text-sm font-medium text-foreground mb-1">
-                    ESIC Registered {isFieldRequired('esic_registered') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('esic_registered', 'ESIC Registered')} {isFieldRequired('esic_registered') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="esic_registered"
@@ -1655,20 +2192,23 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.esic_registered}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.esic_registered ? 'border-red-500' : 'border-border'
+                      errors.esic_registered ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('esic_registered')}
                   >
-                    <option key="__placeholder" value="">Select</option>
-                    <option key="yes" value="yes">Yes</option>
-                    <option key="no" value="no">No</option>
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('esic_registered', 'Select')}</option>
+                    {resolveFieldOptions('esic_registered', ['Yes', 'No']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                   </select>
-                  {errors.esic_registered && <p className="text-red-500 text-sm mt-1">{errors.esic_registered}</p>}
+                  {errors.esic_registered && <p className="text-destructive text-sm mt-1">{errors.esic_registered}</p>}
                 </div>
+                )}
 
+                {isFieldVisible('epf_registered') && (
                 <div>
                   <label htmlFor="epf_registered" className="block text-sm font-medium text-foreground mb-1">
-                    EPF Registered {isFieldRequired('epf_registered') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('epf_registered', 'EPF Registered')} {isFieldRequired('epf_registered') && <span className="text-destructive">*</span>}
                   </label>
                   <select
                     id="epf_registered"
@@ -1676,21 +2216,61 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.epf_registered}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.epf_registered ? 'border-red-500' : 'border-border'
+                      errors.epf_registered ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('epf_registered')}
                   >
-                    <option key="__placeholder" value="">Select</option>
-                    <option key="yes" value="yes">Yes</option>
-                    <option key="no" value="no">No</option>
+                    <option key="__placeholder" value="">{resolveFieldPlaceholder('epf_registered', 'Select')}</option>
+                    {resolveFieldOptions('epf_registered', ['Yes', 'No']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                   </select>
-                  {errors.epf_registered && <p className="text-red-500 text-sm mt-1">{errors.epf_registered}</p>}
+                  {errors.epf_registered && <p className="text-destructive text-sm mt-1">{errors.epf_registered}</p>}
                 </div>
+                )}
+
+                {isFieldVisible('udyam_certificate_url') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      {resolveFieldLabel('udyam_certificate_url', 'UDYAM Certificate')} {isFieldRequired('udyam_certificate_url') && <span className="text-destructive">*</span>}
+                    </label>
+                    <input
+                      id="udyam_certificate_url"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(event) => handleDocumentFileChange('udyamCertificate', event.target.files?.[0] || null)}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="udyam_certificate_url"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.udyam_certificate_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {(formData.udyam_certificate_url || documentFiles.udyamCertificate) ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {documentFiles.udyamCertificate && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.udyamCertificate.name}</p>
+                    )}
+                    {!documentFiles.udyamCertificate && formData.udyam_certificate_url && (
+                      <a
+                        href={formData.udyam_certificate_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline mt-1 inline-block"
+                      >
+                        View current UDYAM certificate
+                      </a>
+                    )}
+                    {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}
+                  </div>
+                )}
 
                 {/* Field 1: Member ID (Read-only) */}
                 <div>
                   <label htmlFor="member_id" className="block text-sm font-medium text-foreground mb-1">
-                    Member ID
+                    {resolveFieldLabel('member_id', 'Member ID')}
                   </label>
                   <input
                     type="text"
@@ -1704,9 +2284,10 @@ const MemberEditProfile: React.FC = () => {
                 </div>
 
                 {/* Field 2: Referred By (Editable) */}
+                {isFieldVisible('referred_by') && (
                 <div>
                   <label htmlFor="referred_by" className="block text-sm font-medium text-foreground mb-1">
-                    Referred By {isFieldRequired('referred_by') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('referred_by', 'Referred By')} {isFieldRequired('referred_by') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1714,19 +2295,22 @@ const MemberEditProfile: React.FC = () => {
                     name="referred_by"
                     value={formData.referred_by}
                     onChange={handleChange}
-                    placeholder="Name of the person who referred you"
+                    placeholder={resolveFieldPlaceholder('referred_by', 'Name of the person who referred you')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.referred_by ? 'border-red-500' : 'border-border'
+                      errors.referred_by ? 'border-destructive' : 'border-border'
                     }`}
                     required={isFieldRequired('referred_by')}
+                    maxLength={getFieldMaxLength('referred_by') ?? undefined}
                   />
-                  {errors.referred_by && <p className="text-red-500 text-sm mt-1">{errors.referred_by}</p>}
+                  {errors.referred_by && <p className="text-destructive text-sm mt-1">{errors.referred_by}</p>}
                 </div>
+                )}
 
                 {/* Field 3: Amount Paid (Read-only) */}
+                {isFieldVisible('amount_paid') && (
                 <div>
                   <label htmlFor="amount_paid" className="block text-sm font-medium text-foreground mb-1">
-                    Amount Paid
+                    {resolveFieldLabel('amount_paid', 'Amount Paid')}
                   </label>
                   <input
                     type="text"
@@ -1738,11 +2322,13 @@ const MemberEditProfile: React.FC = () => {
                     className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
+                )}
 
                 {/* Field 4: Payment Date (Read-only) */}
+                {isFieldVisible('payment_date') && (
                 <div>
                   <label htmlFor="payment_date" className="block text-sm font-medium text-foreground mb-1">
-                    Payment Date
+                    {resolveFieldLabel('payment_date', 'Payment Date')}
                   </label>
                   <input
                     type="text"
@@ -1754,11 +2340,13 @@ const MemberEditProfile: React.FC = () => {
                     className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
+                )}
 
                 {/* Field 5: Payment Mode (Read-only) */}
+                {isFieldVisible('payment_mode') && (
                 <div>
                   <label htmlFor="payment_mode" className="block text-sm font-medium text-foreground mb-1">
-                    Payment Mode
+                    {resolveFieldLabel('payment_mode', 'Payment Mode')}
                   </label>
                   <input
                     type="text"
@@ -1770,11 +2358,13 @@ const MemberEditProfile: React.FC = () => {
                     className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
+                )}
 
                 {/* Field 6: Transaction ID / Reference (Read-only) */}
+                {isFieldVisible('transaction_id') && (
                 <div>
                   <label htmlFor="transaction_id" className="block text-sm font-medium text-foreground mb-1">
-                    Transaction ID / Reference
+                    {resolveFieldLabel('transaction_id', 'Transaction ID / Reference')}
                   </label>
                   <input
                     type="text"
@@ -1786,11 +2376,13 @@ const MemberEditProfile: React.FC = () => {
                     className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
+                )}
 
                 {/* Field 7: Bank Reference (Read-only) */}
+                {isFieldVisible('bank_reference') && (
                 <div>
                   <label htmlFor="bank_reference" className="block text-sm font-medium text-foreground mb-1">
-                    Bank Reference
+                    {resolveFieldLabel('bank_reference', 'Bank Reference')}
                   </label>
                   <input
                     type="text"
@@ -1802,6 +2394,45 @@ const MemberEditProfile: React.FC = () => {
                     className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
                   />
                 </div>
+                )}
+
+                {isFieldVisible('payment_proof_url') && (
+                  <div>
+                    <label htmlFor="payment_proof_upload" className="block text-sm font-medium text-foreground mb-1">
+                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')} {isFieldRequired('payment_proof_url') && <span className="text-destructive">*</span>}
+                    </label>
+                    <input
+                      id="payment_proof_upload"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(event) => handleDocumentFileChange('paymentProof', event.target.files?.[0] || null)}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="payment_proof_upload"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.payment_proof_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {(formData.payment_proof_url || documentFiles.paymentProof) ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {documentFiles.paymentProof && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.paymentProof.name}</p>
+                    )}
+                    {!documentFiles.paymentProof && formData.payment_proof_url && (
+                      <a
+                        href={formData.payment_proof_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline mt-1 inline-block"
+                      >
+                        View current payment proof
+                      </a>
+                    )}
+                    {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1812,9 +2443,10 @@ const MemberEditProfile: React.FC = () => {
                 Alternate Contact Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isFieldVisible('alternate_contact_name') && (
                 <div>
                   <label htmlFor="alternate_contact_name" className="block text-sm font-medium text-foreground mb-1">
-                    Contact Name {isFieldRequired('alternate_contact_name') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('alternate_contact_name', 'Contact Name')} {isFieldRequired('alternate_contact_name') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1823,13 +2455,16 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.alternate_contact_name}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
-                    placeholder="Enter alternate contact name"
+                    placeholder={resolveFieldPlaceholder('alternate_contact_name', 'Enter alternate contact name')}
+                    maxLength={getFieldMaxLength('alternate_contact_name') ?? undefined}
                   />
                 </div>
+                )}
 
+                {isFieldVisible('alternate_mobile') && (
                 <div>
                   <label htmlFor="alternate_mobile" className="block text-sm font-medium text-foreground mb-1">
-                    Mobile Number {isFieldRequired('alternate_mobile') && <span className="text-red-500">*</span>}
+                    {resolveFieldLabel('alternate_mobile', 'Mobile Number')} {isFieldRequired('alternate_mobile') && <span className="text-destructive">*</span>}
                   </label>
                   <input
                     type="text"
@@ -1838,29 +2473,31 @@ const MemberEditProfile: React.FC = () => {
                     value={formData.alternate_mobile}
                     onChange={handleMobileChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.alternate_mobile ? 'border-red-500' : 'border-border'
+                      errors.alternate_mobile ? 'border-destructive' : 'border-border'
                     }`}
-                    placeholder="10 digit mobile number"
+                    placeholder={resolveFieldPlaceholder('alternate_mobile', '10 digit mobile number')}
+                    maxLength={getFieldMaxLength('alternate_mobile') ?? undefined}
                   />
-                  {errors.alternate_mobile && <p className="text-red-500 text-sm mt-1">{errors.alternate_mobile}</p>}
+                  {errors.alternate_mobile && <p className="text-destructive text-sm mt-1">{errors.alternate_mobile}</p>}
                 </div>
+                )}
               </div>
             </div>
 
             {/* Form Actions */}
             <div className="flex items-center justify-end gap-4 pt-6 border-t border-border">
               <Link
-                to="/dashboard/profile"
+                to={isPreviewMode ? "/admin/form-studio/member_edit" : "/dashboard/profile"}
                 className="px-6 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                Cancel
+                {isPreviewMode ? 'Back to Studio' : 'Cancel'}
               </Link>
               <button
                 ref={submitButtonRef}
                 type="submit"
-                disabled={isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
+                disabled={isPreviewMode || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
+                  isPreviewMode || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
@@ -1880,11 +2517,11 @@ const MemberEditProfile: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void handleVerify()}
-                disabled={isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
+                disabled={isPreviewMode || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
+                  isPreviewMode || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
                 }`}
               >
                 {isVerifying ? (

@@ -154,7 +154,7 @@ const AdminDeletedMembers: React.FC = () => {
       fallback={
         <div className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
-            <Lock className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <Lock className="w-16 h-16 text-destructive/70 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Restricted</h2>
             <p className="text-muted-foreground">Only users with restore permissions can access the deleted members archive.</p>
           </div>
@@ -227,7 +227,7 @@ const AdminDeletedMembers: React.FC = () => {
                       </div>
 
                       <div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mb-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive mb-2">
                           Deleted
                         </span>
                         <p className="text-xs text-muted-foreground flex items-center">
@@ -244,9 +244,9 @@ const AdminDeletedMembers: React.FC = () => {
                     </div>
 
                     {member.deletion_reason && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-xs font-medium text-red-800 mb-1">Deletion Reason:</p>
-                        <p className="text-sm text-red-700">{member.deletion_reason}</p>
+                      <div className="p-3 bg-destructive/5 border border-destructive/30 rounded-lg">
+                        <p className="text-xs font-medium text-destructive mb-1">Deletion Reason:</p>
+                        <p className="text-sm text-destructive">{member.deletion_reason}</p>
                       </div>
                     )}
                   </div>
@@ -260,7 +260,7 @@ const AdminDeletedMembers: React.FC = () => {
                           memberName: member.full_name
                         })
                       }
-                      className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       <RotateCcw className="w-4 h-4 mr-2" />
                       Restore Member
@@ -274,10 +274,10 @@ const AdminDeletedMembers: React.FC = () => {
       </div>
 
       {restoreDialog.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-green-500 mr-3" />
+              <AlertTriangle className="w-6 h-6 text-primary mr-3" />
               <h3 className="text-section font-semibold text-foreground">
                 Confirm Restoration
               </h3>
@@ -299,7 +299,7 @@ const AdminDeletedMembers: React.FC = () => {
               </button>
               <button
                 onClick={handleRestore}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Restore Member
@@ -314,3 +314,6 @@ const AdminDeletedMembers: React.FC = () => {
 };
 
 export default AdminDeletedMembers;
+
+
+

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  ArrowLeft,
   Eye,
   Save,
   AlertCircle,
@@ -95,6 +97,16 @@ const AdminDirectoryVisibility: React.FC = () => {
     >
     <div className="p-6">
       <div>
+        <div className="mb-4">
+          <Link
+            to="/admin/settings"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Settings Hub
+          </Link>
+        </div>
+
         <PageHeader
           title="Directory Field Visibility Settings"
           subtitle="Control which member information is visible to public visitors and logged-in members"
@@ -147,16 +159,16 @@ const AdminDirectoryVisibility: React.FC = () => {
                 <table className="w-full">
                   <thead className="bg-muted/50 border-b border-border">
                     <tr>
-                      <th className="px-6 py-4 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                         Field Name
                       </th>
-                      <th className="px-6 py-4 text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
                         <div className="flex items-center justify-center">
                           <Eye className="w-4 h-4 mr-2" />
                           Show to Public Visitors
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
                         <div className="flex items-center justify-center">
                           <Eye className="w-4 h-4 mr-2" />
                           Show to Logged-in Members
@@ -167,41 +179,47 @@ const AdminDirectoryVisibility: React.FC = () => {
                   <tbody className="divide-y divide-border">
                     {fieldSettings.map((field) => (
                       <tr key={field.field_name} className="hover:bg-muted/30">
-                        <td className="px-6 py-4">
+                        <td className="">
                           <div>
                             <p className="font-medium text-foreground">{field.field_label}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">{field.field_name}</p>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="text-center">
                           <button
                             onClick={() => canConfigureSettings && handleToggle(field.field_name, 'public')}
                             disabled={!canConfigureSettings}
-                            className={`inline-flex items-center justify-center w-12 h-6 rounded-full transition-colors ${
+                            className={`inline-flex items-center justify-center w-12 h-6 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                               field.show_to_public
-                                ? 'bg-primary hover:bg-primary/90'
-                                : 'bg-muted hover:bg-muted/80'
-                            } ${!canConfigureSettings ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                ? 'bg-primary border-primary hover:bg-primary/90'
+                                : 'bg-muted/90 border-input hover:bg-muted'
+                            } ${!canConfigureSettings ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            role="switch"
+                            aria-checked={field.show_to_public}
+                            aria-label={`Toggle public visibility for ${field.field_label}`}
                           >
                             <span
-                              className={`block w-4 h-4 bg-background rounded-full transition-transform ${
+                              className={`block w-4 h-4 bg-background border border-border/60 rounded-full shadow-sm transition-transform ${
                                 field.show_to_public ? 'translate-x-3' : '-translate-x-3'
                               }`}
                             />
                           </button>
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="text-center">
                           <button
                             onClick={() => canConfigureSettings && handleToggle(field.field_name, 'members')}
                             disabled={!canConfigureSettings}
-                            className={`inline-flex items-center justify-center w-12 h-6 rounded-full transition-colors ${
+                            className={`inline-flex items-center justify-center w-12 h-6 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                               field.show_to_members
-                                ? 'bg-primary hover:bg-primary/90'
-                                : 'bg-muted hover:bg-muted/80'
-                            } ${!canConfigureSettings ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                ? 'bg-primary border-primary hover:bg-primary/90'
+                                : 'bg-muted/90 border-input hover:bg-muted'
+                            } ${!canConfigureSettings ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            role="switch"
+                            aria-checked={field.show_to_members}
+                            aria-label={`Toggle member visibility for ${field.field_label}`}
                           >
                             <span
-                              className={`block w-4 h-4 bg-background rounded-full transition-transform ${
+                              className={`block w-4 h-4 bg-background border border-border/60 rounded-full shadow-sm transition-transform ${
                                 field.show_to_members ? 'translate-x-3' : '-translate-x-3'
                               }`}
                             />

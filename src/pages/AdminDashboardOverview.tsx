@@ -81,14 +81,14 @@ const AdminDashboardOverview: React.FC = () => {
           title="Pending Registrations"
           value={metrics?.pendingRegistrations ?? '--'}
           icon={Clock}
-          iconColor="text-amber-600"
-          iconBg="bg-amber-50"
+          iconColor="text-primary"
+          iconBg="bg-muted/50"
           isLoading={isLoading}
           badge={
             metrics?.pendingRegistrations && metrics.pendingRegistrations > 0
               ? {
                   text: `${metrics.pendingRegistrations} new`,
-                  color: 'bg-amber-100 text-amber-800'
+                  color: 'bg-muted text-foreground'
                 }
               : undefined
           }
@@ -100,8 +100,8 @@ const AdminDashboardOverview: React.FC = () => {
           title="Pending Cities"
           value={metrics?.pendingCities ?? '--'}
           icon={MapPin}
-          iconColor="text-emerald-600"
-          iconBg="bg-emerald-50"
+          iconColor="text-primary"
+          iconBg="bg-primary/5"
           isLoading={isLoading}
           onClick={() => navigate('/admin/pending-cities')}
           delay={200}
@@ -111,8 +111,8 @@ const AdminDashboardOverview: React.FC = () => {
           title="Active Admin Users"
           value={metrics?.activeAdminUsers ?? '--'}
           icon={Shield}
-          iconColor="text-violet-600"
-          iconBg="bg-violet-50"
+          iconColor="text-primary"
+          iconBg="bg-primary/5"
           isLoading={isLoading}
           onClick={() => navigate('/admin/user-management')}
           delay={300}
@@ -139,3 +139,5 @@ const AdminDashboardOverview: React.FC = () => {
 };
 
 export default AdminDashboardOverview;
+
+

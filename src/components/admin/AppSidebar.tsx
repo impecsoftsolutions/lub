@@ -9,7 +9,8 @@ import {
   Settings,
   Shield,
   BarChart3,
-  LogOut
+  LogOut,
+  PanelLeftClose
 } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,7 +55,7 @@ interface NavSection {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
-  const { setOpenMobile, isMobile } = useSidebar();
+  const { setOpenMobile, isMobile, toggleSidebar } = useSidebar();
   const isMobileBreakpoint = useIsMobile();
   const { pendingRegistrationsCount, pendingCitiesCount } = useAdmin();
   const { profile: orgProfile } = useOrganisationProfile();
@@ -110,9 +111,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       label: "Settings",
       icon: Settings,
       children: [
-        { label: "Form Configuration", path: "/admin/settings/forms/join-lub" },
+        { label: "Settings Hub", path: "/admin/settings" },
+        { label: "Form Configuration", path: "/admin/settings/forms" },
         { label: "Validation Settings", path: "/admin/settings/validation" },
-        { label: "Appearance", path: "/admin/settings/appearance" }
+        { label: "Theme", path: "/admin/settings/appearance" },
+        { label: "AI Settings", path: "/admin/settings/ai" }
       ]
     },
     {
@@ -146,8 +149,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              className="hover:bg-sidebar-accent"
-              tooltip={orgProfile?.organization_name ?? "Admin Portal"}>
+              onClick={toggleSidebar}
+              tooltip="Toggle navigation"
+              className="hover:bg-sidebar-accent group/logo-btn cursor-pointer">
               {orgProfile?.organization_logo_url ? (
                 <img
                   src={orgProfile.organization_logo_url}
@@ -161,9 +165,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </span>
                 </div>
               )}
-              <span className="font-semibold truncate">
+              <span className="font-semibold truncate flex-1">
                 {orgProfile?.organization_name ?? "Admin Portal"}
               </span>
+              <PanelLeftClose className="ml-auto size-4 shrink-0 opacity-0 group-hover/logo-btn:opacity-50 transition-opacity" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

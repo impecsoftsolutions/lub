@@ -278,7 +278,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Join LUB Form - Field Configuration</h1>
+              <h1 className="text-xl font-semibold text-foreground">Member Registration Form - Field Configuration</h1>
               <p className="text-muted-foreground mt-2">Configure which fields appear in the member registration form</p>
             </div>
 
@@ -297,16 +297,16 @@ const AdminFormFieldConfiguration: React.FC = () => {
         </div>
 
         {hasChanges && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+          <div className="mb-6 p-4 bg-muted/50 border border-border rounded-lg flex items-start">
+            <AlertCircle className="w-5 h-5 text-muted-foreground mr-3 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-yellow-800 text-sm font-medium">You have unsaved changes</p>
-              <p className="text-yellow-700 text-sm mt-1">Click "Save Changes" to apply your configuration updates</p>
+              <p className="text-foreground text-sm font-medium">You have unsaved changes</p>
+              <p className="text-muted-foreground text-sm mt-1">Click "Save Changes" to apply your configuration updates</p>
             </div>
           </div>
         )}
 
-        <div className="bg-card rounded-lg shadow-md mb-6">
+        <div className="bg-card rounded-lg shadow-sm mb-6">
           <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between">
               <div>
@@ -352,7 +352,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
             const isExpanded = expandedSections[sectionName];
 
             return (
-              <div key={sectionName} className="bg-card rounded-lg shadow-md overflow-hidden">
+              <div key={sectionName} className="bg-card rounded-lg shadow-sm overflow-hidden">
                 <button
                   onClick={() => toggleSection(sectionName)}
                   className="w-full px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors duration-200"
@@ -374,22 +374,23 @@ const AdminFormFieldConfiguration: React.FC = () => {
 
                 {isExpanded && (
                   <div className="border-t border-border">
+                    <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Field
                           </th>
-                          <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Database Column
                           </th>
-                          <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Validation Rule
                           </th>
-                          <th className="px-6 py-3 text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Visible
                           </th>
-                          <th className="px-6 py-3 text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
+                          <th className="text-center text-label font-medium text-muted-foreground uppercase tracking-wider">
                             Required
                           </th>
                         </tr>
@@ -397,15 +398,15 @@ const AdminFormFieldConfiguration: React.FC = () => {
                       <tbody className="divide-y divide-border">
                         {fields.map((field) => (
                           <tr key={field.field_name} className="hover:bg-muted/30">
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="whitespace-nowrap">
                               <div className="text-sm font-medium text-foreground">{field.field_label}</div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="whitespace-nowrap">
                               <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                                 {field.field_name}
                               </code>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="">
                               <select
                                 value={field.validation_rule_id || ''}
                                 onChange={(e) => handleValidationRuleChange(
@@ -425,18 +426,18 @@ const AdminFormFieldConfiguration: React.FC = () => {
                               </select>
                               {field.validation_rule && (
                                 <div className="flex items-start gap-1 mt-1">
-                                  <Shield className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                                  <Shield className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
                                   <p className="text-xs text-muted-foreground">{field.validation_rule.description}</p>
                                 </div>
                               )}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="whitespace-nowrap text-center">
                               {canManageFormConfig ? (
                                 <button
                                   onClick={() => handleVisibilityToggle(field.field_name, sectionName)}
                                   className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors duration-200 ${
                                     field.is_visible
-                                      ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                      ? 'bg-primary/10 text-primary hover:bg-primary/20'
                                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                   }`}
                                 >
@@ -455,7 +456,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                               ) : (
                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                                   field.is_visible
-                                    ? 'bg-green-100 text-green-800'
+                                    ? 'bg-primary/10 text-primary'
                                     : 'bg-muted text-muted-foreground'
                                 }`}>
                                   {field.is_visible ? (
@@ -472,7 +473,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                 </span>
                               )}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="whitespace-nowrap text-center">
                               {canManageFormConfig ? (
                                 <button
                                   onClick={() => handleRequiredToggle(field.field_name, sectionName)}
@@ -481,7 +482,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                     !field.is_visible
                                       ? 'bg-muted text-muted-foreground cursor-not-allowed'
                                       : field.is_required
-                                      ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                      ? 'bg-destructive/10 text-destructive hover:bg-destructive/20'
                                       : 'bg-primary/10 text-primary hover:bg-primary/20'
                                   }`}
                                 >
@@ -502,7 +503,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                                   !field.is_visible
                                     ? 'bg-muted text-muted-foreground'
                                     : field.is_required
-                                    ? 'bg-red-100 text-red-800'
+                                    ? 'bg-destructive/10 text-destructive'
                                     : 'bg-primary/10 text-primary'
                                 }`}>
                                   {field.is_required ? (
@@ -523,6 +524,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -536,3 +538,5 @@ const AdminFormFieldConfiguration: React.FC = () => {
 };
 
 export default AdminFormFieldConfiguration;
+
+

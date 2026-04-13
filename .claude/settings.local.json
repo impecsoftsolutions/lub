@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm run:*)",
       "mcp__Claude_Preview__preview_start",
-      "WebFetch(domain:ui.shadcn.com)"
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(curl -s 'https://qskziirjtzomrtckpzas.supabase.co/rest/v1/users?select=email,account_type,is_frozen&order=created_at.desc&limit=500' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFza3ppaXJqdHpvbXJ0Y2twemFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NjU4NjksImV4cCI6MjA3NDE0MTg2OX0.K888tIN7BzOraEQVXV6eTw5jQY2vyQSJZsGOrfUL89k' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFza3ppaXJqdHpvbXJ0Y2twemFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NjU4NjksImV4cCI6MjA3NDE0MTg2OX0.K888tIN7BzOraEQVXV6eTw5jQY2vyQSJZsGOrfUL89k')",
+      "Bash(node -e ':*)",
+      "Bash(node)"
     ]
   }
 }

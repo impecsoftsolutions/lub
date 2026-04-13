@@ -109,6 +109,90 @@ export const memberAuthService = {
     }
   },
 
+  async signUpMemberV2(
+    email: string,
+    mobile_number: string,
+    state: string | null,
+    dynamicPayload: Record<string, unknown>
+  ): Promise<SignUpResult> {
+    try {
+      const normalizedEmail = normalizeEmail(email);
+      const normalizedMobile = normalizeMobileNumber(mobile_number);
+      const normalizedState = state ? state.trim() : '';
+      console.log('[memberAuthService] Sign up V2 attempt for:', normalizedEmail);
+
+      if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        return {
+          success: false,
+          error: 'Please enter a valid email address.',
+          data: null
+        };
+      }
+
+      if (!/^[1-9][0-9]{9}$/.test(normalizedMobile)) {
+        return {
+          success: false,
+          error: 'Mobile number must be exactly 10 digits.',
+          data: null
+        };
+      }
+
+      if (dynamicPayload && typeof dynamicPayload !== 'object') {
+        return {
+          success: false,
+          error: 'Invalid form payload.',
+          data: null
+        };
+      }
+
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+      const { data, error: rpcError } = await supabase.rpc('create_portal_user_with_session_v2', {
+        p_email: normalizedEmail,
+        p_mobile_number: normalizedMobile,
+        p_state: normalizedState || null,
+        p_dynamic_payload: dynamicPayload || {},
+        p_ip_address: null,
+        p_user_agent: userAgent
+      });
+
+      if (rpcError) {
+        console.error('[memberAuthService] User creation V2 RPC error:', rpcError);
+        return {
+          success: false,
+          error: 'Failed to create account. Please try again.',
+          data: null
+        };
+      }
+
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!result?.success || !result?.user || !result?.sessionToken || !result?.expiresAt) {
+        return {
+          success: false,
+          error: result?.error || 'Failed to create account. Please try again.',
+          data: null
+        };
+      }
+
+      console.log('[memberAuthService] User created successfully via V2:', result.user.id);
+      return {
+        success: true,
+        data: result.user as User,
+        user: result.user as User,
+        sessionToken: result.sessionToken as string,
+        expiresAt: result.expiresAt as string,
+        error: null
+      };
+    } catch (error) {
+      console.error('[memberAuthService] Sign up V2 error:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+        data: null
+      };
+    }
+  },
+
   async signInMember(email: string, password: string) {
     console.warn('[memberAuthService] signInMember is deprecated', email, password ? 'with password input' : '');
     return {

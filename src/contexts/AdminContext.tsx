@@ -24,18 +24,32 @@ export const AdminContextProvider: React.FC<AdminContextProviderProps> = ({
 
   const loadCounts = async () => {
     try {
-      const { count: registrationsCount } = await supabase
-        .from('member_registrations')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
       const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        setPendingRegistrationsCount(0);
+        setPendingCitiesCount(0);
+        return;
+      }
 
-      const pendingCitiesResult = sessionToken
-        ? await adminCitiesService.listPendingCustomCities(sessionToken)
-        : { success: false, items: [] };
+      const { data: pendingRegistrationsData, error: pendingRegistrationsError } = await supabase.rpc(
+        'get_admin_member_registrations_with_session',
+        {
+          p_session_token: sessionToken,
+          p_status_filter: 'pending',
+          p_search_query: null,
+          p_state_filter: null,
+          p_limit: 5000,
+          p_offset: 0
+        }
+      );
 
-      setPendingRegistrationsCount(registrationsCount || 0);
+      if (pendingRegistrationsError) {
+        throw pendingRegistrationsError;
+      }
+
+      const pendingCitiesResult = await adminCitiesService.listPendingCustomCities(sessionToken);
+
+      setPendingRegistrationsCount(Array.isArray(pendingRegistrationsData) ? pendingRegistrationsData.length : 0);
       setPendingCitiesCount(pendingCitiesResult.success ? (pendingCitiesResult.items?.length || 0) : 0);
     } catch (error) {
       console.error('Error loading counts:', error);

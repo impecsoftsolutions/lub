@@ -406,7 +406,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const personalSection: SectionData = {
     title: 'Personal Information',
-    icon: <User className="w-5 h-5 text-blue-600" />,
+    icon: <User className="w-5 h-5 text-primary" />,
     fields: getFilledFields([
       { label: 'Full Name', value: applicationData.full_name },
       { label: 'Email', value: applicationData.email },
@@ -419,7 +419,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const companySection: SectionData = {
     title: 'Company Information',
-    icon: <Building2 className="w-5 h-5 text-blue-600" />,
+    icon: <Building2 className="w-5 h-5 text-primary" />,
     fields: getFilledFields([
       { label: 'Company Name', value: applicationData.company_name },
       { label: 'Designation', value: applicationData.company_designations?.designation_name },
@@ -432,7 +432,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const locationSection: SectionData = {
     title: 'Location Details',
-    icon: <MapPin className="w-5 h-5 text-blue-600" />,
+    icon: <MapPin className="w-5 h-5 text-primary" />,
     fields: getFilledFields([
       { label: 'State', value: applicationData.state },
       { label: 'District', value: applicationData.district },
@@ -443,7 +443,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const businessSection: SectionData = {
     title: 'Business Details',
-    icon: <Building2 className="w-5 h-5 text-blue-600" />,
+    icon: <Building2 className="w-5 h-5 text-primary" />,
     fields: getFilledFields([
       { label: 'Industry', value: applicationData.industry },
       { label: 'Activity Type', value: applicationData.activity_type },
@@ -455,7 +455,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const registrationSection: SectionData = {
     title: 'Registration Information',
-    icon: <FileText className="w-5 h-5 text-blue-600" />,
+    icon: <FileText className="w-5 h-5 text-primary" />,
     fields: getFilledFields([
       { label: 'GST Registered', value: applicationData.gst_registered },
       { label: 'GST Number', value: applicationData.gst_number },
@@ -466,7 +466,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const paymentSection: SectionData = {
     title: 'Payment Information',
-    icon: <CreditCard className="w-5 h-5 text-blue-600" />,
+    icon: <CreditCard className="w-5 h-5 text-primary" />,
     fields: [
       ...getFilledFields([
         { label: 'Amount Paid', value: applicationData.amount_paid },
@@ -482,7 +482,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const additionalSection: SectionData = {
     title: 'Additional Information',
-    icon: <User className="w-5 h-5 text-blue-600" />,
+    icon: <User className="w-5 h-5 text-primary" />,
     fields: getFilledFields([
       { label: 'Alternate Contact Name', value: applicationData.alternate_contact_name },
       { label: 'Alternate Mobile', value: applicationData.alternate_mobile },
@@ -589,7 +589,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
                     href={applicationData.udyam_certificate_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     UDYAM Certificate
@@ -601,7 +601,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
                     href={applicationData.payment_proof_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Payment Proof

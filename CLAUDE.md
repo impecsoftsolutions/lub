@@ -18,6 +18,9 @@ Do not skip step 1. It is the fastest way to know where the project currently st
 - Check `supabase/migrations/` for the relevant domain's SQL before writing frontend code
 - Inspect the relevant page/component/service before proposing changes
 
+### UI component conventions
+- **Action menus:** All admin pages with row-level actions MUST use `<DropdownMenu>` from `@/components/ui/dropdown-menu`. Never build a custom inline dropdown with manual positioning (`getBoundingClientRect`, `position: fixed`, `useRef` for click-outside). See `src/pages/AdminRegistrations.tsx` for the established pattern with icons and permission checks.
+
 ### Domain ownership per session
 - One agent owns one implementation slice end-to-end at a time
 - Do not concurrently edit the same domain/files as another agent unless explicitly coordinated

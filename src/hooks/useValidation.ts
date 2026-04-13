@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { validationService, ValidationRule, ValidationResult } from '../lib/validation';
 
-export const useValidation = () => {
+interface UseValidationOptions {
+  formKey?: string;
+}
+
+export const useValidation = (options?: UseValidationOptions) => {
+  const formKey = options?.formKey || 'join_lub';
   const [rules, setRules] = useState<ValidationRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +36,7 @@ export const useValidation = () => {
     async (fieldName: string, value: string): Promise<ValidationResult> => {
       try {
         console.log('[useValidation] validateField called:', { fieldName, valueLength: value.length });
-        const result = await validationService.validateByFieldName(fieldName, value);
+        const result = await validationService.validateByFieldName(fieldName, value, formKey);
         console.log('[useValidation] Validation result for', fieldName, ':', result.isValid ? 'VALID' : 'INVALID', result.message || '(no error)');
         return result;
       } catch (err) {
@@ -42,7 +47,7 @@ export const useValidation = () => {
         };
       }
     },
-    []
+    [formKey]
   );
 
   const getErrorMessage = useCallback(

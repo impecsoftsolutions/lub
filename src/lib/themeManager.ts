@@ -432,6 +432,7 @@ export function applyFontFamily(id: FontOption): void {
 
 export type TableBorderOption = 'none' | 'thin' | 'medium' | 'thick';
 export type TableShadowOption = 'none' | 'subtle' | 'soft' | 'strong';
+export type CardShadowOption  = 'none' | 'subtle' | 'soft' | 'strong';
 
 export const TABLE_BORDER_OPTIONS: { id: TableBorderOption; label: string; value: string; description: string }[] = [
   { id: 'none',   label: 'None',   value: '0',   description: 'No row dividers' },
@@ -493,8 +494,20 @@ export function applyTableScrollbarSize(px: number): void {
   document.documentElement.style.setProperty('--table-scrollbar-size', `${px}px`);
 }
 
-const TABLE_BORDER_KEY = 'lub_table_border';
-const TABLE_SHADOW_KEY = 'lub_table_shadow';
+export const CARD_SHADOW_OPTIONS: { id: CardShadowOption; label: string; value: string; description: string }[] = [
+  { id: 'none',   label: 'None',   value: 'none',
+    description: 'No shadow' },
+  { id: 'subtle', label: 'Subtle', value: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+    description: 'Matches default' },
+  { id: 'soft',   label: 'Soft',   value: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+    description: 'Medium depth' },
+  { id: 'strong', label: 'Strong', value: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    description: 'High depth' },
+];
+
+const TABLE_BORDER_KEY  = 'lub_table_border';
+const TABLE_SHADOW_KEY  = 'lub_table_shadow';
+const CARD_SHADOW_KEY   = 'lub_card_shadow';
 
 export function getTableBorder(): TableBorderOption {
   return (safeGet(TABLE_BORDER_KEY) as TableBorderOption) ?? 'thin';
@@ -522,6 +535,19 @@ export function applyTableShadow(id: TableShadowOption): void {
   document.documentElement.style.setProperty('--table-shadow', opt.value);
 }
 
+export function getCardShadow(): CardShadowOption {
+  return (safeGet(CARD_SHADOW_KEY) as CardShadowOption) ?? 'subtle';
+}
+export function setCardShadow(id: CardShadowOption): void {
+  safeSet(CARD_SHADOW_KEY, id);
+  applyCardShadow(id);
+}
+export function applyCardShadow(id: CardShadowOption): void {
+  const opt = CARD_SHADOW_OPTIONS.find((o) => o.id === id);
+  if (!opt) return;
+  document.documentElement.style.setProperty('--card-shadow', opt.value);
+}
+
 // ─── Startup restore ───────────────────────────────────────────────────────
 /** Called once on app startup — restores all persisted appearance settings. */
 export function applyStoredTheme(): void {
@@ -534,6 +560,7 @@ export function applyStoredTheme(): void {
   applyTableScrollbarSize(getTableScrollbarSize());
   applyTableBorder(getTableBorder());
   applyTableShadow(getTableShadow());
+  applyCardShadow(getCardShadow());
   const saved = getCustomColor();
   if (saved) applyCustomColor(saved);
 }

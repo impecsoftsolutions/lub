@@ -91,8 +91,8 @@ export function AdminLayout() {
       <SidebarInset>
         {/* Top header bar */}
         <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="h-4" />
+          <SidebarTrigger className="-ml-1 md:hidden" />
+          <Separator orientation="vertical" className="h-4 md:hidden" />
           <div className="flex-1" />
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">{userEmail}</span>

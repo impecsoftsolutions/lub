@@ -39,19 +39,19 @@ const AuditHistoryModal: React.FC<AuditHistoryModalProps> = ({
   const getActionIcon = (actionType: string) => {
     switch (actionType) {
       case 'update':
-        return <FileEdit className="w-5 h-5 text-blue-600" />;
+        return <FileEdit className="w-5 h-5 text-primary" />;
       case 'status_change':
-        return <Activity className="w-5 h-5 text-green-600" />;
+        return <Activity className="w-5 h-5 text-primary" />;
       case 'deactivate':
-        return <Activity className="w-5 h-5 text-orange-600" />;
+        return <Activity className="w-5 h-5 text-destructive" />;
       case 'activate':
-        return <Activity className="w-5 h-5 text-green-600" />;
+        return <Activity className="w-5 h-5 text-primary" />;
       case 'delete':
-        return <Activity className="w-5 h-5 text-red-600" />;
+        return <Activity className="w-5 h-5 text-destructive" />;
       case 'restore':
-        return <Activity className="w-5 h-5 text-purple-600" />;
+        return <Activity className="w-5 h-5 text-primary" />;
       case 'create':
-        return <Activity className="w-5 h-5 text-blue-600" />;
+        return <Activity className="w-5 h-5 text-primary" />;
       default:
         return <Activity className="w-5 h-5 text-muted-foreground" />;
     }
@@ -60,19 +60,19 @@ const AuditHistoryModal: React.FC<AuditHistoryModalProps> = ({
   const getActionColor = (actionType: string) => {
     switch (actionType) {
       case 'update':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-primary/10 text-primary';
       case 'status_change':
-        return 'bg-green-100 text-green-800';
+        return 'bg-primary/10 text-primary';
       case 'deactivate':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-destructive/10 text-destructive';
       case 'activate':
-        return 'bg-green-100 text-green-800';
+        return 'bg-primary/10 text-primary';
       case 'delete':
-        return 'bg-red-100 text-red-800';
+        return 'bg-destructive/10 text-destructive';
       case 'restore':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-primary/10 text-primary';
       case 'create':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-primary/10 text-primary';
       default:
         return 'bg-muted text-foreground';
     }
@@ -129,7 +129,7 @@ const AuditHistoryModal: React.FC<AuditHistoryModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-12">

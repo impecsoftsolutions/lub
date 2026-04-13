@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, Filter, Mail, Phone, Shield, Calendar, Lock, ChevronUp, ChevronDown } from 'lucide-react';
+import { Users, Search, Filter, Mail, Phone, Shield, Lock, ChevronUp, ChevronDown, MoreHorizontal, Edit3, Ban, Trash2, ShieldCheck } from 'lucide-react';
 import { PermissionGate } from '../../components/permissions/PermissionGate';
 import { supabase } from '../../lib/supabase';
 import Toast from '../../components/Toast';
@@ -10,6 +10,9 @@ import EditUserModal from '../../components/admin/modals/EditUserModal';
 import DeleteUserModal from '../../components/admin/modals/DeleteUserModal';
 import BlockUserModal from '../../components/admin/modals/BlockUserModal';
 import AssignRoleModal from '../../components/admin/modals/AssignRoleModal';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 
 interface UserRole {
   id: string;
@@ -200,14 +203,6 @@ const AdminUsers: React.FC = () => {
 
   const hideToast = () => {
     setToast(prev => ({ ...prev, isVisible: false }));
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
   };
 
   const handleSort = (field: SortField) => {
@@ -401,7 +396,7 @@ const AdminUsers: React.FC = () => {
                   <thead className="bg-muted/50">
                     <tr>
                       <th
-                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[30%]"
+                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[35%]"
                         onClick={() => handleSort('email')}
                       >
                         <div className="flex items-center justify-between">
@@ -413,11 +408,11 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[14%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[16%]">
                         Mobile Number
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[16%]"
+                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[20%]"
                         onClick={() => handleSort('account_type')}
                       >
                         <div className="flex items-center justify-between">
@@ -429,13 +424,10 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[12%]">
-                        Created Date
-                      </th>
-                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[16%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[20%]">
                         Role
                       </th>
-                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[12%]">
+                      <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[9%]">
                         Actions
                       </th>
                     </tr>
@@ -443,21 +435,19 @@ const AdminUsers: React.FC = () => {
                   <tbody className="bg-card divide-y divide-border">
                     {filteredUsers.map((user) => (
                       <tr key={user.id} className={`hover:bg-muted/50 transition-colors ${user.is_frozen ? 'opacity-50 bg-muted/50' : ''}`}>
-                        <td className="px-4 py-4 max-w-0">
-                          <div className="flex items-center min-w-0">
-                            <Mail className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
-                            <span className="text-sm text-foreground truncate" title={user.email}>{user.email}</span>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm text-foreground">{user.email}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <Phone className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
-                            <span className="text-sm text-foreground">
-                              {user.mobile_number || '-'}
-                            </span>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm text-foreground">{user.mobile_number || '-'}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex gap-2 items-center">
                             {getAccountTypeBadge(user)}
                             {user.is_frozen && (
@@ -467,89 +457,61 @@ const AdminUsers: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
-                            <span className="text-sm text-foreground">
-                              {formatDate(user.created_at)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-1">
                             {user.roles.length > 0 ? (
-                              <>
-                                {user.roles.map((role) => (
-                                  <span
-                                    key={role.id}
-                                    className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
-                                  >
-                                    {formatRoleName(role.role)}
-                                  </span>
-                                ))}
-                                {canAssignRoles && (
-                                  <button
-                                    onClick={() => handleAssignRoleClick(user)}
-                                    className="text-xs font-medium text-indigo-600 hover:text-indigo-900"
-                                    title="Assign or change role"
-                                  >
-                                    Change
-                                  </button>
-                                )}
-                              </>
+                              user.roles.map((role) => (
+                                <span
+                                  key={role.id}
+                                  className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+                                >
+                                  {formatRoleName(role.role)}
+                                </span>
+                              ))
                             ) : (
-                              <>
-                                <span className="text-sm text-muted-foreground">No role assigned</span>
-                                {canAssignRoles && (
-                                  <button
-                                    onClick={() => handleAssignRoleClick(user)}
-                                    className="text-xs font-medium text-indigo-600 hover:text-indigo-900"
-                                    title="Assign role"
-                                  >
-                                    Assign
-                                  </button>
-                                )}
-                              </>
+                              <span className="text-sm text-muted-foreground">No role</span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm">
-                          <div className="flex gap-2 items-center">
-                            {canEdit && (
-                              <button
-                                onClick={() => handleEditClick(user)}
-                                className="text-primary hover:text-primary/80"
-                                title="Edit user"
-                              >
-                                Edit
-                              </button>
-                            )}
-
-                            {canDelete && (
-                              <button
-                                onClick={() => handleDeleteClick(user)}
-                                disabled={user.account_type !== 'general_user'}
-                                className={
-                                  user.account_type !== 'general_user'
-                                    ? 'text-muted-foreground opacity-50 cursor-not-allowed'
-                                    : 'text-destructive hover:text-destructive/80'
-                                }
-                                title={user.account_type !== 'general_user' ? 'Cannot delete non-general user accounts' : 'Delete user'}
-                              >
-                                Delete
-                              </button>
-                            )}
-
-                            {canBlock && (
-                              <button
-                                onClick={() => handleBlockClick(user, user.is_frozen ? 'unblock' : 'block')}
-                                className={user.is_frozen ? 'text-primary hover:text-primary/80' : 'text-destructive hover:text-destructive/80'}
-                                title={user.is_frozen ? 'Unblock user' : 'Block user'}
-                              >
-                                {user.is_frozen ? 'Unblock' : 'Block'}
-                              </button>
-                            )}
-                          </div>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}>
+                              <span className="sr-only">Open actions menu</span>
+                              <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canEdit && (
+                                <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                                  <Edit3 className="w-4 h-4" />Edit
+                                </DropdownMenuItem>
+                              )}
+                              {canBlock && (
+                                <DropdownMenuItem onClick={() => handleBlockClick(user, user.is_frozen ? 'unblock' : 'block')}>
+                                  <Ban className="w-4 h-4" />{user.is_frozen ? 'Unblock' : 'Block'}
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    disabled={user.account_type !== 'general_user'}
+                                    onClick={() => handleDeleteClick(user)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {canAssignRoles && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleAssignRoleClick(user)}>
+                                    <ShieldCheck className="w-4 h-4" />{user.roles.length > 0 ? 'Change Role' : 'Assign Role'}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     ))}
@@ -596,3 +558,5 @@ const AdminUsers: React.FC = () => {
 };
 
 export default AdminUsers;
+
+

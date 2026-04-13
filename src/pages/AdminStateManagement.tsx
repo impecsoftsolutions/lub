@@ -204,19 +204,19 @@ const AdminStateManagement: React.FC = () => {
               <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       State Name
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Created
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Updated
                     </th>
-                    <th className="px-6 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -224,19 +224,19 @@ const AdminStateManagement: React.FC = () => {
                 <tbody className="bg-card divide-y divide-border">
                   {filteredStates.map((state) => (
                     <tr key={state.id} className="hover:bg-muted/50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <div className="flex items-center">
                           <MapPin className="w-4 h-4 text-muted-foreground mr-2" />
                           <span className="text-sm font-medium text-foreground">{state.state_name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         {canManageStates ? (
                           <button
                             onClick={() => handleToggleActive(state.id, state.is_active)}
                             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                               state.is_active
-                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                ? 'bg-primary/10 text-primary hover:bg-primary/20'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
                             }`}
                           >
@@ -255,7 +255,7 @@ const AdminStateManagement: React.FC = () => {
                         ) : (
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                             state.is_active
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-primary/10 text-primary'
                               : 'bg-muted text-muted-foreground'
                           }`}>
                             {state.is_active ? (
@@ -272,13 +272,13 @@ const AdminStateManagement: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                      <td className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(state.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                      <td className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(state.updated_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="whitespace-nowrap text-sm font-medium">
                         <Link
                           to={`/admin/locations/states/${encodeURIComponent(state.state_name)}/locations`}
                           className="inline-flex items-center px-3 py-1 text-sm font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
@@ -298,8 +298,8 @@ const AdminStateManagement: React.FC = () => {
 
       {/* Add State Modal */}
       {showAddModal && canManageStates && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section font-semibold text-foreground">Add New State</h3>
               <button
@@ -313,7 +313,7 @@ const AdminStateManagement: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  State Name <span className="text-red-500">*</span>
+                  State Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
@@ -323,7 +323,7 @@ const AdminStateManagement: React.FC = () => {
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                 />
                 {newStateName.trim().length > 0 && newStateName.trim().length < 3 && (
-                  <p className="text-red-500 text-sm mt-1">State name must be at least 3 characters long</p>
+                  <p className="text-destructive text-sm mt-1">State name must be at least 3 characters long</p>
                 )}
               </div>
 
@@ -365,3 +365,6 @@ const AdminStateManagement: React.FC = () => {
 };
 
 export default AdminStateManagement;
+
+
+

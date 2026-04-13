@@ -199,7 +199,7 @@ export default function AdminPendingCities() {
           </div>
         ) : pendingError ? (
           <div className="bg-card rounded-lg shadow-sm border border-border p-8 text-center">
-            <AlertCircle className="w-10 h-10 text-amber-600 mx-auto mb-3" />
+            <AlertCircle className="w-10 h-10 text-primary mx-auto mb-3" />
             <p className="text-foreground">{pendingError}</p>
           </div>
         ) : pendingCities.length === 0 ? (
@@ -229,7 +229,7 @@ export default function AdminPendingCities() {
                         <h3 className="text-section font-semibold text-foreground">
                           {city.other_city_name_display}
                         </h3>
-                        <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                        <span className="px-2.5 py-0.5 bg-muted text-foreground text-xs font-medium rounded-full">
                           Pending Review
                         </span>
                       </div>
@@ -254,10 +254,10 @@ export default function AdminPendingCities() {
                       </div>
 
                       {!city.district_id && (
-                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg">
                           <div className="flex items-start gap-2">
-                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                            <p className="text-sm text-amber-900">
+                            <AlertCircle className="w-5 h-5 text-primary mt-0.5" />
+                            <p className="text-sm text-foreground">
                               District not resolved. Assignment is disabled for this item.
                             </p>
                           </div>
@@ -279,7 +279,7 @@ export default function AdminPendingCities() {
                         disabled={!canAssign || !city.pending_city_id}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
                           canAssign && city.pending_city_id
-                            ? 'bg-amber-600 text-white hover:bg-amber-700'
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                             : 'bg-muted text-muted-foreground cursor-not-allowed'
                         }`}
                       >
@@ -294,8 +294,8 @@ export default function AdminPendingCities() {
           </div>
         )}
         {showAssociationsModal && selectedPending && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-sm max-w-4xl w-full">
               <div className="px-6 py-4 border-b border-border flex items-center justify-between">
                 <div>
                   <h3 className="text-section font-semibold text-foreground">Associated Records</h3>
@@ -308,7 +308,7 @@ export default function AdminPendingCities() {
                 {isLoadingAssociations ? (
                   <p className="text-muted-foreground">Loading associated records...</p>
                 ) : associationsError ? (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  <div className="p-3 bg-destructive/5 border border-destructive/30 rounded-lg text-destructive text-sm">
                     {associationsError}
                   </div>
                 ) : associations.length === 0 ? (
@@ -318,21 +318,21 @@ export default function AdminPendingCities() {
                     <table className="min-w-full divide-y divide-border">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Registration ID</th>
-                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Email</th>
-                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Mobile</th>
-                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Company</th>
-                          <th className="px-3 py-2 text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Registration ID</th>
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Email</th>
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Mobile</th>
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Company</th>
+                          <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                         </tr>
                       </thead>
                       <tbody className="bg-card divide-y divide-border">
                         {associations.map((record) => (
                           <tr key={record.registration_id}>
-                            <td className="px-3 py-2 text-xs text-foreground">{record.registration_id}</td>
-                            <td className="px-3 py-2 text-sm text-foreground">{record.email || 'N/A'}</td>
-                            <td className="px-3 py-2 text-sm text-foreground">{record.mobile_number || 'N/A'}</td>
-                            <td className="px-3 py-2 text-sm text-foreground">{record.company_name || 'N/A'}</td>
-                            <td className="px-3 py-2 text-sm text-foreground">{record.status || 'N/A'}</td>
+                            <td className="text-xs text-foreground">{record.registration_id}</td>
+                            <td className="text-sm text-foreground">{record.email || 'N/A'}</td>
+                            <td className="text-sm text-foreground">{record.mobile_number || 'N/A'}</td>
+                            <td className="text-sm text-foreground">{record.company_name || 'N/A'}</td>
+                            <td className="text-sm text-foreground">{record.status || 'N/A'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -356,8 +356,8 @@ export default function AdminPendingCities() {
           </div>
         )}
         {showAssignModal && selectedPending && canApprovePending && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg shadow-xl max-w-md w-full">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-lg shadow-sm max-w-md w-full">
               <div className="px-6 py-4 border-b border-border">
                 <h3 className="text-section font-semibold text-foreground">Assign Approved City</h3>
               </div>
@@ -420,7 +420,7 @@ export default function AdminPendingCities() {
                 <button
                   onClick={handleAssign}
                   disabled={!finalCityName.trim() || isResolving}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isResolving ? 'Resolving...' : 'Assign City'}
                 </button>
@@ -433,3 +433,6 @@ export default function AdminPendingCities() {
     </PermissionGate>
   );
 }
+
+
+

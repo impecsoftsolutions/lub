@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Directory from './pages/Directory';
@@ -10,7 +10,7 @@ import Leadership from './pages/Leadership';
 import Join from './pages/Join';
 import MembershipBenefits from './pages/MembershipBenefits';
 import SignIn from './pages/SignIn';
-import SignUp from './pages/SignUp';
+import SignUpV2 from './pages/SignUpV2';
 import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -36,6 +36,12 @@ import AdminValidationSettings from './pages/AdminValidationSettings';
 import AdminDashboardOverview from './pages/AdminDashboardOverview';
 import PaymentSettings from './pages/AdminDashboard/PaymentSettings';
 import AdminAppearanceSettings from './pages/admin/AdminAppearanceSettings';
+import AdminSettingsHub from './pages/AdminSettingsHub';
+import AdminAISettings from './pages/AdminAISettings';
+import AdminFormBuilderV2 from './pages/AdminFormBuilderV2';
+import AdminFormEditorV2 from './pages/AdminFormEditorV2';
+import AdminFieldLibrary from './pages/AdminFieldLibrary';
+import AdminFormStudio from './pages/AdminFormStudio';
 import Styleguide from './pages/Styleguide';
 import Payment from './pages/Payment';
 import MemberProfile from './pages/MemberProfile';
@@ -47,6 +53,27 @@ import { applyStoredTheme } from './lib/themeManager';
 
 // Restore persisted theme and color mode before first render
 applyStoredTheme();
+
+const LAST_NON_SIGNIN_ROUTE_KEY = 'lub:last_non_signin_route';
+
+function RouteHistoryTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname === '/signin' || location.pathname === '/admin/login') {
+      return;
+    }
+
+    const fullPath = `${location.pathname}${location.search}${location.hash}`;
+    try {
+      sessionStorage.setItem(LAST_NON_SIGNIN_ROUTE_KEY, fullPath);
+    } catch {
+      // Ignore storage errors; signin guard has fallbacks.
+    }
+  }, [location]);
+
+  return null;
+}
 
 const AdminLayoutLazy = React.lazy(() =>
   import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout }))
@@ -75,6 +102,7 @@ function App() {
     <Router>
       <PermissionProvider>
         <MemberContextProvider>
+          <RouteHistoryTracker />
           <Routes>
           {/* Public Routes - All wrapped with MemberContextProvider for global login detection */}
           <Route element={<Layout />}>
@@ -92,7 +120,7 @@ function App() {
 
             {/* Auth-Free Routes - For unauthenticated users (signin, signup, password reset) */}
             <Route path="/signin" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
+            <Route path="/signup" element={<SignUpV2 />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -122,6 +150,9 @@ function App() {
           <Route path="/admin/deleted-members" element={<Navigate to="/admin/members/deleted" replace />} />
           <Route path="/admin/forms" element={<Navigate to="/admin/settings/forms" replace />} />
 
+          {/* Form Studio — minimal chrome, opens in new tab */}
+          <Route path="/admin/form-studio/:formKey" element={<AdminFormStudio />} />
+
           <Route element={<AdminLayoutWrapper />}>
             <Route path="/admin/dashboard" element={<AdminDashboardOverview />} />
 
@@ -139,9 +170,14 @@ function App() {
             <Route path="/admin/organization/designations" element={<AdminDesignationsManagement />} />
 
             <Route path="/admin/settings/forms" element={<AdminFormsList />} />
+            <Route path="/admin/settings" element={<AdminSettingsHub />} />
             <Route path="/admin/settings/forms/join-lub" element={<AdminFormFieldConfiguration />} />
+            <Route path="/admin/settings/forms/builder" element={<AdminFormBuilderV2 />} />
+            <Route path="/admin/settings/forms/builder/:formKey" element={<AdminFormEditorV2 />} />
+            <Route path="/admin/settings/forms/library" element={<AdminFieldLibrary />} />
             <Route path="/admin/settings/validation" element={<AdminValidationSettings />} />
             <Route path="/admin/settings/appearance" element={<AdminAppearanceSettings />} />
+            <Route path="/admin/settings/ai" element={<AdminAISettings />} />
 
             <Route path="/admin/administration/users" element={<AdminUsers />} />
           </Route>

@@ -33,3 +33,4 @@ test-results/
 phase1-smoke-fixtures.json
 tests/e2e/fixtures/*.local.json
 lub-private/
+lub-private/*.env
