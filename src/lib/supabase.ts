@@ -155,6 +155,309 @@ export interface FormFieldConfiguration {
   updated_at: string;
 }
 
+export type SignupV2FieldType =
+  | 'text'
+  | 'textarea'
+  | 'select'
+  | 'checkbox'
+  | 'number'
+  | 'date'
+  | 'url'
+  | 'email'
+  | 'tel';
+
+export interface SignupFormFieldV2 {
+  id: string;
+  form_key: 'signup';
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible: boolean;
+  is_required: boolean;
+  is_locked: boolean;
+  is_system_field: boolean;
+  display_order: number;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+}
+
+export interface SigninFormFieldV2 {
+  id: string;
+  form_key: 'signin';
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible: boolean;
+  is_required: boolean;
+  is_locked: boolean;
+  is_system_field: boolean;
+  display_order: number;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+}
+
+export interface JoinFormFieldV2 {
+  id: string;
+  form_key: 'join_lub';
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible: boolean;
+  is_required: boolean;
+  is_locked: boolean;
+  is_system_field: boolean;
+  display_order: number;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+}
+
+export type FormDraftConfigurationErrorCode = 'no_session' | 'access_denied' | 'load_failed';
+export type SignupDraftConfigurationErrorCode = FormDraftConfigurationErrorCode;
+export type JoinDraftConfigurationErrorCode = FormDraftConfigurationErrorCode;
+export type MemberEditDraftConfigurationErrorCode = FormDraftConfigurationErrorCode;
+
+export interface MemberEditFormFieldV2 {
+  id: string;
+  form_key: 'member_edit';
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible: boolean;
+  is_required: boolean;
+  is_locked: boolean;
+  is_system_field: boolean;
+  display_order: number;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+}
+
+export interface SignupFormFieldV2UpsertInput {
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible: boolean;
+  is_required: boolean;
+  display_order: number;
+  validation_rule_id?: string | null;
+}
+
+export interface SignupFormFieldV2CreateInput {
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible?: boolean;
+  is_required?: boolean;
+  display_order?: number;
+  validation_rule_id?: string | null;
+}
+
+export interface FormConfigV2FormSummary {
+  id: string;
+  form_key: string;
+  form_name: string;
+  description?: string | null;
+  is_active: boolean;
+  field_count: number;
+}
+
+export interface FormBuilderV2FormSummary extends FormConfigV2FormSummary {
+  updated_at: string;
+  live_published_at?: string | null;
+  live_published_by?: string | null;
+  live_published_by_email?: string | null;
+  live_publish_origin?: FormLivePublishOrigin;
+}
+
+export type FormLivePublishOrigin = 'never_published' | 'legacy_seeded' | 'manual_publish' | 'unpublished';
+
+export interface FormLivePublishStatus {
+  form_id: string;
+  form_key: string;
+  form_name: string;
+  live_published_at?: string | null;
+  live_published_by?: string | null;
+  live_published_by_email?: string | null;
+  live_publish_origin: FormLivePublishOrigin;
+}
+
+export interface FormConfigV2FormCreateInput {
+  form_key: string;
+  form_name: string;
+  description?: string | null;
+}
+
+export interface FormConfigV2Field {
+  id: string;
+  form_key: string;
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible: boolean;
+  is_required: boolean;
+  is_locked: boolean;
+  is_system_field: boolean;
+  display_order: number;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+}
+
+export interface FormConfigV2FieldCreateInput {
+  form_key: string;
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  default_value?: string | null;
+  is_visible?: boolean;
+  is_required?: boolean;
+  display_order?: number;
+  validation_rule_id?: string | null;
+}
+
+export interface FormBuilderSchemaFieldV2 extends FormConfigV2Field {
+  form_name: string;
+  description?: string | null;
+  is_active: boolean;
+  library_is_archived: boolean;
+}
+
+export interface FormBuilderSchemaV2 {
+  form: {
+    id: string;
+    form_key: string;
+    form_name: string;
+    description?: string | null;
+    is_active: boolean;
+    live_published_at?: string | null;
+    live_published_by?: string | null;
+    live_published_by_email?: string | null;
+    live_publish_origin?: FormLivePublishOrigin;
+  };
+  fields: FormBuilderSchemaFieldV2[];
+}
+
+export interface FormBuilderV2CloneInput {
+  source_form_key: string;
+  target_form_key: string;
+  target_form_name: string;
+  description?: string | null;
+}
+
+export interface FormBuilderV2AttachFieldInput {
+  form_key: string;
+  field_key: string;
+  is_visible?: boolean;
+  is_required?: boolean;
+  display_order?: number | null;
+}
+
+export interface FormBuilderV2FieldSettingsInput {
+  field_key: string;
+  is_visible: boolean;
+  is_required: boolean;
+  display_order?: number | null;
+}
+
+export interface FieldLibraryItemV2 {
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+  is_locked: boolean;
+  is_system_field: boolean;
+  is_archived: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FieldLibraryItemV2UpsertInput {
+  field_key: string;
+  label: string;
+  field_type: SignupV2FieldType;
+  section_name: string;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: string[] | null;
+  min_length?: number | null;
+  max_length?: number | null;
+  validation_rule_id?: string | null;
+  is_system_field?: boolean;
+  is_locked?: boolean;
+}
+
+export type AIProvider = 'openai' | 'google' | 'anthropic' | 'azure_openai' | 'custom';
+export type AIRuntimeReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
+
+export interface AIRuntimeSettings {
+  setting_key: string;
+  provider: AIProvider;
+  model: string;
+  reasoning_effort?: AIRuntimeReasoningEffort | null;
+  is_enabled: boolean;
+  has_api_key: boolean;
+  api_key_masked?: string | null;
+  updated_at?: string | null;
+  updated_by_email?: string | null;
+  live_updated_via?: string | null;
+}
+
+export interface AIRuntimeProfile {
+  provider: AIProvider;
+  model: string;
+  reasoning_effort?: AIRuntimeReasoningEffort | null;
+  is_enabled: boolean;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 interface UserRoleQueryRow {
@@ -2641,6 +2944,1299 @@ export const formFieldConfigService = {
   }
 };
 
+interface FormConfigV2FieldRpcRow extends Omit<FormConfigV2Field, 'option_items'> {
+  option_items?: unknown;
+}
+
+interface SignupFormFieldV2RpcRow extends Omit<SignupFormFieldV2, 'option_items' | 'form_key'> {
+  form_key: string;
+  option_items?: unknown;
+}
+
+interface SigninFormFieldV2RpcRow extends Omit<SigninFormFieldV2, 'option_items' | 'form_key'> {
+  form_key: string;
+  option_items?: unknown;
+}
+
+interface JoinFormFieldV2RpcRow extends Omit<JoinFormFieldV2, 'option_items' | 'form_key'> {
+  form_key: string;
+  option_items?: unknown;
+}
+
+interface MemberEditFormFieldV2RpcRow extends Omit<MemberEditFormFieldV2, 'option_items' | 'form_key'> {
+  form_key: string;
+  option_items?: unknown;
+}
+
+type FormConfigV2FormSummaryRpcRow = FormConfigV2FormSummary;
+type FormBuilderV2FormSummaryRpcRow = FormBuilderV2FormSummary;
+
+interface FormLivePublishStatusRpcRow {
+  form_id: string;
+  form_key: string;
+  form_name: string;
+  live_published_at?: string | null;
+  live_published_by?: string | null;
+  live_published_by_email?: string | null;
+  live_publish_origin?: string | null;
+}
+
+interface FormBuilderSchemaFieldV2RpcRow {
+  form_id: string;
+  id?: string | null;
+  form_key: string;
+  form_name: string;
+  description?: string | null;
+  is_active: boolean;
+  live_published_at?: string | null;
+  live_published_by?: string | null;
+  live_published_by_email?: string | null;
+  live_publish_origin?: string | null;
+  field_key?: string | null;
+  label?: string | null;
+  field_type?: SignupV2FieldType | null;
+  section_name?: string | null;
+  placeholder?: string | null;
+  help_text?: string | null;
+  option_items?: unknown;
+  min_length?: number | null;
+  max_length?: number | null;
+  default_value?: string | null;
+  is_visible?: boolean | null;
+  is_required?: boolean | null;
+  is_locked?: boolean | null;
+  is_system_field?: boolean | null;
+  display_order?: number | null;
+  validation_rule_id?: string | null;
+  library_is_archived?: boolean | null;
+}
+
+interface FieldLibraryItemV2RpcRow extends Omit<FieldLibraryItemV2, 'option_items'> {
+  option_items?: unknown;
+}
+
+const AI_PROVIDER_VALUES: AIProvider[] = ['openai', 'google', 'anthropic', 'azure_openai', 'custom'];
+const AI_RUNTIME_REASONING_VALUES: AIRuntimeReasoningEffort[] = ['low', 'medium', 'high', 'xhigh'];
+
+const normalizeAIProvider = (value: unknown): AIProvider => {
+  const candidate = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (AI_PROVIDER_VALUES.includes(candidate as AIProvider)) {
+    return candidate as AIProvider;
+  }
+  return 'openai';
+};
+
+const normalizeAIRuntimeReasoningEffort = (value: unknown): AIRuntimeReasoningEffort | null => {
+  const candidate = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (AI_RUNTIME_REASONING_VALUES.includes(candidate as AIRuntimeReasoningEffort)) {
+    return candidate as AIRuntimeReasoningEffort;
+  }
+  return null;
+};
+
+const mapAIRuntimeSettings = (raw: unknown): AIRuntimeSettings => {
+  const row = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {};
+  return {
+    setting_key: typeof row.setting_key === 'string' && row.setting_key.trim() !== ''
+      ? row.setting_key
+      : 'member_normalization',
+    provider: normalizeAIProvider(row.provider),
+    model: typeof row.model === 'string' && row.model.trim() !== ''
+      ? row.model
+      : 'gpt-4o-mini',
+    reasoning_effort: normalizeAIRuntimeReasoningEffort(row.reasoning_effort),
+    is_enabled: Boolean(row.is_enabled),
+    has_api_key: Boolean(row.has_api_key),
+    api_key_masked: typeof row.api_key_masked === 'string' ? row.api_key_masked : null,
+    updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
+    updated_by_email: typeof row.updated_by_email === 'string' ? row.updated_by_email : null,
+    live_updated_via: typeof row.live_updated_via === 'string' ? row.live_updated_via : null
+  };
+};
+
+const normalizeLivePublishOrigin = (
+  origin?: string | null,
+  livePublishedAt?: string | null,
+  livePublishedBy?: string | null
+): FormLivePublishOrigin => {
+  if (
+    origin === 'manual_publish'
+    || origin === 'legacy_seeded'
+    || origin === 'never_published'
+    || origin === 'unpublished'
+  ) {
+    return origin;
+  }
+  if (livePublishedAt) {
+    return livePublishedBy ? 'manual_publish' : 'legacy_seeded';
+  }
+  return 'never_published';
+};
+
+const normalizeFormDraftConfigurationErrorCode = (errorMessage?: string): FormDraftConfigurationErrorCode => {
+  const message = (errorMessage || '').toLowerCase();
+  if (message.includes('session') || message.includes('invalid session') || message.includes('not found. please log in again')) {
+    return 'no_session';
+  }
+  if (message.includes('not authorized') || message.includes('permission')) {
+    return 'access_denied';
+  }
+  return 'load_failed';
+};
+
+const mapFormLivePublishStatusRow = (row: FormLivePublishStatusRpcRow): FormLivePublishStatus => ({
+  form_id: row.form_id,
+  form_key: row.form_key,
+  form_name: row.form_name,
+  live_published_at: row.live_published_at ?? null,
+  live_published_by: row.live_published_by ?? null,
+  live_published_by_email: row.live_published_by_email ?? null,
+  live_publish_origin: normalizeLivePublishOrigin(
+    row.live_publish_origin,
+    row.live_published_at ?? null,
+    row.live_published_by ?? null
+  )
+});
+
+const toNullableLengthValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return Math.trunc(parsed);
+    }
+  }
+  return null;
+};
+
+const mapFormConfigV2FieldRow = (row: FormConfigV2FieldRpcRow): FormConfigV2Field => ({
+  id: row.id,
+  form_key: row.form_key,
+  field_key: row.field_key,
+  label: row.label,
+  field_type: row.field_type,
+  section_name: row.section_name,
+  placeholder: row.placeholder ?? null,
+  help_text: row.help_text ?? null,
+  option_items: Array.isArray(row.option_items)
+    ? (row.option_items as unknown[]).map(value => String(value))
+    : null,
+  default_value: row.default_value ?? null,
+  is_visible: row.is_visible,
+  is_required: row.is_required,
+  is_locked: row.is_locked,
+  is_system_field: row.is_system_field,
+  display_order: row.display_order,
+  min_length: toNullableLengthValue((row as { min_length?: unknown }).min_length),
+  max_length: toNullableLengthValue((row as { max_length?: unknown }).max_length),
+  validation_rule_id: row.validation_rule_id ?? null
+});
+
+const mapSignupV2FieldRow = (row: SignupFormFieldV2RpcRow): SignupFormFieldV2 => ({
+  ...mapFormConfigV2FieldRow(row as FormConfigV2FieldRpcRow),
+  form_key: 'signup'
+});
+
+const mapSigninV2FieldRow = (row: SigninFormFieldV2RpcRow): SigninFormFieldV2 => ({
+  ...mapFormConfigV2FieldRow(row as FormConfigV2FieldRpcRow),
+  form_key: 'signin'
+});
+
+const mapJoinV2FieldRow = (row: JoinFormFieldV2RpcRow): JoinFormFieldV2 => ({
+  ...mapFormConfigV2FieldRow(row as FormConfigV2FieldRpcRow),
+  form_key: 'join_lub'
+});
+
+const mapMemberEditV2FieldRow = (row: MemberEditFormFieldV2RpcRow): MemberEditFormFieldV2 => ({
+  ...mapFormConfigV2FieldRow(row as FormConfigV2FieldRpcRow),
+  form_key: 'member_edit'
+});
+
+const mapFormBuilderSchemaFieldRow = (row: FormBuilderSchemaFieldV2RpcRow): FormBuilderSchemaFieldV2 => ({
+  id: row.id ?? '',
+  form_key: row.form_key,
+  field_key: row.field_key ?? '',
+  label: row.label ?? '',
+  field_type: (row.field_type ?? 'text') as SignupV2FieldType,
+  section_name: row.section_name ?? 'General',
+  placeholder: row.placeholder ?? null,
+  help_text: row.help_text ?? null,
+  option_items: Array.isArray(row.option_items)
+    ? (row.option_items as unknown[]).map(value => String(value))
+    : null,
+  default_value: row.default_value ?? null,
+  is_visible: Boolean(row.is_visible),
+  is_required: Boolean(row.is_required),
+  is_locked: Boolean(row.is_locked),
+  is_system_field: Boolean(row.is_system_field),
+  display_order: row.display_order ?? 0,
+  min_length: toNullableLengthValue(row.min_length),
+  max_length: toNullableLengthValue(row.max_length),
+  validation_rule_id: row.validation_rule_id ?? null,
+  form_name: row.form_name,
+  description: row.description ?? null,
+  is_active: row.is_active,
+  library_is_archived: Boolean(row.library_is_archived)
+});
+
+const mapFieldLibraryItemV2Row = (row: FieldLibraryItemV2RpcRow): FieldLibraryItemV2 => ({
+  field_key: row.field_key,
+  label: row.label,
+  field_type: row.field_type,
+  section_name: row.section_name,
+  placeholder: row.placeholder ?? null,
+  help_text: row.help_text ?? null,
+  option_items: Array.isArray(row.option_items)
+    ? (row.option_items as unknown[]).map(value => String(value))
+    : null,
+  min_length: toNullableLengthValue((row as { min_length?: unknown }).min_length),
+  max_length: toNullableLengthValue((row as { max_length?: unknown }).max_length),
+  validation_rule_id: row.validation_rule_id ?? null,
+  is_locked: row.is_locked,
+  is_system_field: row.is_system_field,
+  is_archived: row.is_archived,
+  usage_count: row.usage_count,
+  created_at: row.created_at,
+  updated_at: row.updated_at
+});
+
+export const signupFormConfigV2Service = {
+  async getConfiguration(): Promise<{ success: boolean; data?: SignupFormFieldV2[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('get_signup_form_configuration_v2');
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const rows = Array.isArray(data) ? (data as SignupFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapSignupV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching signup v2 configuration:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getDraftConfiguration(
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: SignupFormFieldV2[]; error?: string; errorCode?: SignupDraftConfigurationErrorCode }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return {
+          success: false,
+          error: 'User session not found. Please log in again.',
+          errorCode: 'no_session'
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_signup_form_configuration_v2_draft_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+          errorCode: normalizeFormDraftConfigurationErrorCode(error.message)
+        };
+      }
+
+      const rows = Array.isArray(data) ? (data as SignupFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapSignupV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching signup v2 draft configuration:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+        errorCode: 'load_failed'
+      };
+    }
+  },
+
+  async saveConfiguration(
+    fields: SignupFormFieldV2UpsertInput[],
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('upsert_signup_form_configuration_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_fields: fields
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to save configuration' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving signup v2 configuration:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async createCustomField(
+    input: SignupFormFieldV2CreateInput,
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: SignupFormFieldV2; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('create_signup_custom_field_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: input.field_key,
+        p_label: input.label,
+        p_field_type: input.field_type,
+        p_section_name: input.section_name,
+        p_placeholder: input.placeholder ?? null,
+        p_help_text: input.help_text ?? null,
+        p_option_items: input.option_items ?? null,
+        p_default_value: input.default_value ?? null,
+        p_is_visible: input.is_visible ?? true,
+        p_is_required: input.is_required ?? false,
+        p_display_order: input.display_order ?? null,
+        p_validation_rule_id: input.validation_rule_id ?? null
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string; data?: SignupFormFieldV2RpcRow };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to create custom field' };
+      }
+
+      return {
+        success: true,
+        data: result.data ? mapSignupV2FieldRow(result.data) : undefined
+      };
+    } catch (error) {
+      console.error('Error creating signup v2 custom field:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async deleteCustomField(
+    field_key: string,
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('delete_signup_custom_field_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: field_key
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete custom field' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting signup v2 custom field:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+export const signinFormConfigV2Service = {
+  async getConfiguration(): Promise<{ success: boolean; data?: SigninFormFieldV2[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('get_signin_form_configuration_v2');
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const rows = Array.isArray(data) ? (data as SigninFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapSigninV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching signin v2 configuration:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getDraftConfiguration(
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: SigninFormFieldV2[]; error?: string; errorCode?: FormDraftConfigurationErrorCode }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return {
+          success: false,
+          error: 'User session not found. Please log in again.',
+          errorCode: 'no_session'
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_signin_form_configuration_v2_draft_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+          errorCode: normalizeFormDraftConfigurationErrorCode(error.message)
+        };
+      }
+
+      const rows = Array.isArray(data) ? (data as SigninFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapSigninV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching signin v2 draft configuration:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+        errorCode: 'load_failed'
+      };
+    }
+  }
+};
+
+export const joinFormConfigV2Service = {
+  async getConfiguration(): Promise<{ success: boolean; data?: JoinFormFieldV2[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('get_join_form_configuration_v2');
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const rows = Array.isArray(data) ? (data as JoinFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapJoinV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching join v2 configuration:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getDraftConfiguration(
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: JoinFormFieldV2[]; error?: string; errorCode?: JoinDraftConfigurationErrorCode }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return {
+          success: false,
+          error: 'User session not found. Please log in again.',
+          errorCode: 'no_session'
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_join_form_configuration_v2_draft_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+          errorCode: normalizeFormDraftConfigurationErrorCode(error.message)
+        };
+      }
+
+      const rows = Array.isArray(data) ? (data as JoinFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapJoinV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching join v2 draft configuration:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+        errorCode: 'load_failed'
+      };
+    }
+  }
+};
+
+export const memberEditFormConfigV2Service = {
+  async getConfiguration(
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: MemberEditFormFieldV2[]; error?: string; errorCode?: MemberEditDraftConfigurationErrorCode }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return {
+          success: false,
+          error: 'User session not found. Please log in again.',
+          errorCode: 'no_session'
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_member_edit_form_configuration_v2_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+          errorCode: normalizeFormDraftConfigurationErrorCode(error.message)
+        };
+      }
+
+      const rows = Array.isArray(data) ? (data as MemberEditFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapMemberEditV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching member-edit v2 configuration:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+        errorCode: 'load_failed'
+      };
+    }
+  },
+
+  async getDraftConfiguration(
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: MemberEditFormFieldV2[]; error?: string; errorCode?: MemberEditDraftConfigurationErrorCode }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return {
+          success: false,
+          error: 'User session not found. Please log in again.',
+          errorCode: 'no_session'
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_member_edit_form_configuration_v2_draft_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+          errorCode: normalizeFormDraftConfigurationErrorCode(error.message)
+        };
+      }
+
+      const rows = Array.isArray(data) ? (data as MemberEditFormFieldV2RpcRow[]) : [];
+      return {
+        success: true,
+        data: rows.map(mapMemberEditV2FieldRow)
+      };
+    } catch (error) {
+      console.error('Error fetching member-edit v2 draft configuration:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+        errorCode: 'load_failed'
+      };
+    }
+  }
+};
+
+export const formBuilderV2Service = {
+  async listForms(): Promise<{ success: boolean; data?: FormConfigV2FormSummary[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('list_form_config_v2_forms');
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const rows = Array.isArray(data) ? (data as FormConfigV2FormSummaryRpcRow[]) : [];
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error listing form config v2 forms:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getFormConfiguration(formKey: string): Promise<{ success: boolean; data?: FormConfigV2Field[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('get_form_configuration_v2', {
+        p_form_key: formKey
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const rows = Array.isArray(data) ? (data as FormConfigV2FieldRpcRow[]) : [];
+      return { success: true, data: rows.map(mapFormConfigV2FieldRow) };
+    } catch (error) {
+      console.error('Error fetching form config v2 fields:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async createForm(
+    input: FormConfigV2FormCreateInput,
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: FormConfigV2FormSummary; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('create_form_config_v2_form_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: input.form_key,
+        p_form_name: input.form_name,
+        p_description: input.description ?? null
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string; data?: FormConfigV2FormSummary };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to create form' };
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error creating form config v2 form:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async createField(
+    input: FormConfigV2FieldCreateInput,
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: FormConfigV2Field; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('attach_field_to_form_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: input.form_key,
+        p_field_key: input.field_key,
+        p_is_visible: input.is_visible ?? true,
+        p_is_required: input.is_required ?? false,
+        p_display_order: input.display_order ?? null
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string; data?: FormConfigV2FieldRpcRow };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to create field' };
+      }
+
+      return {
+        success: true,
+        data: result.data ? mapFormConfigV2FieldRow(result.data) : undefined
+      };
+    } catch (error) {
+      console.error('Error creating form config v2 field:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async deleteField(
+    formKey: string,
+    fieldKey: string,
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('detach_field_from_form_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey,
+        p_field_key: fieldKey
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success: boolean; error?: string };
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete field' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting form config v2 field:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+export const formBuilderV21Service = {
+  async listForms(): Promise<{ success: boolean; data?: FormBuilderV2FormSummary[]; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('list_forms_builder_v2');
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const rows = Array.isArray(data) ? (data as FormBuilderV2FormSummaryRpcRow[]) : [];
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error listing form builder v2.1 forms:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async listLivePublishStatus(sessionToken?: string): Promise<{ success: boolean; data?: FormLivePublishStatus[]; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('list_form_builder_live_publish_status_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const rows = Array.isArray(data) ? (data as FormLivePublishStatusRpcRow[]) : [];
+      return { success: true, data: rows.map(mapFormLivePublishStatusRow) };
+    } catch (error) {
+      console.error('Error listing form builder live publish status:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getLivePublishStatus(formKey: string, sessionToken?: string): Promise<{ success: boolean; data?: FormLivePublishStatus | null; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('get_form_builder_live_publish_status_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const rows = Array.isArray(data) ? (data as FormLivePublishStatusRpcRow[]) : [];
+      if (rows.length === 0) {
+        return { success: true, data: null };
+      }
+      return { success: true, data: mapFormLivePublishStatusRow(rows[0]) };
+    } catch (error) {
+      console.error('Error fetching form builder live publish status:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getFormSchema(formKey: string): Promise<{ success: boolean; data?: FormBuilderSchemaV2; error?: string }> {
+    try {
+      const { data, error } = await supabase.rpc('get_form_builder_schema_v2', {
+        p_form_key: formKey
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const rows = Array.isArray(data) ? (data as FormBuilderSchemaFieldV2RpcRow[]) : [];
+      if (rows.length === 0) {
+        return { success: false, error: 'Form not found' };
+      }
+
+      const fields = rows
+        .filter(row => Boolean(row.id && row.field_key))
+        .map(mapFormBuilderSchemaFieldRow);
+      const first = rows[0];
+        return {
+          success: true,
+          data: {
+            form: {
+              id: first.form_id,
+              form_key: first.form_key,
+              form_name: first.form_name,
+              description: first.description ?? null,
+              is_active: first.is_active,
+              live_published_at: first.live_published_at ?? null,
+              live_published_by: first.live_published_by ?? null,
+              live_published_by_email: first.live_published_by_email ?? null,
+              live_publish_origin: normalizeLivePublishOrigin(
+                first.live_publish_origin,
+                first.live_published_at ?? null,
+                first.live_published_by ?? null
+              )
+            },
+            fields
+          }
+      };
+    } catch (error) {
+      console.error('Error fetching form builder v2.1 schema:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async createForm(
+    input: FormConfigV2FormCreateInput,
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('create_form_builder_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: input.form_key,
+        p_form_name: input.form_name,
+        p_description: input.description ?? null
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to create form' };
+    } catch (error) {
+      console.error('Error creating form builder v2.1 form:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async cloneForm(input: FormBuilderV2CloneInput, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('clone_form_builder_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_source_form_key: input.source_form_key,
+        p_target_form_key: input.target_form_key,
+        p_target_form_name: input.target_form_name,
+        p_description: input.description ?? null
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to clone form' };
+    } catch (error) {
+      console.error('Error cloning form builder v2.1 form:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async archiveForm(formKey: string, archive = true, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('archive_form_builder_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey,
+        p_archive: archive
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to archive form' };
+    } catch (error) {
+      console.error('Error archiving form builder v2.1 form:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async publishFormToLive(formKey: string, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('publish_form_builder_v2_to_live_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to publish form' };
+    } catch (error) {
+      console.error('Error publishing form builder v2.1 form:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async unpublishForm(formKey: string, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('unpublish_form_builder_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to unpublish form' };
+    } catch (error) {
+      console.error('Error unpublishing form builder v2.1 form:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async attachField(input: FormBuilderV2AttachFieldInput, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('attach_field_to_form_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: input.form_key,
+        p_field_key: input.field_key,
+        p_is_visible: input.is_visible ?? true,
+        p_is_required: input.is_required ?? false,
+        p_display_order: input.display_order ?? null
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to attach field' };
+    } catch (error) {
+      console.error('Error attaching field in form builder v2.1:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async detachField(formKey: string, fieldKey: string, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('detach_field_from_form_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey,
+        p_field_key: fieldKey
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to detach field' };
+    } catch (error) {
+      console.error('Error detaching field in form builder v2.1:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async reorderFields(formKey: string, fieldKeys: string[], sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('reorder_form_fields_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey,
+        p_field_keys: fieldKeys
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to reorder fields' };
+    } catch (error) {
+      console.error('Error reordering fields in form builder v2.1:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async saveFieldSettings(
+    formKey: string,
+    fields: FormBuilderV2FieldSettingsInput[],
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('upsert_form_builder_v2_field_settings_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_form_key: formKey,
+        p_fields: fields
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to save field settings' };
+    } catch (error) {
+      console.error('Error saving form builder v2.1 field settings:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+export const fieldLibraryV2Service = {
+  async listItems(sessionToken?: string): Promise<{ success: boolean; data?: FieldLibraryItemV2[]; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('list_field_library_v2_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const rows = Array.isArray(data) ? (data as FieldLibraryItemV2RpcRow[]) : [];
+      return { success: true, data: rows.map(mapFieldLibraryItemV2Row) };
+    } catch (error) {
+      console.error('Error listing field library v2 items:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async createItem(input: FieldLibraryItemV2UpsertInput, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('create_field_library_item_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: input.field_key,
+        p_label: input.label,
+        p_field_type: input.field_type,
+        p_section_name: input.section_name,
+        p_placeholder: input.placeholder ?? null,
+        p_help_text: input.help_text ?? null,
+        p_option_items: input.option_items ?? null,
+        p_validation_rule_id: input.validation_rule_id ?? null,
+        p_min_length: input.min_length ?? null,
+        p_max_length: input.max_length ?? null,
+        p_is_system_field: input.is_system_field ?? false,
+        p_is_locked: input.is_locked ?? false
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to create field library item' };
+    } catch (error) {
+      console.error('Error creating field library v2 item:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async updateItem(input: FieldLibraryItemV2UpsertInput, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('update_field_library_item_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: input.field_key,
+        p_label: input.label,
+        p_field_type: input.field_type,
+        p_section_name: input.section_name,
+        p_placeholder: input.placeholder ?? null,
+        p_help_text: input.help_text ?? null,
+        p_option_items: input.option_items ?? null,
+        p_validation_rule_id: input.validation_rule_id ?? null,
+        p_min_length: input.min_length ?? null,
+        p_max_length: input.max_length ?? null,
+        p_is_system_field: input.is_system_field ?? false,
+        p_is_locked: input.is_locked ?? false
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to update field library item' };
+    } catch (error) {
+      console.error('Error updating field library v2 item:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async archiveItem(fieldKey: string, archive = true, sessionToken?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+      const { data, error } = await supabase.rpc('archive_field_library_item_v2_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: fieldKey,
+        p_archive: archive
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error || 'Failed to archive field library item' };
+    } catch (error) {
+      console.error('Error archiving field library v2 item:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+export const aiSettingsService = {
+  async getSettings(sessionToken?: string): Promise<{ success: boolean; data?: AIRuntimeSettings; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('get_ai_runtime_settings_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: unknown } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to load AI settings' };
+      }
+
+      return { success: true, data: mapAIRuntimeSettings(result.data) };
+    } catch (error) {
+      console.error('Error loading AI settings:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async saveSettings(
+    input: {
+      provider: AIProvider;
+      model: string;
+      reasoningEffort?: AIRuntimeReasoningEffort | null;
+      isEnabled: boolean;
+      apiKey?: string | null;
+    },
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string; data?: AIRuntimeSettings }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('upsert_ai_runtime_settings_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_provider: input.provider,
+        p_model: input.model,
+        p_reasoning_effort: input.reasoningEffort ?? null,
+        p_is_enabled: input.isEnabled,
+        p_api_key: input.apiKey && input.apiKey.trim() !== '' ? input.apiKey.trim() : null
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: unknown } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to save AI settings' };
+      }
+
+      const refresh = await aiSettingsService.getSettings(resolvedSessionToken);
+      if (!refresh.success) {
+        return { success: true };
+      }
+
+      return { success: true, data: refresh.data };
+    } catch (error) {
+      console.error('Error saving AI settings:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getRuntimeProfile(): Promise<AIRuntimeProfile | null> {
+    try {
+      const { data, error } = await supabase.rpc('get_ai_runtime_normalization_profile');
+      if (error) {
+        return null;
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: unknown } | null;
+      if (!result?.success || !result.data || typeof result.data !== 'object') {
+        return null;
+      }
+
+      const payload = result.data as Record<string, unknown>;
+      return {
+        provider: normalizeAIProvider(payload.provider),
+        model: typeof payload.model === 'string' && payload.model.trim() !== ''
+          ? payload.model
+          : 'gpt-4o-mini',
+        reasoning_effort: normalizeAIRuntimeReasoningEffort(payload.reasoning_effort),
+        is_enabled: Boolean(payload.is_enabled)
+      };
+    } catch (error) {
+      console.warn('Unable to load AI runtime profile:', error);
+      return null;
+    }
+  }
+};
+
 export interface AuditHistoryEntry {
   id: string;
   member_id: string;
@@ -2796,16 +4392,20 @@ export interface ValidationRule {
 export const validationRulesService = {
   async getAllValidationRules(): Promise<ValidationRule[]> {
     try {
-      const { data, error } = await supabase
-        .from('validation_rules')
-        .select('*')
-        .order('display_order');
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        throw new Error('User session not found. Please log in again.');
+      }
+
+      const { data, error } = await supabase.rpc('get_validation_rules_with_session', {
+        p_session_token: sessionToken
+      });
 
       if (error) {
         throw error;
       }
 
-      return data || [];
+      return (data as ValidationRule[] | null) || [];
     } catch (error) {
       console.error('Error fetching all validation rules:', error);
       throw error;
@@ -2853,7 +4453,12 @@ export const validationRulesService = {
 
   async updateValidationRule(
     id: string,
-    updates: { validation_pattern?: string; error_message?: string; is_active?: boolean }
+    updates: {
+      validation_pattern?: string;
+      error_message?: string;
+      description?: string | null;
+      is_active?: boolean;
+    }
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const sessionToken = sessionManager.getSessionToken();
@@ -2865,7 +4470,8 @@ export const validationRulesService = {
         p_session_token: sessionToken,
         p_rule_id: id,
         p_validation_pattern: updates.validation_pattern ?? null,
-        p_error_message: updates.error_message ?? null
+        p_error_message: updates.error_message ?? null,
+        p_description: updates.description ?? null
       });
 
       if (error) {
@@ -2956,16 +4562,8 @@ export const validationRulesService = {
 
   async getAllCategories(): Promise<string[]> {
     try {
-      const { data, error } = await supabase
-        .from('validation_rules')
-        .select('category')
-        .order('category');
-
-      if (error) {
-        throw error;
-      }
-
-      const uniqueCategories = [...new Set((data || []).map(item => item.category))];
+      const rules = await validationRulesService.getAllValidationRules();
+      const uniqueCategories = [...new Set(rules.map(item => item.category))];
       return uniqueCategories.sort();
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -2976,24 +4574,11 @@ export const validationRulesService = {
   async checkRuleNameExists(ruleName: string, excludeId?: string): Promise<boolean> {
     try {
       const lowerRuleName = ruleName.toLowerCase();
-
-      let query = supabase
-        .from('validation_rules')
-        .select('id')
-        .ilike('rule_name', lowerRuleName);
-
-      if (excludeId) {
-        query = query.neq('id', excludeId);
-      }
-
-      const { data, error } = await query.maybeSingle();
-
-      if (error) {
-        console.error('Error checking rule name:', error);
-        return false;
-      }
-
-      return !!data;
+      const rules = await validationRulesService.getAllValidationRules();
+      return rules.some(rule =>
+        rule.rule_name.toLowerCase() === lowerRuleName &&
+        (!excludeId || rule.id !== excludeId)
+      );
     } catch (error) {
       console.error('Error checking rule name:', error);
       return false;
@@ -3002,19 +4587,12 @@ export const validationRulesService = {
 
   async getMaxDisplayOrder(): Promise<number> {
     try {
-      const { data, error } = await supabase
-        .from('validation_rules')
-        .select('display_order')
-        .order('display_order', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error getting max display order:', error);
+      const rules = await validationRulesService.getAllValidationRules();
+      if (rules.length === 0) {
         return 0;
       }
 
-      return data?.display_order || 0;
+      return rules.reduce((max, rule) => Math.max(max, rule.display_order || 0), 0);
     } catch (error) {
       console.error('Error getting max display order:', error);
       return 0;

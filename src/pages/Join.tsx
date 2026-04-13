@@ -7,6 +7,7 @@ import {
   Building2,
   MapPin,
   Phone,
+  Lock,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -22,7 +23,8 @@ import {
   PublicPaymentState,
   DistrictOption,
   CityOption,
-  DesignationMaster
+  DesignationMaster,
+  type JoinDraftConfigurationErrorCode
 } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { useFormFieldConfig } from '../hooks/useFormFieldConfig';
@@ -43,11 +45,33 @@ const correctionFieldLabels: Record<string, string> = {
   referred_by: 'Referred By'
 };
 
+const JOIN_LIVE_VALIDATION_EXCLUDED_FIELDS = new Set<string>([
+  'is_custom_city',
+  'gst_certificate_url',
+  'udyam_certificate_url',
+  'payment_proof_url'
+]);
+
 const Join: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isFieldVisible, isFieldRequired, isLoading: isLoadingConfig } = useFormFieldConfig();
-  const { validateField: validateFieldByRule, isLoading: isLoadingValidation } = useValidation();
+  const isPreviewMode = searchParams.get('preview') === '1';
+  const {
+    isFieldVisible,
+    isFieldRequired,
+    getFieldLabel,
+    getFieldPlaceholder,
+    getFieldOptions,
+    getFieldMinLength,
+    getFieldMaxLength,
+    isLoading: isLoadingConfig,
+    error: configError,
+    errorCode: configErrorCode
+  } = useFormFieldConfig({
+    source: isPreviewMode ? 'builder_draft' : 'builder_live',
+    formKey: 'join_lub'
+  });
+  const { validateField: validateFieldByRule, isLoading: isLoadingValidation } = useValidation({ formKey: 'join_lub' });
 
   // Authentication and existing registration state
   const { member, isAuthenticated, isLoading: isLoadingAuth, refreshMember } = useMember();
@@ -91,6 +115,7 @@ const Join: React.FC = () => {
     alternate_contact_name: '',
     alternate_mobile: ''
   });
+  type JoinFormData = typeof formData;
 
   // Location state
   const [availableStates, setAvailableStates] = useState<PublicPaymentState[]>([]);
@@ -136,10 +161,25 @@ const Join: React.FC = () => {
   const [correctionFields, setCorrectionFields] = useState<FieldCorrectionStep[]>([]);
   const [showCorrectionStepper, setShowCorrectionStepper] = useState(false);
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+  const latestErrorsRef = useRef<Record<string, string>>({});
+
+  const scrollToFirstError = (errorMap: Record<string, string>) => {
+    for (const key of Object.keys(errorMap)) {
+      const el =
+        document.getElementById(key) ??
+        (document.querySelector(`[name="${key}"]`) as HTMLElement | null);
+      if (el && el.offsetParent !== null) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+        return;
+      }
+    }
+  };
 
   // Validation and UI state
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [formErrorMessage, setFormErrorMessage] = useState<string>('');
+  const [previewBlockReason, setPreviewBlockReason] = useState<JoinDraftConfigurationErrorCode | null>(null);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -157,6 +197,42 @@ const Join: React.FC = () => {
   const hideToast = useCallback(() => {
     setToast(prev => ({ ...prev, isVisible: false }));
   }, []);
+
+  const isFieldApplicable = useCallback(
+    (fieldName: string, data: JoinFormData = formData): boolean => {
+      if (!isFieldVisible(fieldName)) {
+        return false;
+      }
+
+      // GST-related fields only apply when GST is marked as registered.
+      if ((fieldName === 'gst_number' || fieldName === 'gst_certificate_url') && data.gst_registered !== 'yes') {
+        return false;
+      }
+
+      return true;
+    },
+    [formData, isFieldVisible]
+  );
+
+  const resolveFieldLabel = useCallback(
+    (fieldKey: string, fallback: string) => getFieldLabel(fieldKey, fallback),
+    [getFieldLabel]
+  );
+
+  const resolveFieldPlaceholder = useCallback(
+    (fieldKey: string, fallback: string) => getFieldPlaceholder(fieldKey, fallback),
+    [getFieldPlaceholder]
+  );
+
+  const resolveFieldOptions = useCallback(
+    (fieldKey: string, fallback: string[]) => {
+      const configured = getFieldOptions(fieldKey)
+        .map(item => String(item).trim())
+        .filter(Boolean);
+      return configured.length > 0 ? configured : fallback;
+    },
+    [getFieldOptions]
+  );
 
   const getCorrectionFields = useCallback((result: NormalizationResult): FieldCorrectionStep[] => {
     return Object.entries(correctionFieldLabels)
@@ -183,16 +259,44 @@ const Join: React.FC = () => {
     return JSON.stringify(formData) !== JSON.stringify(initialFormSnapshot);
   }, [formData, initialFormSnapshot]);
 
-  // Check authentication - redirect to sign in if not authenticated
+  // Check authentication - redirect to sign in if not authenticated (non-preview only)
   useEffect(() => {
+    if (isPreviewMode) {
+      return;
+    }
     if (!isLoadingAuth && !isAuthenticated) {
       console.log('[Join] Not authenticated, redirecting to sign in');
       navigate('/signin', { replace: true });
     }
-  }, [isLoadingAuth, isAuthenticated, navigate]);
+  }, [isLoadingAuth, isAuthenticated, isPreviewMode, navigate]);
+
+  // Preview access gate: admin-only draft preview, no live fallback.
+  useEffect(() => {
+    if (!isPreviewMode || isLoadingConfig) {
+      return;
+    }
+
+    if (!configError && !configErrorCode) {
+      setPreviewBlockReason(null);
+      return;
+    }
+
+    const reason = configErrorCode ?? 'load_failed';
+    if (reason === 'no_session') {
+      navigate(`/signin?next=${encodeURIComponent('/join?preview=1')}`, { replace: true });
+      return;
+    }
+
+    setPreviewBlockReason(reason);
+  }, [configError, configErrorCode, isLoadingConfig, isPreviewMode, navigate]);
 
   // Check for existing registration and handle based on status
   useEffect(() => {
+    if (isPreviewMode) {
+      setIsCheckingExisting(false);
+      return;
+    }
+
     const checkExistingRegistration = async () => {
       // Only check if authenticated and member data is available
       if (!isAuthenticated || !member || !member.user_id) {
@@ -276,7 +380,7 @@ const Join: React.FC = () => {
     } else {
       setIsCheckingExisting(false);
     }
-  }, [isAuthenticated, member, navigate]);
+  }, [isAuthenticated, isPreviewMode, member, navigate]);
 
   // Load initial data and handle URL parameters
   // Auto-fill amount paid based on state payment settings and gender
@@ -537,17 +641,81 @@ const Join: React.FC = () => {
     }
   };
 
+  const fallbackFieldLabel = useCallback((fieldName: string): string => {
+    return fieldName
+      .split('_')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }, []);
+
+  const getRequiredFieldMessage = useCallback(
+    (fieldName: string, dataToCheck: JoinFormData = formData): { errorKey: string; message: string } | null => {
+      if (fieldName === 'is_custom_city') {
+        return null;
+      }
+
+      if (fieldName === 'city') {
+        if (!isFieldRequired('city') || !isFieldApplicable('city', dataToCheck)) {
+          return null;
+        }
+
+        if (dataToCheck.is_custom_city) {
+          if (!String(dataToCheck.other_city_name ?? '').trim()) {
+            return { errorKey: 'city', message: 'Please enter a city/town/village name' };
+          }
+          return null;
+        }
+
+        if (!String(dataToCheck.city ?? '').trim()) {
+          return { errorKey: 'city', message: 'City/Town/Village is required' };
+        }
+        return null;
+      }
+
+      if (!isFieldRequired(fieldName) || !isFieldApplicable(fieldName, dataToCheck)) {
+        return null;
+      }
+
+      const rawValue = dataToCheck[fieldName as keyof JoinFormData];
+      if (String(rawValue ?? '').trim()) {
+        return null;
+      }
+
+      const label = resolveFieldLabel(fieldName, fallbackFieldLabel(fieldName));
+      return { errorKey: fieldName, message: `${label} is required` };
+    },
+    [fallbackFieldLabel, formData, isFieldApplicable, isFieldRequired, resolveFieldLabel]
+  );
+
   const validateField = async (fieldName: string) => {
+    if (fieldName !== 'other_city_name' && !Object.prototype.hasOwnProperty.call(formData, fieldName)) {
+      return;
+    }
+
+    if (fieldName === 'other_city_name') {
+      const cityIssue = getRequiredFieldMessage('city');
+      setErrors(prev => ({ ...prev, city: cityIssue?.message ?? '' }));
+      return;
+    }
+
+    if (!isFieldApplicable(fieldName)) {
+      setErrors(prev => ({ ...prev, [fieldName]: '' }));
+      return;
+    }
+
     const value = formData[fieldName as keyof typeof formData];
 
     console.log('[Join] validateField called for:', fieldName, 'value:', value ? (value.toString().substring(0, 20) + '...') : '(empty)');
 
-    // Only validate if field has a value (all fields are optional unless required)
+    const requiredIssue = getRequiredFieldMessage(fieldName);
+    if (requiredIssue?.errorKey === fieldName) {
+      setErrors(prev => ({ ...prev, [fieldName]: requiredIssue.message }));
+      return;
+    }
+
+    // Only validate format if field has a value.
     if (!value || value.toString().trim() === '') {
-      // Clear error if field is empty
-      if (errors[fieldName]) {
-        setErrors(prev => ({ ...prev, [fieldName]: '' }));
-      }
+      setErrors(prev => ({ ...prev, [fieldName]: '' }));
       return;
     }
 
@@ -582,6 +750,24 @@ const Join: React.FC = () => {
     }
 
     setErrors(prev => ({ ...prev, [fieldName]: errorMessage }));
+  };
+
+  const handleFormBlurCapture = (event: React.FocusEvent<HTMLFormElement>) => {
+    const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+    const fieldName = target.name;
+    if (!fieldName) {
+      return;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(formData, fieldName)) {
+      return;
+    }
+
+    if (JOIN_LIVE_VALIDATION_EXCLUDED_FIELDS.has(fieldName)) {
+      return;
+    }
+
+    void validateField(fieldName);
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -636,6 +822,19 @@ const Join: React.FC = () => {
 
   const handleFileChange = (fileType: keyof typeof files, file: File | null) => {
     setFiles(prev => ({ ...prev, [fileType]: file }));
+    const errorKeyMap: Record<keyof typeof files, string> = {
+      gstCertificate: 'gst_certificate_url',
+      udyamCertificate: 'udyam_certificate_url',
+      paymentProof: 'payment_proof_url'
+    };
+    const errorKey = errorKeyMap[fileType];
+    if (errorKey && errors[errorKey]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[errorKey];
+        return next;
+      });
+    }
     setIsVerifiedForSubmit(false);
   };
 
@@ -688,7 +887,7 @@ const Join: React.FC = () => {
     showToast('error', error);
   };
 
-  const validateForm = async (dataToValidate: typeof formData = formData): Promise<boolean> => {
+  const validateForm = async (dataToValidate: JoinFormData = formData): Promise<boolean> => {
     console.log('[Join.tsx] Starting form validation...');
     const newErrors: { [key: string]: string } = {};
 
@@ -716,12 +915,15 @@ const Join: React.FC = () => {
       { field: 'website', label: 'Website' },
       { field: 'gst_registered', label: 'GST Registered' },
       { field: 'gst_number', label: 'GST Number' },
+      { field: 'gst_certificate_url', label: 'GST Certificate' },
       { field: 'pan_company', label: 'PAN (Company)' },
       { field: 'esic_registered', label: 'ESIC Registered' },
       { field: 'epf_registered', label: 'EPF Registered' },
+      { field: 'udyam_certificate_url', label: 'UDYAM Certificate' },
       { field: 'amount_paid', label: 'Amount Paid' },
       { field: 'payment_date', label: 'Payment Date' },
       { field: 'payment_mode', label: 'Payment Mode' },
+      { field: 'payment_proof_url', label: 'Payment Proof' },
       { field: 'transaction_id', label: 'Transaction ID / Reference' },
       { field: 'bank_reference', label: 'Bank Reference' },
       { field: 'alternate_contact_name', label: 'Alternate Contact Name' },
@@ -735,9 +937,18 @@ const Join: React.FC = () => {
       // Skip city field - handle it separately below due to conditional logic
       if (field === 'city') return;
 
-      const value = dataToValidate[field as keyof typeof formData];
-      if (isFieldRequired(field) && isFieldVisible(field)) {
-        if (!value || value.toString().trim() === '') {
+      const value = field === 'gst_certificate_url'
+        ? files.gstCertificate
+        : field === 'udyam_certificate_url'
+          ? files.udyamCertificate
+          : field === 'payment_proof_url'
+            ? files.paymentProof
+            : dataToValidate[field as keyof JoinFormData];
+      if (isFieldRequired(field) && isFieldApplicable(field, dataToValidate)) {
+        if (
+          !value ||
+          (typeof value === 'string' && value.toString().trim() === '')
+        ) {
           newErrors[field] = `${label} is required`;
         }
       }
@@ -745,7 +956,7 @@ const Join: React.FC = () => {
 
     // Conditional city validation based on is_custom_city flag
     // This handles both standard city selection and custom "Other" city entry
-    if (isFieldRequired('city') && isFieldVisible('city')) {
+    if (isFieldRequired('city') && isFieldApplicable('city', dataToValidate)) {
       if (dataToValidate.is_custom_city) {
         // Custom city mode: "Other" was selected
         // Validate that other_city_name is provided
@@ -767,6 +978,7 @@ const Join: React.FC = () => {
     if (Object.keys(newErrors).length > 0) {
       console.log('[Join.tsx] Validation failed - missing required fields:', Object.keys(newErrors));
       setFormErrorMessage('Please fill in all required fields marked below');
+      latestErrorsRef.current = newErrors;
       setErrors(newErrors);
       return false;
     }
@@ -785,10 +997,28 @@ const Join: React.FC = () => {
         continue;
       }
 
-      const fieldValue = dataToValidate[fieldName as keyof typeof formData];
+      if (!isFieldApplicable(fieldName, dataToValidate)) {
+        continue;
+      }
+
+      const fieldValue = dataToValidate[fieldName as keyof JoinFormData];
 
       // Only validate fields that have a value
       if (fieldValue && fieldValue.toString().trim() !== '') {
+        const trimmedValue = fieldValue.toString().trim();
+        const charCount = trimmedValue.length;
+        const minLen = getFieldMinLength(fieldName);
+        const maxLen = getFieldMaxLength(fieldName);
+        const label = getFieldLabel(fieldName);
+
+        if (maxLen !== null && charCount > maxLen) {
+          newErrors[fieldName] = `${label} must be at most ${maxLen} characters`;
+          continue;
+        } else if (minLen !== null && charCount < minLen) {
+          newErrors[fieldName] = `${label} must be at least ${minLen} characters`;
+          continue;
+        }
+
         console.log(`[Join.tsx] Validating field '${fieldName}'`);
 
         try {
@@ -807,6 +1037,7 @@ const Join: React.FC = () => {
       }
     }
 
+    latestErrorsRef.current = newErrors;
     setErrors(newErrors);
 
     // Show toast message if there are validation errors
@@ -820,7 +1051,7 @@ const Join: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const sanitizeFormData = (data: typeof formData) => {
+  const sanitizeFormData = (data: JoinFormData) => {
     console.log('[Join.tsx] Sanitizing form data before submission');
     console.log('[Join.tsx] is_custom_city flag:', data.is_custom_city);
     console.log('[Join.tsx] city value:', data.city || 'null');
@@ -839,10 +1070,55 @@ const Join: React.FC = () => {
       gender: data.gender as string | null
     };
 
+    const clearWhenHiddenFields: Array<keyof JoinFormData> = [
+      'full_name',
+      'gender',
+      'date_of_birth',
+      'company_name',
+      'company_designation_id',
+      'company_address',
+      'district',
+      'city',
+      'other_city_name',
+      'pin_code',
+      'industry',
+      'activity_type',
+      'constitution',
+      'annual_turnover',
+      'number_of_employees',
+      'products_services',
+      'brand_names',
+      'website',
+      'gst_registered',
+      'gst_number',
+      'pan_company',
+      'esic_registered',
+      'epf_registered',
+      'referred_by',
+      'amount_paid',
+      'payment_date',
+      'payment_mode',
+      'transaction_id',
+      'bank_reference',
+      'alternate_contact_name',
+      'alternate_mobile'
+    ];
+
+    clearWhenHiddenFields.forEach((fieldName) => {
+      const visibilityField = fieldName === 'other_city_name' ? 'city' : fieldName;
+      if (!isFieldApplicable(visibilityField, sanitized)) {
+        sanitized[fieldName] = '';
+      }
+    });
+
     // Handle custom city: when is_custom_city is true, set city to null
     // The custom city name is stored in other_city_name field
     // CRITICAL: Explicitly preserve the is_custom_city flag to ensure it's saved to database
-    if (sanitized.is_custom_city === true) {
+    if (!isFieldApplicable('city', sanitized)) {
+      sanitized.city = null;
+      sanitized.other_city_name = null;
+      sanitized.is_custom_city = false;
+    } else if (sanitized.is_custom_city === true) {
       console.log('[Join.tsx] Custom city detected, setting city to null and preserving other_city_name');
       sanitized.city = null;
       // Ensure other_city_name has a value when is_custom_city is true
@@ -895,7 +1171,7 @@ const Join: React.FC = () => {
     return sanitized;
   };
 
-  const submitFormData = async (dataToSubmit: typeof formData) => {
+  const submitFormData = async (dataToSubmit: JoinFormData) => {
     console.log('[Join.tsx] Starting form data submission');
 
     // Proceed with validation and submission
@@ -958,9 +1234,17 @@ const Join: React.FC = () => {
 
       // Submit registration
       console.log('[Join.tsx] Submitting registration to backend...');
+      const submissionFiles = {
+        ...files,
+        profilePhoto,
+        gstCertificate: isFieldApplicable('gst_certificate_url', sanitizedData) ? files.gstCertificate : null,
+        udyamCertificate: isFieldApplicable('udyam_certificate_url', sanitizedData) ? files.udyamCertificate : null,
+        paymentProof: isFieldApplicable('payment_proof_url', sanitizedData) ? files.paymentProof : null
+      };
+
       const result = await memberRegistrationService.submitRegistration(
         sanitizedData,
-        { ...files, profilePhoto },
+        submissionFiles,
         photoFileName
       );
 
@@ -1058,6 +1342,11 @@ const Join: React.FC = () => {
   const handleVerify = async () => {
     console.log('[Join.tsx] Verification started');
 
+    if (isPreviewMode) {
+      showToast('error', 'Preview mode is read-only.');
+      return;
+    }
+
     if (isLoadingConfig) {
       showToast('error', 'Please wait while the form loads.');
       return;
@@ -1068,18 +1357,34 @@ const Join: React.FC = () => {
       return;
     }
 
-    const isValid = await validateForm(formData);
-    if (!isValid) {
-      return;
-    }
-
+    setIsVerifying(true);
     try {
-      setIsVerifying(true);
+      const isValid = await validateForm(formData);
+      if (!isValid) {
+        scrollToFirstError(latestErrorsRef.current);
+        return;
+      }
 
-      const normalizationPayload = { ...formData };
-      delete normalizationPayload.email;
-      delete normalizationPayload.mobile_number;
-      delete normalizationPayload.alternate_mobile;
+      const normalizationPayload: Record<string, string> = {};
+      const normalizationFields: Array<keyof JoinFormData> = [
+        'full_name',
+        'company_name',
+        'company_address',
+        'products_services',
+        'alternate_contact_name',
+        'referred_by'
+      ];
+
+      normalizationFields.forEach((fieldName) => {
+        if (!isFieldApplicable(fieldName, formData)) {
+          return;
+        }
+        const value = String(formData[fieldName] ?? '').trim();
+        if (value) {
+          normalizationPayload[fieldName] = value;
+        }
+      });
+
       const raw = await normalizeMemberData(normalizationPayload);
       const adapted = normalizeResultAdapter(raw, formData);
 
@@ -1114,6 +1419,11 @@ const Join: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isPreviewMode) {
+      showToast('error', 'Preview mode is read-only.');
+      return;
+    }
+
     if (!isVerifiedForSubmit) {
       showToast('error', 'Please click Verify before submitting.');
       return;
@@ -1146,17 +1456,35 @@ const Join: React.FC = () => {
     }
   }, [normalizationOriginalSnapshot]);
 
-  // Show loading state while checking authentication or existing registration
-  if (isLoadingConfig || isLoadingValidation || isLoadingAuth || isCheckingExisting) {
+  const isBlockingAuthLoad = !isPreviewMode && (isLoadingAuth || isCheckingExisting);
+
+  // Show loading state while loading form config/validation and (for normal mode) auth checks.
+  if (isLoadingConfig || isLoadingValidation || isBlockingAuthLoad) {
     return (
       <div className="flex items-center justify-center min-h-screen py-8">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {isLoadingAuth ? 'Checking authentication...' :
-             isCheckingExisting ? 'Checking registration status...' :
+            {isBlockingAuthLoad && isLoadingAuth ? 'Checking authentication...' :
+             isBlockingAuthLoad && isCheckingExisting ? 'Checking registration status...' :
              'Loading form...'}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (previewBlockReason) {
+    const message = previewBlockReason === 'access_denied'
+      ? "You don't have permission to preview form drafts."
+      : 'Draft preview could not be loaded. Please try again or contact your administrator.';
+
+    return (
+      <div className="min-h-screen py-12 px-4 flex items-center justify-center">
+        <div className="max-w-md w-full text-center space-y-4">
+          <Lock className="w-10 h-10 text-muted-foreground/50 mx-auto" />
+          <p className="text-sm font-medium text-foreground">{message}</p>
+          <Link to="/" className="text-sm text-primary hover:text-primary/80">Back to Home</Link>
         </div>
       </div>
     );
@@ -1174,25 +1502,25 @@ const Join: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Join LUB</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Member Registration</h1>
           <p className="text-muted-foreground">Complete your membership registration</p>
         </div>
 
         {/* Registration Form */}
-        <div className="bg-card rounded-lg shadow-md p-8">
+        <div className="bg-card rounded-lg shadow-sm p-8">
           {/* Form Error Banner */}
           {formErrorMessage && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
-              <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
-              <p className="text-red-800 text-sm font-medium">{formErrorMessage}</p>
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start">
+              <AlertCircle className="w-5 h-5 text-destructive mr-3 mt-0.5 flex-shrink-0" />
+              <p className="text-destructive text-sm font-medium">{formErrorMessage}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="space-y-8">
             {/* Personal Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <User className="w-5 h-5 mr-2 text-blue-600" />
+                <User className="w-5 h-5 mr-2 text-primary" />
                 Personal Information
               </h2>
 
@@ -1200,7 +1528,7 @@ const Join: React.FC = () => {
                 {isFieldVisible('full_name') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Full Name{isFieldRequired('full_name') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('full_name', 'Full Name')}{isFieldRequired('full_name') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1209,20 +1537,21 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       onBlur={() => validateField('full_name')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.full_name ? 'border-red-500' : 'border-border'
+                        errors.full_name ? 'border-destructive' : 'border-border'
                       }`}
-                      placeholder="Enter your full name"
+                      placeholder={resolveFieldPlaceholder('full_name', 'Enter your full name')}
                       required={isFieldRequired('full_name')}
+                      maxLength={getFieldMaxLength('full_name') ?? undefined}
                     />
 
-                    {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name}</p>}
+                    {errors.full_name && <p className="text-destructive text-sm mt-1">{errors.full_name}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('gender') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Gender{isFieldRequired('gender') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('gender', 'Gender')}{isFieldRequired('gender') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="gender"
@@ -1230,21 +1559,22 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       required={isFieldRequired('gender')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                      errors.gender ? 'border-red-500' : 'border-border'
+                      errors.gender ? 'border-destructive' : 'border-border'
                     }`}
                   >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
+                    <option value="">{resolveFieldPlaceholder('gender', 'Select Gender')}</option>
+                    {resolveFieldOptions('gender', ['Male', 'Female']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                   </select>
-                  {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
+                  {errors.gender && <p className="text-destructive text-sm mt-1">{errors.gender}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('date_of_birth') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Date of Birth{isFieldRequired('date_of_birth') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('date_of_birth', 'Date of Birth')}{isFieldRequired('date_of_birth') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="date"
@@ -1252,11 +1582,11 @@ const Join: React.FC = () => {
                       value={formData.date_of_birth}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.date_of_birth ? 'border-red-500' : 'border-border'
+                        errors.date_of_birth ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('date_of_birth')}
                     />
-                    {errors.date_of_birth && <p className="text-red-500 text-sm mt-1">{errors.date_of_birth}</p>}
+                    {errors.date_of_birth && <p className="text-destructive text-sm mt-1">{errors.date_of_birth}</p>}
                   </div>
                 )}
 
@@ -1296,7 +1626,7 @@ const Join: React.FC = () => {
                         />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-green-600 font-medium mb-2 flex items-center">
+                        <p className="text-sm text-primary font-medium mb-2 flex items-center">
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Photo ready
                         </p>
@@ -1306,7 +1636,7 @@ const Join: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleRemovePhoto}
-                          className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                          className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-destructive bg-destructive/10 rounded-lg hover:bg-destructive/20 transition-colors"
                         >
                           <XIcon className="w-4 h-4 mr-1" />
                           Remove Photo
@@ -1319,7 +1649,7 @@ const Join: React.FC = () => {
                 {isFieldVisible('email') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Email Address{isFieldRequired('email') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('email', 'Email Address')}{isFieldRequired('email') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1329,18 +1659,19 @@ const Join: React.FC = () => {
                       onBlur={() => validateField('email')}
                       readOnly={isAuthenticated}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.email ? 'border-red-500' : 'border-border'
+                        errors.email ? 'border-destructive' : 'border-border'
                       } ${isAuthenticated ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                       required={isFieldRequired('email')}
+                      maxLength={getFieldMaxLength('email') ?? undefined}
                   />
-                  {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                  {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('mobile_number') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Mobile Number{isFieldRequired('mobile_number') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('mobile_number', 'Mobile Number')}{isFieldRequired('mobile_number') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1348,14 +1679,15 @@ const Join: React.FC = () => {
                       value={formData.mobile_number}
                       onChange={handleMobileNumberChange}
                       onBlur={() => validateField('mobile_number')}
-                      placeholder="10-digit mobile number"
+                      placeholder={resolveFieldPlaceholder('mobile_number', '10-digit mobile number')}
                       readOnly={isAuthenticated}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.mobile_number ? 'border-red-500' : 'border-border'
+                        errors.mobile_number ? 'border-destructive' : 'border-border'
                       } ${isAuthenticated ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                       required={isFieldRequired('mobile_number')}
+                      maxLength={getFieldMaxLength('mobile_number') ?? undefined}
                   />
-                  {errors.mobile_number && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
+                  {errors.mobile_number && <p className="text-destructive text-sm mt-1">{errors.mobile_number}</p>}
                   </div>
                 )}
               </div>
@@ -1364,7 +1696,7 @@ const Join: React.FC = () => {
             {/* Payment Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <Phone className="w-5 h-5 mr-2 text-blue-600" />
+                <Phone className="w-5 h-5 mr-2 text-primary" />
                 Payment Information
               </h2>
               
@@ -1372,27 +1704,27 @@ const Join: React.FC = () => {
                 {isFieldVisible('amount_paid') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Amount Paid{isFieldRequired('amount_paid') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('amount_paid', 'Amount Paid')}{isFieldRequired('amount_paid') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
                       name="amount_paid"
                       value={formData.amount_paid}
                       onChange={handleInputChange}
-                      placeholder="Select state and gender first"
+                      placeholder={resolveFieldPlaceholder('amount_paid', 'Select state and gender first')}
                       disabled
                       className={`w-full px-3 py-2 border rounded-lg bg-muted/50 cursor-not-allowed ${
-                        errors.amount_paid ? 'border-red-500' : 'border-border'
+                        errors.amount_paid ? 'border-destructive' : 'border-border'
                       }`}
                     />
-                    {errors.amount_paid && <p className="text-red-500 text-sm mt-1">{errors.amount_paid}</p>}
+                    {errors.amount_paid && <p className="text-destructive text-sm mt-1">{errors.amount_paid}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('payment_date') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Payment Date{isFieldRequired('payment_date') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('payment_date', 'Payment Date')}{isFieldRequired('payment_date') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="date"
@@ -1400,88 +1732,109 @@ const Join: React.FC = () => {
                       value={formData.payment_date}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.payment_date ? 'border-red-500' : 'border-border'
+                        errors.payment_date ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('payment_date')}
                     />
-                    {errors.payment_date && <p className="text-red-500 text-sm mt-1">{errors.payment_date}</p>}
+                    {errors.payment_date && <p className="text-destructive text-sm mt-1">{errors.payment_date}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('payment_mode') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Payment Mode{isFieldRequired('payment_mode') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('payment_mode', 'Payment Mode')}{isFieldRequired('payment_mode') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="payment_mode"
                       value={formData.payment_mode}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.payment_mode ? 'border-red-500' : 'border-border'
+                        errors.payment_mode ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('payment_mode')}
                     >
-                    <option value="">Select Payment Mode</option>
-                    <option value="QR Code / UPI">QR Code / UPI</option>
-                    <option value="Bank Transfer (NEFT/RTGS/IMPS)">Bank Transfer (NEFT/RTGS/IMPS)</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Demand Draft">Demand Draft</option>
-                    <option value="Cash">Cash</option>
+                    <option value="">{resolveFieldPlaceholder('payment_mode', 'Select Payment Mode')}</option>
+                    {resolveFieldOptions('payment_mode', ['QR Code / UPI', 'Bank Transfer (NEFT/RTGS/IMPS)', 'Cheque', 'Demand Draft', 'Cash']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                     </select>
-                    {errors.payment_mode && <p className="text-red-500 text-sm mt-1">{errors.payment_mode}</p>}
+                    {errors.payment_mode && <p className="text-destructive text-sm mt-1">{errors.payment_mode}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('transaction_id') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Transaction ID / Reference{isFieldRequired('transaction_id') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('transaction_id', 'Transaction ID / Reference')}{isFieldRequired('transaction_id') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
+                      id="transaction_id"
                       name="transaction_id"
                       value={formData.transaction_id}
                       onChange={handleInputChange}
-                      placeholder="Transaction ID or reference number"
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      onBlur={() => validateField('transaction_id')}
+                      placeholder={resolveFieldPlaceholder('transaction_id', 'Transaction ID or reference number')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.transaction_id ? 'border-destructive' : 'border-border'
+                      }`}
                       required={isFieldRequired('transaction_id')}
+                      maxLength={getFieldMaxLength('transaction_id') ?? undefined}
                     />
+                    {errors.transaction_id && <p className="text-destructive text-sm mt-1">{errors.transaction_id}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('bank_reference') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Bank Reference{isFieldRequired('bank_reference') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('bank_reference', 'Bank Reference')}{isFieldRequired('bank_reference') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
+                      id="bank_reference"
                       name="bank_reference"
                       value={formData.bank_reference}
                       onChange={handleInputChange}
-                      placeholder="Bank reference number (if any)"
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      onBlur={() => validateField('bank_reference')}
+                      placeholder={resolveFieldPlaceholder('bank_reference', 'Bank reference number (if any)')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.bank_reference ? 'border-destructive' : 'border-border'
+                      }`}
                       required={isFieldRequired('bank_reference')}
+                      maxLength={getFieldMaxLength('bank_reference') ?? undefined}
                     />
+                    {errors.bank_reference && <p className="text-destructive text-sm mt-1">{errors.bank_reference}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('payment_proof_url') && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Payment Proof{isFieldRequired('payment_proof_url') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')}{isFieldRequired('payment_proof_url') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
+                      id="payment_proof_url"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('paymentProof', e.target.files?.[0] || null)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.payment_proof ? 'border-red-500' : 'border-border'
-                      }`}
+                      className="sr-only"
                     />
+                    <label
+                      htmlFor="payment_proof_url"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.payment_proof_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {files.paymentProof ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {files.paymentProof && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.paymentProof.name}</p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">Upload screenshot or receipt of your membership fee payment</p>
-                    {errors.payment_proof && <p className="text-red-500 text-sm mt-1">{errors.payment_proof}</p>}
+                    {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
                   </div>
                 )}
               </div>
@@ -1490,7 +1843,7 @@ const Join: React.FC = () => {
             {/* Company Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+                <Building2 className="w-5 h-5 mr-2 text-primary" />
                 Company Information
               </h2>
 
@@ -1498,7 +1851,7 @@ const Join: React.FC = () => {
                 {isFieldVisible('company_name') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Company Name{isFieldRequired('company_name') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('company_name', 'Company Name')}{isFieldRequired('company_name') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1506,19 +1859,20 @@ const Join: React.FC = () => {
                       value={formData.company_name}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.company_name ? 'border-red-500' : 'border-border'
+                        errors.company_name ? 'border-destructive' : 'border-border'
                       }`}
-                      placeholder="Enter your company name"
+                      placeholder={resolveFieldPlaceholder('company_name', 'Enter your company name')}
                       required={isFieldRequired('company_name')}
+                      maxLength={getFieldMaxLength('company_name') ?? undefined}
                     />
-                    {errors.company_name && <p className="text-red-500 text-sm mt-1">{errors.company_name}</p>}
+                    {errors.company_name && <p className="text-destructive text-sm mt-1">{errors.company_name}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('company_designation_id') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Designation{isFieldRequired('company_designation_id') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('company_designation_id', 'Designation')}{isFieldRequired('company_designation_id') && <span className="text-destructive ml-1">*</span>}
                   </label>
                   {isLoadingDesignations ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
@@ -1531,11 +1885,11 @@ const Join: React.FC = () => {
                       value={formData.company_designation_id}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.company_designation_id ? 'border-red-500' : 'border-border'
+                        errors.company_designation_id ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('company_designation_id')}
                     >
-                      <option value="">Select Designation</option>
+                      <option value="">{resolveFieldPlaceholder('company_designation_id', 'Select Designation')}</option>
                       {availableDesignations.map(designation => (
                         <option key={designation.id} value={designation.id}>
                           {designation.designation_name}
@@ -1543,7 +1897,7 @@ const Join: React.FC = () => {
                       ))}
                     </select>
                   )}
-                  {errors.company_designation_id && <p className="text-red-500 text-sm mt-1">{errors.company_designation_id}</p>}
+                  {errors.company_designation_id && <p className="text-destructive text-sm mt-1">{errors.company_designation_id}</p>}
                   </div>
                 )}
               </div>
@@ -1552,7 +1906,7 @@ const Join: React.FC = () => {
             {/* Location Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+                <MapPin className="w-5 h-5 mr-2 text-primary" />
                 Location Information
               </h2>
               
@@ -1561,7 +1915,7 @@ const Join: React.FC = () => {
                 {isFieldVisible('state') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      State{isFieldRequired('state') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('state', 'State')}{isFieldRequired('state') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     {isLoadingStates ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
@@ -1574,11 +1928,11 @@ const Join: React.FC = () => {
                       value={formData.state}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.state ? 'border-red-500' : 'border-border'
+                        errors.state ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('state')}
                     >
-                      <option value="">Select State</option>
+                      <option value="">{resolveFieldPlaceholder('state', 'Select State')}</option>
                       {availableStates.map(state => (
                         <option key={state.state} value={state.state}>
                           {state.state}
@@ -1586,7 +1940,7 @@ const Join: React.FC = () => {
                       ))}
                     </select>
                   )}
-                  {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
+                  {errors.state && <p className="text-destructive text-sm mt-1">{errors.state}</p>}
                   </div>
                 )}
 
@@ -1594,7 +1948,7 @@ const Join: React.FC = () => {
                 {isFieldVisible('district') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      District{isFieldRequired('district') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('district', 'District')}{isFieldRequired('district') && <span className="text-destructive ml-1">*</span>}
                     </label>
                   {isLoadingDistricts ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
@@ -1608,7 +1962,7 @@ const Join: React.FC = () => {
                       onChange={handleDistrictChange}
                       disabled={!formData.state}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed ${
-                        errors.district ? 'border-red-500' : 'border-border'
+                        errors.district ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('district')}
                     >
@@ -1622,7 +1976,7 @@ const Join: React.FC = () => {
                       ))}
                     </select>
                   )}
-                  {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
+                  {errors.district && <p className="text-destructive text-sm mt-1">{errors.district}</p>}
                   </div>
                 )}
 
@@ -1630,7 +1984,7 @@ const Join: React.FC = () => {
                 {isFieldVisible('city') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      City/Town/Village{isFieldRequired('city') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('city', 'City/Town/Village')}{isFieldRequired('city') && <span className="text-destructive ml-1">*</span>}
                     </label>
                   {isLoadingCities ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 flex items-center">
@@ -1644,7 +1998,7 @@ const Join: React.FC = () => {
                       onChange={handleCityChange}
                       disabled={!selectedDistrictId}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed ${
-                        errors.city ? 'border-red-500' : 'border-border'
+                        errors.city ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('city')}
                     >
@@ -1659,7 +2013,7 @@ const Join: React.FC = () => {
                       <option value="Other">Other</option>
                     </select>
                   )}
-                  {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+                  {errors.city && <p className="text-destructive text-sm mt-1">{errors.city}</p>}
                   </div>
                 )}
 
@@ -1667,27 +2021,27 @@ const Join: React.FC = () => {
                 {showOtherCity && isFieldVisible('city') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Enter City/Town/Village{isFieldRequired('city') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('other_city_name', 'Enter City/Town/Village')}{isFieldRequired('city') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
                       value={otherCityText}
                       onChange={handleOtherCityChange}
-                      placeholder="Enter your city, town, or village"
+                      placeholder={resolveFieldPlaceholder('other_city_name', 'Enter your city, town, or village')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.city ? 'border-red-500' : 'border-border'
+                        errors.city ? 'border-destructive' : 'border-border'
                       }`}
                       required={formData.city === 'Other'}
                     />
                     <p className="text-xs text-muted-foreground mt-1">Enter your city, town, or village name</p>
-                    {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+                    {errors.city && <p className="text-destructive text-sm mt-1">{errors.city}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('pin_code') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      PIN Code{isFieldRequired('pin_code') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('pin_code', 'PIN Code')}{isFieldRequired('pin_code') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1695,20 +2049,21 @@ const Join: React.FC = () => {
                       value={formData.pin_code}
                       onChange={handlePinCodeChange}
                       onBlur={() => validateField('pin_code')}
-                      placeholder="6-digit PIN code"
+                      placeholder={resolveFieldPlaceholder('pin_code', '6-digit PIN code')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.pin_code ? 'border-red-500' : 'border-border'
+                        errors.pin_code ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('pin_code')}
+                      maxLength={getFieldMaxLength('pin_code') ?? undefined}
                     />
-                    {errors.pin_code && <p className="text-red-500 text-sm mt-1">{errors.pin_code}</p>}
+                    {errors.pin_code && <p className="text-destructive text-sm mt-1">{errors.pin_code}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('company_address') && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Company Address{isFieldRequired('company_address') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('company_address', 'Company Address')}{isFieldRequired('company_address') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <textarea
                       name="company_address"
@@ -1716,11 +2071,12 @@ const Join: React.FC = () => {
                       onChange={handleInputChange}
                       rows={3}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.company_address ? 'border-red-500' : 'border-border'
+                        errors.company_address ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('company_address')}
+                      maxLength={getFieldMaxLength('company_address') ?? undefined}
                     />
-                    {errors.company_address && <p className="text-red-500 text-sm mt-1">{errors.company_address}</p>}
+                    {errors.company_address && <p className="text-destructive text-sm mt-1">{errors.company_address}</p>}
                   </div>
                 )}
               </div>
@@ -1729,7 +2085,7 @@ const Join: React.FC = () => {
             {/* Business Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+                <Building2 className="w-5 h-5 mr-2 text-primary" />
                 Business Information
               </h2>
               
@@ -1737,169 +2093,166 @@ const Join: React.FC = () => {
                 {isFieldVisible('industry') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Industry{isFieldRequired('industry') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('industry', 'Industry')}{isFieldRequired('industry') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="industry"
                       value={formData.industry}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.industry ? 'border-red-500' : 'border-border'
+                        errors.industry ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('industry')}
                     >
-                    <option value="">Select Industry</option>
-                    <option value="Micro">Micro</option>
-                    <option value="Small">Small</option>
-                    <option value="Medium">Medium</option>
+                    <option value="">{resolveFieldPlaceholder('industry', 'Select Industry')}</option>
+                    {resolveFieldOptions('industry', ['Micro', 'Small', 'Medium']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                     </select>
-                    {errors.industry && <p className="text-red-500 text-sm mt-1">{errors.industry}</p>}
+                    {errors.industry && <p className="text-destructive text-sm mt-1">{errors.industry}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('activity_type') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Activity Type{isFieldRequired('activity_type') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('activity_type', 'Activity Type')}{isFieldRequired('activity_type') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="activity_type"
                       value={formData.activity_type}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.activity_type ? 'border-red-500' : 'border-border'
+                        errors.activity_type ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('activity_type')}
                     >
-                    <option value="">Select Activity Type</option>
-                    <option value="Manufacturer">Manufacturer</option>
-                    <option value="Service Provider">Service Provider</option>
-                    <option value="Trader">Trader</option>
-                  </select>
-                  {errors.activity_type && <p className="text-red-500 text-sm mt-1">{errors.activity_type}</p>}
+                    <option value="">{resolveFieldPlaceholder('activity_type', 'Select Activity Type')}</option>
+                    {resolveFieldOptions('activity_type', ['Manufacturer', 'Service Provider', 'Trader']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                    </select>
+                  {errors.activity_type && <p className="text-destructive text-sm mt-1">{errors.activity_type}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('constitution') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Industry Constitution{isFieldRequired('constitution') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('constitution', 'Industry Constitution')}{isFieldRequired('constitution') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="constitution"
                       value={formData.constitution}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.constitution ? 'border-red-500' : 'border-border'
+                        errors.constitution ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('constitution')}
                     >
-                    <option value="">Select Industry Constitution</option>
-                    <option value="Proprietorship">Proprietorship</option>
-                    <option value="Partnership">Partnership</option>
-                    <option value="Limited Liability Partnership">Limited Liability Partnership</option>
-                    <option value="One Person Company">One Person Company</option>
-                    <option value="Private Limited Company">Private Limited Company</option>
-                    <option value="Limited Company">Limited Company</option>
+                    <option value="">{resolveFieldPlaceholder('constitution', 'Select Industry Constitution')}</option>
+                    {resolveFieldOptions('constitution', ['Proprietorship', 'Partnership', 'Limited Liability Partnership', 'One Person Company', 'Private Limited Company', 'Limited Company']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                     </select>
-                    {errors.constitution && <p className="text-red-500 text-sm mt-1">{errors.constitution}</p>}
+                    {errors.constitution && <p className="text-destructive text-sm mt-1">{errors.constitution}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('annual_turnover') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Annual Turnover{isFieldRequired('annual_turnover') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('annual_turnover', 'Annual Turnover')}{isFieldRequired('annual_turnover') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="annual_turnover"
                       value={formData.annual_turnover}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.annual_turnover ? 'border-red-500' : 'border-border'
+                        errors.annual_turnover ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('annual_turnover')}
                     >
-                    <option value="">Select Annual Turnover</option>
-                    <option value="Less than 50 Lakhs">Less than 50 Lakhs</option>
-                    <option value="50 Lakhs - 1 Crore">50 Lakhs - 1 Crore</option>
-                    <option value="1 Crore - 5 Crores">1 Crore - 5 Crores</option>
-                    <option value="5 Crores - 10 Crores">5 Crores - 10 Crores</option>
-                    <option value="10 Crores - 25 Crores">10 Crores - 25 Crores</option>
-                    <option value="Above 25 Crores">Above 25 Crores</option>
+                    <option value="">{resolveFieldPlaceholder('annual_turnover', 'Select Annual Turnover')}</option>
+                    {resolveFieldOptions('annual_turnover', ['Less than 50 Lakhs', '50 Lakhs - 1 Crore', '1 Crore - 5 Crores', '5 Crores - 10 Crores', '10 Crores - 25 Crores', 'Above 25 Crores']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                     </select>
-                    {errors.annual_turnover && <p className="text-red-500 text-sm mt-1">{errors.annual_turnover}</p>}
+                    {errors.annual_turnover && <p className="text-destructive text-sm mt-1">{errors.annual_turnover}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('number_of_employees') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Number of Employees{isFieldRequired('number_of_employees') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('number_of_employees', 'Number of Employees')}{isFieldRequired('number_of_employees') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="number_of_employees"
                       value={formData.number_of_employees}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.number_of_employees ? 'border-red-500' : 'border-border'
+                        errors.number_of_employees ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('number_of_employees')}
                     >
-                    <option value="">Select Number of Employees</option>
-                    <option value="Less than 5 employees">Less than 5 employees</option>
-                    <option value="6 to 10 employees">6 to 10 employees</option>
-                    <option value="11 to 20 employees">11 to 20 employees</option>
-                    <option value="21 to 50 employees">21 to 50 employees</option>
-                    <option value="51 to 100 employees">51 to 100 employees</option>
-                    <option value="101 to 150 employees">101 to 150 employees</option>
-                    <option value="Above 151 employees">Above 151 employees</option>
+                    <option value="">{resolveFieldPlaceholder('number_of_employees', 'Select Number of Employees')}</option>
+                    {resolveFieldOptions('number_of_employees', ['Less than 5 employees', '6 to 10 employees', '11 to 20 employees', '21 to 50 employees', '51 to 100 employees', '101 to 150 employees', 'Above 151 employees']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                     </select>
-                    {errors.number_of_employees && <p className="text-red-500 text-sm mt-1">{errors.number_of_employees}</p>}
+                    {errors.number_of_employees && <p className="text-destructive text-sm mt-1">{errors.number_of_employees}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('products_services') && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Products & Services{isFieldRequired('products_services') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('products_services', 'Products & Services')}{isFieldRequired('products_services') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <textarea
                       name="products_services"
                       value={formData.products_services}
                       onChange={handleInputChange}
                       rows={3}
-                      placeholder="Describe your main products and services"
+                      placeholder={resolveFieldPlaceholder('products_services', 'Describe your main products and services')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.products_services ? 'border-red-500' : 'border-border'
+                        errors.products_services ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('products_services')}
+                      maxLength={getFieldMaxLength('products_services') ?? undefined}
                     />
-                    {errors.products_services && <p className="text-red-500 text-sm mt-1">{errors.products_services}</p>}
+                    {errors.products_services && <p className="text-destructive text-sm mt-1">{errors.products_services}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('brand_names') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Brand Names{isFieldRequired('brand_names') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('brand_names', 'Brand Names')}{isFieldRequired('brand_names') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
+                      id="brand_names"
                       name="brand_names"
                       value={formData.brand_names}
                       onChange={handleInputChange}
-                      placeholder="Your brand names (if any)"
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      onBlur={() => validateField('brand_names')}
+                      placeholder={resolveFieldPlaceholder('brand_names', 'Your brand names (if any)')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.brand_names ? 'border-destructive' : 'border-border'
+                      }`}
                       required={isFieldRequired('brand_names')}
+                      maxLength={getFieldMaxLength('brand_names') ?? undefined}
                     />
+                    {errors.brand_names && <p className="text-destructive text-sm mt-1">{errors.brand_names}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('website') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Website{isFieldRequired('website') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('website', 'Website')}{isFieldRequired('website') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1907,13 +2260,14 @@ const Join: React.FC = () => {
                       value={formData.website}
                       onChange={handleInputChange}
                       onBlur={() => validateField('website')}
-                      placeholder="www.yourcompany.com"
+                      placeholder={resolveFieldPlaceholder('website', 'www.yourcompany.com')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.website ? 'border-red-500' : 'border-border'
+                        errors.website ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('website')}
+                      maxLength={getFieldMaxLength('website') ?? undefined}
                     />
-                    {errors.website && <p className="text-red-500 text-sm mt-1">{errors.website}</p>}
+                    {errors.website && <p className="text-destructive text-sm mt-1">{errors.website}</p>}
                   </div>
                 )}
               </div>
@@ -1922,7 +2276,7 @@ const Join: React.FC = () => {
             {/* Registration Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                <FileText className="w-5 h-5 mr-2 text-primary" />
                 Registration Information
               </h2>
               
@@ -1930,29 +2284,30 @@ const Join: React.FC = () => {
                 {isFieldVisible('gst_registered') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      GST Registered{isFieldRequired('gst_registered') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('gst_registered', 'GST Registered')}{isFieldRequired('gst_registered') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="gst_registered"
                       value={formData.gst_registered}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.gst_registered ? 'border-red-500' : 'border-border'
+                        errors.gst_registered ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('gst_registered')}
                     >
-                    <option value="">Select</option>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
+                    <option value="">{resolveFieldPlaceholder('gst_registered', 'Select')}</option>
+                    {resolveFieldOptions('gst_registered', ['Yes', 'No']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                     </select>
-                    {errors.gst_registered && <p className="text-red-500 text-sm mt-1">{errors.gst_registered}</p>}
+                    {errors.gst_registered && <p className="text-destructive text-sm mt-1">{errors.gst_registered}</p>}
                   </div>
                 )}
 
                 {formData.gst_registered === 'yes' && isFieldVisible('gst_number') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      GST Number{isFieldRequired('gst_number') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('gst_number', 'GST Number')}{isFieldRequired('gst_number') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1960,20 +2315,21 @@ const Join: React.FC = () => {
                       value={formData.gst_number}
                       onChange={handleGstChange}
                       onBlur={() => validateField('gst_number')}
-                      placeholder="22AAAAA0000A1Z5"
+                      placeholder={resolveFieldPlaceholder('gst_number', '22AAAAA0000A1Z5')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.gst_number ? 'border-red-500' : 'border-border'
+                        errors.gst_number ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('gst_number')}
+                      maxLength={getFieldMaxLength('gst_number') ?? undefined}
                     />
-                    {errors.gst_number && <p className="text-red-500 text-sm mt-1">{errors.gst_number}</p>}
+                    {errors.gst_number && <p className="text-destructive text-sm mt-1">{errors.gst_number}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('pan_company') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      PAN (Company){isFieldRequired('pan_company') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('pan_company', 'PAN (Company)')}{isFieldRequired('pan_company') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -1981,57 +2337,60 @@ const Join: React.FC = () => {
                       value={formData.pan_company}
                       onChange={handlePanChange}
                       onBlur={() => validateField('pan_company')}
-                      placeholder="10 alphanumeric characters"
+                      placeholder={resolveFieldPlaceholder('pan_company', '10 alphanumeric characters')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.pan_company ? 'border-red-500' : 'border-border'
+                        errors.pan_company ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('pan_company')}
+                      maxLength={getFieldMaxLength('pan_company') ?? undefined}
                     />
-                    {errors.pan_company && <p className="text-red-500 text-sm mt-1">{errors.pan_company}</p>}
+                    {errors.pan_company && <p className="text-destructive text-sm mt-1">{errors.pan_company}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('esic_registered') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      ESIC Registered{isFieldRequired('esic_registered') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('esic_registered', 'ESIC Registered')}{isFieldRequired('esic_registered') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="esic_registered"
                       value={formData.esic_registered}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.esic_registered ? 'border-red-500' : 'border-border'
+                        errors.esic_registered ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('esic_registered')}
                     >
-                    <option value="">Select</option>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
+                    <option value="">{resolveFieldPlaceholder('esic_registered', 'Select')}</option>
+                    {resolveFieldOptions('esic_registered', ['Yes', 'No']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                     </select>
-                    {errors.esic_registered && <p className="text-red-500 text-sm mt-1">{errors.esic_registered}</p>}
+                    {errors.esic_registered && <p className="text-destructive text-sm mt-1">{errors.esic_registered}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('epf_registered') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      EPF Registered{isFieldRequired('epf_registered') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('epf_registered', 'EPF Registered')}{isFieldRequired('epf_registered') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <select
                       name="epf_registered"
                       value={formData.epf_registered}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.epf_registered ? 'border-red-500' : 'border-border'
+                        errors.epf_registered ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('epf_registered')}
                     >
-                    <option value="">Select</option>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
+                    <option value="">{resolveFieldPlaceholder('epf_registered', 'Select')}</option>
+                    {resolveFieldOptions('epf_registered', ['Yes', 'No']).map(option => (
+                      <option key={option} value={option.toLowerCase()}>{option}</option>
+                    ))}
                     </select>
-                    {errors.epf_registered && <p className="text-red-500 text-sm mt-1">{errors.epf_registered}</p>}
+                    {errors.epf_registered && <p className="text-destructive text-sm mt-1">{errors.epf_registered}</p>}
                   </div>
                 )}
               </div>
@@ -2040,7 +2399,7 @@ const Join: React.FC = () => {
             {/* Document Uploads */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <Upload className="w-5 h-5 mr-2 text-blue-600" />
+                <Upload className="w-5 h-5 mr-2 text-primary" />
                 Document Uploads
               </h2>
               
@@ -2048,30 +2407,58 @@ const Join: React.FC = () => {
                 {formData.gst_registered === 'yes' && isFieldVisible('gst_certificate_url') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      GST Certificate{isFieldRequired('gst_certificate_url') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('gst_certificate_url', 'GST Certificate')}{isFieldRequired('gst_certificate_url') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
+                      id="gst_certificate_url"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('gstCertificate', e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      className="sr-only"
                     />
+                    <label
+                      htmlFor="gst_certificate_url"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.gst_certificate_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {files.gstCertificate ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {files.gstCertificate && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.gstCertificate.name}</p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG (Max 10MB)</p>
+                    {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('udyam_certificate_url') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      UDYAM Certificate{isFieldRequired('udyam_certificate_url') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('udyam_certificate_url', 'UDYAM Certificate')}{isFieldRequired('udyam_certificate_url') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
+                      id="udyam_certificate_url"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('udyamCertificate', e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      className="sr-only"
                     />
+                    <label
+                      htmlFor="udyam_certificate_url"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.udyam_certificate_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {files.udyamCertificate ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {files.udyamCertificate && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.udyamCertificate.name}</p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG (Max 10MB)</p>
+                    {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}
                   </div>
                 )}
 
@@ -2081,7 +2468,7 @@ const Join: React.FC = () => {
             {/* Additional Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <User className="w-5 h-5 mr-2 text-blue-600" />
+                <User className="w-5 h-5 mr-2 text-primary" />
                 Additional Information
               </h2>
               
@@ -2089,24 +2476,30 @@ const Join: React.FC = () => {
                 {isFieldVisible('alternate_contact_name') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Alternate Contact Name{isFieldRequired('alternate_contact_name') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('alternate_contact_name', 'Alternate Contact Name')}{isFieldRequired('alternate_contact_name') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
+                      id="alternate_contact_name"
                       name="alternate_contact_name"
                       value={formData.alternate_contact_name}
                       onChange={handleInputChange}
-                      placeholder="Alternate contact person name"
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      onBlur={() => validateField('alternate_contact_name')}
+                      placeholder={resolveFieldPlaceholder('alternate_contact_name', 'Alternate contact person name')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.alternate_contact_name ? 'border-destructive' : 'border-border'
+                      }`}
                       required={isFieldRequired('alternate_contact_name')}
+                      maxLength={getFieldMaxLength('alternate_contact_name') ?? undefined}
                     />
+                    {errors.alternate_contact_name && <p className="text-destructive text-sm mt-1">{errors.alternate_contact_name}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('alternate_mobile') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Alternate Mobile{isFieldRequired('alternate_mobile') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('alternate_mobile', 'Alternate Mobile')}{isFieldRequired('alternate_mobile') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
@@ -2114,30 +2507,37 @@ const Join: React.FC = () => {
                       value={formData.alternate_mobile}
                       onChange={handleMobileNumberChange}
                       onBlur={() => validateField('alternate_mobile')}
-                      placeholder="Alternate mobile number"
+                      placeholder={resolveFieldPlaceholder('alternate_mobile', 'Alternate mobile number')}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.alternate_mobile ? 'border-red-500' : 'border-border'
+                        errors.alternate_mobile ? 'border-destructive' : 'border-border'
                       }`}
                       required={isFieldRequired('alternate_mobile')}
+                      maxLength={getFieldMaxLength('alternate_mobile') ?? undefined}
                     />
-                    {errors.alternate_mobile && <p className="text-red-500 text-sm mt-1">{errors.alternate_mobile}</p>}
+                    {errors.alternate_mobile && <p className="text-destructive text-sm mt-1">{errors.alternate_mobile}</p>}
                   </div>
                 )}
 
                 {isFieldVisible('referred_by') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Referred By{isFieldRequired('referred_by') && <span className="text-red-500 ml-1">*</span>}
+                      {resolveFieldLabel('referred_by', 'Referred By')}{isFieldRequired('referred_by') && <span className="text-destructive ml-1">*</span>}
                     </label>
                     <input
                       type="text"
+                      id="referred_by"
                       name="referred_by"
                       value={formData.referred_by}
                       onChange={handleInputChange}
-                      placeholder="Name of the person who referred you"
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      onBlur={() => validateField('referred_by')}
+                      placeholder={resolveFieldPlaceholder('referred_by', 'Name of the person who referred you')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.referred_by ? 'border-destructive' : 'border-border'
+                      }`}
                       required={isFieldRequired('referred_by')}
+                      maxLength={getFieldMaxLength('referred_by') ?? undefined}
                     />
+                    {errors.referred_by && <p className="text-destructive text-sm mt-1">{errors.referred_by}</p>}
                   </div>
                 )}
               </div>
@@ -2146,7 +2546,7 @@ const Join: React.FC = () => {
             {/* Submit Button */}
             <div className="flex flex-col sm:flex-row gap-4 justify-end pt-8 border-t border-border">
               <Link
-                to="/dashboard"
+                to={isPreviewMode ? '/' : '/dashboard'}
                 className="inline-flex items-center justify-center px-6 py-3 border border-border text-base font-medium rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors duration-200 sm:order-1"
               >
                 Cancel
@@ -2155,11 +2555,11 @@ const Join: React.FC = () => {
               <button
                 ref={submitButtonRef}
                 type="submit"
-                disabled={isSubmitting || isVerifying || !isVerifiedForSubmit}
-                className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-2 ${
-                  isSubmitting || isVerifying || !isVerifiedForSubmit
-                    ? 'bg-muted cursor-not-allowed'
-                    : 'bg-primary hover:bg-primary/90'
+                disabled={isPreviewMode || isSubmitting || isVerifying || !isVerifiedForSubmit}
+                className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg transition-colors duration-200 sm:order-2 ${
+                  isPreviewMode || isSubmitting || isVerifying || !isVerifiedForSubmit
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
                 {isSubmitting ? (
@@ -2177,11 +2577,11 @@ const Join: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void handleVerify()}
-                disabled={isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()}
-                className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-colors duration-200 sm:order-3 ${
-                  isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()
-                    ? 'bg-muted cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-700'
+                disabled={isPreviewMode || isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()}
+                className={`inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg transition-colors duration-200 sm:order-3 ${
+                  isPreviewMode || isSubmitting || isVerifying || isVerifiedForSubmit || !hasFormChanges()
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
                 }`}
               >
                 {isVerifying ? (
