@@ -33,8 +33,10 @@ import ImageCropModal from '../components/ImageCropModal';
 import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../lib/imageProcessing';
 import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import FieldCorrectionStepper, { type FieldCorrectionStep } from '../components/FieldCorrectionStepper';
+import SmartUploadDocument from '../components/SmartUploadDocument';
 import { useMember } from '../contexts/useMember';
 import { supabase } from '../lib/supabase';
+import { sessionManager } from '../lib/sessionManager';
 
 const correctionFieldLabels: Record<string, string> = {
   full_name: 'Full Name',
@@ -51,6 +53,247 @@ const JOIN_LIVE_VALIDATION_EXCLUDED_FIELDS = new Set<string>([
   'udyam_certificate_url',
   'payment_proof_url'
 ]);
+
+const EMPTY_JOIN_FORM_DATA = {
+  full_name: '',
+  gender: '',
+  date_of_birth: '',
+  email: '',
+  mobile_number: '',
+  company_name: '',
+  company_designation_id: '',
+  company_address: '',
+  city: '',
+  other_city_name: '',
+  is_custom_city: false,
+  district: '',
+  state: '',
+  pin_code: '',
+  industry: '',
+  activity_type: '',
+  constitution: '',
+  annual_turnover: '',
+  number_of_employees: '',
+  products_services: '',
+  brand_names: '',
+  website: '',
+  gst_registered: '',
+  gst_number: '',
+  pan_company: '',
+  esic_registered: '',
+  epf_registered: '',
+  referred_by: '',
+  amount_paid: '',
+  payment_date: '',
+  payment_mode: '',
+  transaction_id: '',
+  bank_reference: '',
+  alternate_contact_name: '',
+  alternate_mobile: ''
+};
+
+type JoinFormData = typeof EMPTY_JOIN_FORM_DATA;
+type RegistrationEntryStage = 'choice' | 'smart' | 'form';
+
+const JOIN_PREFILL_FIELD_KEYS: Array<keyof JoinFormData> = [
+  'full_name',
+  'gender',
+  'date_of_birth',
+  'email',
+  'mobile_number',
+  'company_name',
+  'company_designation_id',
+  'company_address',
+  'city',
+  'other_city_name',
+  'is_custom_city',
+  'district',
+  'state',
+  'pin_code',
+  'industry',
+  'activity_type',
+  'constitution',
+  'annual_turnover',
+  'number_of_employees',
+  'products_services',
+  'brand_names',
+  'website',
+  'gst_registered',
+  'gst_number',
+  'pan_company',
+  'esic_registered',
+  'epf_registered',
+  'referred_by',
+  'amount_paid',
+  'payment_date',
+  'payment_mode',
+  'transaction_id',
+  'bank_reference',
+  'alternate_contact_name',
+  'alternate_mobile'
+] as const;
+
+const PREFILL_SOURCE_KEY_ALIASES: Partial<Record<keyof JoinFormData, string[]>> = {
+  company_designation_id: ['designation', 'company_designation', 'company_designation_name'],
+  date_of_birth: ['dob'],
+  payment_date: ['transaction_date'],
+  other_city_name: ['other_city', 'custom_city'],
+  transaction_id: ['transaction_reference', 'utr', 'utr_number'],
+  bank_reference: ['reference_number', 'bank_ref']
+};
+
+const isDateField = (fieldKey: keyof JoinFormData): boolean =>
+  fieldKey === 'date_of_birth' || fieldKey === 'payment_date';
+
+const normalizeDateField = (rawValue: string): string => {
+  const value = rawValue.trim();
+  if (!value) {
+    return '';
+  }
+
+  // Handle YYYY-MM-DDTHH:mm:ss and related ISO-like timestamps.
+  const isoPrefix = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoPrefix?.[1]) {
+    return isoPrefix[1];
+  }
+
+  // Handle DD-MM-YYYY or DD/MM/YYYY.
+  const dmy = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  }
+
+  return value;
+};
+
+const normalizeComparableValue = (value: string): string =>
+  value.trim().replace(/\s+/g, ' ').toLowerCase();
+
+const findCaseInsensitiveMatch = (options: string[], candidate: string): string | null => {
+  const normalizedCandidate = normalizeComparableValue(candidate);
+  if (!normalizedCandidate) {
+    return null;
+  }
+
+  return options.find(option => normalizeComparableValue(option) === normalizedCandidate) ?? null;
+};
+
+const sanitizeGstNumber = (value: string): string =>
+  value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const sanitizePanNumber = (value: string): string =>
+  value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const derivePanFromGstNumber = (gstNumber: string): string | null => {
+  const sanitized = sanitizeGstNumber(gstNumber);
+  if (!/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/.test(sanitized)) {
+    return null;
+  }
+  return sanitized.slice(2, 12);
+};
+
+const SMART_UPLOAD_REQUIRED_DOC_OPTIONS = [
+  {
+    value: 'aadhaar_card',
+    label: 'Aadhaar Card',
+    guidance: 'Useful for name, date of birth, and gender autofill.',
+  },
+  {
+    value: 'gst_certificate',
+    label: 'GST Certificate',
+    guidance: 'Useful for GST number, business name, address, and location autofill.',
+  },
+  {
+    value: 'pan_card',
+    label: 'PAN Card (Company)',
+    guidance: 'Useful when PAN is not clearly available from GST data.',
+  },
+  {
+    value: 'payment_proof',
+    label: 'Payment Proof',
+    guidance: 'Required to complete registration payment verification.',
+  },
+  {
+    value: 'udyam_certificate',
+    label: 'UDYAM Certificate',
+    guidance: 'Useful for MSME business details, activity type, and products/services.',
+  },
+  {
+    value: 'others',
+    label: 'Others',
+    guidance: '',
+  },
+] as const;
+
+const SMART_AUTOFILL_ALLOWED = new Set([
+  'full_name', 'date_of_birth', 'gender',
+  'payment_date', 'transaction_id', 'bank_reference',
+  'gst_registered', 'gst_number', 'pan_company',
+  'company_name', 'company_address', 'pin_code',
+  'state', 'district', 'city',
+  'industry', 'activity_type', 'products_services',
+]);
+
+const hasPrefillValue = (fieldKey: keyof JoinFormData, value: unknown): boolean => {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim() !== '';
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+  if (typeof value === 'boolean') {
+    return fieldKey === 'is_custom_city' ? value === true : true;
+  }
+  return false;
+};
+
+const normalizePrefillValue = (fieldKey: keyof JoinFormData, value: unknown): JoinFormData[keyof JoinFormData] => {
+  if (fieldKey === 'is_custom_city') {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y';
+  }
+
+  const textValue = String(value).trim();
+  if (isDateField(fieldKey)) {
+    return normalizeDateField(textValue);
+  }
+  if (fieldKey === 'gender') {
+    return textValue.toLowerCase();
+  }
+  return textValue;
+};
+
+const getPrefillCandidateValue = (
+  source: Record<string, unknown>,
+  fieldKey: keyof JoinFormData
+): unknown => {
+  if (Object.prototype.hasOwnProperty.call(source, fieldKey as string)) {
+    return source[fieldKey as string];
+  }
+
+  const aliases = PREFILL_SOURCE_KEY_ALIASES[fieldKey];
+  if (!aliases?.length) {
+    return undefined;
+  }
+
+  for (const alias of aliases) {
+    if (!Object.prototype.hasOwnProperty.call(source, alias)) {
+      continue;
+    }
+    const aliasValue = source[alias];
+    if (aliasValue !== undefined && aliasValue !== null) {
+      return aliasValue;
+    }
+  }
+
+  return undefined;
+};
 
 const Join: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -76,46 +319,46 @@ const Join: React.FC = () => {
   // Authentication and existing registration state
   const { member, isAuthenticated, isLoading: isLoadingAuth, refreshMember } = useMember();
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
+  const [hasRegistrationRecord, setHasRegistrationRecord] = useState<boolean | null>(
+    isPreviewMode ? true : null
+  );
+  const [registrationStatusError, setRegistrationStatusError] = useState<string | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
-    full_name: '',
-    gender: '',
-    date_of_birth: '',
-    email: '',
-    mobile_number: '',
-    company_name: '',
-    company_designation_id: '',
-    company_address: '',
-    city: '',
-    other_city_name: '',
-    is_custom_city: false,
-    district: '',
-    state: '',
-    pin_code: '',
-    industry: '',
-    activity_type: '',
-    constitution: '',
-    annual_turnover: '',
-    number_of_employees: '',
-    products_services: '',
-    brand_names: '',
-    website: '',
-    gst_registered: '',
-    gst_number: '',
-    pan_company: '',
-    esic_registered: '',
-    epf_registered: '',
-    referred_by: '',
-    amount_paid: '',
-    payment_date: '',
-    payment_mode: '',
-    transaction_id: '',
-    bank_reference: '',
-    alternate_contact_name: '',
-    alternate_mobile: ''
-  });
-  type JoinFormData = typeof formData;
+  const [formData, setFormData] = useState<JoinFormData>(EMPTY_JOIN_FORM_DATA);
+  const [registrationEntryStage, setRegistrationEntryStage] = useState<RegistrationEntryStage>(
+    isPreviewMode ? 'form' : 'choice'
+  );
+  const [smartUploadDraft, setSmartUploadDraft] = useState<Record<string, string>>({});
+  const [smartUploadGuideDoc, setSmartUploadGuideDoc] = useState<string>('payment_proof');
+  const applyPrefillFromSources = useCallback((
+    current: JoinFormData,
+    sources: Array<Record<string, unknown>>
+  ): JoinFormData => {
+    const next: JoinFormData = { ...current };
+
+    for (const key of JOIN_PREFILL_FIELD_KEYS) {
+      if (hasPrefillValue(key, current[key])) {
+        continue;
+      }
+
+      for (const source of sources) {
+        if (!source || typeof source !== 'object') {
+          continue;
+        }
+
+        const candidate = getPrefillCandidateValue(source, key);
+        if (!hasPrefillValue(key, candidate)) {
+          continue;
+        }
+
+        next[key] = normalizePrefillValue(key, candidate) as JoinFormData[typeof key];
+        break;
+      }
+    }
+
+    return next;
+  }, []);
 
   // Location state
   const [availableStates, setAvailableStates] = useState<PublicPaymentState[]>([]);
@@ -155,7 +398,7 @@ const Join: React.FC = () => {
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
   // Normalization state
-  const [initialFormSnapshot, setInitialFormSnapshot] = useState(formData);
+  const [initialFormSnapshot, setInitialFormSnapshot] = useState<JoinFormData>(EMPTY_JOIN_FORM_DATA);
   const [isVerifiedForSubmit, setIsVerifiedForSubmit] = useState(false);
   const [normalizationOriginalSnapshot, setNormalizationOriginalSnapshot] = useState<typeof formData | null>(null);
   const [correctionFields, setCorrectionFields] = useState<FieldCorrectionStep[]>([]);
@@ -293,6 +536,8 @@ const Join: React.FC = () => {
   // Check for existing registration and handle based on status
   useEffect(() => {
     if (isPreviewMode) {
+      setHasRegistrationRecord(true);
+      setRegistrationStatusError(null);
       setIsCheckingExisting(false);
       return;
     }
@@ -300,75 +545,151 @@ const Join: React.FC = () => {
     const checkExistingRegistration = async () => {
       // Only check if authenticated and member data is available
       if (!isAuthenticated || !member || !member.user_id) {
+        setHasRegistrationRecord(false);
+        setRegistrationStatusError(null);
         setIsCheckingExisting(false);
         return;
       }
 
       try {
         setIsCheckingExisting(true);
+        setRegistrationStatusError(null);
         console.log('[Join] Checking for existing registration for user:', member.user_id);
 
-        const { data, error } = await supabase
+        const { data: registrationRows, error } = await supabase
           .from('member_registrations')
-          .select('id, status, full_name, email, mobile_number, company_name, rejection_reason, reapplication_count, created_at')
+          .select('*')
           .eq('user_id', member.user_id)
-          .maybeSingle();
+          .order('created_at', { ascending: false })
+          .limit(1);
 
         if (error) {
           console.error('[Join] Error checking registration:', error);
+          setHasRegistrationRecord(null);
+          setRegistrationStatusError('Unable to confirm your registration status right now. Please refresh and try again.');
           setIsCheckingExisting(false);
           return;
         }
 
+        let existingRegistration = registrationRows?.[0] as Record<string, unknown> | undefined;
+
+        // Legacy fallback where user_id may still be null on older registrations.
+        if (!existingRegistration && member.email) {
+          const { data: legacyRows, error: legacyError } = await supabase
+            .from('member_registrations')
+            .select('*')
+            .is('user_id', null)
+            .eq('email', member.email)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (!legacyError) {
+            existingRegistration = legacyRows?.[0] as Record<string, unknown> | undefined;
+          } else {
+            console.warn('[Join] Legacy registration prefill lookup failed:', legacyError.message);
+          }
+        }
+
+        const resolveUserPrefillSource = async (): Promise<Record<string, unknown>> => {
+          const userPrefillSource: Record<string, unknown> = {
+            ...member,
+            email: member.email || '',
+            mobile_number: member.mobile_number || ''
+          };
+
+          // Include cached session user payload (may carry additional fields).
+          const cachedUser = sessionManager.getUserData();
+          if (cachedUser && typeof cachedUser === 'object') {
+            Object.assign(userPrefillSource, cachedUser);
+          }
+
+          // Pull fresh account row to capture any additional join-compatible fields.
+          if (member.user_id) {
+            try {
+              const { data: userRow, error: userStateError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', member.user_id)
+                .maybeSingle();
+
+              if (!userStateError && userRow && typeof userRow === 'object') {
+                Object.assign(userPrefillSource, userRow as Record<string, unknown>);
+              } else if (userStateError) {
+                console.warn('[Join] Could not fetch user row from users table:', userStateError.message);
+              }
+            } catch (stateLookupError) {
+              console.warn('[Join] Unexpected error while fetching user prefill fallback:', stateLookupError);
+            }
+          }
+
+          return userPrefillSource;
+        };
+
+        const userPrefillSource = await resolveUserPrefillSource();
+        const signupPrefillResult = await memberRegistrationService.getSignupPrefillPayloadByToken();
+        const signupPrefillSource =
+          signupPrefillResult.data && typeof signupPrefillResult.data === 'object'
+            ? (signupPrefillResult.data as Record<string, unknown>)
+            : {};
+
+        if (signupPrefillResult.error) {
+          console.warn('[Join] Failed to load signup prefill payload:', signupPrefillResult.error);
+        } else if (Object.keys(signupPrefillSource).length > 0) {
+          console.log('[Join] Loaded signup prefill payload keys:', Object.keys(signupPrefillSource));
+        }
+
         // Handle different registration statuses
-        if (data) {
-          console.log('[Join] Found existing registration with status:', data.status);
+        if (existingRegistration) {
+          setHasRegistrationRecord(true);
+          setRegistrationStatusError(null);
+          const registrationStatus = String(existingRegistration.status ?? '').toLowerCase();
+          console.log('[Join] Found existing registration with status:', registrationStatus || 'unknown');
 
           // Pending: Redirect to dashboard
-          if (data.status === 'pending') {
+          if (registrationStatus === 'pending') {
             console.log('[Join] User has pending registration, redirecting to dashboard');
             navigate('/dashboard', { replace: true });
             return;
           }
 
           // Approved: Redirect to dashboard
-          if (data.status === 'approved') {
+          if (registrationStatus === 'approved') {
             console.log('[Join] User is already approved, redirecting to dashboard');
             navigate('/dashboard', { replace: true });
             return;
           }
 
           // Rejected: Redirect to reapply page
-          if (data.status === 'rejected') {
+          if (registrationStatus === 'rejected') {
             console.log('[Join] User has rejected registration, redirecting to reapply page');
             navigate('/dashboard/reapply', { replace: true });
             return;
           }
+
+          // For non-blocking legacy/edge statuses, prefill from matching registration fields
+          // and user account payload without overwriting user-entered values.
+          setFormData(prev => {
+            const nextFormData = applyPrefillFromSources(prev, [existingRegistration, signupPrefillSource, userPrefillSource]);
+            setInitialFormSnapshot(snapshot => applyPrefillFromSources(snapshot, [existingRegistration!, signupPrefillSource, userPrefillSource]));
+            return nextFormData;
+          });
+          console.log('[Join] Pre-filled form from existing registration + signup payload + user data for non-blocking status');
         } else {
+          setHasRegistrationRecord(false);
+          setRegistrationStatusError(null);
           console.log('[Join] No existing registration found - user can proceed with form');
-          // Pre-fill account fields from authenticated user account
-          if (isAuthenticated && member) {
-            setFormData(prev => {
-              const resolvedState = prev.state || member.state || '';
-              const nextFormData = {
-                ...prev,
-                email: member.email || '',
-                mobile_number: member.mobile_number || '',
-                state: resolvedState
-              };
-              setInitialFormSnapshot(snapshot => ({
-                ...snapshot,
-                email: member.email || '',
-                mobile_number: member.mobile_number || '',
-                state: resolvedState
-              }));
-              return nextFormData;
-            });
-            console.log('[Join] Pre-filled account fields from user account');
-          }
+          // Prefill all matching form fields from signup payload + user payloads.
+          setFormData(prev => {
+            const nextFormData = applyPrefillFromSources(prev, [signupPrefillSource, userPrefillSource]);
+            setInitialFormSnapshot(snapshot => applyPrefillFromSources(snapshot, [signupPrefillSource, userPrefillSource]));
+            return nextFormData;
+          });
+          console.log('[Join] Pre-filled form from signup payload + available user data');
         }
       } catch (error) {
         console.error('[Join] Unexpected error checking registration:', error);
+        setHasRegistrationRecord(null);
+        setRegistrationStatusError('Unable to confirm your registration status right now. Please refresh and try again.');
       } finally {
         setIsCheckingExisting(false);
       }
@@ -378,9 +699,11 @@ const Join: React.FC = () => {
     if (isAuthenticated && member) {
       checkExistingRegistration();
     } else {
+      setHasRegistrationRecord(false);
+      setRegistrationStatusError(null);
       setIsCheckingExisting(false);
     }
-  }, [isAuthenticated, isPreviewMode, member, navigate]);
+  }, [applyPrefillFromSources, isAuthenticated, isPreviewMode, member, navigate]);
 
   // Load initial data and handle URL parameters
   // Auto-fill amount paid based on state payment settings and gender
@@ -511,6 +834,25 @@ const Join: React.FC = () => {
   }, [formData.state, loadDistricts, loadPaymentSettingsForState]);
 
   useEffect(() => {
+    if (!formData.state || availableStates.length === 0) {
+      return;
+    }
+
+    const matchedState = findCaseInsensitiveMatch(
+      availableStates.map(item => item.state),
+      formData.state
+    );
+
+    if (matchedState && matchedState !== formData.state) {
+      setFormData(prev => (
+        prev.state === formData.state
+          ? { ...prev, state: matchedState }
+          : prev
+      ));
+    }
+  }, [availableStates, formData.state]);
+
+  useEffect(() => {
     if (selectedDistrictId) {
       void loadCities(selectedDistrictId);
     } else {
@@ -520,6 +862,45 @@ const Join: React.FC = () => {
       setFormData(prev => ({ ...prev, city: '', other_city_name: '', is_custom_city: false }));
     }
   }, [loadCities, selectedDistrictId]);
+
+  // When district is prefilled from existing data, hydrate selectedDistrictId so city options load.
+  useEffect(() => {
+    if (formData.district && availableDistricts.length > 0) {
+      const matchedDistrict = availableDistricts.find(
+        district => normalizeComparableValue(district.district_name) === normalizeComparableValue(formData.district)
+      );
+      if (matchedDistrict) {
+        if (matchedDistrict.district_name !== formData.district) {
+          setFormData(prev => (
+            prev.district === formData.district
+              ? { ...prev, district: matchedDistrict.district_name }
+              : prev
+          ));
+        }
+        if (selectedDistrictId !== matchedDistrict.district_id) {
+          setSelectedDistrictId(matchedDistrict.district_id);
+        }
+      }
+    }
+  }, [availableDistricts, formData.district, selectedDistrictId]);
+
+  useEffect(() => {
+    if (!formData.city || showOtherCity || availableCities.length === 0) {
+      return;
+    }
+
+    const matchedCity = availableCities.find(
+      city => normalizeComparableValue(city.city_name) === normalizeComparableValue(formData.city)
+    );
+
+    if (matchedCity && matchedCity.city_name !== formData.city) {
+      setFormData(prev => (
+        prev.city === formData.city
+          ? { ...prev, city: matchedCity.city_name }
+          : prev
+      ));
+    }
+  }, [availableCities, formData.city, showOtherCity]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -837,6 +1218,193 @@ const Join: React.FC = () => {
     }
     setIsVerifiedForSubmit(false);
   };
+
+  // Smart Upload callbacks
+  const applySmartFieldsToJoinData = useCallback((current: JoinFormData, fields: Record<string, string>) => {
+    const updates: Partial<JoinFormData> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (SMART_AUTOFILL_ALLOWED.has(key) && Object.prototype.hasOwnProperty.call(current, key)) {
+        (updates as Record<string, string>)[key] = value;
+      }
+    }
+    return { ...current, ...updates };
+  }, []);
+
+  const normalizeSmartUploadFields = useCallback((fields: Record<string, string>) => {
+    const normalized = { ...fields };
+
+    if (normalized.payment_date) {
+      normalized.payment_date = normalizeDateField(normalized.payment_date);
+    }
+
+    if (normalized.state) {
+      const matchedState = findCaseInsensitiveMatch(
+        availableStates.map(item => item.state),
+        normalized.state
+      );
+      if (matchedState) {
+        normalized.state = matchedState;
+      }
+    }
+
+    if (normalized.district) {
+      const matchedDistrict = findCaseInsensitiveMatch(
+        availableDistricts.map(item => item.district_name),
+        normalized.district
+      );
+      if (matchedDistrict) {
+        normalized.district = matchedDistrict;
+      }
+    }
+
+    if (normalized.city) {
+      const matchedCity = findCaseInsensitiveMatch(
+        availableCities.map(item => item.city_name),
+        normalized.city
+      );
+      if (matchedCity) {
+        normalized.city = matchedCity;
+      }
+    }
+
+    if (normalized.gst_number) {
+      normalized.gst_number = sanitizeGstNumber(normalized.gst_number);
+      normalized.gst_registered = 'yes';
+
+      if (!normalized.pan_company) {
+        const derivedPan = derivePanFromGstNumber(normalized.gst_number);
+        if (derivedPan) {
+          normalized.pan_company = derivedPan;
+        }
+      }
+    }
+
+    if (normalized.pan_company) {
+      normalized.pan_company = sanitizePanNumber(normalized.pan_company);
+    }
+
+    return normalized;
+  }, [availableCities, availableDistricts, availableStates]);
+
+  const hydrateSmartUploadLocationFields = useCallback(async (fields: Record<string, string>) => {
+    const hydratedFields = { ...fields };
+
+    if (!hydratedFields.state) {
+      return hydratedFields;
+    }
+
+    const matchedState = findCaseInsensitiveMatch(
+      availableStates.map(item => item.state),
+      hydratedFields.state
+    );
+    if (matchedState) {
+      hydratedFields.state = matchedState;
+    }
+
+    let districtOptions = availableDistricts;
+    if (hydratedFields.district && districtOptions.length === 0 && hydratedFields.state) {
+      try {
+        districtOptions = await locationsService.getActiveDistrictsByStateName(hydratedFields.state);
+        setAvailableDistricts(districtOptions);
+      } catch (error) {
+        console.warn('[Join] Smart Upload district hydration failed:', error);
+      }
+    }
+
+    let matchedDistrict: DistrictOption | null = null;
+    if (hydratedFields.district && districtOptions.length > 0) {
+      matchedDistrict = districtOptions.find(
+        district => normalizeComparableValue(district.district_name) === normalizeComparableValue(hydratedFields.district)
+      ) ?? null;
+
+      if (matchedDistrict) {
+        hydratedFields.district = matchedDistrict.district_name;
+      }
+    }
+
+    let cityOptions = availableCities;
+    if (hydratedFields.city && matchedDistrict && cityOptions.length === 0) {
+      try {
+        cityOptions = await locationsService.getActiveCitiesByDistrictId(matchedDistrict.district_id);
+        setAvailableCities(cityOptions);
+      } catch (error) {
+        console.warn('[Join] Smart Upload city hydration failed:', error);
+      }
+    }
+
+    if (hydratedFields.city && cityOptions.length > 0) {
+      const matchedCity = cityOptions.find(
+        city => normalizeComparableValue(city.city_name) === normalizeComparableValue(hydratedFields.city)
+      );
+      if (matchedCity) {
+        hydratedFields.city = matchedCity.city_name;
+      }
+    }
+
+    return hydratedFields;
+  }, [availableCities, availableDistricts, availableStates]);
+
+  const handleSmartAutofill = useCallback(async (fields: Record<string, string>) => {
+    const hydratedFields = await hydrateSmartUploadLocationFields(fields);
+    setFormData(prev => applySmartFieldsToJoinData(prev, hydratedFields));
+    setIsVerifiedForSubmit(false);
+  }, [applySmartFieldsToJoinData, hydrateSmartUploadLocationFields]);
+
+  const handleSmartConflictResolved = useCallback(async (fields: Record<string, string>) => {
+    const hydratedFields = await hydrateSmartUploadLocationFields(fields);
+    setFormData(prev => applySmartFieldsToJoinData(prev, hydratedFields));
+    setIsVerifiedForSubmit(false);
+  }, [applySmartFieldsToJoinData, hydrateSmartUploadLocationFields]);
+
+  const smartUploadDraftFieldValues = {
+    full_name: smartUploadDraft.full_name ?? formData.full_name,
+    date_of_birth: smartUploadDraft.date_of_birth ?? formData.date_of_birth,
+    gender: smartUploadDraft.gender ?? formData.gender,
+    payment_date: smartUploadDraft.payment_date ?? formData.payment_date,
+    transaction_id: smartUploadDraft.transaction_id ?? formData.transaction_id,
+    bank_reference: smartUploadDraft.bank_reference ?? formData.bank_reference,
+    gst_registered: smartUploadDraft.gst_registered ?? formData.gst_registered,
+    gst_number: smartUploadDraft.gst_number ?? formData.gst_number,
+    pan_company: smartUploadDraft.pan_company ?? formData.pan_company,
+    company_name: smartUploadDraft.company_name ?? formData.company_name,
+    company_address: smartUploadDraft.company_address ?? formData.company_address,
+    pin_code: smartUploadDraft.pin_code ?? formData.pin_code,
+    state: smartUploadDraft.state ?? formData.state,
+    district: smartUploadDraft.district ?? formData.district,
+    city: smartUploadDraft.city ?? formData.city,
+    industry: smartUploadDraft.industry ?? formData.industry,
+    activity_type: smartUploadDraft.activity_type ?? formData.activity_type,
+    products_services: smartUploadDraft.products_services ?? formData.products_services,
+  };
+
+  const handleSmartDraftAutofill = useCallback(async (fields: Record<string, string>) => {
+    const hydratedFields = await hydrateSmartUploadLocationFields(fields);
+    setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
+  }, [hydrateSmartUploadLocationFields]);
+
+  const handleSmartDraftConflictResolved = useCallback(async (fields: Record<string, string>) => {
+    const hydratedFields = await hydrateSmartUploadLocationFields(fields);
+    setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
+  }, [hydrateSmartUploadLocationFields]);
+
+  const handleContinueFromSmartDraft = useCallback(async () => {
+    if (Object.keys(smartUploadDraft).length > 0) {
+      const hydratedFields = await hydrateSmartUploadLocationFields(smartUploadDraft);
+      setFormData(prev => applySmartFieldsToJoinData(prev, hydratedFields));
+    }
+    setSmartUploadDraft({});
+    setRegistrationEntryStage('form');
+    setIsVerifiedForSubmit(false);
+  }, [applySmartFieldsToJoinData, hydrateSmartUploadLocationFields, smartUploadDraft]);
+
+  const handleSmartFileReady = useCallback(
+    (slot: 'paymentProof' | 'gstCertificate' | 'udyamCertificate', file: File) => {
+      handleFileChange(slot, file);
+    },
+    // handleFileChange is stable (no deps) — safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1456,7 +2024,29 @@ const Join: React.FC = () => {
     }
   }, [normalizationOriginalSnapshot]);
 
-  const isBlockingAuthLoad = !isPreviewMode && (isLoadingAuth || isCheckingExisting);
+  const isBlockingAuthLoad =
+    !isPreviewMode &&
+    (isLoadingAuth || isCheckingExisting || (isAuthenticated && hasRegistrationRecord === null && !registrationStatusError));
+
+  if (registrationStatusError) {
+    return (
+      <div className="min-h-screen py-8">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-card rounded-lg shadow-sm border border-destructive/30 p-8 text-center">
+            <h1 className="text-2xl font-semibold text-foreground mb-3">Registration status unavailable</h1>
+            <p className="text-muted-foreground mb-6">{registrationStatusError}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state while loading form config/validation and (for normal mode) auth checks.
   if (isLoadingConfig || isLoadingValidation || isBlockingAuthLoad) {
@@ -1490,6 +2080,12 @@ const Join: React.FC = () => {
     );
   }
 
+  const shouldShowRegistrationEntryStage =
+    !isPreviewMode &&
+    hasRegistrationRecord === false &&
+    registrationEntryStage !== 'form';
+  const smartUploadDraftEntries = Object.entries(smartUploadDraft).filter(([, value]) => value.trim() !== '');
+
   return (
     <div className="min-h-screen py-8">
       <Toast
@@ -1508,6 +2104,124 @@ const Join: React.FC = () => {
 
         {/* Registration Form */}
         <div className="bg-card rounded-lg shadow-sm p-8">
+          {shouldShowRegistrationEntryStage ? (
+            registrationEntryStage === 'choice' ? (
+              <div className="space-y-6">
+                <div className="rounded-lg border border-border bg-muted/20 p-5">
+                  <h2 className="text-section font-semibold text-foreground mb-2">Choose how you want to complete registration</h2>
+                  <p className="text-sm text-muted-foreground">
+                    You can upload documents first for smart prefill, or open the form directly and fill it manually.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setRegistrationEntryStage('smart')}
+                    className="rounded-xl border border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/10"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <Upload className="h-5 w-5 text-primary" />
+                      <h3 className="text-base font-semibold text-foreground">Use Smart Upload</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Upload your documents first, review the extracted details, then continue to the registration form with matching fields prefilled.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRegistrationEntryStage('form')}
+                    className="rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <h3 className="text-base font-semibold text-foreground">Fill Form Manually</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Open the Member Registration form directly. The in-form Smart Upload block will still remain available if you need it later.
+                    </p>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-5">
+                  <h2 className="text-section font-semibold text-foreground mb-2">Smart Upload-assisted registration</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Upload the documents you have, import the extracted data, review it, and then continue to the Member Registration form.
+                  </p>
+                </div>
+
+                <SmartUploadDocument
+                  formFieldValues={smartUploadDraftFieldValues}
+                  onAutofill={handleSmartDraftAutofill}
+                  onConflictResolved={handleSmartDraftConflictResolved}
+                  onFileReady={handleSmartFileReady}
+                  normalizeExtractedFields={normalizeSmartUploadFields}
+                  extraControls={
+                    <select
+                      value={smartUploadGuideDoc}
+                      onChange={(event) => setSmartUploadGuideDoc(event.target.value)}
+                      className="min-w-[220px] rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                      aria-label="Document type"
+                    >
+                      {SMART_UPLOAD_REQUIRED_DOC_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  }
+                  disabled={false}
+                />
+
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Extracted data review</h3>
+                  {smartUploadDraftEntries.length > 0 ? (
+                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                      {smartUploadDraftEntries.map(([fieldKey, value]) => (
+                        <div key={fieldKey} className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {resolveFieldLabel(fieldKey, fallbackFieldLabel(fieldKey))}
+                          </p>
+                          <p className="text-sm text-foreground break-words">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No extracted fields yet. Upload documents and click Import Data to prepare prefill before continuing.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.history.length > 1) {
+                        navigate(-1);
+                      } else {
+                        navigate('/');
+                      }
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinueFromSmartDraft}
+                    className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Continue to Member Registration Form
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            <>
           {/* Form Error Banner */}
           {formErrorMessage && (
             <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start">
@@ -1517,6 +2231,182 @@ const Join: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="space-y-8">
+            {/* Smart Upload — top-level shortcut for any registration document */}
+            <SmartUploadDocument
+              formFieldValues={{
+                full_name: formData.full_name,
+                date_of_birth: formData.date_of_birth,
+                gender: formData.gender,
+                payment_date: formData.payment_date,
+                transaction_id: formData.transaction_id,
+                bank_reference: formData.bank_reference,
+                gst_registered: formData.gst_registered,
+                gst_number: formData.gst_number,
+                pan_company: formData.pan_company,
+                company_name: formData.company_name,
+                company_address: formData.company_address,
+                pin_code: formData.pin_code,
+                state: formData.state,
+                district: formData.district,
+                city: formData.city,
+                industry: formData.industry,
+                activity_type: formData.activity_type,
+                products_services: formData.products_services,
+              }}
+              onAutofill={handleSmartAutofill}
+              onConflictResolved={handleSmartConflictResolved}
+              onFileReady={handleSmartFileReady}
+              normalizeExtractedFields={normalizeSmartUploadFields}
+              disabled={isPreviewMode}
+            />
+
+            {/* Payment Information */}
+            <section>
+              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
+                <Phone className="w-5 h-5 mr-2 text-primary" />
+                Payment Information
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {isFieldVisible('payment_proof_url') && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')}{isFieldRequired('payment_proof_url') && <span className="text-destructive ml-1">*</span>}
+                    </label>
+                    <input
+                      id="payment_proof_url"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileChange('paymentProof', e.target.files?.[0] || null)}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="payment_proof_url"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                        errors.payment_proof_url ? 'border-destructive' : 'border-border'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {files.paymentProof ? 'Upload New File' : 'Upload File'}
+                    </label>
+                    {files.paymentProof && (
+                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.paymentProof.name}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">Upload screenshot or receipt of your membership fee payment</p>
+                    {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('payment_date') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {resolveFieldLabel('payment_date', 'Payment Date')}{isFieldRequired('payment_date') && <span className="text-destructive ml-1">*</span>}
+                    </label>
+                    <input
+                      type="date"
+                      name="payment_date"
+                      value={formData.payment_date}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.payment_date ? 'border-destructive' : 'border-border'
+                      }`}
+                      required={isFieldRequired('payment_date')}
+                    />
+                    {errors.payment_date && <p className="text-destructive text-sm mt-1">{errors.payment_date}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('payment_mode') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {resolveFieldLabel('payment_mode', 'Payment Mode')}{isFieldRequired('payment_mode') && <span className="text-destructive ml-1">*</span>}
+                    </label>
+                    <select
+                      name="payment_mode"
+                      value={formData.payment_mode}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.payment_mode ? 'border-destructive' : 'border-border'
+                      }`}
+                      required={isFieldRequired('payment_mode')}
+                    >
+                    <option value="">{resolveFieldPlaceholder('payment_mode', 'Select Payment Mode')}</option>
+                    {resolveFieldOptions('payment_mode', ['QR Code / UPI', 'Bank Transfer (NEFT/RTGS/IMPS)', 'Cheque', 'Demand Draft', 'Cash']).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                    </select>
+                    {errors.payment_mode && <p className="text-destructive text-sm mt-1">{errors.payment_mode}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('transaction_id') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {resolveFieldLabel('transaction_id', 'Transaction ID / Reference')}{isFieldRequired('transaction_id') && <span className="text-destructive ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      id="transaction_id"
+                      name="transaction_id"
+                      value={formData.transaction_id}
+                      onChange={handleInputChange}
+                      onBlur={() => validateField('transaction_id')}
+                      placeholder={resolveFieldPlaceholder('transaction_id', 'Transaction ID or reference number')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.transaction_id ? 'border-destructive' : 'border-border'
+                      }`}
+                      required={isFieldRequired('transaction_id')}
+                      maxLength={getFieldMaxLength('transaction_id') ?? undefined}
+                    />
+                    {errors.transaction_id && <p className="text-destructive text-sm mt-1">{errors.transaction_id}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('bank_reference') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {resolveFieldLabel('bank_reference', 'Bank Reference')}{isFieldRequired('bank_reference') && <span className="text-destructive ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      id="bank_reference"
+                      name="bank_reference"
+                      value={formData.bank_reference}
+                      onChange={handleInputChange}
+                      onBlur={() => validateField('bank_reference')}
+                      placeholder={resolveFieldPlaceholder('bank_reference', 'Bank reference number (if any)')}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
+                        errors.bank_reference ? 'border-destructive' : 'border-border'
+                      }`}
+                      required={isFieldRequired('bank_reference')}
+                      maxLength={getFieldMaxLength('bank_reference') ?? undefined}
+                    />
+                    {errors.bank_reference && <p className="text-destructive text-sm mt-1">{errors.bank_reference}</p>}
+                  </div>
+                )}
+
+                {isFieldVisible('amount_paid') && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {resolveFieldLabel('amount_paid', 'Amount Paid')}{isFieldRequired('amount_paid') && <span className="text-destructive ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      name="amount_paid"
+                      value={formData.amount_paid}
+                      onChange={handleInputChange}
+                      placeholder={resolveFieldPlaceholder('amount_paid', 'Select state and gender first')}
+                      disabled
+                      className={`w-full px-3 py-2 border rounded-lg bg-muted/50 cursor-not-allowed ${
+                        errors.amount_paid ? 'border-destructive' : 'border-border'
+                      }`}
+                    />
+                    {errors.amount_paid && <p className="text-destructive text-sm mt-1">{errors.amount_paid}</p>}
+                  </div>
+                )}
+              </div>
+            </section>
+
             {/* Personal Information */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
@@ -1688,153 +2578,6 @@ const Join: React.FC = () => {
                       maxLength={getFieldMaxLength('mobile_number') ?? undefined}
                   />
                   {errors.mobile_number && <p className="text-destructive text-sm mt-1">{errors.mobile_number}</p>}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Payment Information */}
-            <section>
-              <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
-                <Phone className="w-5 h-5 mr-2 text-primary" />
-                Payment Information
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {isFieldVisible('amount_paid') && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {resolveFieldLabel('amount_paid', 'Amount Paid')}{isFieldRequired('amount_paid') && <span className="text-destructive ml-1">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      name="amount_paid"
-                      value={formData.amount_paid}
-                      onChange={handleInputChange}
-                      placeholder={resolveFieldPlaceholder('amount_paid', 'Select state and gender first')}
-                      disabled
-                      className={`w-full px-3 py-2 border rounded-lg bg-muted/50 cursor-not-allowed ${
-                        errors.amount_paid ? 'border-destructive' : 'border-border'
-                      }`}
-                    />
-                    {errors.amount_paid && <p className="text-destructive text-sm mt-1">{errors.amount_paid}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('payment_date') && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {resolveFieldLabel('payment_date', 'Payment Date')}{isFieldRequired('payment_date') && <span className="text-destructive ml-1">*</span>}
-                    </label>
-                    <input
-                      type="date"
-                      name="payment_date"
-                      value={formData.payment_date}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.payment_date ? 'border-destructive' : 'border-border'
-                      }`}
-                      required={isFieldRequired('payment_date')}
-                    />
-                    {errors.payment_date && <p className="text-destructive text-sm mt-1">{errors.payment_date}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('payment_mode') && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {resolveFieldLabel('payment_mode', 'Payment Mode')}{isFieldRequired('payment_mode') && <span className="text-destructive ml-1">*</span>}
-                    </label>
-                    <select
-                      name="payment_mode"
-                      value={formData.payment_mode}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.payment_mode ? 'border-destructive' : 'border-border'
-                      }`}
-                      required={isFieldRequired('payment_mode')}
-                    >
-                    <option value="">{resolveFieldPlaceholder('payment_mode', 'Select Payment Mode')}</option>
-                    {resolveFieldOptions('payment_mode', ['QR Code / UPI', 'Bank Transfer (NEFT/RTGS/IMPS)', 'Cheque', 'Demand Draft', 'Cash']).map(option => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                    </select>
-                    {errors.payment_mode && <p className="text-destructive text-sm mt-1">{errors.payment_mode}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('transaction_id') && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {resolveFieldLabel('transaction_id', 'Transaction ID / Reference')}{isFieldRequired('transaction_id') && <span className="text-destructive ml-1">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      id="transaction_id"
-                      name="transaction_id"
-                      value={formData.transaction_id}
-                      onChange={handleInputChange}
-                      onBlur={() => validateField('transaction_id')}
-                      placeholder={resolveFieldPlaceholder('transaction_id', 'Transaction ID or reference number')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.transaction_id ? 'border-destructive' : 'border-border'
-                      }`}
-                      required={isFieldRequired('transaction_id')}
-                      maxLength={getFieldMaxLength('transaction_id') ?? undefined}
-                    />
-                    {errors.transaction_id && <p className="text-destructive text-sm mt-1">{errors.transaction_id}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('bank_reference') && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {resolveFieldLabel('bank_reference', 'Bank Reference')}{isFieldRequired('bank_reference') && <span className="text-destructive ml-1">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      id="bank_reference"
-                      name="bank_reference"
-                      value={formData.bank_reference}
-                      onChange={handleInputChange}
-                      onBlur={() => validateField('bank_reference')}
-                      placeholder={resolveFieldPlaceholder('bank_reference', 'Bank reference number (if any)')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                        errors.bank_reference ? 'border-destructive' : 'border-border'
-                      }`}
-                      required={isFieldRequired('bank_reference')}
-                      maxLength={getFieldMaxLength('bank_reference') ?? undefined}
-                    />
-                    {errors.bank_reference && <p className="text-destructive text-sm mt-1">{errors.bank_reference}</p>}
-                  </div>
-                )}
-
-                {isFieldVisible('payment_proof_url') && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')}{isFieldRequired('payment_proof_url') && <span className="text-destructive ml-1">*</span>}
-                    </label>
-                    <input
-                      id="payment_proof_url"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange('paymentProof', e.target.files?.[0] || null)}
-                      className="sr-only"
-                    />
-                    <label
-                      htmlFor="payment_proof_url"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
-                        errors.payment_proof_url ? 'border-destructive' : 'border-border'
-                      }`}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {files.paymentProof ? 'Upload New File' : 'Upload File'}
-                    </label>
-                    {files.paymentProof && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.paymentProof.name}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">Upload screenshot or receipt of your membership fee payment</p>
-                    {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
                   </div>
                 )}
               </div>
@@ -2595,6 +3338,8 @@ const Join: React.FC = () => {
               </button>
             </div>
           </form>
+          </>
+          )}
         </div>
 
         <ImageCropModal

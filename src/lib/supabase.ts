@@ -478,9 +478,34 @@ interface MemberRegistrationRpcRow extends JsonRecord {
   company_designation_name?: string | null;
 }
 
+const mapApprovedMemberExportRow = (value: unknown): ApprovedMemberExportRow => {
+  const row = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const readString = (input: unknown): string => (typeof input === 'string' ? input : '');
+  return {
+    company_name: readString(row.company_name),
+    member_name: readString(row.member_name),
+    city: readString(row.city),
+    district: readString(row.district),
+    mobile_number: readString(row.mobile_number),
+    email: readString(row.email),
+    member_id: readString(row.member_id),
+    company_address: readString(row.company_address),
+    gender: readString(row.gender),
+  };
+};
+
 interface SubmitRegistrationPayload extends JsonRecord {
   user_id?: string | null;
   is_custom_city?: boolean;
+}
+
+interface SignupPrefillPayloadRpcResult extends JsonRecord {
+  success?: boolean;
+  error?: string;
+  data?: JsonRecord;
+  core_payload?: JsonRecord;
+  custom_payload?: JsonRecord;
+  submission_created_at?: string | null;
 }
 
 interface UpdateStatusResult {
@@ -1762,6 +1787,72 @@ export const memberRegistrationService = {
     }
   },
 
+  async getSignupPrefillPayloadByToken(
+    sessionToken?: string
+  ): Promise<{
+    data: JsonRecord;
+    corePayload: JsonRecord;
+    customPayload: JsonRecord;
+    submissionCreatedAt: string | null;
+    error: string | null;
+  }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return {
+          data: {},
+          corePayload: {},
+          customPayload: {},
+          submissionCreatedAt: null,
+          error: 'User session not found. Please log in again.'
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_signup_prefill_payload_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        console.error('[getSignupPrefillPayloadByToken] RPC error:', error);
+        return {
+          data: {},
+          corePayload: {},
+          customPayload: {},
+          submissionCreatedAt: null,
+          error: error.message
+        };
+      }
+
+      const result = (data ?? {}) as SignupPrefillPayloadRpcResult;
+      if (!result.success) {
+        return {
+          data: {},
+          corePayload: {},
+          customPayload: {},
+          submissionCreatedAt: null,
+          error: result.error || 'Failed to load signup prefill payload'
+        };
+      }
+
+      return {
+        data: (result.data as JsonRecord) || {},
+        corePayload: (result.core_payload as JsonRecord) || {},
+        customPayload: (result.custom_payload as JsonRecord) || {},
+        submissionCreatedAt: result.submission_created_at ?? null,
+        error: null
+      };
+    } catch (error) {
+      console.error('[getSignupPrefillPayloadByToken] Unexpected error:', error);
+      return {
+        data: {},
+        corePayload: {},
+        customPayload: {},
+        submissionCreatedAt: null,
+        error: 'An unexpected error occurred'
+      };
+    }
+  },
+
   async submitRegistration(
     registrationData: SubmitRegistrationPayload,
     files: {
@@ -2133,6 +2224,36 @@ export const memberRegistrationService = {
       return { success: true };
     } catch (error) {
       console.error('Error marking application as viewed:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getApprovedMembersExport(
+    sessionToken?: string
+  ): Promise<{ success: boolean; data?: ApprovedMemberExportRow[]; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('get_admin_approved_members_export_with_session', {
+        p_session_token: resolvedSessionToken,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = (data ?? null) as ApprovedMembersExportRpcResult | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to load approved members export' };
+      }
+
+      const rows = Array.isArray(result.data) ? result.data.map(mapApprovedMemberExportRow) : [];
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('[getApprovedMembersExport] Unexpected error:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }
@@ -4305,6 +4426,18 @@ export interface DeletedMember {
   profile_photo_url?: string | null;
 }
 
+export interface ApprovedMemberExportRow {
+  company_name: string;
+  member_name: string;
+  city: string;
+  district: string;
+  mobile_number: string;
+  email: string;
+  member_id: string;
+  company_address: string;
+  gender: string;
+}
+
 export const deletedMembersService = {
   async getAllDeletedMembers(
     sessionToken: string,
@@ -4387,6 +4520,158 @@ export interface ValidationRule {
   display_order: number;
   created_at: string;
   updated_at: string;
+}
+
+export type NormalizationRuleCategory = 'identity' | 'contact' | 'company' | 'business' | 'referral';
+
+export interface NormalizationRule {
+  id: string;
+  field_key: string;
+  label: string;
+  category: NormalizationRuleCategory;
+  instruction_text: string;
+  default_instruction_text: string;
+  is_enabled: boolean;
+  display_order: number;
+  updated_at?: string | null;
+  updated_by?: string | null;
+  updated_by_email?: string | null;
+}
+
+const normalizeNormalizationRuleCategory = (value: unknown): NormalizationRuleCategory => {
+  switch (typeof value === 'string' ? value.trim().toLowerCase() : '') {
+    case 'identity':
+    case 'contact':
+    case 'company':
+    case 'business':
+    case 'referral':
+      return value as NormalizationRuleCategory;
+    default:
+      return 'contact';
+  }
+};
+
+const mapNormalizationRule = (raw: unknown): NormalizationRule => {
+  const payload = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  return {
+    id: typeof payload.id === 'string' ? payload.id : '',
+    field_key: typeof payload.field_key === 'string' ? payload.field_key : '',
+    label: typeof payload.label === 'string' ? payload.label : '',
+    category: normalizeNormalizationRuleCategory(payload.category),
+    instruction_text: typeof payload.instruction_text === 'string' ? payload.instruction_text : '',
+    default_instruction_text: typeof payload.default_instruction_text === 'string' ? payload.default_instruction_text : '',
+    is_enabled: Boolean(payload.is_enabled),
+    display_order: typeof payload.display_order === 'number'
+      ? payload.display_order
+      : Number(payload.display_order ?? 0),
+    updated_at: typeof payload.updated_at === 'string' ? payload.updated_at : null,
+    updated_by: typeof payload.updated_by === 'string' ? payload.updated_by : null,
+    updated_by_email: typeof payload.updated_by_email === 'string' ? payload.updated_by_email : null
+  };
+};
+
+export const normalizationRulesService = {
+  async getRules(sessionToken?: string): Promise<{ success: boolean; data?: NormalizationRule[]; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('get_normalization_rules_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: unknown } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to load normalization rules' };
+      }
+
+      const rows = Array.isArray(result.data) ? result.data.map(mapNormalizationRule) : [];
+      return { success: true, data: rows };
+    } catch (error) {
+      console.error('Error loading normalization rules:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async updateRule(
+    input: {
+      fieldKey: string;
+      instructionText?: string | null;
+      isEnabled?: boolean;
+    },
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('update_normalization_rule_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: input.fieldKey,
+        p_instruction_text: input.instructionText ?? null,
+        p_is_enabled: typeof input.isEnabled === 'boolean' ? input.isEnabled : null
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string } | null;
+      return result?.success
+        ? { success: true }
+        : { success: false, error: result?.error || 'Failed to update normalization rule' };
+    } catch (error) {
+      console.error('Error updating normalization rule:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async reorderRules(
+    updates: Array<{ fieldKey: string; displayOrder: number }>,
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string; updatedCount?: number }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('reorder_normalization_rules_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_updates: updates.map((update) => ({
+          field_key: update.fieldKey,
+          display_order: update.displayOrder
+        }))
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string; updated_count?: number } | null;
+      return result?.success
+        ? { success: true, updatedCount: typeof result.updated_count === 'number' ? result.updated_count : undefined }
+        : { success: false, error: result?.error || 'Failed to reorder normalization rules' };
+    } catch (error) {
+      console.error('Error reordering normalization rules:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+};
+
+interface ApprovedMembersExportRpcResult {
+  success?: boolean;
+  error?: string;
+  data?: unknown;
 }
 
 export const validationRulesService = {

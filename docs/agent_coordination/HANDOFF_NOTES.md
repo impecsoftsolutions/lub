@@ -4,55 +4,47 @@ Keep this file short and overwrite it instead of appending a journal.
 
 ## Current Owner - None
 
-## Current Slice - None in progress
+## Current Slice - None
 
 ---
 
-## Handoff Message (2026-04-12)
+## Handoff Message (2026-04-16)
 
-I am Claude Code. This message is for Codex (or next agent).
+I am Claude. This message is for the next agent.
 
-- Slice ID: `CLAUDE-FIELD-LENGTH-001`
+- Slice ID: `CLAUDE-USR-MODAL-ZINDEX-001`
 - Owner: Claude
-- Status: Complete
+- Status: **Complete**
 
-### What changed
+### What was fixed
 
-- `src/hooks/useFormFieldConfig.ts`:
-  - Added `min_length?: number | null` and `max_length?: number | null` to `FieldConfigMap` interface
-  - All 4 builder branches now map `config.min_length` / `config.max_length` into configMap entries
-  - Added `getFieldMinLength(fieldName): number | null` and `getFieldMaxLength(fieldName): number | null` helpers
-  - Both exported from hook return
+Block Account and Assign Role modals in Admin Users (`/admin/administration/users`) were rendering behind the overlay backdrop due to a z-index stacking bug, making them unreachable. The same bug had previously been fixed for Edit User and Delete User modals in `COD-USR-001` and `COD-USR-DELMODAL-002`.
 
-- `src/pages/AdminFieldLibrary.tsx`:
-  - Added `LENGTH_SUPPORTED_TYPES` constant (`text`, `textarea`, `email`, `tel`, `number`, `url`)
-  - Added `min_length: null, max_length: null` to `EMPTY_FORM`
-  - `getSubmitValue()` now strips `min_length`/`max_length` for non-applicable field types
-  - `ItemForm` render: Min Length + Max Length number inputs shown conditionally for applicable types (below Validation Rule select)
-  - `startEdit`: pre-fills `min_length` / `max_length` from existing `item`
+**Root cause:** Both broken modals used `z-50` on the outer shell (same level as the Radix dropdown portal) and had no `relative z-10` on the dialog card, so the backdrop obscured the card.
 
-- `src/pages/Join.tsx`:
-  - Destructures `getFieldMinLength`, `getFieldMaxLength` from `useFormFieldConfig`
-  - `maxLength={getFieldMaxLength(fieldName) ?? undefined}` added to all 14 editable text/textarea inputs
-  - `validateForm`: length checks added inside the dynamic validation loop — max violation blocks with error before regex; min violation blocks similarly; both use `getFieldLabel` for error message copy
+**Files changed:**
 
-- `src/pages/MemberEditProfile.tsx`:
-  - Same hook destructuring additions
-  - `maxLength` added to all 14 editable text/textarea inputs (readonly fields excluded)
-  - `validateForm`: same length check block added before `validateFieldByRule` call
+1. `src/components/admin/modals/BlockUserModal.tsx`
+2. `src/components/admin/modals/AssignRoleModal.tsx`
 
-### What was NOT changed
-- No SQL migrations added or modified
-- No `src/lib/supabase.ts` changes (Codex domain)
-- No auth/session patterns changed
-- No regex validation rule behavior changed
+**Changes applied to both files (identical pattern):**
+- Outer shell: `z-50` → `z-[80]`
+- Centering wrapper: `flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0` → `relative flex min-h-screen items-center justify-center px-4 py-6 text-center sm:p-0`
+- Removed legacy zero-width space `<span>` vertical centering hack
+- Dialog card: added `relative z-10`, updated to `rounded-xl border border-border shadow-2xl w-full max-w-lg` to match established fixed-modal pattern
 
 ### Validation
-- `npm run lint` - PASS (0 errors / 3 expected warnings)
-- `npm run build` - PASS
-- `npm run test:e2e:phase1:local` - PASS (3 passed / 12 skipped)
+
+- `npm run lint` → PASS (0 errors / 3 expected warnings)
+- `npm run build` → PASS
+- `npm run test:e2e:phase1:local` → PASS (3 passed / 12 skipped)
+
+### What was NOT changed
+
+- No changes to `AdminUsers.tsx`
+- No changes to `EditUserModal.tsx` or `DeleteUserModal.tsx` (already correct)
+- No backend, RPC, or service layer changes
 
 ### Blockers / next action
-- No blockers.
-- Full field-length stack is complete end-to-end. Admin can now configure min/max length on Field Library items; Join and Member Edit forms enforce these limits at verify/submit time and hard-stop typing via maxLength.
-- Next work: see TASK_BOARD.md Ready queue — `COD-MSME-SHOWCASE-001` requires product scoping session with user before starting.
+
+- No blockers. Ready queue is open.

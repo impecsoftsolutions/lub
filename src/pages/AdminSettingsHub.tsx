@@ -10,7 +10,8 @@ import {
   Lock,
   ArrowRight,
   Settings,
-  Loader2
+  Loader2,
+  Wand2,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ const AdminSettingsHub: React.FC = () => {
   const { isLoading } = usePermissions();
   const canViewForms = useHasPermission('settings.forms.view');
   const canViewValidation = useHasPermission('settings.validation.view');
+  const canViewNormalization = useHasPermission('settings.normalization.view');
   const canViewDirectory = useHasPermission('settings.directory.view');
   const canViewPayment = useHasPermission('settings.payment.view');
   const canViewAI = useHasPermission('settings.ai.view');
@@ -52,6 +54,15 @@ const AdminSettingsHub: React.FC = () => {
       path: '/admin/settings/validation',
       icon: ShieldCheck,
       canAccess: canViewValidation,
+      section: 'Settings'
+    },
+    {
+      id: 'normalization',
+      title: 'Normalization Rules',
+      description: 'Configure AI text cleanup applied at member verification. Separate from validation rules and Smart Upload extraction.',
+      path: '/admin/settings/normalization',
+      icon: Wand2,
+      canAccess: canViewNormalization,
       section: 'Settings'
     },
     {

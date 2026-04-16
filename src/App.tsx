@@ -38,6 +38,7 @@ import PaymentSettings from './pages/AdminDashboard/PaymentSettings';
 import AdminAppearanceSettings from './pages/admin/AdminAppearanceSettings';
 import AdminSettingsHub from './pages/AdminSettingsHub';
 import AdminAISettings from './pages/AdminAISettings';
+import AdminNormalizationSettings from './pages/AdminNormalizationSettings';
 import AdminFormBuilderV2 from './pages/AdminFormBuilderV2';
 import AdminFormEditorV2 from './pages/AdminFormEditorV2';
 import AdminFieldLibrary from './pages/AdminFieldLibrary';
@@ -176,6 +177,7 @@ function App() {
             <Route path="/admin/settings/forms/builder/:formKey" element={<AdminFormEditorV2 />} />
             <Route path="/admin/settings/forms/library" element={<AdminFieldLibrary />} />
             <Route path="/admin/settings/validation" element={<AdminValidationSettings />} />
+            <Route path="/admin/settings/normalization" element={<AdminNormalizationSettings />} />
             <Route path="/admin/settings/appearance" element={<AdminAppearanceSettings />} />
             <Route path="/admin/settings/ai" element={<AdminAISettings />} />
 

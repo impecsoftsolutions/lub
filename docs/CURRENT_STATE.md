@@ -1,14 +1,14 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-04-12
-**Updated by:** Claude
+**Last updated:** 2026-04-16
+**Updated by:** Claude (`CLAUDE-USR-MODAL-ZINDEX-001`)
 
 ---
 
 ## Project
 
 - **Repo:** `C:\webprojects\lub`
-- **Latest deep handover:** `docs/session_documents/session_77_field_length_backend_contracts.md`
+- **Latest deep handover:** `docs/session_documents/session_78_smart_upload_batch_005.md`
 - **Project guide:** `docs/lub_web_portal_project_guide_for_claude_code.md`
 
 ---
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-04-12) |
-| Lint (`npm run lint`) | PASS - 0 errors, 3 warnings in shadcn primitives (expected) (2026-04-12) |
+| Build (`npm run build`) | PASS (2026-04-16) |
+| Lint (`npm run lint`) | PASS - 0 errors, 3 warnings in shadcn primitives (expected) (2026-04-16) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13 baseline) |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-04-12) |
+| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-04-16) |
 
 Phase 1 destructive baseline remains the non-negotiable floor.
 
@@ -28,19 +28,31 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 
 ## Active Stream
 
-**Active stream:** None. All queued work is complete.
+**Active stream:** None.
 **Current owner:** None
 **Task board:** `docs/agent_coordination/TASK_BOARD.md`
-**Current handoff state:** `CLAUDE-FIELD-LENGTH-001` complete. Full field-length stack is live: backend DB/RPC contracts (Codex) + UI inputs, hook helpers, and runtime enforcement (Claude).
+**Current handoff state:** All in-flight slices complete. Ready queue is open.
 
 Most recently completed streams:
+- **CLAUDE-USR-MODAL-ZINDEX-001**: Fixed z-index stacking bug in Admin Users action-menu modals. Block Account and Assign Role dialogs were rendering behind the overlay backdrop (unreachable) due to `z-50` outer shell (same level as Radix dropdown portal) and missing `relative z-10` on the dialog card. Applied the established fixed-modal pattern from `COD-USR-001`/`COD-USR-DELMODAL-002` to both `BlockUserModal.tsx` and `AssignRoleModal.tsx`: outer shell `z-50` → `z-[80]`, added `relative z-10` to dialog card, updated centering wrapper, removed legacy zero-width spacer. No backend changes.
+- **COD-MEMBERS-EXPORT-001**: Completed approved-members XLSX export v2 on the existing admin registrations page (`/admin/members/registrations`) without creating a new members page or changing member-management flow. Migration `20260416093000_add_admin_members_export_rpc.sql` introduced session-wrapped RPC `get_admin_approved_members_export_with_session`, and follow-up migration `20260416113000_extend_admin_members_export_rpc_optional_fields.sql` extended the same approved-only contract with optional export fields (`mobile_number`, `email`, `member_id`, `company_address`, `gender`) while preserving the existing admin members permission model. `src/lib/supabase.ts` now exposes the richer `ApprovedMemberExportRow` and `memberRegistrationService.getApprovedMembersExport()`. `src/lib/xlsxExport.ts` remains the single-sheet XLSX generator using existing `jszip`. `AdminRegistrations.tsx` now opens an `Export Members` dialog with fixed core columns (`company_name`, `member_name`, `city`, `district`) and optional extra-column checkboxes; core columns are always included, extras are unchecked by default, and the export remains independent of current client-side filters. Live browser verification confirmed both the core-only and core-plus-extras downloads use `LUB_Members_YYYY-MM-DD.xlsx`, the dialog defaults are correct, and the exported workbook row count stays aligned to the approved-members RPC even when the page filter is set to pending.
+- **CLAUDE-NORMALIZATION-RULES-UI-001**: Completed the admin UI for Verify-time normalization rules. New page `src/pages/AdminNormalizationSettings.tsx` (~380 lines) at `/admin/settings/normalization`: rules grouped by category (identity/contact/company/business/referral), per-row enable/disable toggle, inline instruction-text edit with Save/Cancel, restore-default action using `default_instruction_text`, reorder up/down, "customised" badge when instruction differs from default, audit trail only when `updated_by_email` set. Scope info banner clarifies Verify-time AI cleanup vs. validation rules vs. Smart Upload extraction. PermissionGate on `settings.normalization.view`. Settings Hub Normalization Rules card added (Wand2 icon). Sidebar entry added between Validation Settings and Theme. Route wired in App.tsx. No changes to service layer, backend, or Verify flow.
+- **NORMALIZATION-RULES-ADMIN-001**: Completed the backend/runtime half of admin-configurable Verify-time normalization. Added migration `20260415143000_add_normalization_rules_admin_contracts.sql`, which creates `member_normalization_rules`, seeds all nine normalization fields with default instructions, adds `settings.normalization.view/manage`, and exports session-wrapped read/update/reorder RPCs. `src/lib/supabase.ts` now exposes `NormalizationRule`, `NormalizationRuleCategory`, and `normalizationRulesService`. `supabase/functions/normalize-member/index.ts` now loads normalization rules from DB in parallel with AI runtime settings, falls back to the previous hardcoded defaults when rules are unavailable, and short-circuits to passthrough when all effective rules are disabled. Migration was applied safely after avoiding collision with an older remote `normalization_rules` table by using the dedicated `member_normalization_rules` table. Deployed `normalize-member` and verified a live function probe returns normalized output successfully.
+- **SMART-UPLOAD-DOC-QUALITY-006**: Completed the Smart Upload document-quality hardening slice in `supabase/functions/extract-document/index.ts`. Replaced fragile PDF-only extraction with parser-first `pdfjs-dist` text extraction plus legacy fallback, tightened pdf-text -> pdf-vision retry behavior, added Responses JSON-mode enforcement for the PDF-vision path, fixed PAN-anchor misclassification so UDYAM documents are not collapsed into PAN-only docs, expanded generic/UDYAM key normalization and prompt rules, and added doc-specific enrichment for auto-detected uploads. Live verification now passes for the real UDYAM sample (`MSME Certificate Sai Sree Constructions.pdf`) with company/address/business fields extracted, and for a real Aadhaar image with `full_name`, `date_of_birth`, and `gender` extracted.
+- **CLAUDE-SMART-ENTRY-UI-002**: Smart Upload entry-step UX refinement in `src/pages/Join.tsx`. Reordered `SMART_UPLOAD_REQUIRED_DOC_OPTIONS` alphabetically (Aadhaar Card, GST Certificate, PAN Card (Company), Payment Proof, UDYAM Certificate) with Others appended last. Removed `smartUploadGuide` computed value (was only used in the now-removed panel). Removed the separate Recommended Documents panel and the two-column grid wrapper. Restructured smart stage to single-column flow: header → SmartUploadDocument → Extracted Data Review (full-width below) → button row. Removed "Fill Manually Instead" button. Updated Back button to use `navigate(-1)` with `navigate('/')` fallback instead of switching to the choice stage. No changes to SmartUploadDocument.tsx, extraction logic, conflict resolution, or backend contracts.
+- **COD-SMART-BATCH-005**: Completed the Smart Upload improvement bundle in one runtime slice. `SmartUploadDocument` now only treats option-like fields as case-insensitive conflicts, while Join-side normalization canonicalizes extracted state/district/city values to database-backed casing before autofill. GST certificate imports now sanitize GSTIN, set `gst_registered = yes`, and derive PAN from GSTIN when PAN is absent. New authenticated users without an existing registration now land on a pre-registration choice screen (Smart Upload-assisted vs manual), with staged extracted-data review before entering the Member Registration form. Post-review fixes closed two follow-up issues: registration-status lookup failures now render a reachable blocking retry state instead of an indefinite spinner, and staged Smart Upload district/city values are hydrated against live district/city lists before they are merged into the form. Secondary review pass after fixes reported no remaining material logic issues in `Join.tsx` or `SmartUploadDocument.tsx`.
+- **CLAUDE-SMART-UPLOAD-COPY-001 + CLAUDE-FORM-UPLOAD-002 + CLAUDE-AVATAR-FALLBACK-001**: Three UI-only slices completed in one pass. (1) Smart Upload helper text changed to "Upload all documents...". (2) File-input audit confirmed all inputs already standardized — no-op. (3) Header avatar fallback: removed initials/color helpers, added `photoError` state + reset effect, replaced colored-initials circle with `User` icon in `bg-muted` circle for both no-photo members and auth-only users; auth-only users now see "Signed in / Registration incomplete" dropdown with Complete Registration link and Logout instead of confusing Sign In button.
+- **COD-SMART-PAYMENT-READ-001 + COD-USER-PROFILE-GATE-001**: Completed the backend/runtime hardening bundle. In extract-document, added deterministic doc-type resolution anchors so payment-proof uploads no longer leak payee/org/company fields via misclassification (`payment_date/transaction_id/bank_reference/amount_paid` stay payment-owned). In Member Edit, added non-member gate behavior: when no registration submission exists, prefill available fields from signup/session/user sources, show registration-required banner, and block editing/verify/submit until first registration is submitted. Contract note for avatar slice: `useMember` shape unchanged; auth-only users remain `member = null`.
+- **COD-SIGNUP-PREFILL-001**: Added hardened session RPC `get_signup_prefill_payload_with_session` to return the latest Signup V2 submission payload (`core_payload`, `custom_payload`, and merged `data`) for the active custom-session user. Join prefill now hydrates all supported registration fields from available sources in safe order (latest registration row, signup payload, users/session profile) without overwriting user-entered values. Added district-id hydration when district is prefilled so dependent city options load correctly.
+- **CLAUDE-SMART-UPLOAD-BATCH-002**: Removed manual document-type dropdown from Smart Upload. Files now queue on upload; extraction only starts when user clicks Import Data. Added `runPdfVisionPipeline` to edge function â€” image-based/scanned PDFs now route to OpenAI `input_file` vision path instead of returning `unsupported_format`. Updated `SmartUploadItem` to track only AI-detected type (removed `selectedDocType`, `finalMappedType`, `typeMismatch`). `extractDocument()` param now defaults to `'unknown'`. `buildExtractionPrompt` handles `'unknown'` gracefully. Merge policy, conflict modal, field-source priority rules all unchanged.
+- **COD-SMART-DOC-PRIORITY-004**: Implemented strict Smart Upload ownership plus deterministic merge priority end-to-end. Edge Function now enforces document-field policy filtering after extraction (`Aadhaar -> name/DOB/gender`, `Payment Proof -> payment fields`, `PAN -> PAN`, `GST/Udyam -> company/location/business fields`) using effective detected doc-type fallback. Added business extraction support (`industry`, `activity_type`, `products_services`) with expanded key synonyms. Smart Upload UI now tracks per-field source doc and blocks lower-priority docs from overriding higher-priority Smart Upload values. Join mapping expanded to accept and apply business autofill fields. Deployed live via `supabase functions deploy extract-document`.
 - **CLAUDE-FIELD-LENGTH-001**: Implemented frontend consumption of field-level length contracts. Added `min_length`/`max_length` to `useFormFieldConfig` hook (`FieldConfigMap` interface, all 4 builder branches, `getFieldMinLength`/`getFieldMaxLength` helpers). Added min/max length inputs to `AdminFieldLibrary` create/edit form (applicable types only: text/textarea/email/tel/number/url). Added `maxLength` HTML attribute to all text/textarea inputs in Join and MemberEditProfile. Added length validation checks in `validateForm` of both forms (max-length hard stop, min-length error before regex). `EMPTY_FORM` constant and `startEdit` pre-fill updated with length fields.
 - **COD-FIELD-LENGTH-001**: Implemented field-level length contract foundation for Form Builder V2. Added nullable `min_length` / `max_length` columns to field library + draft/live form-field tables, extended field read payloads (builder schema, field library, Signup/Signin/Join/MemberEdit live+draft RPCs), extended field-library create/update write contracts with type-aware length guardrails, and exported matching type/service support in `src/lib/supabase.ts`.
 - **COD-AI-RUNTIME-003**: Cut over live `normalize-member` to DB-backed AI runtime settings. Added/deployed `supabase/functions/normalize-member/index.ts` (version 11) to read `provider/model/reasoning_effort/api_key_secret` from `public.ai_runtime_settings` (`member_normalization`) via `SUPABASE_SERVICE_ROLE_KEY`. Verified live probe returns valid normalization response and remote function-body scans now show `OPENAI_API_KEY=MISS` for all deployed functions.
 - **COD-AI-VERIFY-003**: Completed read-only live verification of deployed `normalize-member` dependency chain. Pulled remote function body via Supabase management API and inspected ESZIP bundle strings; confirmed deployed code still contains `const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")` and `"OPENAI_API_KEY not configured"` error path. Decision: keep `OPENAI_API_KEY` in Edge secrets until a new function version is deployed that no longer depends on it.
 - **COD-AI-SETTINGS-002**: Added OpenAI reasoning setting support end-to-end. New migration `20260412222000_add_ai_runtime_reasoning_effort.sql` adds `reasoning_effort` to AI runtime settings and extends AI settings RPC contracts; client service/types and Admin AI Settings page now support conditional reasoning dropdown for OpenAI only. Runtime profile now exports reasoning effort in `_ai_runtime` hint payload.
 - **COD-VAL-DESC-002**: Closed the backend persistence gap for validation-rule description edits. Added migration `20260412201500_update_validation_rule_with_description_param.sql` extending `update_validation_rule_with_session` with `p_description`, updated `validationRulesService.updateValidationRule` typing/RPC payload, and wired `editedDescription` into `AdminValidationSettings` save flow so description updates survive reloads.
-- **CLAUDE-THEME-001 + CLAUDE-SIDEBAR-LOGO-001 + CLAUDE-VAL-DESC-001**: (1) Renamed "Appearance" → "Theme" in sidebar nav, Settings Hub card, and page title — route unchanged. (2) Sidebar logo button now acts as collapse trigger: `toggleSidebar` on click, `PanelLeftClose` hover affordance, desktop `SidebarTrigger` hidden, mobile trigger preserved. (3) Description textarea added to validation rule edit form with full state management; backend persistence dependency is now closed by `COD-VAL-DESC-002`.
+- **CLAUDE-THEME-001 + CLAUDE-SIDEBAR-LOGO-001 + CLAUDE-VAL-DESC-001**: (1) Renamed "Appearance" â†’ "Theme" in sidebar nav, Settings Hub card, and page title â€” route unchanged. (2) Sidebar logo button now acts as collapse trigger: `toggleSidebar` on click, `PanelLeftClose` hover affordance, desktop `SidebarTrigger` hidden, mobile trigger preserved. (3) Description textarea added to validation rule edit form with full state management; backend persistence dependency is now closed by `COD-VAL-DESC-002`.
 - **COD-AI-SETTINGS-001**: Added secure AI runtime settings management for normalization workflows. Implemented `settings.ai.view/manage` permissions, singleton settings table, masked read and session-wrapped write RPCs, non-sensitive public runtime profile RPC, and admin page wiring (`/admin/settings/ai`) via Settings Hub and sidebar.
 - **COD-APPEAR-LINK-002**: Completed targeted appearance-token linkage cleanup across Join/admin/login-auth scope. Replaced remaining hardcoded color/shadow classes with semantic theme-token classes (including Form Studio/Form Editor preview/status surfaces), then ran a scoped audit that returned `NO_HARDCODED_CLASSES_FOUND` for the targeted domain.
 - **COD-USR-001**: Fixed Admin Users Edit User modal interaction/persistence blocker. Root cause was overlay layering (modal rendering beneath/backdrop interference), not RPC. Modal now uses stable dialog layering (`z-[80]` shell, backdrop below, modal panel above with click isolation) and tokenized success/error visuals for theme consistency. User confirmed fix in runtime.
@@ -60,11 +72,11 @@ Most recently completed streams:
 - **COD-REG-UX-002**: Fixed Admin Registrations + Edit Member modal defects. Pending member names now render bold in pending state, pending approvals count now uses session-based registrations read path (same security model as pending cities), custom-city required validation now respects existing value and required logic, custom city text is preserved when toggling city `Other <-> standard city`, and edit-modal close/success now returns to the true origin context (list vs Application Review modal).
 - **COD-FORM-SYSTEM-CLEAN-001**: Applied migration `20260410183000_hide_system_fields_from_builder_access.sql` to remove reserved system metadata keys (`id`, `status`, `created_at`, `updated_at`) from Builder/Studio-accessible schema, field-library listings, and Join/Member Edit runtime contracts. Added backend write guards so these keys cannot be reattached or recreated via Builder RPC paths.
 - **COD-VAL-MEMBER-EDIT-001**: Fixed form-aware validation runtime parity for Member Edit and Join. `validationService.validateByFieldName` now accepts `formKey` (`join_lub` / `member_edit`) instead of hardcoded Join mapping, `useValidation` now passes form context, and Member Edit required/format checks now honor field visibility so hidden fields do not block save/submit.
-- **CLAUDE-JOIN-EDIT-UI-001**: Member Edit pilot UI wired to Builder contracts. `useFormFieldConfig` switched from legacy → `builder_live`/`builder_draft` for `member_edit`. `isFieldVisible` checks added to all configurable fields (personal info, company, business, registration, alternate contact). Preview gate: `no_session` redirects to signin, `access_denied`/`load_failed` render blocking screens. Preview banner + submit/verify blocked in preview mode. Studio preview path extended: `member_edit` → `/dashboard/edit?preview=1`.
+- **CLAUDE-JOIN-EDIT-UI-001**: Member Edit pilot UI wired to Builder contracts. `useFormFieldConfig` switched from legacy â†’ `builder_live`/`builder_draft` for `member_edit`. `isFieldVisible` checks added to all configurable fields (personal info, company, business, registration, alternate contact). Preview gate: `no_session` redirects to signin, `access_denied`/`load_failed` render blocking screens. Preview banner + submit/verify blocked in preview mode. Studio preview path extended: `member_edit` â†’ `/dashboard/edit?preview=1`.
 - **COD-MEMBER-EDIT-BE-001**: Added Member Edit Builder backend/runtime contracts. Seeded `member_edit` form from `join_lub` draft baseline, added authenticated live read RPC (`get_member_edit_form_configuration_v2_with_session`) and admin draft preview RPC (`get_member_edit_form_configuration_v2_draft_with_session`), and exported client services/hooks support (`memberEditFormConfigV2Service`, `builder_live`/`builder_draft` hook support for `member_edit`) to unblock pilot Member Edit UI.
 - **COD-JOIN-PREVIEW-003**: Added Join draft preview hardening for Form Studio preview path. Implemented admin-gated Join draft read RPC (`get_join_form_configuration_v2_draft_with_session`), added `joinFormConfigV2Service.getDraftConfiguration()`, extended `useFormFieldConfig` with `builder_draft` source/error codes, and updated Join runtime preview handling (`no_session` signin redirect with `next`, admin-only access block, no live fallback). Join preview verify/submit actions are now read-only.
-- **CLAUDE-TERM-001**: Renamed "Join LUB Form" → "Member Registration Form" in all UI labels (`AdminFormsList.tsx`, `AdminFormFieldConfiguration.tsx`). Technical keys/paths/form_key values unchanged.
-- **CLAUDE-JOIN-UI-003**: Enabled Join form preview entrypoint in Studio — `join_lub` now routes to `/join?preview=1` in the preview path ternary. Updated fallback toast to generic copy.
+- **CLAUDE-TERM-001**: Renamed "Join LUB Form" â†’ "Member Registration Form" in all UI labels (`AdminFormsList.tsx`, `AdminFormFieldConfiguration.tsx`). Technical keys/paths/form_key values unchanged.
+- **CLAUDE-JOIN-UI-003**: Enabled Join form preview entrypoint in Studio â€” `join_lub` now routes to `/join?preview=1` in the preview path ternary. Updated fallback toast to generic copy.
 - **COD-SIGNUP-LEGACY-REMOVE-003**: Permanently removed legacy Signup fallback by deleting `/signup-legacy`, deleting `SignUp.tsx`, and removing `VITE_SIGNUP_PRIMARY_MODE` rollback routing logic so `/signup` is always Builder-driven Signup V2.
 - **COD-FORM-DEPRECATE-002**: Hard removed obsolete admin Signup configuration page by deleting route `/admin/settings/forms/signup` and removing `AdminSignupFormConfiguration` page implementation.
 - **COD-UI-013**: Removed Signup Form card from the Form Configuration hub page so centralized Form Builder is the primary admin path.
@@ -90,25 +102,22 @@ Deferred by decision:
 
 ## Last Verified
 
-- **When:** 2026-04-12
-- **What:** Field length frontend implementation (`CLAUDE-FIELD-LENGTH-001`)
+- **When:** 2026-04-16
+- **What:** Admin Users modal z-index fix (`CLAUDE-USR-MODAL-ZINDEX-001`)
 - **Result:** PASS
 - **Commands:**
   ```
-  npm run lint     → 0 errors / 3 warnings (expected)
-  npm run build    → PASS
-  npm run test:e2e:phase1:local → 3 passed / 12 skipped (baseline intact)
+  npm run db:migrations:audit -> PASS
+  npm run db:migration:apply:single -- --version=20260416113000 -> PASS
+  npm run lint     -> 0 errors / 3 warnings (expected)
+  npm run build    -> PASS
+  npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
+  targeted browser export dialog + XLSX header checks -> PASS (`LUB_Members_2026-04-16.xlsx`)
   ```
-
----
 
 ## In Progress / Dirty State
 
-No active coordinated slice. Working tree is clean relative to CLAUDE-FIELD-LENGTH-001 completion.
-
-Working tree may contain additional unrelated local changes from prior sessions. Do not revert without explicit user direction.
-
----
+No active coordinated slice.
 
 ## Deferred / Next Candidate Work
 
@@ -116,13 +125,14 @@ When forms stream is complete, next top candidates are:
 1. `COD-MSME-SHOWCASE-001` - **new priority**: MSME product showcase platform with free + member tiers (product display, photo gallery, inquiry form). Higher priority than news/events. Needs product scoping session with user before starting.
 2. `COD-MSME-ISSUES-001` - MSME issue intake/categorization platform (deferred by user).
 3. `COD-PUBLIC-001` - populate public Events/News/Activities pages beyond placeholder headings (lower priority than showcase, deferred by user).
-4. `CLAUDE-FORM-UPLOAD-002` - replace remaining native file input text with standardized upload button pattern where still present.
+4. `CLAUDE-DATETIME-FORMAT-001` - add admin settings for globally selected date and time formats across the website.
+5. `COD-MEMBERS-EXPORT-002` - lowest-priority export UX follow-ups only: optional `Select all extras` / `Clear extras`, optional CSV export, and optional remember-last-selection behavior for the approved-members export dialog. Do not start unless explicitly re-prioritized.
 
 ---
 
 ## Known Risks / Watch Items
 
-- Readonly smoke can show occasional login-route flakiness; rerun currently passes.
+- Readonly smoke was unstable on 2026-04-14 with admin auth/permission denials on `/admin/dashboard`; this did not point at the Join/Smart Upload slice but still leaves end-to-end verification noisy.
 - Main chunk size warning can still appear as a non-blocking optimization warning.
 - Migration safety workflow remains mandatory: audit first, apply only targeted versions, verify after each apply.
 - Join legacy settings page still exists by design until UAT sign-off on Builder/Studio workflows.
@@ -134,4 +144,6 @@ When forms stream is complete, next top candidates are:
 - Task board: `docs/agent_coordination/TASK_BOARD.md`
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
-- Latest deep handover: `docs/session_documents/session_77_field_length_backend_contracts.md`
+- Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+
+

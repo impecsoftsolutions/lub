@@ -10,6 +10,7 @@ const Header: React.FC = () => {
   const [isJoinDropdownOpen, setIsJoinDropdownOpen] = useState(false);
   const [orgLogo, setOrgLogo] = useState<string>('');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -41,6 +42,10 @@ const Header: React.FC = () => {
       }
     };
     checkIfAdmin();
+  }, [member]);
+
+  useEffect(() => {
+    setPhotoError(false);
   }, [member]);
 
   useEffect(() => {
@@ -111,32 +116,6 @@ const Header: React.FC = () => {
     return fullName.split(' ')[0];
   };
 
-  const getInitials = (fullName: string) => {
-    const names = fullName.trim().split(' ');
-    if (names.length === 1) {
-      return names[0].charAt(0).toUpperCase();
-    }
-    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
-  };
-
-  const getAvatarColor = (fullName: string) => {
-    const colors = [
-      'bg-blue-600',
-      'bg-green-600',
-      'bg-purple-600',
-      'bg-pink-600',
-      'bg-indigo-600',
-      'bg-teal-600',
-      'bg-orange-600',
-      'bg-red-600'
-    ];
-    let hash = 0;
-    for (let i = 0; i < fullName.length; i++) {
-      hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
   const isAnyUserAuthenticated = isMemberAuthenticated;
   const shouldShowJoinOptions = !isAnyUserAuthenticated || (isMemberAuthenticated && !isMemberApproved);
 
@@ -205,87 +184,116 @@ const Header: React.FC = () => {
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
-            {isAnyUserAuthenticated && member ? (
+            {isAnyUserAuthenticated ? (
               <div className="relative" ref={userDropdownRef}>
                 <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors"
                 >
-                  {member.profile_photo_url ? (
+                  {member?.profile_photo_url && !photoError ? (
                     <img
                       src={member.profile_photo_url}
                       alt={member.full_name}
                       className="w-8 h-8 rounded-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
+                      onError={() => setPhotoError(true)}
                     />
                   ) : (
-                    <div className={`w-8 h-8 ${getAvatarColor(member.full_name)} rounded-full flex items-center justify-center text-white font-semibold text-sm`}>
-                      {getInitials(member.full_name)}
+                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4 text-muted-foreground" />
                     </div>
                   )}
-                  <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
-                    {getFirstName(member.full_name)}
-                  </span>
+                  {member && (
+                    <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
+                      {getFirstName(member.full_name)}
+                    </span>
+                  )}
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </button>
 
                 {isUserDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border py-2 z-50">
-                    <div className="px-4 py-3 border-b border-border">
-                      <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                    </div>
+                    {member ? (
+                      <>
+                        <div className="px-4 py-3 border-b border-border">
+                          <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                        </div>
 
-                    <Link
-                      to="/dashboard"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                      Dashboard
-                    </Link>
+                        <Link
+                          to="/dashboard"
+                          onClick={() => setIsUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Dashboard
+                        </Link>
 
-                    <Link
-                      to="/dashboard/profile"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
-                    >
-                      <User className="w-4 h-4" />
-                      My Profile
-                    </Link>
+                        <Link
+                          to="/dashboard/profile"
+                          onClick={() => setIsUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
+                        >
+                          <User className="w-4 h-4" />
+                          My Profile
+                        </Link>
 
-                    <Link
-                      to="/dashboard/settings"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
-                    >
-                      <Key className="w-4 h-4" />
-                      Settings
-                    </Link>
+                        <Link
+                          to="/dashboard/settings"
+                          onClick={() => setIsUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
+                        >
+                          <Key className="w-4 h-4" />
+                          Settings
+                        </Link>
 
-                    {isAdminUser && (
-                      <a
-                        href="/admin"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => setIsUserDropdownOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
-                      >
-                        <Shield className="w-4 h-4" />
-                        Admin Panel
-                      </a>
+                        {isAdminUser && (
+                          <a
+                            href="/admin"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setIsUserDropdownOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Admin Panel
+                          </a>
+                        )}
+
+                        <button
+                          onClick={handleLogout}
+                          disabled={isLoggingOut}
+                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          {isLoggingOut ? 'Logging out...' : 'Logout'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="px-4 py-3 border-b border-border">
+                          <p className="text-sm font-semibold text-foreground">Signed in</p>
+                          <p className="text-xs text-muted-foreground">Registration incomplete</p>
+                        </div>
+
+                        <Link
+                          to="/join"
+                          onClick={() => setIsUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted/50 hover:text-primary transition-colors"
+                        >
+                          <User className="w-4 h-4" />
+                          Complete Registration
+                        </Link>
+
+                        <button
+                          onClick={handleLogout}
+                          disabled={isLoggingOut}
+                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          {isLoggingOut ? 'Logging out...' : 'Logout'}
+                        </button>
+                      </>
                     )}
-
-                    <button
-                      onClick={handleLogout}
-                      disabled={isLoggingOut}
-                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      {isLoggingOut ? 'Logging out...' : 'Logout'}
-                    </button>
                   </div>
                 )}
               </div>
@@ -369,28 +377,45 @@ const Header: React.FC = () => {
               )}
 
               <div className="flex items-center justify-between pt-3 border-t border-border">
-                {isAnyUserAuthenticated && member ? (
-                  <div className="flex flex-col gap-2">
+                {isAnyUserAuthenticated ? (
+                  <div className="flex flex-col gap-2 w-full">
                     <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
-                      {member.profile_photo_url ? (
+                      {member?.profile_photo_url && !photoError ? (
                         <img
                           src={member.profile_photo_url}
                           alt={member.full_name}
                           className="w-8 h-8 rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
+                          onError={() => setPhotoError(true)}
                         />
                       ) : (
-                        <div className={`w-8 h-8 ${getAvatarColor(member.full_name)} rounded-full flex items-center justify-center text-white font-semibold text-sm`}>
-                          {getInitials(member.full_name)}
+                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                      <div className="flex-1 min-w-0">
+                        {member ? (
+                          <>
+                            <p className="text-sm font-semibold text-foreground">{member.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-foreground">Signed in</p>
+                            <p className="text-xs text-muted-foreground">Registration incomplete</p>
+                          </>
+                        )}
                       </div>
                     </div>
+                    {!member && (
+                      <Link
+                        to="/join"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        Complete Registration
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}

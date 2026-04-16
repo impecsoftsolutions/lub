@@ -29,6 +29,13 @@ interface AIRuntimeSettingsRow {
   api_key_secret: string | null;
 }
 
+interface NormalizationRuleRow {
+  field_key: NormalizableField;
+  instruction_text: string;
+  is_enabled: boolean;
+  display_order: number;
+}
+
 interface OpenAICompletionResponse {
   choices?: Array<{
     message?: {
@@ -41,6 +48,17 @@ interface OpenAICompletionResponse {
 }
 
 const VALID_REASONING_EFFORT = new Set(['low', 'medium', 'high', 'xhigh']);
+const DEFAULT_NORMALIZATION_RULES: Partial<Record<NormalizableField, string>> = {
+  full_name: 'Title Case, trim extra spaces',
+  company_name: 'Title Case, trim extra spaces',
+  company_address: 'Trim extra spaces and normalize spacing',
+  products_services: 'Trim extra spaces and normalize punctuation spacing',
+  alternate_contact_name: 'Title Case, trim extra spaces',
+  referred_by: 'Title Case, trim extra spaces',
+  email: 'Keep as provided',
+  mobile_number: 'Keep as provided',
+  alternate_mobile: 'Keep as provided',
+};
 
 function toStringValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -101,6 +119,65 @@ async function loadAIRuntimeSettings(): Promise<AIRuntimeSettingsRow | null> {
   return rows[0] ?? null;
 }
 
+async function loadNormalizationRules(): Promise<NormalizationRuleRow[] | null> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim();
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.warn('[normalize-member] normalization rules fallback: missing Supabase env');
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/member_normalization_rules?select=field_key,instruction_text,is_enabled,display_order&order=display_order.asc`,
+      {
+        method: 'GET',
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.warn(`[normalize-member] normalization rules fallback: ${response.status} ${errorBody}`);
+      return null;
+    }
+
+    const rows = (await response.json()) as NormalizationRuleRow[];
+    return Array.isArray(rows) ? rows : null;
+  } catch (error) {
+    const details = error instanceof Error ? error.message : 'Unknown error';
+    console.warn(`[normalize-member] normalization rules fallback: ${details}`);
+    return null;
+  }
+}
+
+function buildEffectiveNormalizationRules(
+  rows: NormalizationRuleRow[] | null
+): Partial<Record<NormalizableField, string>> {
+  if (!rows || rows.length === 0) {
+    return { ...DEFAULT_NORMALIZATION_RULES };
+  }
+
+  const rules: Partial<Record<NormalizableField, string>> = {};
+
+  for (const row of rows) {
+    if (!NORMALIZABLE_FIELDS.includes(row.field_key)) continue;
+    if (!row.is_enabled) continue;
+
+    const instruction = toStringValue(row.instruction_text);
+    if (!instruction) continue;
+
+    rules[row.field_key] = instruction;
+  }
+
+  return rules;
+}
+
 function coerceNormalizedRecord(raw: unknown, fallbackOriginal: NormalizationRecord): NormalizationRecord {
   if (!raw || typeof raw !== 'object') {
     return { ...fallbackOriginal };
@@ -139,7 +216,8 @@ async function callOpenAIForNormalization(
   apiKey: string,
   model: string,
   reasoningEffort: string | null,
-  original: NormalizationRecord
+  original: NormalizationRecord,
+  rules: Partial<Record<NormalizableField, string>>
 ): Promise<NormalizationRecord> {
   const systemInstruction =
     'You normalize member registration fields for consistency. Return strict JSON only with either {"normalized": {...}} or {"original": {...}, "normalized": {...}}. Keep email and mobile numbers unchanged.';
@@ -148,17 +226,7 @@ async function callOpenAIForNormalization(
     {
       task: 'normalize_member_fields',
       fields: original,
-      rules: {
-        full_name: 'Title Case, trim extra spaces',
-        company_name: 'Title Case, trim extra spaces',
-        company_address: 'Trim extra spaces and normalize spacing',
-        products_services: 'Trim extra spaces and normalize punctuation spacing',
-        alternate_contact_name: 'Title Case, trim extra spaces',
-        referred_by: 'Title Case, trim extra spaces',
-        email: 'Keep as provided',
-        mobile_number: 'Keep as provided',
-        alternate_mobile: 'Keep as provided',
-      },
+      rules,
     },
     null,
     2
@@ -226,7 +294,10 @@ Deno.serve(async (req: Request) => {
     const payload = (await req.json()) as GenericPayload;
     const original = buildOriginalRecord(payload);
 
-    const settings = await loadAIRuntimeSettings();
+    const [settings, normalizationRules] = await Promise.all([
+      loadAIRuntimeSettings(),
+      loadNormalizationRules(),
+    ]);
     if (!settings) {
       return new Response(JSON.stringify(buildPassthroughResult(original)), {
         status: 200,
@@ -247,7 +318,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const normalized = await callOpenAIForNormalization(apiKey, model, reasoningEffort, original);
+    const effectiveRules = buildEffectiveNormalizationRules(normalizationRules);
+    if (Object.keys(effectiveRules).length === 0) {
+      return new Response(JSON.stringify(buildPassthroughResult(original)), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const normalized = await callOpenAIForNormalization(
+      apiKey,
+      model,
+      reasoningEffort,
+      original,
+      effectiveRules
+    );
 
     return new Response(
       JSON.stringify({

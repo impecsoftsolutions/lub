@@ -142,16 +142,14 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
   const buttonBgColor = isBlock ? 'bg-orange-600 hover:bg-orange-700 focus:ring-orange-500' : 'bg-green-600 hover:bg-green-700 focus:ring-green-500';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div className="fixed inset-0 z-[80] overflow-y-auto">
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-6 text-center sm:p-0">
         <div
           className="fixed inset-0 transition-opacity bg-black/50"
           onClick={handleClose}
         />
 
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-
-        <div className="inline-block align-bottom bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div className="relative z-10 inline-block w-full max-w-lg transform overflow-hidden rounded-xl border border-border bg-card text-left shadow-2xl transition-all">
 
           <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-start justify-between mb-4">

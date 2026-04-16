@@ -108,6 +108,52 @@ const REQUIRED_MESSAGE_OVERRIDES: Record<string, string> = {
   products_services: 'Products & services is required'
 };
 
+const MEMBER_EDIT_PREFILL_FIELDS = [
+  'full_name',
+  'gender',
+  'date_of_birth',
+  'email',
+  'mobile_number',
+  'company_name',
+  'company_designation_id',
+  'company_address',
+  'state',
+  'district',
+  'city',
+  'other_city_name',
+  'is_custom_city',
+  'pin_code',
+  'industry',
+  'activity_type',
+  'constitution',
+  'annual_turnover',
+  'number_of_employees',
+  'products_services',
+  'brand_names',
+  'website',
+  'gst_registered',
+  'gst_number',
+  'pan_company',
+  'esic_registered',
+  'epf_registered',
+  'referred_by',
+  'alternate_contact_name',
+  'alternate_mobile',
+  'payment_date',
+  'payment_mode',
+  'transaction_id',
+  'bank_reference'
+] as const;
+
+const MEMBER_EDIT_PREFILL_KEY_ALIASES: Partial<Record<(typeof MEMBER_EDIT_PREFILL_FIELDS)[number], string[]>> = {
+  company_designation_id: ['designation', 'company_designation', 'company_designation_name'],
+  date_of_birth: ['dob'],
+  payment_date: ['transaction_date'],
+  transaction_id: ['transaction_reference', 'utr', 'utr_number'],
+  bank_reference: ['reference_number', 'bank_ref'],
+  other_city_name: ['other_city', 'custom_city']
+};
+
 const MemberEditProfile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -225,6 +271,9 @@ const MemberEditProfile: React.FC = () => {
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>('');
   const [showOtherCity, setShowOtherCity] = useState(false);
   const [memberRegistrationId, setMemberRegistrationId] = useState<string | null>(null);
+  const [isEditLockedUntilRegistration, setIsEditLockedUntilRegistration] = useState(false);
+  const [registrationGateMessage, setRegistrationGateMessage] = useState<string | null>(null);
+  const [isCheckingRegistrationGate, setIsCheckingRegistrationGate] = useState(false);
 
   // Loading states
   const [isLoadingStates, setIsLoadingStates] = useState(true);
@@ -425,98 +474,280 @@ const MemberEditProfile: React.FC = () => {
     setIsVerifiedForSubmit(false);
   }, [isPreviewMode]);
 
+  const normalizePrefillDate = useCallback((rawValue: string): string => {
+    const value = rawValue.trim();
+    if (!value) {
+      return '';
+    }
+
+    const isoPrefix = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoPrefix?.[1]) {
+      return isoPrefix[1];
+    }
+
+    const dmy = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+    if (dmy) {
+      return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    }
+
+    return value;
+  }, []);
+
+  const hasPrefillValue = useCallback((fieldKey: string, value: unknown): boolean => {
+    if (value === null || value === undefined) {
+      return false;
+    }
+
+    if (typeof value === 'boolean') {
+      return fieldKey === 'is_custom_city' ? value === true : true;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value);
+    }
+
+    return String(value).trim() !== '';
+  }, []);
+
+  const getPrefillCandidateValue = useCallback((source: Record<string, unknown>, fieldKey: string): unknown => {
+    if (Object.prototype.hasOwnProperty.call(source, fieldKey)) {
+      return source[fieldKey];
+    }
+
+    const aliases = MEMBER_EDIT_PREFILL_KEY_ALIASES[fieldKey as keyof typeof MEMBER_EDIT_PREFILL_KEY_ALIASES];
+    if (!aliases?.length) {
+      return undefined;
+    }
+
+    for (const alias of aliases) {
+      if (!Object.prototype.hasOwnProperty.call(source, alias)) {
+        continue;
+      }
+      const aliasValue = source[alias];
+      if (aliasValue !== undefined && aliasValue !== null) {
+        return aliasValue;
+      }
+    }
+
+    return undefined;
+  }, []);
+
+  const normalizePrefillValue = useCallback((fieldKey: string, value: unknown): string | boolean => {
+    if (fieldKey === 'is_custom_city') {
+      if (typeof value === 'boolean') {
+        return value;
+      }
+      const normalized = String(value).trim().toLowerCase();
+      return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y';
+    }
+
+    const textValue = String(value ?? '').trim();
+    if (fieldKey === 'date_of_birth' || fieldKey === 'payment_date') {
+      return normalizePrefillDate(textValue);
+    }
+    if (fieldKey === 'gender') {
+      return textValue.toLowerCase();
+    }
+    return textValue;
+  }, [normalizePrefillDate]);
+
+  const applyPrefillFromSources = useCallback((current: typeof formData, sources: Array<Record<string, unknown>>) => {
+    const next = { ...current };
+
+    for (const fieldKey of MEMBER_EDIT_PREFILL_FIELDS) {
+      if (hasPrefillValue(fieldKey, next[fieldKey])) {
+        continue;
+      }
+
+      for (const source of sources) {
+        if (!source || typeof source !== 'object') {
+          continue;
+        }
+
+        const candidate = getPrefillCandidateValue(source, fieldKey);
+        if (!hasPrefillValue(fieldKey, candidate)) {
+          continue;
+        }
+
+        next[fieldKey] = normalizePrefillValue(fieldKey, candidate) as (typeof next)[typeof fieldKey];
+        break;
+      }
+    }
+
+    return next;
+  }, [getPrefillCandidateValue, hasPrefillValue, normalizePrefillValue]);
+
+  const resolveUserPrefillSource = useCallback(async (): Promise<Record<string, unknown>> => {
+    const source: Record<string, unknown> = {
+      ...(member || {}),
+      email: member?.email || '',
+      mobile_number: member?.mobile_number || ''
+    };
+
+    const cachedUser = sessionManager.getUserData();
+    if (cachedUser && typeof cachedUser === 'object') {
+      Object.assign(source, cachedUser);
+    }
+
+    if (member?.user_id) {
+      try {
+        const { data: userRow, error: userRowError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', member.user_id)
+          .maybeSingle();
+
+        if (!userRowError && userRow && typeof userRow === 'object') {
+          Object.assign(source, userRow as Record<string, unknown>);
+        } else if (userRowError) {
+          console.warn('[MemberEditProfile] Could not fetch users row for prefill:', userRowError.message);
+        }
+      } catch (userRowFetchError) {
+        console.warn('[MemberEditProfile] Unexpected error loading users row for prefill:', userRowFetchError);
+      }
+    }
+
+    return source;
+  }, [member]);
+
   // Load complete member profile data from database
   const loadMemberProfile = useCallback(async () => {
     if (!member?.id) return;
 
+    setIsCheckingRegistrationGate(true);
     console.log('[MemberEditProfile] Loading complete profile for member:', member.id);
     try {
       const sessionToken = sessionManager.getSessionToken();
       if (!sessionToken || sessionManager.isSessionExpired()) {
+        setIsEditLockedUntilRegistration(true);
+        setRegistrationGateMessage('User session not found. Please log in again.');
         showToast('error', 'User session not found. Please log in again.');
         return;
       }
 
-      const { data, error } = await memberRegistrationService.getMyMemberRegistrationByToken(sessionToken);
+      const [registrationResult, signupPrefillResult, userPrefillSource] = await Promise.all([
+        memberRegistrationService.getMyMemberRegistrationByToken(sessionToken),
+        memberRegistrationService.getSignupPrefillPayloadByToken(sessionToken),
+        resolveUserPrefillSource()
+      ]);
 
-      if (error) {
-        showToast('error', error);
+      const prefillSources: Array<Record<string, unknown>> = [
+        signupPrefillResult.data,
+        signupPrefillResult.customPayload,
+        signupPrefillResult.corePayload,
+        userPrefillSource
+      ];
+
+      if (registrationResult.error) {
+        setIsEditLockedUntilRegistration(true);
+        setRegistrationGateMessage('Could not verify your registration status right now. Please try again.');
+        showToast('error', registrationResult.error);
         return;
       }
 
-      if (!data) {
-        showToast('error', 'Failed to load profile data');
+      if (!registrationResult.data) {
+        const prefilledData = applyPrefillFromSources(createEmptyFormData(), prefillSources);
+        const isCustomCity = Boolean(prefilledData.is_custom_city || prefilledData.city === 'Other');
+        const normalizedPrefillData = {
+          ...prefilledData,
+          city: isCustomCity ? 'Other' : prefilledData.city,
+          is_custom_city: isCustomCity
+        };
+
+        setMemberRegistrationId(null);
+        setFormData(normalizedPrefillData);
+        setOriginalData(normalizedPrefillData);
+        setShowOtherCity(isCustomCity);
+        setProfilePhoto(null);
+        setPhotoFileName('');
+        setPhotoImageSrc('');
+        setDocumentFiles({
+          gstCertificate: null,
+          udyamCertificate: null,
+          paymentProof: null
+        });
+        setProfilePhotoPreview(normalizedPrefillData.profile_photo_url || '');
+        setErrors({});
+        setIsVerifiedForSubmit(false);
+        setIsEditLockedUntilRegistration(true);
+        setRegistrationGateMessage('You can edit this form only after submitting Member Registration once. Available account data is shown below for reference.');
         return;
       }
 
-      console.log('[MemberEditProfile] Profile data loaded:', data);
+      const registrationData = registrationResult.data as Record<string, unknown>;
+      console.log('[MemberEditProfile] Profile data loaded:', registrationData);
 
-      // Store the member_registrations.id
-      setMemberRegistrationId(data.id);
+      const registrationId = registrationData.id ? String(registrationData.id) : null;
+      setMemberRegistrationId(registrationId);
 
-      const isCustomCity = data.is_custom_city || data.city === 'Other';
-
-      const initialFormData = {
-        full_name: data.full_name || '',
-        email: data.email || '',
-        mobile_number: data.mobile_number || '',
-        gender: data.gender || '',
-        date_of_birth: data.date_of_birth || '',
-        company_name: data.company_name || '',
-        company_designation_id: data.company_designation_id || '',
-        company_address: data.company_address || '',
-        state: data.state || '',
-        district: data.district || '',
-        city: isCustomCity ? 'Other' : (data.city || ''),
-        is_custom_city: isCustomCity,
-        other_city_name: data.other_city_name || '',
-        pin_code: data.pin_code || '',
-        industry: data.industry || '',
-        activity_type: data.activity_type || '',
-        constitution: data.constitution || '',
-        annual_turnover: data.annual_turnover || '',
-        number_of_employees: data.number_of_employees || '',
-        products_services: data.products_services || '',
-        brand_names: data.brand_names || '',
-        website: data.website || '',
-        gst_registered: data.gst_registered || '',
-        gst_number: data.gst_number || '',
-        gst_certificate_url: data.gst_certificate_url || '',
-        pan_company: data.pan_company || '',
-        esic_registered: data.esic_registered || '',
-        epf_registered: data.epf_registered || '',
-        udyam_certificate_url: data.udyam_certificate_url || '',
-        payment_proof_url: data.payment_proof_url || '',
-        member_id: data.member_id || '',
-        referred_by: data.referred_by || '',
-        amount_paid: data.amount_paid || '',
-        payment_date: data.payment_date || '',
-        payment_mode: data.payment_mode || '',
-        transaction_id: data.transaction_id || '',
-        bank_reference: data.bank_reference || '',
-        alternate_contact_name: data.alternate_contact_name || '',
-        alternate_mobile: data.alternate_mobile || '',
-        profile_photo_url: data.profile_photo_url || ''
-      };
+      const isCustomCity = Boolean(registrationData.is_custom_city || registrationData.city === 'Other');
+      const initialFormData = applyPrefillFromSources(
+        {
+          full_name: String(registrationData.full_name || ''),
+          email: String(registrationData.email || ''),
+          mobile_number: String(registrationData.mobile_number || ''),
+          gender: String(registrationData.gender || ''),
+          date_of_birth: String(registrationData.date_of_birth || ''),
+          company_name: String(registrationData.company_name || ''),
+          company_designation_id: String(registrationData.company_designation_id || ''),
+          company_address: String(registrationData.company_address || ''),
+          state: String(registrationData.state || ''),
+          district: String(registrationData.district || ''),
+          city: isCustomCity ? 'Other' : String(registrationData.city || ''),
+          is_custom_city: isCustomCity,
+          other_city_name: String(registrationData.other_city_name || ''),
+          pin_code: String(registrationData.pin_code || ''),
+          industry: String(registrationData.industry || ''),
+          activity_type: String(registrationData.activity_type || ''),
+          constitution: String(registrationData.constitution || ''),
+          annual_turnover: String(registrationData.annual_turnover || ''),
+          number_of_employees: String(registrationData.number_of_employees || ''),
+          products_services: String(registrationData.products_services || ''),
+          brand_names: String(registrationData.brand_names || ''),
+          website: String(registrationData.website || ''),
+          gst_registered: String(registrationData.gst_registered || ''),
+          gst_number: String(registrationData.gst_number || ''),
+          gst_certificate_url: String(registrationData.gst_certificate_url || ''),
+          pan_company: String(registrationData.pan_company || ''),
+          esic_registered: String(registrationData.esic_registered || ''),
+          epf_registered: String(registrationData.epf_registered || ''),
+          udyam_certificate_url: String(registrationData.udyam_certificate_url || ''),
+          payment_proof_url: String(registrationData.payment_proof_url || ''),
+          member_id: String(registrationData.member_id || ''),
+          referred_by: String(registrationData.referred_by || ''),
+          amount_paid: String(registrationData.amount_paid || ''),
+          payment_date: String(registrationData.payment_date || ''),
+          payment_mode: String(registrationData.payment_mode || ''),
+          transaction_id: String(registrationData.transaction_id || ''),
+          bank_reference: String(registrationData.bank_reference || ''),
+          alternate_contact_name: String(registrationData.alternate_contact_name || ''),
+          alternate_mobile: String(registrationData.alternate_mobile || ''),
+          profile_photo_url: String(registrationData.profile_photo_url || '')
+        },
+        prefillSources
+      );
 
       setFormData(initialFormData);
       setOriginalData(initialFormData);
+      setShowOtherCity(Boolean(initialFormData.is_custom_city));
+      setIsEditLockedUntilRegistration(false);
+      setRegistrationGateMessage(null);
 
-      // Handle "Other" city display
-      if (isCustomCity) {
-        setShowOtherCity(true);
-      }
-
-      // Load existing profile photo if it exists
-      if (data.profile_photo_url) {
-        setProfilePhotoPreview(data.profile_photo_url);
-        console.log('[MemberEditProfile] Loaded existing photo:', data.profile_photo_url);
+      if (initialFormData.profile_photo_url) {
+        setProfilePhotoPreview(initialFormData.profile_photo_url);
+        console.log('[MemberEditProfile] Loaded existing photo:', initialFormData.profile_photo_url);
+      } else {
+        setProfilePhotoPreview('');
       }
     } catch (error) {
       console.error('[MemberEditProfile] Error loading member profile:', error);
+      setIsEditLockedUntilRegistration(true);
+      setRegistrationGateMessage('Could not verify your registration status right now. Please try again.');
       showToast('error', 'Failed to load profile data');
+    } finally {
+      setIsCheckingRegistrationGate(false);
     }
-  }, [member, showToast]);
+  }, [applyPrefillFromSources, member, resolveUserPrefillSource, showToast]);
 
   const loadStates = useCallback(async () => {
     try {
@@ -789,6 +1020,9 @@ const MemberEditProfile: React.FC = () => {
   };
 
   const hasFormChanges = (): boolean => {
+    if (!isPreviewMode && isEditLockedUntilRegistration) {
+      return false;
+    }
     if (documentFiles.gstCertificate || documentFiles.udyamCertificate || documentFiles.paymentProof) {
       return true;
     }
@@ -1020,6 +1254,10 @@ const MemberEditProfile: React.FC = () => {
       showToast('error', 'Member data not available');
       return;
     }
+    if (isEditingLocked) {
+      showToast('error', 'Submit Member Registration once to unlock profile editing.');
+      return;
+    }
 
     setIsVerifying(true);
     try {
@@ -1083,6 +1321,10 @@ const MemberEditProfile: React.FC = () => {
 
     if (!member) {
       showToast('error', 'Member data not available');
+      return;
+    }
+    if (isEditingLocked) {
+      showToast('error', 'Submit Member Registration once to unlock profile editing.');
       return;
     }
 
@@ -1358,6 +1600,8 @@ const MemberEditProfile: React.FC = () => {
     }
   }, [correctionSnapshot]);
 
+  const isEditingLocked = !isPreviewMode && isEditLockedUntilRegistration;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1382,6 +1626,17 @@ const MemberEditProfile: React.FC = () => {
           >
             Back to Dashboard
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isPreviewMode && isCheckingRegistrationGate) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Checking registration status...</p>
         </div>
       </div>
     );
@@ -1453,7 +1708,28 @@ const MemberEditProfile: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="p-6 space-y-8">
+          {isEditingLocked && (
+            <div className="mx-6 mt-4 rounded-lg border border-border bg-muted/40 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-foreground">Profile editing is locked for this account</p>
+                  <p className="text-sm text-muted-foreground">
+                    {registrationGateMessage || 'Submit Member Registration once to unlock profile editing.'}
+                  </p>
+                  <Link
+                    to="/join"
+                    className="inline-flex items-center px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    Complete Member Registration
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="p-6">
+            <fieldset disabled={isEditingLocked} className={`space-y-8 ${isEditingLocked ? 'opacity-80' : ''}`}>
             {/* Section 1: Personal Information */}
             <div>
               <h2 className="text-section font-semibold text-foreground mb-4 flex items-center gap-2 pb-2 border-b border-border">
@@ -1628,14 +1904,19 @@ const MemberEditProfile: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowEmailModal(true)}
-                      className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
+                      disabled={isEditingLocked}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
+                        isEditingLocked
+                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      }`}
                     >
                       <Unlock className="w-4 h-4" />
                       Change
                     </button>
                   </div>
                   {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
-                  {!isEmailEditable && (
+                  {!isEmailEditable && !isEditingLocked && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit email</p>
                   )}
                 </div>
@@ -1666,14 +1947,19 @@ const MemberEditProfile: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowMobileModal(true)}
-                      className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
+                      disabled={isEditingLocked}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
+                        isEditingLocked
+                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      }`}
                     >
                       <Unlock className="w-4 h-4" />
                       Change
                     </button>
                   </div>
                   {errors.mobile_number && <p className="text-destructive text-sm mt-1">{errors.mobile_number}</p>}
-                  {!isMobileEditable && (
+                  {!isMobileEditable && !isEditingLocked && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit mobile</p>
                   )}
                 </div>
@@ -2495,9 +2781,9 @@ const MemberEditProfile: React.FC = () => {
               <button
                 ref={submitButtonRef}
                 type="submit"
-                disabled={isPreviewMode || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
+                disabled={isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isPreviewMode || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
+                  isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
@@ -2517,9 +2803,9 @@ const MemberEditProfile: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void handleVerify()}
-                disabled={isPreviewMode || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
+                disabled={isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isPreviewMode || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
+                  isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
                 }`}
@@ -2537,6 +2823,7 @@ const MemberEditProfile: React.FC = () => {
                 )}
               </button>
             </div>
+            </fieldset>
           </form>
         </div>
       </div>

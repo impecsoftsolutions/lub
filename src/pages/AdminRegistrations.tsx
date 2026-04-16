@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal } from 'lucide-react';
+import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
-import { supabase, memberRegistrationService } from '../lib/supabase';
+import { supabase, memberRegistrationService, type ApprovedMemberExportRow } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { emailService, WelcomeEmailData } from '../lib/emailService';
 import Toast from '../components/Toast';
@@ -22,6 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useAdmin } from '../contexts/useAdmin';
+import { downloadSingleSheetXlsx } from '../lib/xlsxExport';
 
 interface MemberRegistration {
   id: string;
@@ -49,6 +50,32 @@ interface RegistrationRpcRow extends Omit<MemberRegistration, 'company_designati
   company_designation_name?: string | null;
 }
 
+type ExportColumnKey = keyof ApprovedMemberExportRow;
+type OptionalExportColumnKey = 'mobile_number' | 'email' | 'member_id' | 'company_address' | 'gender';
+
+const CORE_EXPORT_COLUMNS: Array<{ key: ExportColumnKey; header: string }> = [
+  { key: 'company_name', header: 'Company Name' },
+  { key: 'member_name', header: 'Member Name' },
+  { key: 'city', header: 'City' },
+  { key: 'district', header: 'District' },
+];
+
+const OPTIONAL_EXPORT_COLUMNS: Array<{ key: OptionalExportColumnKey; header: string }> = [
+  { key: 'mobile_number', header: 'Mobile' },
+  { key: 'email', header: 'Email' },
+  { key: 'member_id', header: 'Membership ID' },
+  { key: 'company_address', header: 'Address' },
+  { key: 'gender', header: 'Gender' },
+];
+
+const DEFAULT_OPTIONAL_EXPORT_SELECTION: Record<OptionalExportColumnKey, boolean> = {
+  mobile_number: false,
+  email: false,
+  member_id: false,
+  company_address: false,
+  gender: false,
+};
+
 const AdminRegistrations: React.FC = () => {
   const [registrations, setRegistrations] = useState<MemberRegistration[]>([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState<MemberRegistration[]>([]);
@@ -56,6 +83,11 @@ const AdminRegistrations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [selectedOptionalExportColumns, setSelectedOptionalExportColumns] = useState<Record<OptionalExportColumnKey, boolean>>(
+    DEFAULT_OPTIONAL_EXPORT_SELECTION
+  );
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     registrationId: string;
@@ -308,6 +340,55 @@ const AdminRegistrations: React.FC = () => {
     }
   };
 
+  const handleExportApprovedMembers = async () => {
+    try {
+      setIsExporting(true);
+      const result = await memberRegistrationService.getApprovedMembersExport();
+
+      if (!result.success || !result.data) {
+        showToast('error', result.error || 'Failed to export approved members');
+        return;
+      }
+
+      if (result.data.length === 0) {
+        showToast('error', 'No approved members available to export');
+        return;
+      }
+
+      const selectedColumns = [
+        ...CORE_EXPORT_COLUMNS,
+        ...OPTIONAL_EXPORT_COLUMNS.filter((column) => selectedOptionalExportColumns[column.key]),
+      ];
+
+      await downloadSingleSheetXlsx({
+        fileName: `LUB_Members_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        sheetName: 'Members',
+        columns: selectedColumns,
+        rows: result.data,
+      });
+
+      showToast('success', `Approved members exported successfully (${result.data.length} rows)`);
+      setIsExportDialogOpen(false);
+    } catch (error) {
+      console.error('[AdminRegistrations] Error exporting approved members:', error);
+      showToast('error', 'Failed to export approved members');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const openExportDialog = () => {
+    setSelectedOptionalExportColumns(DEFAULT_OPTIONAL_EXPORT_SELECTION);
+    setIsExportDialogOpen(true);
+  };
+
+  const handleExportColumnToggle = (key: OptionalExportColumnKey) => {
+    setSelectedOptionalExportColumns((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
+
   const handleEditMember = (member: MemberRegistration) => {
     setReturnToViewOnEditClose(false);
     setViewingApplicationId('');
@@ -461,7 +542,28 @@ const AdminRegistrations: React.FC = () => {
       <PageHeader
         title="Member Registrations"
         subtitle="Manage and review membership applications"
-        actions={<span className="text-sm text-muted-foreground">{registrations.length} total</span>}
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">{registrations.length} total</span>
+            {canViewMembers && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openExportDialog}
+                disabled={isExporting}
+                className="gap-1.5"
+              >
+                {isExporting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Export Members
+              </Button>
+            )}
+          </div>
+        }
       />
 
       {/* Filter bar */}
@@ -688,6 +790,91 @@ const AdminRegistrations: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={isExportDialogOpen}
+        onOpenChange={(open) => {
+          if (!isExporting) {
+            setIsExportDialogOpen(open);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Approved Members</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This export always includes approved members only. Current page filters do not affect the downloaded file.
+            </p>
+
+            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-foreground">Core Columns</h3>
+                <span className="text-xs text-muted-foreground">Always included</span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {CORE_EXPORT_COLUMNS.map((column) => (
+                  <label
+                    key={column.key}
+                    className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    <input type="checkbox" checked readOnly className="h-4 w-4 accent-primary" />
+                    <span>{column.header}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-foreground">Optional Columns</h3>
+                <span className="text-xs text-muted-foreground">Unchecked by default</span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {OPTIONAL_EXPORT_COLUMNS.map((column) => (
+                  <label
+                    key={column.key}
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted/40"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedOptionalExportColumns[column.key]}
+                      onChange={() => handleExportColumnToggle(column.key)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span>{column.header}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsExportDialogOpen(false)}
+              disabled={isExporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleExportApprovedMembers()}
+              disabled={isExporting}
+              className="gap-1.5"
+            >
+              {isExporting ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Download XLSX
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation Dialog */}
       <Dialog
