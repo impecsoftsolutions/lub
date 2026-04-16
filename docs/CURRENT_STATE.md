@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-04-16
-**Updated by:** Claude (`CLAUDE-USR-MODAL-ZINDEX-001`)
+**Updated by:** Claude (`CLAUDE-MEMBER-PROFILE-VIEW-001`)
 
 ---
 
@@ -34,6 +34,8 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 **Current handoff state:** All in-flight slices complete. Ready queue is open.
 
 Most recently completed streams:
+- **CLAUDE-MEMBER-PROFILE-VIEW-001**: Expanded the member Profile page (`/dashboard/profile`) from a minimal 4-field view to a full-detail display. `MemberViewProfile.tsx` fully rewritten with 10 conditional sections (only rendered when data is present): Personal Information, Company & Location, Business Details, Registration & Compliance (with yes/no badges), Membership Details, Alternate Contact, Referral, Payment Information, Documents (clickable open-in-new-tab links), Rejection Reason. Expanded local `MemberRegistrationData` interface to type all `member_registrations` columns. Added `Field`, `WideField`, `YesNoField`, `SectionHeader`, `DocLink` helper components. No backend or RPC changes — existing `get_my_member_registration_by_token` already returns the full row.
+- **CLAUDE-DATETIME-FORMAT-001**: Completed global date/time formatting settings across the portal. Added migration `20260416163000_add_datetime_format_settings_admin_contracts.sql` introducing `datetime_format_settings`, runtime/profile RPCs, and `settings.datetime.view/manage` permissions. `src/lib/supabase.ts` now exposes `dateTimeSettingsService` and the shared date/time format types. Added `src/lib/dateTimeManager.ts` as the single formatting/runtime-sync utility and `src/components/DateTimeFormatBootstrap.tsx` to refresh the runtime profile in the background without blocking first paint. Added new admin settings page `src/pages/AdminDateTimeSettings.tsx` at `/admin/settings/datetime`, then wired the route into `App.tsx`, the Settings Hub, and the admin sidebar. Replaced scattered direct `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` display formatting across the audited admin/member/public surfaces with the shared formatter so the chosen global profile propagates consistently. Targeted browser verification temporarily switched the site to `yyyy-mm-dd` + `24h`, confirmed the new format rendered on Admin AI Settings metadata, then restored the defaults back to `dd-mm-yyyy` + `12h`.
 - **CLAUDE-USR-MODAL-ZINDEX-001**: Fixed z-index stacking bug in Admin Users action-menu modals. Block Account and Assign Role dialogs were rendering behind the overlay backdrop (unreachable) due to `z-50` outer shell (same level as Radix dropdown portal) and missing `relative z-10` on the dialog card. Applied the established fixed-modal pattern from `COD-USR-001`/`COD-USR-DELMODAL-002` to both `BlockUserModal.tsx` and `AssignRoleModal.tsx`: outer shell `z-50` → `z-[80]`, added `relative z-10` to dialog card, updated centering wrapper, removed legacy zero-width spacer. No backend changes.
 - **COD-MEMBERS-EXPORT-001**: Completed approved-members XLSX export v2 on the existing admin registrations page (`/admin/members/registrations`) without creating a new members page or changing member-management flow. Migration `20260416093000_add_admin_members_export_rpc.sql` introduced session-wrapped RPC `get_admin_approved_members_export_with_session`, and follow-up migration `20260416113000_extend_admin_members_export_rpc_optional_fields.sql` extended the same approved-only contract with optional export fields (`mobile_number`, `email`, `member_id`, `company_address`, `gender`) while preserving the existing admin members permission model. `src/lib/supabase.ts` now exposes the richer `ApprovedMemberExportRow` and `memberRegistrationService.getApprovedMembersExport()`. `src/lib/xlsxExport.ts` remains the single-sheet XLSX generator using existing `jszip`. `AdminRegistrations.tsx` now opens an `Export Members` dialog with fixed core columns (`company_name`, `member_name`, `city`, `district`) and optional extra-column checkboxes; core columns are always included, extras are unchecked by default, and the export remains independent of current client-side filters. Live browser verification confirmed both the core-only and core-plus-extras downloads use `LUB_Members_YYYY-MM-DD.xlsx`, the dialog defaults are correct, and the exported workbook row count stays aligned to the approved-members RPC even when the page filter is set to pending.
 - **CLAUDE-NORMALIZATION-RULES-UI-001**: Completed the admin UI for Verify-time normalization rules. New page `src/pages/AdminNormalizationSettings.tsx` (~380 lines) at `/admin/settings/normalization`: rules grouped by category (identity/contact/company/business/referral), per-row enable/disable toggle, inline instruction-text edit with Save/Cancel, restore-default action using `default_instruction_text`, reorder up/down, "customised" badge when instruction differs from default, audit trail only when `updated_by_email` set. Scope info banner clarifies Verify-time AI cleanup vs. validation rules vs. Smart Upload extraction. PermissionGate on `settings.normalization.view`. Settings Hub Normalization Rules card added (Wand2 icon). Sidebar entry added between Validation Settings and Theme. Route wired in App.tsx. No changes to service layer, backend, or Verify flow.
@@ -103,16 +105,16 @@ Deferred by decision:
 ## Last Verified
 
 - **When:** 2026-04-16
-- **What:** Admin Users modal z-index fix (`CLAUDE-USR-MODAL-ZINDEX-001`)
+- **What:** Global admin-configurable date/time formatting (`CLAUDE-DATETIME-FORMAT-001`)
 - **Result:** PASS
 - **Commands:**
   ```
   npm run db:migrations:audit -> PASS
-  npm run db:migration:apply:single -- --version=20260416113000 -> PASS
+  npm run db:migration:apply:single -- --version=20260416163000 -> PASS
   npm run lint     -> 0 errors / 3 warnings (expected)
   npm run build    -> PASS
   npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
-  targeted browser export dialog + XLSX header checks -> PASS (`LUB_Members_2026-04-16.xlsx`)
+  targeted runtime profile RPC + admin browser format switch/restore -> PASS
   ```
 
 ## In Progress / Dirty State
@@ -125,7 +127,7 @@ When forms stream is complete, next top candidates are:
 1. `COD-MSME-SHOWCASE-001` - **new priority**: MSME product showcase platform with free + member tiers (product display, photo gallery, inquiry form). Higher priority than news/events. Needs product scoping session with user before starting.
 2. `COD-MSME-ISSUES-001` - MSME issue intake/categorization platform (deferred by user).
 3. `COD-PUBLIC-001` - populate public Events/News/Activities pages beyond placeholder headings (lower priority than showcase, deferred by user).
-4. `CLAUDE-DATETIME-FORMAT-001` - add admin settings for globally selected date and time formats across the website.
+4. `CLAUDE-MEMBER-PROFILE-VIEW-001` - expand `/dashboard/profile` to show all available member details already loaded on the page in a clean grouped layout, without backend changes.
 5. `COD-MEMBERS-EXPORT-002` - lowest-priority export UX follow-ups only: optional `Select all extras` / `Clear extras`, optional CSV export, and optional remember-last-selection behavior for the approved-members export dialog. Do not start unless explicitly re-prioritized.
 
 ---

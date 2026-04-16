@@ -12,39 +12,90 @@ Keep this file short and overwrite it instead of appending a journal.
 
 I am Claude. This message is for the next agent.
 
-- Slice ID: `CLAUDE-USR-MODAL-ZINDEX-001`
+- Slice ID: `CLAUDE-MEMBER-PROFILE-VIEW-001`
 - Owner: Claude
 - Status: **Complete**
 
-### What was fixed
+### What was built
 
-Block Account and Assign Role modals in Admin Users (`/admin/administration/users`) were rendering behind the overlay backdrop due to a z-index stacking bug, making them unreachable. The same bug had previously been fixed for Edit User and Delete User modals in `COD-USR-001` and `COD-USR-DELMODAL-002`.
+`src/pages/MemberViewProfile.tsx` fully rewritten. The profile page at `/dashboard/profile` now shows all available member registration data, organized into 10 distinct sections (only rendered when data is present):
 
-**Root cause:** Both broken modals used `z-50` on the outer shell (same level as the Radix dropdown portal) and had no `relative z-10` on the dialog card, so the backdrop obscured the card.
+1. **Personal Information** — full name, gender, date of birth, email, mobile
+2. **Company & Location** — company name, designation, address, city, district, state, pin code
+3. **Business Details** — industry, activity type, constitution, turnover, employees, products/services, brand names, website
+4. **Registration & Compliance** — GST registered (yes/no badge) + GST number, PAN, ESIC registered, EPF registered
+5. **Membership Details** — status badge, member ID, member since, approval date, application attempts
+6. **Alternate Contact** — name + mobile (hidden if both empty)
+7. **Referral** — referred by (hidden if empty)
+8. **Payment Information** — amount paid, payment date, payment mode, transaction ID, bank reference
+9. **Documents** — GST certificate, UDYAM certificate, payment proof (clickable links, open in new tab)
+10. **Rejection Reason** — shown only when status is rejected
 
-**Files changed:**
-
-1. `src/components/admin/modals/BlockUserModal.tsx`
-2. `src/components/admin/modals/AssignRoleModal.tsx`
-
-**Changes applied to both files (identical pattern):**
-- Outer shell: `z-50` → `z-[80]`
-- Centering wrapper: `flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0` → `relative flex min-h-screen items-center justify-center px-4 py-6 text-center sm:p-0`
-- Removed legacy zero-width space `<span>` vertical centering hack
-- Dialog card: added `relative z-10`, updated to `rounded-xl border border-border shadow-2xl w-full max-w-lg` to match established fixed-modal pattern
+No new RPC or backend changes — data already returned by existing `get_my_member_registration_by_token`. Expanded local `MemberRegistrationData` interface to type all fields. Added `Field`, `WideField`, `YesNoField`, `SectionHeader`, `DocLink` helper components within the file. Fields/sections that have no value are hidden automatically.
 
 ### Validation
 
 - `npm run lint` → PASS (0 errors / 3 expected warnings)
 - `npm run build` → PASS
-- `npm run test:e2e:phase1:local` → PASS (3 passed / 12 skipped)
 
 ### What was NOT changed
 
-- No changes to `AdminUsers.tsx`
-- No changes to `EditUserModal.tsx` or `DeleteUserModal.tsx` (already correct)
-- No backend, RPC, or service layer changes
+- No backend or RPC changes
+- No changes to `MemberEditProfile.tsx`, `MemberNav`, or member context
+
+---
+
+## Previous Handoff (Codex — CLAUDE-DATETIME-FORMAT-001)
+- Owner: Codex
+- Status: **Complete**
+
+### What changed
+
+Global date/time formatting is now admin-configurable and applied through a shared runtime formatter.
+
+**Backend / runtime**
+- Added migration `20260416163000_add_datetime_format_settings_admin_contracts.sql`
+- Created `datetime_format_settings` singleton storage with seeded `global_display` row
+- Added permissions `settings.datetime.view` and `settings.datetime.manage`
+- Added RPCs:
+  - `get_datetime_format_settings_with_session`
+  - `upsert_datetime_format_settings_with_session`
+  - `get_datetime_format_runtime_profile`
+- Added `dateTimeSettingsService` and shared portal date/time format types in `src/lib/supabase.ts`
+- Added `src/lib/dateTimeManager.ts` as the single formatter/runtime-sync utility
+- Added `src/components/DateTimeFormatBootstrap.tsx` to refresh the runtime profile in the background without blocking first paint
+
+**UI / wiring**
+- Added `src/pages/AdminDateTimeSettings.tsx` at `/admin/settings/datetime`
+- Added Settings Hub card and admin sidebar entry for Date & Time Settings
+- Registered the route in `src/App.tsx`
+- Replaced scattered direct `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` display formatting across the audited admin/member/public surfaces with the shared formatter so the selected profile propagates consistently
+
+### Validation
+
+- `npm run db:migrations:audit` -> PASS
+- `npm run db:migration:apply:single -- --version=20260416163000` -> PASS
+- `npm run lint` -> PASS (0 errors / 3 expected warnings)
+- `npm run build` -> PASS
+- `npm run test:e2e:phase1:local` -> PASS (3 passed / 12 skipped)
+- Targeted runtime profile RPC + browser verification -> PASS
+  - temporarily switched to `yyyy-mm-dd` + `24h`
+  - confirmed Admin AI Settings metadata adopted the new format
+  - restored defaults to `dd-mm-yyyy` + `12h`
+
+### What was NOT changed
+
+- No validation-rule behavior changes
+- No Smart Upload or document-extraction changes
+- No storage-format changes for member/admin data; this slice affects display formatting only
+- No blocking app bootstrap/loading screen remains; first paint stays immediate
 
 ### Blockers / next action
 
-- No blockers. Ready queue is open.
+- No blockers
+- Ready queue returns to:
+  1. `COD-MSME-SHOWCASE-001`
+  2. `COD-PUBLIC-001`
+  3. `COD-MSME-ISSUES-001`
+  4. `CLAUDE-MEMBER-PROFILE-VIEW-001`
+  5. low-priority `COD-MEMBERS-EXPORT-002`
