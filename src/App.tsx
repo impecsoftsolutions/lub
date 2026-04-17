@@ -17,6 +17,7 @@ import ResetPassword from './pages/ResetPassword';
 import MemberDashboard from './pages/MemberDashboard';
 import MemberViewProfile from './pages/MemberViewProfile';
 import MemberEditProfile from './pages/MemberEditProfile';
+import AdminMemberEdit from './pages/AdminMemberEdit';
 import MemberReapply from './pages/MemberReapply';
 import MemberChangePassword from './pages/MemberChangePassword';
 import MemberSettings from './pages/MemberSettings';
@@ -161,6 +162,7 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminDashboardOverview />} />
 
             <Route path="/admin/members/registrations" element={<AdminRegistrations />} />
+            <Route path="/admin/members/registrations/:registrationId/edit" element={<AdminMemberEdit />} />
             <Route path="/admin/members/deleted" element={<AdminDeletedMembers />} />
             <Route path="/admin/members/visibility" element={<AdminDirectoryVisibility />} />
 

@@ -154,10 +154,14 @@ const MEMBER_EDIT_PREFILL_KEY_ALIASES: Partial<Record<(typeof MEMBER_EDIT_PREFIL
   other_city_name: ['other_city', 'custom_city']
 };
 
-const MemberEditProfile: React.FC = () => {
+const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?: boolean }> = ({
+  adminRegistrationId,
+  isSuperAdmin = false,
+}) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isPreviewMode = searchParams.get('preview') === '1';
+  const isAdminMode = !!adminRegistrationId;
 
   const { member, isAuthenticated, isLoading, refreshMember } = useMember();
   const {
@@ -275,6 +279,10 @@ const MemberEditProfile: React.FC = () => {
   const [registrationGateMessage, setRegistrationGateMessage] = useState<string | null>(null);
   const [isCheckingRegistrationGate, setIsCheckingRegistrationGate] = useState(false);
 
+  // Admin mode: independent data loading (does not depend on useMember context)
+  const [isAdminDataLoading, setIsAdminDataLoading] = useState(isAdminMode);
+  const [adminDataError, setAdminDataError] = useState<string | null>(null);
+
   // Loading states
   const [isLoadingStates, setIsLoadingStates] = useState(true);
   const [isLoadingDesignations, setIsLoadingDesignations] = useState(true);
@@ -380,12 +388,12 @@ const MemberEditProfile: React.FC = () => {
     });
   }, []);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (skip in admin mode — admin session is validated by AdminLayout)
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isPreviewMode) {
+    if (!isAdminMode && !isLoading && !isAuthenticated && !isPreviewMode) {
       navigate('/signin');
     }
-  }, [isAuthenticated, isLoading, isPreviewMode, navigate]);
+  }, [isAdminMode, isAuthenticated, isLoading, isPreviewMode, navigate]);
 
   // Preview gate: redirect to sign-in if no session
   useEffect(() => {
@@ -749,6 +757,161 @@ const MemberEditProfile: React.FC = () => {
     }
   }, [applyPrefillFromSources, member, resolveUserPrefillSource, showToast]);
 
+  // ── Admin mode: load a specific member's data by registration ID ──────────
+  const loadAdminMemberData = useCallback(async () => {
+    if (!adminRegistrationId) return;
+    setIsAdminDataLoading(true);
+    setAdminDataError(null);
+    try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        setAdminDataError('No admin session found. Please sign in again.');
+        return;
+      }
+      const result = await memberRegistrationService.getApplicationDetails(adminRegistrationId, sessionToken);
+      if (!result.success || !result.data) {
+        setAdminDataError(result.error || 'Failed to load member data');
+        return;
+      }
+      const d = result.data as Record<string, unknown>;
+      const regId = String(d.id || adminRegistrationId);
+      setMemberRegistrationId(regId);
+      const isCustomCity = Boolean(d.is_custom_city || d.city === 'Other');
+      const loaded = {
+        full_name: String(d.full_name || ''),
+        email: String(d.email || ''),
+        mobile_number: String(d.mobile_number || ''),
+        gender: String(d.gender || ''),
+        date_of_birth: d.date_of_birth ? String(d.date_of_birth).slice(0, 10) : '',
+        company_name: String(d.company_name || ''),
+        company_designation_id: String(d.company_designation_id || ''),
+        company_address: String(d.company_address || ''),
+        state: String(d.state || ''),
+        district: String(d.district || ''),
+        city: isCustomCity ? 'Other' : String(d.city || ''),
+        is_custom_city: isCustomCity,
+        other_city_name: String(d.other_city_name || ''),
+        pin_code: String(d.pin_code || ''),
+        industry: String(d.industry || ''),
+        activity_type: String(d.activity_type || ''),
+        constitution: String(d.constitution || ''),
+        annual_turnover: String(d.annual_turnover || ''),
+        number_of_employees: String(d.number_of_employees || ''),
+        products_services: String(d.products_services || ''),
+        brand_names: String(d.brand_names || ''),
+        website: String(d.website || ''),
+        gst_registered: String(d.gst_registered || ''),
+        gst_number: String(d.gst_number || ''),
+        gst_certificate_url: String(d.gst_certificate_url || ''),
+        pan_company: String(d.pan_company || ''),
+        esic_registered: String(d.esic_registered || ''),
+        epf_registered: String(d.epf_registered || ''),
+        udyam_certificate_url: String(d.udyam_certificate_url || ''),
+        payment_proof_url: String(d.payment_proof_url || ''),
+        member_id: String(d.member_id || ''),
+        referred_by: String(d.referred_by || ''),
+        amount_paid: String(d.amount_paid || ''),
+        payment_date: d.payment_date ? String(d.payment_date).slice(0, 10) : '',
+        payment_mode: String(d.payment_mode || ''),
+        transaction_id: String(d.transaction_id || ''),
+        bank_reference: String(d.bank_reference || ''),
+        alternate_contact_name: String(d.alternate_contact_name || ''),
+        alternate_mobile: String(d.alternate_mobile || ''),
+        profile_photo_url: String(d.profile_photo_url || ''),
+      };
+      setFormData(loaded);
+      setOriginalData(loaded);
+      setShowOtherCity(isCustomCity);
+      setIsEditLockedUntilRegistration(false);
+      setRegistrationGateMessage(null);
+      if (loaded.profile_photo_url) {
+        setProfilePhotoPreview(loaded.profile_photo_url);
+      }
+    } catch (err) {
+      console.error('[AdminMemberEdit] Error loading member data:', err);
+      setAdminDataError('An unexpected error occurred while loading member data.');
+    } finally {
+      setIsAdminDataLoading(false);
+    }
+  }, [adminRegistrationId]);
+
+  useEffect(() => {
+    if (isAdminMode) {
+      void loadAdminMemberData();
+    }
+  }, [isAdminMode, loadAdminMemberData]);
+
+  // ── Admin mode: direct save (no normalization / verify step) ────────────
+  const handleAdminSave = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        showToast('error', 'No admin session found. Please sign in again.');
+        return;
+      }
+      if (!memberRegistrationId) {
+        showToast('error', 'Registration ID not found — cannot save.');
+        return;
+      }
+      const merged = { ...originalData, ...formData };
+      const updates: Record<string, unknown> = {
+        full_name: merged.full_name?.trim() || null,
+        gender: merged.gender || null,
+        date_of_birth: merged.date_of_birth || null,
+        company_name: merged.company_name?.trim() || null,
+        company_designation_id: merged.company_designation_id || null,
+        company_address: merged.company_address?.trim() || null,
+        state: merged.state || null,
+        district: merged.district || null,
+        city: merged.city || null,
+        is_custom_city: merged.is_custom_city || false,
+        other_city_name: merged.other_city_name || null,
+        pin_code: merged.pin_code || null,
+        industry: merged.industry || null,
+        activity_type: merged.activity_type || null,
+        constitution: merged.constitution || null,
+        annual_turnover: merged.annual_turnover || null,
+        number_of_employees: merged.number_of_employees || null,
+        products_services: merged.products_services?.trim() || null,
+        brand_names: merged.brand_names || null,
+        website: merged.website || null,
+        gst_registered: merged.gst_registered || null,
+        gst_number: merged.gst_number || null,
+        pan_company: merged.pan_company?.trim() || null,
+        esic_registered: merged.esic_registered || null,
+        epf_registered: merged.epf_registered || null,
+        referred_by: merged.referred_by?.trim() || null,
+        alternate_contact_name: merged.alternate_contact_name?.trim() || null,
+        alternate_mobile: merged.alternate_mobile || null,
+        ...(isSuperAdmin ? {
+          member_id: merged.member_id || null,
+          amount_paid: merged.amount_paid || null,
+          payment_date: merged.payment_date || null,
+          payment_mode: merged.payment_mode || null,
+          transaction_id: merged.transaction_id || null,
+          bank_reference: merged.bank_reference || null,
+        } : {}),
+      };
+      const result = await memberRegistrationService.updateMemberRegistration(
+        memberRegistrationId,
+        updates,
+        sessionToken
+      );
+      if (!result.success) {
+        showToast('error', result.error || 'Failed to save changes');
+        return;
+      }
+      setOriginalData({ ...merged });
+      showToast('success', 'Member updated successfully');
+    } catch (err) {
+      console.error('[AdminMemberEdit] Save error:', err);
+      showToast('error', 'An unexpected error occurred');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [formData, isSuperAdmin, memberRegistrationId, originalData, showToast]);
+
   const loadStates = useCallback(async () => {
     try {
       setIsLoadingStates(true);
@@ -813,10 +976,10 @@ const MemberEditProfile: React.FC = () => {
   }, [loadDesignations, loadStates]);
 
   useEffect(() => {
-    if (!isPreviewMode && member?.id) {
+    if (!isAdminMode && !isPreviewMode && member?.id) {
       void loadMemberProfile();
     }
-  }, [isPreviewMode, loadMemberProfile, member?.id]);
+  }, [isAdminMode, isPreviewMode, loadMemberProfile, member?.id]);
 
   useEffect(() => {
     console.log('[useEffect state] State changed to:', formData.state);
@@ -1600,9 +1763,40 @@ const MemberEditProfile: React.FC = () => {
     }
   }, [correctionSnapshot]);
 
-  const isEditingLocked = !isPreviewMode && isEditLockedUntilRegistration;
+  const isEditingLocked = !isAdminMode && !isPreviewMode && isEditLockedUntilRegistration;
 
-  if (isLoading) {
+  // ── Admin mode loading / error states ───────────────────────────────────
+  if (isAdminMode && isAdminDataLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading member data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdminMode && adminDataError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md px-6">
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">Failed to Load Member</h2>
+          <p className="text-muted-foreground mb-4">{adminDataError}</p>
+          <button
+            onClick={() => navigate('/admin/members/registrations')}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 inline-block"
+          >
+            Back to Members
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Member mode loading / error states ───────────────────────────────────
+  if (!isAdminMode && isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -1613,7 +1807,7 @@ const MemberEditProfile: React.FC = () => {
     );
   }
 
-  if (!member && !isPreviewMode) {
+  if (!isAdminMode && !member && !isPreviewMode) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -1631,7 +1825,7 @@ const MemberEditProfile: React.FC = () => {
     );
   }
 
-  if (!isPreviewMode && isCheckingRegistrationGate) {
+  if (!isAdminMode && !isPreviewMode && isCheckingRegistrationGate) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -1684,11 +1878,15 @@ const MemberEditProfile: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <button
-            onClick={() => navigate(isPreviewMode ? '/admin/form-studio/member_edit' : '/dashboard/profile')}
+            onClick={() => navigate(
+              isAdminMode ? '/admin/members/registrations' :
+              isPreviewMode ? '/admin/form-studio/member_edit' :
+              '/dashboard/profile'
+            )}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            {isPreviewMode ? 'Back to Studio' : 'Back to Profile'}
+            {isAdminMode ? 'Back to Members' : isPreviewMode ? 'Back to Studio' : 'Back to Profile'}
           </button>
         </div>
 
@@ -1696,10 +1894,26 @@ const MemberEditProfile: React.FC = () => {
           <div className="px-6 py-6 border-b border-border">
             <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
               <User className="w-6 h-6" />
-              Edit Profile
+              {isAdminMode
+                ? `Edit Member — ${formData.full_name || '...'}`
+                : 'Edit Profile'}
             </h1>
-            <p className="text-muted-foreground mt-1">Update your profile information</p>
+            <p className="text-muted-foreground mt-1">
+              {isAdminMode
+                ? 'Admin edit — changes are saved directly without verification.'
+                : 'Update your profile information'}
+            </p>
           </div>
+
+          {isAdminMode && (
+            <div className="bg-muted/40 border-b border-border px-6 py-3 flex items-center gap-2 text-sm">
+              <AlertCircle className="w-4 h-4 text-primary flex-shrink-0" />
+              <span className="text-foreground">
+                <strong>Admin Edit Mode</strong> — You are editing this member&apos;s profile on their behalf.
+                {!isSuperAdmin && ' Payment fields and Member ID are read-only (super admin only).'}
+              </span>
+            </div>
+          )}
 
           {isPreviewMode && (
             <div className="bg-muted/40 border-b border-border px-6 py-3 flex items-center gap-2 text-muted-foreground text-sm">
@@ -1708,7 +1922,7 @@ const MemberEditProfile: React.FC = () => {
             </div>
           )}
 
-          {isEditingLocked && (
+          {!isAdminMode && isEditingLocked && (
             <div className="mx-6 mt-4 rounded-lg border border-border bg-muted/40 p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -1728,7 +1942,7 @@ const MemberEditProfile: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="p-6">
+          <form onSubmit={handleSubmit} onBlurCapture={isAdminMode ? undefined : handleFormBlurCapture} className="p-6">
             <fieldset disabled={isEditingLocked} className={`space-y-8 ${isEditingLocked ? 'opacity-80' : ''}`}>
             {/* Section 1: Personal Information */}
             <div>
@@ -1809,10 +2023,21 @@ const MemberEditProfile: React.FC = () => {
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-foreground mb-2">
                     <Camera className="w-4 h-4 inline mr-1" />
-                    Profile Photo (Optional)
+                    Profile Photo {isAdminMode ? '' : '(Optional)'}
                   </label>
 
-                  {!profilePhotoPreview ? (
+                  {isAdminMode ? (
+                    /* Admin mode: display only, no upload */
+                    profilePhotoPreview ? (
+                      <img
+                        src={profilePhotoPreview}
+                        alt="Member profile photo"
+                        className="w-24 h-32 object-cover rounded-lg border-2 border-border"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No profile photo on file</p>
+                    )
+                  ) : !profilePhotoPreview ? (
                     <div>
                       <input
                         type="file"
@@ -1901,22 +2126,24 @@ const MemberEditProfile: React.FC = () => {
                         <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowEmailModal(true)}
-                      disabled={isEditingLocked}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-                        isEditingLocked
-                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      }`}
-                    >
-                      <Unlock className="w-4 h-4" />
-                      Change
-                    </button>
+                    {!isAdminMode && (
+                      <button
+                        type="button"
+                        onClick={() => setShowEmailModal(true)}
+                        disabled={isEditingLocked}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
+                          isEditingLocked
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        }`}
+                      >
+                        <Unlock className="w-4 h-4" />
+                        Change
+                      </button>
+                    )}
                   </div>
                   {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
-                  {!isEmailEditable && !isEditingLocked && (
+                  {!isAdminMode && !isEmailEditable && !isEditingLocked && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit email</p>
                   )}
                 </div>
@@ -1944,22 +2171,24 @@ const MemberEditProfile: React.FC = () => {
                         <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowMobileModal(true)}
-                      disabled={isEditingLocked}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-                        isEditingLocked
-                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      }`}
-                    >
-                      <Unlock className="w-4 h-4" />
-                      Change
-                    </button>
+                    {!isAdminMode && (
+                      <button
+                        type="button"
+                        onClick={() => setShowMobileModal(true)}
+                        disabled={isEditingLocked}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
+                          isEditingLocked
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        }`}
+                      >
+                        <Unlock className="w-4 h-4" />
+                        Change
+                      </button>
+                    )}
                   </div>
                   {errors.mobile_number && <p className="text-destructive text-sm mt-1">{errors.mobile_number}</p>}
-                  {!isMobileEditable && !isEditingLocked && (
+                  {!isAdminMode && !isMobileEditable && !isEditingLocked && (
                     <p className="text-xs text-muted-foreground mt-1">Click "Change" to edit mobile</p>
                   )}
                 </div>
@@ -2410,38 +2639,45 @@ const MemberEditProfile: React.FC = () => {
                 {isFieldApplicable('gst_certificate_url') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">
-                      {resolveFieldLabel('gst_certificate_url', 'GST Certificate')} {isFieldRequired('gst_certificate_url') && <span className="text-destructive">*</span>}
+                      {resolveFieldLabel('gst_certificate_url', 'GST Certificate')} {!isAdminMode && isFieldRequired('gst_certificate_url') && <span className="text-destructive">*</span>}
                     </label>
-                    <input
-                      id="gst_certificate_url"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(event) => handleDocumentFileChange('gstCertificate', event.target.files?.[0] || null)}
-                      className="sr-only"
-                    />
-                    <label
-                      htmlFor="gst_certificate_url"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
-                        errors.gst_certificate_url ? 'border-destructive' : 'border-border'
-                      }`}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {(formData.gst_certificate_url || documentFiles.gstCertificate) ? 'Upload New File' : 'Upload File'}
-                    </label>
-                    {documentFiles.gstCertificate && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.gstCertificate.name}</p>
+                    {isAdminMode ? (
+                      formData.gst_certificate_url ? (
+                        <a href={formData.gst_certificate_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                          View GST Certificate
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No document on file</p>
+                      )
+                    ) : (
+                      <>
+                        <input
+                          id="gst_certificate_url"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(event) => handleDocumentFileChange('gstCertificate', event.target.files?.[0] || null)}
+                          className="sr-only"
+                        />
+                        <label
+                          htmlFor="gst_certificate_url"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                            errors.gst_certificate_url ? 'border-destructive' : 'border-border'
+                          }`}
+                        >
+                          <Upload className="w-4 h-4" />
+                          {(formData.gst_certificate_url || documentFiles.gstCertificate) ? 'Upload New File' : 'Upload File'}
+                        </label>
+                        {documentFiles.gstCertificate && (
+                          <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.gstCertificate.name}</p>
+                        )}
+                        {!documentFiles.gstCertificate && formData.gst_certificate_url && (
+                          <a href={formData.gst_certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                            View current GST certificate
+                          </a>
+                        )}
+                        {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
+                      </>
                     )}
-                    {!documentFiles.gstCertificate && formData.gst_certificate_url && (
-                      <a
-                        href={formData.gst_certificate_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline mt-1 inline-block"
-                      >
-                        View current GST certificate
-                      </a>
-                    )}
-                    {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
                   </div>
                 )}
 
@@ -2518,54 +2754,67 @@ const MemberEditProfile: React.FC = () => {
                 {isFieldVisible('udyam_certificate_url') && (
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">
-                      {resolveFieldLabel('udyam_certificate_url', 'UDYAM Certificate')} {isFieldRequired('udyam_certificate_url') && <span className="text-destructive">*</span>}
+                      {resolveFieldLabel('udyam_certificate_url', 'UDYAM Certificate')} {!isAdminMode && isFieldRequired('udyam_certificate_url') && <span className="text-destructive">*</span>}
                     </label>
-                    <input
-                      id="udyam_certificate_url"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(event) => handleDocumentFileChange('udyamCertificate', event.target.files?.[0] || null)}
-                      className="sr-only"
-                    />
-                    <label
-                      htmlFor="udyam_certificate_url"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
-                        errors.udyam_certificate_url ? 'border-destructive' : 'border-border'
-                      }`}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {(formData.udyam_certificate_url || documentFiles.udyamCertificate) ? 'Upload New File' : 'Upload File'}
-                    </label>
-                    {documentFiles.udyamCertificate && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.udyamCertificate.name}</p>
+                    {isAdminMode ? (
+                      formData.udyam_certificate_url ? (
+                        <a href={formData.udyam_certificate_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                          View UDYAM Certificate
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No document on file</p>
+                      )
+                    ) : (
+                      <>
+                        <input
+                          id="udyam_certificate_url"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(event) => handleDocumentFileChange('udyamCertificate', event.target.files?.[0] || null)}
+                          className="sr-only"
+                        />
+                        <label
+                          htmlFor="udyam_certificate_url"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                            errors.udyam_certificate_url ? 'border-destructive' : 'border-border'
+                          }`}
+                        >
+                          <Upload className="w-4 h-4" />
+                          {(formData.udyam_certificate_url || documentFiles.udyamCertificate) ? 'Upload New File' : 'Upload File'}
+                        </label>
+                        {documentFiles.udyamCertificate && (
+                          <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.udyamCertificate.name}</p>
+                        )}
+                        {!documentFiles.udyamCertificate && formData.udyam_certificate_url && (
+                          <a href={formData.udyam_certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                            View current UDYAM certificate
+                          </a>
+                        )}
+                        {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}
+                      </>
                     )}
-                    {!documentFiles.udyamCertificate && formData.udyam_certificate_url && (
-                      <a
-                        href={formData.udyam_certificate_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline mt-1 inline-block"
-                      >
-                        View current UDYAM certificate
-                      </a>
-                    )}
-                    {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}
                   </div>
                 )}
 
-                {/* Field 1: Member ID (Read-only) */}
+                {/* Field 1: Member ID — editable by super admin in admin mode, otherwise read-only */}
                 <div>
                   <label htmlFor="member_id" className="block text-sm font-medium text-foreground mb-1">
                     {resolveFieldLabel('member_id', 'Member ID')}
+                    {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
                   </label>
                   <input
                     type="text"
                     id="member_id"
                     name="member_id"
                     value={formData.member_id || ''}
-                    disabled
-                    readOnly
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
+                    onChange={isAdminMode && isSuperAdmin ? handleChange : undefined}
+                    disabled={!(isAdminMode && isSuperAdmin)}
+                    readOnly={!(isAdminMode && isSuperAdmin)}
+                    className={`w-full px-3 py-2 border border-border rounded-lg ${
+                      isAdminMode && isSuperAdmin
+                        ? 'focus:ring-2 focus:ring-ring focus:border-ring'
+                        : 'bg-muted/50 text-foreground cursor-not-allowed'
+                    }`}
                   />
                 </div>
 
@@ -2592,131 +2841,145 @@ const MemberEditProfile: React.FC = () => {
                 </div>
                 )}
 
-                {/* Field 3: Amount Paid (Read-only) */}
+                {/* Fields 3–7: Payment fields — editable by super admin in admin mode, read-only otherwise */}
                 {isFieldVisible('amount_paid') && (
                 <div>
                   <label htmlFor="amount_paid" className="block text-sm font-medium text-foreground mb-1">
                     {resolveFieldLabel('amount_paid', 'Amount Paid')}
+                    {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
                   </label>
                   <input
                     type="text"
                     id="amount_paid"
                     name="amount_paid"
                     value={formData.amount_paid || ''}
-                    disabled
-                    readOnly
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
+                    onChange={isAdminMode && isSuperAdmin ? handleChange : undefined}
+                    disabled={!(isAdminMode && isSuperAdmin)}
+                    readOnly={!(isAdminMode && isSuperAdmin)}
+                    className={`w-full px-3 py-2 border border-border rounded-lg ${isAdminMode && isSuperAdmin ? 'focus:ring-2 focus:ring-ring focus:border-ring' : 'bg-muted/50 text-foreground cursor-not-allowed'}`}
                   />
                 </div>
                 )}
 
-                {/* Field 4: Payment Date (Read-only) */}
                 {isFieldVisible('payment_date') && (
                 <div>
                   <label htmlFor="payment_date" className="block text-sm font-medium text-foreground mb-1">
                     {resolveFieldLabel('payment_date', 'Payment Date')}
+                    {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
                   </label>
                   <input
-                    type="text"
+                    type={isAdminMode && isSuperAdmin ? 'date' : 'text'}
                     id="payment_date"
                     name="payment_date"
                     value={formData.payment_date || ''}
-                    disabled
-                    readOnly
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
+                    onChange={isAdminMode && isSuperAdmin ? handleChange : undefined}
+                    disabled={!(isAdminMode && isSuperAdmin)}
+                    readOnly={!(isAdminMode && isSuperAdmin)}
+                    className={`w-full px-3 py-2 border border-border rounded-lg ${isAdminMode && isSuperAdmin ? 'focus:ring-2 focus:ring-ring focus:border-ring' : 'bg-muted/50 text-foreground cursor-not-allowed'}`}
                   />
                 </div>
                 )}
 
-                {/* Field 5: Payment Mode (Read-only) */}
                 {isFieldVisible('payment_mode') && (
                 <div>
                   <label htmlFor="payment_mode" className="block text-sm font-medium text-foreground mb-1">
                     {resolveFieldLabel('payment_mode', 'Payment Mode')}
+                    {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
                   </label>
                   <input
                     type="text"
                     id="payment_mode"
                     name="payment_mode"
                     value={formData.payment_mode || ''}
-                    disabled
-                    readOnly
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
+                    onChange={isAdminMode && isSuperAdmin ? handleChange : undefined}
+                    disabled={!(isAdminMode && isSuperAdmin)}
+                    readOnly={!(isAdminMode && isSuperAdmin)}
+                    className={`w-full px-3 py-2 border border-border rounded-lg ${isAdminMode && isSuperAdmin ? 'focus:ring-2 focus:ring-ring focus:border-ring' : 'bg-muted/50 text-foreground cursor-not-allowed'}`}
                   />
                 </div>
                 )}
 
-                {/* Field 6: Transaction ID / Reference (Read-only) */}
                 {isFieldVisible('transaction_id') && (
                 <div>
                   <label htmlFor="transaction_id" className="block text-sm font-medium text-foreground mb-1">
                     {resolveFieldLabel('transaction_id', 'Transaction ID / Reference')}
+                    {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
                   </label>
                   <input
                     type="text"
                     id="transaction_id"
                     name="transaction_id"
                     value={formData.transaction_id || ''}
-                    disabled
-                    readOnly
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
+                    onChange={isAdminMode && isSuperAdmin ? handleChange : undefined}
+                    disabled={!(isAdminMode && isSuperAdmin)}
+                    readOnly={!(isAdminMode && isSuperAdmin)}
+                    className={`w-full px-3 py-2 border border-border rounded-lg ${isAdminMode && isSuperAdmin ? 'focus:ring-2 focus:ring-ring focus:border-ring' : 'bg-muted/50 text-foreground cursor-not-allowed'}`}
                   />
                 </div>
                 )}
 
-                {/* Field 7: Bank Reference (Read-only) */}
                 {isFieldVisible('bank_reference') && (
                 <div>
                   <label htmlFor="bank_reference" className="block text-sm font-medium text-foreground mb-1">
                     {resolveFieldLabel('bank_reference', 'Bank Reference')}
+                    {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
                   </label>
                   <input
                     type="text"
                     id="bank_reference"
                     name="bank_reference"
                     value={formData.bank_reference || ''}
-                    disabled
-                    readOnly
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-foreground cursor-not-allowed"
+                    onChange={isAdminMode && isSuperAdmin ? handleChange : undefined}
+                    disabled={!(isAdminMode && isSuperAdmin)}
+                    readOnly={!(isAdminMode && isSuperAdmin)}
+                    className={`w-full px-3 py-2 border border-border rounded-lg ${isAdminMode && isSuperAdmin ? 'focus:ring-2 focus:ring-ring focus:border-ring' : 'bg-muted/50 text-foreground cursor-not-allowed'}`}
                   />
                 </div>
                 )}
 
+                {/* Payment Proof — read-only link in admin mode (doc URL persistence requires COD-UNIFIED-EDIT-BE-001) */}
                 {isFieldVisible('payment_proof_url') && (
                   <div>
                     <label htmlFor="payment_proof_upload" className="block text-sm font-medium text-foreground mb-1">
-                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')} {isFieldRequired('payment_proof_url') && <span className="text-destructive">*</span>}
+                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')} {!isAdminMode && isFieldRequired('payment_proof_url') && <span className="text-destructive">*</span>}
                     </label>
-                    <input
-                      id="payment_proof_upload"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(event) => handleDocumentFileChange('paymentProof', event.target.files?.[0] || null)}
-                      className="sr-only"
-                    />
-                    <label
-                      htmlFor="payment_proof_upload"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
-                        errors.payment_proof_url ? 'border-destructive' : 'border-border'
-                      }`}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {(formData.payment_proof_url || documentFiles.paymentProof) ? 'Upload New File' : 'Upload File'}
-                    </label>
-                    {documentFiles.paymentProof && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.paymentProof.name}</p>
+                    {isAdminMode ? (
+                      formData.payment_proof_url ? (
+                        <a href={formData.payment_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                          View Payment Proof
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No document on file</p>
+                      )
+                    ) : (
+                      <>
+                        <input
+                          id="payment_proof_upload"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(event) => handleDocumentFileChange('paymentProof', event.target.files?.[0] || null)}
+                          className="sr-only"
+                        />
+                        <label
+                          htmlFor="payment_proof_upload"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                            errors.payment_proof_url ? 'border-destructive' : 'border-border'
+                          }`}
+                        >
+                          <Upload className="w-4 h-4" />
+                          {(formData.payment_proof_url || documentFiles.paymentProof) ? 'Upload New File' : 'Upload File'}
+                        </label>
+                        {documentFiles.paymentProof && (
+                          <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.paymentProof.name}</p>
+                        )}
+                        {!documentFiles.paymentProof && formData.payment_proof_url && (
+                          <a href={formData.payment_proof_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                            View current payment proof
+                          </a>
+                        )}
+                        {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
+                      </>
                     )}
-                    {!documentFiles.paymentProof && formData.payment_proof_url && (
-                      <a
-                        href={formData.payment_proof_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline mt-1 inline-block"
-                      >
-                        View current payment proof
-                      </a>
-                    )}
-                    {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
                   </div>
                 )}
               </div>
@@ -2772,84 +3035,123 @@ const MemberEditProfile: React.FC = () => {
 
             {/* Form Actions */}
             <div className="flex items-center justify-end gap-4 pt-6 border-t border-border">
-              <Link
-                to={isPreviewMode ? "/admin/form-studio/member_edit" : "/dashboard/profile"}
-                className="px-6 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-              >
-                {isPreviewMode ? 'Back to Studio' : 'Cancel'}
-              </Link>
-              <button
-                ref={submitButtonRef}
-                type="submit"
-                disabled={isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
-                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                }`}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving Changes...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Submit
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleVerify()}
-                disabled={isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
-                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
-                }`}
-              >
-                {isVerifying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Verify
-                  </>
-                )}
-              </button>
+              {isAdminMode ? (
+                <>
+                  <Link
+                    to="/admin/members/registrations"
+                    className="px-6 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                  >
+                    Cancel
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleAdminSave()}
+                    disabled={isSaving || !hasFormChanges()}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      isSaving || !hasFormChanges()
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    }`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save as Admin
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to={isPreviewMode ? "/admin/form-studio/member_edit" : "/dashboard/profile"}
+                    className="px-6 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                  >
+                    {isPreviewMode ? 'Back to Studio' : 'Cancel'}
+                  </Link>
+                  <button
+                    ref={submitButtonRef}
+                    type="submit"
+                    disabled={isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || !isVerifiedForSubmit
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    }`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving Changes...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Submit
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleVerify()}
+                    disabled={isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      isPreviewMode || isEditingLocked || isSaving || isVerifying || !hasFormChanges() || isVerifiedForSubmit
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
+                    }`}
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        Verify
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
             </fieldset>
           </form>
         </div>
       </div>
 
-      {/* Credential Change Modals */}
-      <ChangeCredentialModal
-        isOpen={showEmailModal}
-        onClose={() => setShowEmailModal(false)}
-        type="email"
-        currentValue={formData.email}
-        onSuccess={() => {
-          console.log('Email changed successfully, refreshing member data...');
-          window.location.reload();
-        }}
-      />
+      {/* Credential Change Modals — member mode only */}
+      {!isAdminMode && (
+        <>
+          <ChangeCredentialModal
+            isOpen={showEmailModal}
+            onClose={() => setShowEmailModal(false)}
+            type="email"
+            currentValue={formData.email}
+            onSuccess={() => {
+              console.log('Email changed successfully, refreshing member data...');
+              window.location.reload();
+            }}
+          />
 
-      <ChangeCredentialModal
-        isOpen={showMobileModal}
-        onClose={() => setShowMobileModal(false)}
-        type="mobile"
-        currentValue={formData.mobile_number}
-        onSuccess={() => {
-          console.log('Mobile changed successfully, refreshing member data...');
-          window.location.reload();
-        }}
-      />
+          <ChangeCredentialModal
+            isOpen={showMobileModal}
+            onClose={() => setShowMobileModal(false)}
+            type="mobile"
+            currentValue={formData.mobile_number}
+            onSuccess={() => {
+              console.log('Mobile changed successfully, refreshing member data...');
+              window.location.reload();
+            }}
+          />
+        </>
+      )}
 
       {/* Image Crop Modal */}
       <ImageCropModal
@@ -2860,12 +3162,15 @@ const MemberEditProfile: React.FC = () => {
         onError={handleCropError}
       />
 
-      <FieldCorrectionStepper
-        fields={showCorrectionStepper ? correctionFields : []}
-        onFieldConfirmed={handleFieldConfirmed}
-        onComplete={handleCorrectionComplete}
-        onDiscard={handleCorrectionDiscard}
-      />
+      {/* Field Correction Stepper — member mode only */}
+      {!isAdminMode && (
+        <FieldCorrectionStepper
+          fields={showCorrectionStepper ? correctionFields : []}
+          onFieldConfirmed={handleFieldConfirmed}
+          onComplete={handleCorrectionComplete}
+          onDiscard={handleCorrectionDiscard}
+        />
+      )}
     </div>
   );
 };

@@ -1,3 +1,9 @@
+/**
+ * @deprecated CLAUDE-UNIFIED-EDIT-UI-001
+ * Admin member editing now uses the route /admin/members/registrations/:registrationId/edit
+ * (rendered by AdminMemberEdit → MemberEditProfile in admin mode).
+ * This modal is kept temporarily for any residual callers and will be removed in Phase C cleanup.
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Save, AlertCircle, Loader2, Camera, Upload, X as XIcon, CheckCircle } from 'lucide-react';
 import {

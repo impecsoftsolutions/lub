@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-04-17
-**Updated by:** Claude (`CLAUDE-EDIT-MODAL-CONFIG-FIX-001`)
+**Updated by:** Claude (`CLAUDE-UNIFIED-EDIT-UI-001`)
 
 ---
 
@@ -34,7 +34,8 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 **Current handoff state:** All in-flight slices complete. Ready queue is open.
 
 Most recently completed streams:
-- **CLAUDE-EDIT-MODAL-CONFIG-FIX-001**: Fixed admin Edit Member modal ignoring Form Builder V2 config. `EditMemberModal.tsx` now calls `useFormFieldConfig({ source: 'builder_live', formKey: 'member_edit' })` and `useValidation({ formKey: 'member_edit' })` instead of the no-arg defaults (`legacy` / `join_lub`). Admin-only fields (payment, member_id) remain rendered outside builder config using the existing `isSuperAdmin` override — untouched. Two-line change, no migration, no RPC changes. Phase B full unification blocked on Codex migration to extend `update_member_registration` for document URL persistence.
+- **CLAUDE-UNIFIED-EDIT-UI-001**: Full Phase B unification of admin + member edit form. `MemberEditProfile.tsx` extended with optional `adminRegistrationId?: string` + `isSuperAdmin?: boolean` props. When in admin mode: loads member via `getApplicationDetails(registrationId, sessionToken)`; saves via `updateMemberRegistration(registrationId, updates, sessionToken)` (no verify/normalize step); shows admin-specific heading ("Edit Member — [Name]"), back-button target (/admin/members/registrations), banner with AlertCircle and super-admin note, "Save as Admin" button replacing Verify+Submit. Admin-only fields (payment section, member_id) rendered; member-only UI (credential change buttons, FieldCorrectionStepper, ChangeCredentialModal) guarded with `!isAdminMode`. Document URL fields (GST, UDYAM, payment proof) are read-only in admin mode — shows view link or "No document on file" — because the admin RPC (`update_member_registration_with_session`) does not yet persist them (unblocked by `COD-UNIFIED-EDIT-BE-001`). New thin wrapper `AdminMemberEdit.tsx` placed inside AdminLayoutWrapper extracts `isSuperAdmin` from AdminContext and passes both props to `MemberEditProfile`. Route `/admin/members/registrations/:registrationId/edit` added to `App.tsx`. `AdminRegistrations.tsx` "Edit" action now navigates to the new route via `useNavigate` instead of opening the modal; `EditMemberModal` import removed (component kept with `@deprecated` comment for Phase C cleanup). Lint: 0 errors / 3 expected warnings. Build: PASS.
+- **CLAUDE-EDIT-MODAL-CONFIG-FIX-001**: Fixed admin Edit Member modal ignoring Form Builder V2 config. `EditMemberModal.tsx` now calls `useFormFieldConfig({ source: 'builder_live', formKey: 'member_edit' })` and `useValidation({ formKey: 'member_edit' })` instead of the no-arg defaults (`legacy` / `join_lub`). Admin-only fields (payment, member_id) remain rendered outside builder config using the existing `isSuperAdmin` override — untouched. Two-line change, no migration, no RPC changes.
 - **COD-THEME-LINK-DASH-001**: Corrected remaining theme-link drift on the member dashboard surface. In `src/pages/MemberDashboard.tsx`, replaced hardcoded yellow/green/red dashboard status badges, icons, and the registration-lookup warning panel with theme-token-based styling (`primary`, `secondary`, `destructive`) while preserving the existing dashboard flow and status semantics. In `src/components/Header.tsx`, replaced the fallback logo tile and `LUB` brand text orange hardcodes with `primary` / `primary-foreground` tokens so the visible header branding on the dashboard now follows Theme Settings. Validation passed: lint (0 errors / 3 expected warnings), build, and Phase1 readonly smoke.
 - **CLAUDE-MEMBER-PROFILE-VIEW-001**: Expanded the member Profile page (`/dashboard/profile`) from a minimal 4-field view to a full-detail display. `MemberViewProfile.tsx` fully rewritten with 10 conditional sections (only rendered when data is present): Personal Information, Company & Location, Business Details, Registration & Compliance (with yes/no badges), Membership Details, Alternate Contact, Referral, Payment Information, Documents (clickable open-in-new-tab links), Rejection Reason. Expanded local `MemberRegistrationData` interface to type all `member_registrations` columns. Added `Field`, `WideField`, `YesNoField`, `SectionHeader`, `DocLink` helper components. No backend or RPC changes — existing `get_my_member_registration_by_token` already returns the full row.
 - **CLAUDE-DATETIME-FORMAT-001**: Completed global date/time formatting settings across the portal. Added migration `20260416163000_add_datetime_format_settings_admin_contracts.sql` introducing `datetime_format_settings`, runtime/profile RPCs, and `settings.datetime.view/manage` permissions. `src/lib/supabase.ts` now exposes `dateTimeSettingsService` and the shared date/time format types. Added `src/lib/dateTimeManager.ts` as the single formatting/runtime-sync utility and `src/components/DateTimeFormatBootstrap.tsx` to refresh the runtime profile in the background without blocking first paint. Added new admin settings page `src/pages/AdminDateTimeSettings.tsx` at `/admin/settings/datetime`, then wired the route into `App.tsx`, the Settings Hub, and the admin sidebar. Replaced scattered direct `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` display formatting across the audited admin/member/public surfaces with the shared formatter so the chosen global profile propagates consistently. Targeted browser verification temporarily switched the site to `yyyy-mm-dd` + `24h`, confirmed the new format rendered on Admin AI Settings metadata, then restored the defaults back to `dd-mm-yyyy` + `12h`.
@@ -107,13 +108,12 @@ Deferred by decision:
 ## Last Verified
 
 - **When:** 2026-04-17
-- **What:** Theme-link correction for member dashboard surface (`COD-THEME-LINK-DASH-001`)
+- **What:** Phase B unified admin+member edit form (`CLAUDE-UNIFIED-EDIT-UI-001`)
 - **Result:** PASS
 - **Commands:**
   ```
   npm run lint -> PASS (0 errors / 3 expected warnings)
   npm run build -> PASS
-  npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
   ```
 
 ## In Progress / Dirty State

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -7,7 +8,7 @@ import { supabase, memberRegistrationService, type ApprovedMemberExportRow } fro
 import { sessionManager } from '../lib/sessionManager';
 import { emailService, WelcomeEmailData } from '../lib/emailService';
 import Toast from '../components/Toast';
-import EditMemberModal from '../components/EditMemberModal';
+// EditMemberModal import removed — admin editing now uses /admin/members/registrations/:id/edit route (CLAUDE-UNIFIED-EDIT-UI-001)
 import AuditHistoryModal from '../components/AuditHistoryModal';
 import ViewApplicationModal from '../components/ViewApplicationModal';
 import { Badge } from '@/components/ui/badge';
@@ -101,8 +102,6 @@ const AdminRegistrations: React.FC = () => {
     memberName: ''
   });
   const [rejectionReason, setRejectionReason] = useState('');
-  const [editingMember, setEditingMember] = useState<MemberRegistration | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyMemberId, setHistoryMemberId] = useState<string>('');
   const [historyMemberName, setHistoryMemberName] = useState<string>('');
@@ -134,7 +133,7 @@ const AdminRegistrations: React.FC = () => {
   const canEdit = useHasPermission('members.edit');
   const canDelete = useHasPermission('members.delete');
   const { refreshCounts } = useAdmin();
-  const [returnToViewOnEditClose, setReturnToViewOnEditClose] = useState(false);
+  const navigate = useNavigate();
 
 
   const loadRegistrations = useCallback(async () => {
@@ -391,11 +390,7 @@ const AdminRegistrations: React.FC = () => {
   };
 
   const handleEditMember = (member: MemberRegistration) => {
-    setReturnToViewOnEditClose(false);
-    setViewingApplicationId('');
-    setShowViewModal(false);
-    setEditingMember(member);
-    setShowEditModal(true);
+    navigate(`/admin/members/registrations/${member.id}/edit`);
   };
 
   const handleViewHistory = (memberId: string, memberName: string) => {
@@ -410,10 +405,8 @@ const AdminRegistrations: React.FC = () => {
   };
 
   const handleEditFromView = (applicationData: MemberRegistration) => {
-    setReturnToViewOnEditClose(true);
     setShowViewModal(false);
-    setEditingMember(applicationData);
-    setShowEditModal(true);
+    navigate(`/admin/members/registrations/${applicationData.id}/edit`);
   };
 
   const handleApproveFromView = (applicationId: string) => {
@@ -998,34 +991,7 @@ const AdminRegistrations: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Member Modal */}
-      {showEditModal && editingMember && (
-        <EditMemberModal
-          member={editingMember}
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingMember(null);
-            if (returnToViewOnEditClose && viewingApplicationId) {
-              setShowViewModal(true);
-            } else {
-              setViewingApplicationId('');
-            }
-            setReturnToViewOnEditClose(false);
-          }}
-          onSuccess={() => {
-            loadRegistrations();
-            showToast('success', 'Member updated successfully');
-            if (returnToViewOnEditClose && viewingApplicationId) {
-              setShowViewModal(true);
-            } else {
-              setViewingApplicationId('');
-            }
-            setReturnToViewOnEditClose(false);
-          }}
-          onError={(message) => showToast('error', message)}
-        />
-      )}
+      {/* Edit Member: navigates to /admin/members/registrations/:registrationId/edit */}
 
       {/* Audit History Modal */}
       {showHistoryModal && (
