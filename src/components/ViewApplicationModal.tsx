@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
+import { formatDateValue } from '../lib/dateTimeManager';
 
 interface CompanyDesignationSummary {
   designation_name: string;
@@ -302,11 +303,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not provided';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return formatDateValue(dateString);
   };
 
   const formatValue = (value: SectionField['value'], type?: SectionField['type']): string => {
@@ -808,7 +805,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
             {orgProfile?.organization_name ?? 'Laghu Udyog Bharati'} - Confidential. For internal use only.
           </div>
           <div style={{ fontSize: 10, color: '#64748b' }}>
-            Generated {new Date().toLocaleDateString('en-IN')}
+                  Generated {formatDateValue(new Date())}
           </div>
         </div>
       </div>

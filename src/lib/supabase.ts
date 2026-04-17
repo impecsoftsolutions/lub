@@ -458,6 +458,23 @@ export interface AIRuntimeProfile {
   is_enabled: boolean;
 }
 
+export type PortalDateFormat = 'dd-mm-yyyy' | 'mm-dd-yyyy' | 'yyyy-mm-dd' | 'dd-mmm-yyyy';
+export type PortalTimeFormat = '12h' | '24h';
+
+export interface DateTimeFormatSettings {
+  setting_key: string;
+  date_format: PortalDateFormat;
+  time_format: PortalTimeFormat;
+  updated_at?: string | null;
+  updated_by_email?: string | null;
+  live_updated_via?: string | null;
+}
+
+export interface DateTimeFormatProfile {
+  date_format: PortalDateFormat;
+  time_format: PortalTimeFormat;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 interface UserRoleQueryRow {
@@ -3138,6 +3155,8 @@ interface FieldLibraryItemV2RpcRow extends Omit<FieldLibraryItemV2, 'option_item
 
 const AI_PROVIDER_VALUES: AIProvider[] = ['openai', 'google', 'anthropic', 'azure_openai', 'custom'];
 const AI_RUNTIME_REASONING_VALUES: AIRuntimeReasoningEffort[] = ['low', 'medium', 'high', 'xhigh'];
+const PORTAL_DATE_FORMAT_VALUES: PortalDateFormat[] = ['dd-mm-yyyy', 'mm-dd-yyyy', 'yyyy-mm-dd', 'dd-mmm-yyyy'];
+const PORTAL_TIME_FORMAT_VALUES: PortalTimeFormat[] = ['12h', '24h'];
 
 const normalizeAIProvider = (value: unknown): AIProvider => {
   const candidate = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -3153,6 +3172,22 @@ const normalizeAIRuntimeReasoningEffort = (value: unknown): AIRuntimeReasoningEf
     return candidate as AIRuntimeReasoningEffort;
   }
   return null;
+};
+
+const normalizePortalDateFormat = (value: unknown): PortalDateFormat => {
+  const candidate = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (PORTAL_DATE_FORMAT_VALUES.includes(candidate as PortalDateFormat)) {
+    return candidate as PortalDateFormat;
+  }
+  return 'dd-mm-yyyy';
+};
+
+const normalizePortalTimeFormat = (value: unknown): PortalTimeFormat => {
+  const candidate = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (PORTAL_TIME_FORMAT_VALUES.includes(candidate as PortalTimeFormat)) {
+    return candidate as PortalTimeFormat;
+  }
+  return '12h';
 };
 
 const mapAIRuntimeSettings = (raw: unknown): AIRuntimeSettings => {
@@ -3172,6 +3207,20 @@ const mapAIRuntimeSettings = (raw: unknown): AIRuntimeSettings => {
     updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
     updated_by_email: typeof row.updated_by_email === 'string' ? row.updated_by_email : null,
     live_updated_via: typeof row.live_updated_via === 'string' ? row.live_updated_via : null
+  };
+};
+
+const mapDateTimeFormatSettings = (raw: unknown): DateTimeFormatSettings => {
+  const row = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {};
+  return {
+    setting_key: typeof row.setting_key === 'string' && row.setting_key.trim() !== ''
+      ? row.setting_key
+      : 'global_display',
+    date_format: normalizePortalDateFormat(row.date_format),
+    time_format: normalizePortalTimeFormat(row.time_format),
+    updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
+    updated_by_email: typeof row.updated_by_email === 'string' ? row.updated_by_email : null,
+    live_updated_via: typeof row.live_updated_via === 'string' ? row.live_updated_via : null,
   };
 };
 
@@ -4353,6 +4402,98 @@ export const aiSettingsService = {
       };
     } catch (error) {
       console.warn('Unable to load AI runtime profile:', error);
+      return null;
+    }
+  }
+};
+
+export const dateTimeSettingsService = {
+  async getSettings(sessionToken?: string): Promise<{ success: boolean; data?: DateTimeFormatSettings; error?: string }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('get_datetime_format_settings_with_session', {
+        p_session_token: resolvedSessionToken
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: unknown } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to load date and time settings' };
+      }
+
+      return { success: true, data: mapDateTimeFormatSettings(result.data) };
+    } catch (error) {
+      console.error('Error loading date/time settings:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async saveSettings(
+    input: {
+      dateFormat: PortalDateFormat;
+      timeFormat: PortalTimeFormat;
+    },
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string; data?: DateTimeFormatSettings }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('upsert_datetime_format_settings_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_date_format: input.dateFormat,
+        p_time_format: input.timeFormat,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as { success?: boolean; error?: string } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to save date and time settings' };
+      }
+
+      const refresh = await dateTimeSettingsService.getSettings(resolvedSessionToken);
+      if (!refresh.success) {
+        return { success: true };
+      }
+
+      return { success: true, data: refresh.data };
+    } catch (error) {
+      console.error('Error saving date/time settings:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async getRuntimeProfile(): Promise<DateTimeFormatProfile | null> {
+    try {
+      const { data, error } = await supabase.rpc('get_datetime_format_runtime_profile');
+      if (error) {
+        return null;
+      }
+
+      const result = data as { success?: boolean; error?: string; data?: unknown } | null;
+      if (!result?.success || !result.data || typeof result.data !== 'object') {
+        return null;
+      }
+
+      const payload = result.data as Record<string, unknown>;
+      return {
+        date_format: normalizePortalDateFormat(payload.date_format),
+        time_format: normalizePortalTimeFormat(payload.time_format),
+      };
+    } catch (error) {
+      console.warn('Unable to load date/time runtime profile:', error);
       return null;
     }
   }

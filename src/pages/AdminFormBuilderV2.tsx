@@ -30,6 +30,7 @@ import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { PageHeader } from '../components/ui/PageHeader';
+import { formatDateTimeValue, formatDateValue } from '../lib/dateTimeManager';
 
 const EMPTY_NEW_FORM: FormConfigV2FormCreateInput = {
   form_key: '',
@@ -354,7 +355,7 @@ const AdminFormBuilderV2: React.FC = () => {
                                 </span>
                                 {form.live_published_at && (
                                   <p className="text-xs text-muted-foreground mt-1">
-                                    {new Date(form.live_published_at).toLocaleString()}
+                                    {formatDateTimeValue(form.live_published_at)}
                                   </p>
                                 )}
                                 {getLivePublishOrigin(form) === 'manual_publish' && form.live_published_by_email && (
@@ -367,7 +368,7 @@ const AdminFormBuilderV2: React.FC = () => {
                           })()}
                         </td>
                         <td className="px-4 py-4 text-sm text-muted-foreground">
-                          {new Date(form.updated_at).toLocaleDateString()}
+                          {formatDateValue(form.updated_at)}
                         </td>
                         <td className="px-4 py-4 text-center">
                           {archivingKey === form.form_key ? (

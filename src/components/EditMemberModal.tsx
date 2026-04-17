@@ -185,8 +185,8 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
 
-  const { isFieldVisible, isFieldRequired, isLoading: isLoadingFieldConfig } = useFormFieldConfig();
-  const { validateField: validateFieldByRule, isLoading: isLoadingValidation } = useValidation();
+  const { isFieldVisible, isFieldRequired, isLoading: isLoadingFieldConfig } = useFormFieldConfig({ source: 'builder_live', formKey: 'member_edit' });
+  const { validateField: validateFieldByRule, isLoading: isLoadingValidation } = useValidation({ formKey: 'member_edit' });
 
   const normalizePaymentMode = (value: string | null | undefined): string => {
     if (!value) return '';

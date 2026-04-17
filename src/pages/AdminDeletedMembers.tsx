@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { deletedMembersService, DeletedMember } from '../lib/supabase';
+import { formatDateTimeValue } from '../lib/dateTimeManager';
 import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -139,13 +140,7 @@ const AdminDeletedMembers: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTimeValue(dateString);
   };
 
   return (

@@ -7,6 +7,7 @@ import {
   PendingCityAssociationRecord,
   PendingCityListItem
 } from '../lib/supabase';
+import { formatDateValue } from '../lib/dateTimeManager';
 import { sessionManager } from '../lib/sessionManager';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -214,7 +215,7 @@ export default function AdminPendingCities() {
           <div className="space-y-4">
             {pendingCities.map((city) => {
               const latestDate = city.latest_created_at
-                ? new Date(city.latest_created_at).toLocaleDateString()
+                ? formatDateValue(city.latest_created_at)
                 : 'N/A';
               const canAssign = !!city.district_id;
 

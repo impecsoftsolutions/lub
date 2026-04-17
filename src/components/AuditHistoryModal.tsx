@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Clock, User, File as FileEdit, Activity } from 'lucide-react';
 import { memberAuditService, AuditHistoryEntry } from '../lib/supabase';
+import { formatDateTimeValue } from '../lib/dateTimeManager';
 
 interface AuditHistoryModalProps {
   memberId: string;
@@ -92,13 +93,7 @@ const AuditHistoryModal: React.FC<AuditHistoryModalProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTimeValue(dateString);
   };
 
   const formatFieldName = (fieldName: string) => {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Users, MapPin, Phone, AlertCircle, Loader2, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { statesService, locationsService, leadershipService } from '../lib/supabase';
+import { formatMonthYearValue } from '../lib/dateTimeManager';
 
 interface StateMaster {
   id: string;
@@ -201,7 +202,7 @@ const Leadership: React.FC = () => {
       : null;
 
     const formatDate = (date: Date) => {
-      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      return formatMonthYearValue(date, { monthStyle: 'long' });
     };
 
     if (minStart && maxEnd) {

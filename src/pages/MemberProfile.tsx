@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { customAuth } from '../lib/customAuth';
+import { formatMonthYearValue } from '../lib/dateTimeManager';
 
 interface MemberData {
   id: string;
@@ -392,10 +393,7 @@ const MemberProfile: React.FC = () => {
             <section>
               <div className="text-center py-4 border-t border-border">
                 <p className="text-sm text-muted-foreground">
-                  LUB Member since {new Date(member.created_at).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'long'
-                  })}
+                  LUB Member since {formatMonthYearValue(member.created_at, { monthStyle: 'long' })}
                 </p>
               </div>
             </section>

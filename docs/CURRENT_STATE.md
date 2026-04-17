@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-04-16
-**Updated by:** Claude (`CLAUDE-MEMBER-PROFILE-VIEW-001`)
+**Last updated:** 2026-04-17
+**Updated by:** Claude (`CLAUDE-EDIT-MODAL-CONFIG-FIX-001`)
 
 ---
 
@@ -34,6 +34,8 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 **Current handoff state:** All in-flight slices complete. Ready queue is open.
 
 Most recently completed streams:
+- **CLAUDE-EDIT-MODAL-CONFIG-FIX-001**: Fixed admin Edit Member modal ignoring Form Builder V2 config. `EditMemberModal.tsx` now calls `useFormFieldConfig({ source: 'builder_live', formKey: 'member_edit' })` and `useValidation({ formKey: 'member_edit' })` instead of the no-arg defaults (`legacy` / `join_lub`). Admin-only fields (payment, member_id) remain rendered outside builder config using the existing `isSuperAdmin` override — untouched. Two-line change, no migration, no RPC changes. Phase B full unification blocked on Codex migration to extend `update_member_registration` for document URL persistence.
+- **COD-THEME-LINK-DASH-001**: Corrected remaining theme-link drift on the member dashboard surface. In `src/pages/MemberDashboard.tsx`, replaced hardcoded yellow/green/red dashboard status badges, icons, and the registration-lookup warning panel with theme-token-based styling (`primary`, `secondary`, `destructive`) while preserving the existing dashboard flow and status semantics. In `src/components/Header.tsx`, replaced the fallback logo tile and `LUB` brand text orange hardcodes with `primary` / `primary-foreground` tokens so the visible header branding on the dashboard now follows Theme Settings. Validation passed: lint (0 errors / 3 expected warnings), build, and Phase1 readonly smoke.
 - **CLAUDE-MEMBER-PROFILE-VIEW-001**: Expanded the member Profile page (`/dashboard/profile`) from a minimal 4-field view to a full-detail display. `MemberViewProfile.tsx` fully rewritten with 10 conditional sections (only rendered when data is present): Personal Information, Company & Location, Business Details, Registration & Compliance (with yes/no badges), Membership Details, Alternate Contact, Referral, Payment Information, Documents (clickable open-in-new-tab links), Rejection Reason. Expanded local `MemberRegistrationData` interface to type all `member_registrations` columns. Added `Field`, `WideField`, `YesNoField`, `SectionHeader`, `DocLink` helper components. No backend or RPC changes — existing `get_my_member_registration_by_token` already returns the full row.
 - **CLAUDE-DATETIME-FORMAT-001**: Completed global date/time formatting settings across the portal. Added migration `20260416163000_add_datetime_format_settings_admin_contracts.sql` introducing `datetime_format_settings`, runtime/profile RPCs, and `settings.datetime.view/manage` permissions. `src/lib/supabase.ts` now exposes `dateTimeSettingsService` and the shared date/time format types. Added `src/lib/dateTimeManager.ts` as the single formatting/runtime-sync utility and `src/components/DateTimeFormatBootstrap.tsx` to refresh the runtime profile in the background without blocking first paint. Added new admin settings page `src/pages/AdminDateTimeSettings.tsx` at `/admin/settings/datetime`, then wired the route into `App.tsx`, the Settings Hub, and the admin sidebar. Replaced scattered direct `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` display formatting across the audited admin/member/public surfaces with the shared formatter so the chosen global profile propagates consistently. Targeted browser verification temporarily switched the site to `yyyy-mm-dd` + `24h`, confirmed the new format rendered on Admin AI Settings metadata, then restored the defaults back to `dd-mm-yyyy` + `12h`.
 - **CLAUDE-USR-MODAL-ZINDEX-001**: Fixed z-index stacking bug in Admin Users action-menu modals. Block Account and Assign Role dialogs were rendering behind the overlay backdrop (unreachable) due to `z-50` outer shell (same level as Radix dropdown portal) and missing `relative z-10` on the dialog card. Applied the established fixed-modal pattern from `COD-USR-001`/`COD-USR-DELMODAL-002` to both `BlockUserModal.tsx` and `AssignRoleModal.tsx`: outer shell `z-50` → `z-[80]`, added `relative z-10` to dialog card, updated centering wrapper, removed legacy zero-width spacer. No backend changes.
@@ -104,17 +106,14 @@ Deferred by decision:
 
 ## Last Verified
 
-- **When:** 2026-04-16
-- **What:** Global admin-configurable date/time formatting (`CLAUDE-DATETIME-FORMAT-001`)
+- **When:** 2026-04-17
+- **What:** Theme-link correction for member dashboard surface (`COD-THEME-LINK-DASH-001`)
 - **Result:** PASS
 - **Commands:**
   ```
-  npm run db:migrations:audit -> PASS
-  npm run db:migration:apply:single -- --version=20260416163000 -> PASS
-  npm run lint     -> 0 errors / 3 warnings (expected)
-  npm run build    -> PASS
+  npm run lint -> PASS (0 errors / 3 expected warnings)
+  npm run build -> PASS
   npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
-  targeted runtime profile RPC + admin browser format switch/restore -> PASS
   ```
 
 ## In Progress / Dirty State

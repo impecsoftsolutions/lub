@@ -8,30 +8,31 @@ Keep this file short and overwrite it instead of appending a journal.
 
 ---
 
-## Handoff Message (2026-04-16)
+## Handoff Message (2026-04-17)
 
 I am Claude. This message is for the next agent.
 
-- Slice ID: `CLAUDE-MEMBER-PROFILE-VIEW-001`
+- Slice ID: `CLAUDE-EDIT-MODAL-CONFIG-FIX-001` (Phase A of unified edit plan)
 - Owner: Claude
 - Status: **Complete**
 
-### What was built
+### What changed
 
-`src/pages/MemberViewProfile.tsx` fully rewritten. The profile page at `/dashboard/profile` now shows all available member registration data, organized into 10 distinct sections (only rendered when data is present):
+`src/components/EditMemberModal.tsx` — two hook call sites updated (lines 188–189):
 
-1. **Personal Information** — full name, gender, date of birth, email, mobile
-2. **Company & Location** — company name, designation, address, city, district, state, pin code
-3. **Business Details** — industry, activity type, constitution, turnover, employees, products/services, brand names, website
-4. **Registration & Compliance** — GST registered (yes/no badge) + GST number, PAN, ESIC registered, EPF registered
-5. **Membership Details** — status badge, member ID, member since, approval date, application attempts
-6. **Alternate Contact** — name + mobile (hidden if both empty)
-7. **Referral** — referred by (hidden if empty)
-8. **Payment Information** — amount paid, payment date, payment mode, transaction ID, bank reference
-9. **Documents** — GST certificate, UDYAM certificate, payment proof (clickable links, open in new tab)
-10. **Rejection Reason** — shown only when status is rejected
+```
+Before:
+  useFormFieldConfig()                     // source: 'legacy', formKey: 'join_lub'
+  useValidation()                          // formKey: 'join_lub'
 
-No new RPC or backend changes — data already returned by existing `get_my_member_registration_by_token`. Expanded local `MemberRegistrationData` interface to type all fields. Added `Field`, `WideField`, `YesNoField`, `SectionHeader`, `DocLink` helper components within the file. Fields/sections that have no value are hidden automatically.
+After:
+  useFormFieldConfig({ source: 'builder_live', formKey: 'member_edit' })
+  useValidation({ formKey: 'member_edit' })
+```
+
+**Why:** The admin Edit Member modal was silently ignoring all Form Builder V2 changes to the `member_edit` form. Field visibility, labels, and validation rules configured in the Builder had zero effect on the admin modal. This fix closes that drift gap.
+
+Admin-only fields (payment section, member_id) are rendered outside the builder config using the existing `isSuperAdmin` override — that pattern is untouched.
 
 ### Validation
 
@@ -40,62 +41,27 @@ No new RPC or backend changes — data already returned by existing `get_my_memb
 
 ### What was NOT changed
 
-- No backend or RPC changes
-- No changes to `MemberEditProfile.tsx`, `MemberNav`, or member context
+- No RPC changes
+- No migration
+- No admin-only field rendering changes
+- No isSuperAdmin logic changes
+- EditMemberModal.tsx remains the active admin edit path (Phase B unification is a separate slice)
 
----
+### Phase B status — BLOCKED on backend migration
 
-## Previous Handoff (Codex — CLAUDE-DATETIME-FORMAT-001)
-- Owner: Codex
-- Status: **Complete**
+Codex architectural review confirmed Phase B (full unification of admin+member onto MemberEditProfile.tsx) requires a backend migration to extend `update_member_registration` to persist document URLs:
+- `gst_certificate_url`
+- `udyam_certificate_url`
+- `payment_proof_url`
 
-### What changed
+Until that migration exists, admin edits of document uploads will upload to storage but not persist to DB.
 
-Global date/time formatting is now admin-configurable and applied through a shared runtime formatter.
+Phase B task is now on the task board as `COD-UNIFIED-EDIT-BE-001` (Codex) + `CLAUDE-UNIFIED-EDIT-UI-001` (Claude, blocked).
 
-**Backend / runtime**
-- Added migration `20260416163000_add_datetime_format_settings_admin_contracts.sql`
-- Created `datetime_format_settings` singleton storage with seeded `global_display` row
-- Added permissions `settings.datetime.view` and `settings.datetime.manage`
-- Added RPCs:
-  - `get_datetime_format_settings_with_session`
-  - `upsert_datetime_format_settings_with_session`
-  - `get_datetime_format_runtime_profile`
-- Added `dateTimeSettingsService` and shared portal date/time format types in `src/lib/supabase.ts`
-- Added `src/lib/dateTimeManager.ts` as the single formatter/runtime-sync utility
-- Added `src/components/DateTimeFormatBootstrap.tsx` to refresh the runtime profile in the background without blocking first paint
+### Notes from Codex architectural review
 
-**UI / wiring**
-- Added `src/pages/AdminDateTimeSettings.tsx` at `/admin/settings/datetime`
-- Added Settings Hub card and admin sidebar entry for Date & Time Settings
-- Registered the route in `src/App.tsx`
-- Replaced scattered direct `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` display formatting across the audited admin/member/public surfaces with the shared formatter so the selected profile propagates consistently
-
-### Validation
-
-- `npm run db:migrations:audit` -> PASS
-- `npm run db:migration:apply:single -- --version=20260416163000` -> PASS
-- `npm run lint` -> PASS (0 errors / 3 expected warnings)
-- `npm run build` -> PASS
-- `npm run test:e2e:phase1:local` -> PASS (3 passed / 12 skipped)
-- Targeted runtime profile RPC + browser verification -> PASS
-  - temporarily switched to `yyyy-mm-dd` + `24h`
-  - confirmed Admin AI Settings metadata adopted the new format
-  - restored defaults to `dd-mm-yyyy` + `12h`
-
-### What was NOT changed
-
-- No validation-rule behavior changes
-- No Smart Upload or document-extraction changes
-- No storage-format changes for member/admin data; this slice affects display formatting only
-- No blocking app bootstrap/loading screen remains; first paint stays immediate
-
-### Blockers / next action
-
-- No blockers
-- Ready queue returns to:
-  1. `COD-MSME-SHOWCASE-001`
-  2. `COD-PUBLIC-001`
-  3. `COD-MSME-ISSUES-001`
-  4. `CLAUDE-MEMBER-PROFILE-VIEW-001`
-  5. low-priority `COD-MEMBERS-EXPORT-002`
+- Admin route should use `/admin/members/registrations/:registrationId/edit` — `registrationId` is `member_registrations.id`, NOT the `member_id` business field
+- Admin data load: use `memberRegistrationService.getApplicationDetails(registrationId, sessionToken)`
+- Admin save: use `memberRegistrationService.updateMemberRegistration(registrationId, updates, sessionToken)`
+- Preview mode must remain isolated from live data even in admin mode
+- Status/approval/rejection fields must remain separate from the unified edit form

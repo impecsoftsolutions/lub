@@ -20,6 +20,7 @@ import {
   List
 } from 'lucide-react';
 import { supabase, locationsService } from '../lib/supabase';
+import { formatMonthYearValue } from '../lib/dateTimeManager';
 import { useMember } from '../contexts/useMember';
 import ExpandedMemberDetails from '../components/ExpandedMemberDetails';
 
@@ -453,8 +454,7 @@ const Directory: React.FC = () => {
   };
 
   const formatMemberSince = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return formatMonthYearValue(dateString, { monthStyle: 'short' });
   };
 
   const MemberCard: React.FC<{ member: MemberData }> = ({ member }) => {

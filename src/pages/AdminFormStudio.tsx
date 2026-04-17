@@ -50,6 +50,7 @@ import { canSelectFieldBeRequired, resolveSelectOptions, SelectOption } from '..
 import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
+import { formatDateTimeValue } from '../lib/dateTimeManager';
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -569,7 +570,7 @@ const AdminFormStudio: React.FC = () => {
     const publishedByEmail = livePublishStatus?.live_published_by_email ?? schema?.form.live_published_by_email ?? null;
 
     const titleParts: string[] = [];
-    if (publishedAt) titleParts.push(new Date(publishedAt).toLocaleString());
+    if (publishedAt) titleParts.push(formatDateTimeValue(publishedAt));
     if (publishedByEmail) titleParts.push(publishedByEmail);
     const title = titleParts.length > 0 ? titleParts.join(' • ') : undefined;
 

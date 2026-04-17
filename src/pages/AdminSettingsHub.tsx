@@ -12,6 +12,7 @@ import {
   Settings,
   Loader2,
   Wand2,
+  CalendarClock,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ const AdminSettingsHub: React.FC = () => {
   const canViewForms = useHasPermission('settings.forms.view');
   const canViewValidation = useHasPermission('settings.validation.view');
   const canViewNormalization = useHasPermission('settings.normalization.view');
+  const canViewDateTime = useHasPermission('settings.datetime.view');
   const canViewDirectory = useHasPermission('settings.directory.view');
   const canViewPayment = useHasPermission('settings.payment.view');
   const canViewAI = useHasPermission('settings.ai.view');
@@ -63,6 +65,15 @@ const AdminSettingsHub: React.FC = () => {
       path: '/admin/settings/normalization',
       icon: Wand2,
       canAccess: canViewNormalization,
+      section: 'Settings'
+    },
+    {
+      id: 'datetime',
+      title: 'Date & Time Settings',
+      description: 'Choose the global date and time display format used across the website.',
+      path: '/admin/settings/datetime',
+      icon: CalendarClock,
+      canAccess: canViewDateTime,
       section: 'Settings'
     },
     {

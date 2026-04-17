@@ -8,12 +8,33 @@ import Toast from '../components/Toast';
 import { logoutService } from '../lib/logoutService';
 import { memberRegistrationService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
+import { formatDateValue } from '../lib/dateTimeManager';
 
 interface RegistrationSummary {
   full_name?: string | null;
   company_name?: string | null;
   status?: string | null;
 }
+
+type DashboardStatusTone = 'approved' | 'pending' | 'rejected';
+
+const DASHBOARD_STATUS_STYLES: Record<DashboardStatusTone, {
+  badge: string;
+  icon: string;
+}> = {
+  approved: {
+    badge: 'bg-primary/10 text-primary border border-primary/20',
+    icon: 'text-primary',
+  },
+  pending: {
+    badge: 'bg-secondary/15 text-foreground border border-secondary/30',
+    icon: 'text-secondary',
+  },
+  rejected: {
+    badge: 'bg-destructive/10 text-destructive border border-destructive/20',
+    icon: 'text-destructive',
+  },
+};
 
 const MemberDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -125,11 +146,7 @@ const MemberDashboard: React.FC = () => {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return formatDateValue(dateString);
   };
 
   if (isLoading) {
@@ -147,7 +164,7 @@ const MemberDashboard: React.FC = () => {
     return (
       <div className="min-h-screen bg-muted/50 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
           <p className="text-foreground font-medium mb-2">Unable to load your profile</p>
           <p className="text-muted-foreground mb-4">Please try again or contact support</p>
           <button
@@ -168,22 +185,22 @@ const MemberDashboard: React.FC = () => {
     switch (statusForDisplay) {
       case 'pending':
         return (
-          <div className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg">
-            <Clock className="w-5 h-5" />
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${DASHBOARD_STATUS_STYLES.pending.badge}`}>
+            <Clock className={`w-5 h-5 ${DASHBOARD_STATUS_STYLES.pending.icon}`} />
             <span className="font-medium">Pending Review</span>
           </div>
         );
       case 'approved':
         return (
-          <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg">
-            <CheckCircle className="w-5 h-5" />
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${DASHBOARD_STATUS_STYLES.approved.badge}`}>
+            <CheckCircle className={`w-5 h-5 ${DASHBOARD_STATUS_STYLES.approved.icon}`} />
             <span className="font-medium">Approved</span>
           </div>
         );
       case 'rejected':
         return (
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-800 rounded-lg">
-            <AlertCircle className="w-5 h-5" />
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${DASHBOARD_STATUS_STYLES.rejected.badge}`}>
+            <AlertCircle className={`w-5 h-5 ${DASHBOARD_STATUS_STYLES.rejected.icon}`} />
             <span className="font-medium">Rejected</span>
           </div>
         );
@@ -198,20 +215,20 @@ const MemberDashboard: React.FC = () => {
         return {
           title: 'Your application is under review',
           description: 'Our team is reviewing your membership application. You will receive an email once a decision has been made.',
-          icon: <Clock className="w-12 h-12 text-yellow-500" />
+          icon: <Clock className={`w-12 h-12 ${DASHBOARD_STATUS_STYLES.pending.icon}`} />
         };
       case 'approved':
         return {
           title: 'Welcome to LUB!',
           description: `Your membership has been approved. Your Member ID is ${member.member_id || 'being generated'}. You can now access all member benefits.`,
-          icon: <CheckCircle className="w-12 h-12 text-green-500" />,
+          icon: <CheckCircle className={`w-12 h-12 ${DASHBOARD_STATUS_STYLES.approved.icon}`} />,
           approvalDate: member.approval_date
         };
       case 'rejected':
         return {
           title: 'Application Not Approved',
           description: member.rejection_reason || 'Your application was not approved. Please review the requirements and re-apply.',
-          icon: <AlertCircle className="w-12 h-12 text-red-500" />
+          icon: <AlertCircle className={`w-12 h-12 ${DASHBOARD_STATUS_STYLES.rejected.icon}`} />
         };
       default:
         return null;
@@ -258,13 +275,13 @@ const MemberDashboard: React.FC = () => {
                 Checking registration status...
               </div>
             ) : registrationLookupError ? (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start justify-between gap-4">
-                <p className="text-sm text-yellow-800">
+              <div className="p-4 bg-secondary/10 border border-secondary/25 rounded-lg flex items-start justify-between gap-4">
+                <p className="text-sm text-foreground">
                   Could not load your registration status. Please try again.
                 </p>
                 <button
                   onClick={handleRetryRegistrationLookup}
-                  className="px-4 py-2 text-sm font-medium text-yellow-800 border border-yellow-300 rounded-lg hover:bg-yellow-100 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary border border-secondary/30 rounded-lg hover:bg-secondary/90 transition-colors"
                 >
                   Retry
                 </button>

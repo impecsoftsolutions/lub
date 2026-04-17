@@ -4,6 +4,7 @@ import { ArrowLeft, Bot, KeyRound, Loader2, Save } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import { AIProvider, AIRuntimeReasoningEffort, AIRuntimeSettings, aiSettingsService } from '../lib/supabase';
+import { formatDateTimeValue } from '../lib/dateTimeManager';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -290,7 +291,7 @@ const AdminAISettings: React.FC = () => {
 
                 <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
                   {settings?.updated_at
-                    ? `Last updated ${new Date(settings.updated_at).toLocaleString()}${settings.updated_by_email ? ` by ${settings.updated_by_email}` : ''}.`
+                    ? `Last updated ${formatDateTimeValue(settings.updated_at)}${settings.updated_by_email ? ` by ${settings.updated_by_email}` : ''}.`
                     : 'No previous update metadata available.'}
                 </div>
               </CardContent>

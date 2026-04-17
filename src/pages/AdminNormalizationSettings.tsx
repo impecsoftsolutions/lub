@@ -19,6 +19,7 @@ import {
   NormalizationRuleCategory,
   normalizationRulesService,
 } from '../lib/supabase';
+import { formatDateValue } from '../lib/dateTimeManager';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -490,7 +491,7 @@ const AdminNormalizationSettings: React.FC = () => {
                           {rule.updated_by_email && (
                             <p className="mt-1.5 text-xs text-muted-foreground/60">
                               Last updated{' '}
-                              {new Date(rule.updated_at).toLocaleDateString()} by{' '}
+                              {formatDateValue(rule.updated_at)} by{' '}
                               {rule.updated_by_email}
                             </p>
                           )}

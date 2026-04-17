@@ -1,5 +1,6 @@
 import React from 'react';
 import { Globe, Building2, FileText, RefreshCw } from 'lucide-react';
+import { formatDateTimeValue } from '../../lib/dateTimeManager';
 
 interface SystemStatistics {
   activeStates: number;
@@ -68,7 +69,7 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({
           </div>
 
           <div className="text-xs text-muted-foreground text-center pt-2 border-t border-border">
-            Last updated: {systemStatus.lastUpdated.toLocaleString()}
+            Last updated: {formatDateTimeValue(systemStatus.lastUpdated)}
           </div>
         </div>
       ) : (

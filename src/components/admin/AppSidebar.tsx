@@ -115,6 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         { label: "Form Configuration", path: "/admin/settings/forms" },
         { label: "Validation Settings", path: "/admin/settings/validation" },
         { label: "Normalization Rules", path: "/admin/settings/normalization" },
+        { label: "Date & Time Settings", path: "/admin/settings/datetime" },
         { label: "Theme", path: "/admin/settings/appearance" },
         { label: "AI Settings", path: "/admin/settings/ai" }
       ]

@@ -39,6 +39,7 @@ import AdminAppearanceSettings from './pages/admin/AdminAppearanceSettings';
 import AdminSettingsHub from './pages/AdminSettingsHub';
 import AdminAISettings from './pages/AdminAISettings';
 import AdminNormalizationSettings from './pages/AdminNormalizationSettings';
+import AdminDateTimeSettings from './pages/AdminDateTimeSettings';
 import AdminFormBuilderV2 from './pages/AdminFormBuilderV2';
 import AdminFormEditorV2 from './pages/AdminFormEditorV2';
 import AdminFieldLibrary from './pages/AdminFieldLibrary';
@@ -51,6 +52,7 @@ import { PermissionProvider } from './contexts/PermissionContext';
 import { AdminContextProvider } from './contexts/AdminContext';
 import { sessionManager } from './lib/sessionManager';
 import { applyStoredTheme } from './lib/themeManager';
+import { DateTimeFormatBootstrap } from './components/DateTimeFormatBootstrap';
 
 // Restore persisted theme and color mode before first render
 applyStoredTheme();
@@ -100,9 +102,10 @@ function AdminLayoutWrapper() {
 
 function App() {
   return (
-    <Router>
-      <PermissionProvider>
-        <MemberContextProvider>
+    <DateTimeFormatBootstrap>
+      <Router>
+        <PermissionProvider>
+          <MemberContextProvider>
           <RouteHistoryTracker />
           <Routes>
           {/* Public Routes - All wrapped with MemberContextProvider for global login detection */}
@@ -178,15 +181,17 @@ function App() {
             <Route path="/admin/settings/forms/library" element={<AdminFieldLibrary />} />
             <Route path="/admin/settings/validation" element={<AdminValidationSettings />} />
             <Route path="/admin/settings/normalization" element={<AdminNormalizationSettings />} />
+            <Route path="/admin/settings/datetime" element={<AdminDateTimeSettings />} />
             <Route path="/admin/settings/appearance" element={<AdminAppearanceSettings />} />
             <Route path="/admin/settings/ai" element={<AdminAISettings />} />
 
             <Route path="/admin/administration/users" element={<AdminUsers />} />
           </Route>
           </Routes>
-        </MemberContextProvider>
-      </PermissionProvider>
-    </Router>
+          </MemberContextProvider>
+        </PermissionProvider>
+      </Router>
+    </DateTimeFormatBootstrap>
   );
 }
 

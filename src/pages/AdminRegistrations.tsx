@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useAdmin } from '../contexts/useAdmin';
 import { downloadSingleSheetXlsx } from '../lib/xlsxExport';
+import { formatDateTimeValue } from '../lib/dateTimeManager';
 
 interface MemberRegistration {
   id: string;
@@ -511,13 +512,7 @@ const AdminRegistrations: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTimeValue(dateString);
   };
 
   return (

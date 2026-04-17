@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
+import { formatDateTimeValue, formatTimeValue } from '../../lib/dateTimeManager';
 
 interface Activity {
   id: string;
@@ -34,8 +35,7 @@ const RecentActivityList: React.FC<RecentActivityListProps> = ({
 
   const formatLastUpdated = () => {
     if (!lastUpdated) return '';
-    const date = lastUpdated instanceof Date ? lastUpdated : new Date(lastUpdated);
-    return date.toLocaleTimeString();
+    return formatTimeValue(lastUpdated);
   };
 
   return (
@@ -74,7 +74,7 @@ const RecentActivityList: React.FC<RecentActivityListProps> = ({
               <div className="flex items-center gap-2 mt-2">
                 <Clock className="w-3 h-3 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  {new Date(activity.created_at).toLocaleString()}
+                  {formatDateTimeValue(activity.created_at)}
                 </span>
               </div>
             </div>

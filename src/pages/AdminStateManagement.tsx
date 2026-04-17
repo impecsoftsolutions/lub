@@ -10,6 +10,7 @@ import {
   Lock
 } from 'lucide-react';
 import { statesService, StateMaster } from '../lib/supabase';
+import { formatDateTimeValue } from '../lib/dateTimeManager';
 import Toast from '../components/Toast';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -112,13 +113,7 @@ const AdminStateManagement: React.FC = () => {
   );
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTimeValue(dateString);
   };
 
   return (

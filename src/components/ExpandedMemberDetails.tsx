@@ -10,6 +10,7 @@ import {
   Download
 } from 'lucide-react';
 import { directoryVisibilityService, DirectoryFieldVisibility } from '../lib/supabase';
+import { formatMonthYearValue } from '../lib/dateTimeManager';
 
 interface MemberData {
   id: string;
@@ -119,8 +120,7 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
   };
 
   const formatMemberSince = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return formatMonthYearValue(dateString, { monthStyle: 'long' });
   };
 
   if (isLoading) {
