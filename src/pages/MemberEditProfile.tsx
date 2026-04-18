@@ -855,6 +855,47 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
         return;
       }
       const merged = { ...originalData, ...formData };
+
+      // Upload any newly selected document files to storage first
+      let finalGstCertificateUrl: string | null = merged.gst_certificate_url || null;
+      let finalUdyamCertificateUrl: string | null = merged.udyam_certificate_url || null;
+      let finalPaymentProofUrl: string | null = merged.payment_proof_url || null;
+
+      const docUploadQueue: Array<{
+        file: File | null;
+        prefix: string;
+        label: string;
+        onSuccess: (url: string) => void;
+      }> = [
+        {
+          file: documentFiles.gstCertificate,
+          prefix: 'gst',
+          label: 'GST certificate',
+          onSuccess: (url) => { finalGstCertificateUrl = url; },
+        },
+        {
+          file: documentFiles.udyamCertificate,
+          prefix: 'udyam',
+          label: 'UDYAM certificate',
+          onSuccess: (url) => { finalUdyamCertificateUrl = url; },
+        },
+        ...(isSuperAdmin ? [{
+          file: documentFiles.paymentProof,
+          prefix: 'payment',
+          label: 'Payment proof',
+          onSuccess: (url: string) => { finalPaymentProofUrl = url; },
+        }] : []),
+      ];
+
+      for (const task of docUploadQueue) {
+        if (!task.file) continue;
+        const ext = task.file.name.includes('.') ? task.file.name.split('.').pop()?.toLowerCase() : null;
+        const fileName = `${task.prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext ? `.${ext}` : ''}`;
+        const uploadedUrl = await fileUploadService.uploadFile(task.file, fileName, 'registrations');
+        if (!uploadedUrl) throw new Error(`Failed to upload ${task.label}`);
+        task.onSuccess(uploadedUrl);
+      }
+
       const updates: Record<string, unknown> = {
         full_name: merged.full_name?.trim() || null,
         gender: merged.gender || null,
@@ -878,6 +919,8 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
         website: merged.website || null,
         gst_registered: merged.gst_registered || null,
         gst_number: merged.gst_number || null,
+        gst_certificate_url: finalGstCertificateUrl,
+        udyam_certificate_url: finalUdyamCertificateUrl,
         pan_company: merged.pan_company?.trim() || null,
         esic_registered: merged.esic_registered || null,
         epf_registered: merged.epf_registered || null,
@@ -891,6 +934,7 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
           payment_mode: merged.payment_mode || null,
           transaction_id: merged.transaction_id || null,
           bank_reference: merged.bank_reference || null,
+          payment_proof_url: finalPaymentProofUrl,
         } : {}),
       };
       const result = await memberRegistrationService.updateMemberRegistration(
@@ -902,6 +946,14 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
         showToast('error', result.error || 'Failed to save changes');
         return;
       }
+      // Reflect uploaded URLs back into form state so UI shows new values immediately
+      setFormData(prev => ({
+        ...prev,
+        gst_certificate_url: finalGstCertificateUrl || '',
+        udyam_certificate_url: finalUdyamCertificateUrl || '',
+        ...(isSuperAdmin ? { payment_proof_url: finalPaymentProofUrl || '' } : {}),
+      }));
+      setDocumentFiles({ gstCertificate: null, udyamCertificate: null, paymentProof: null });
       setOriginalData({ ...merged });
       showToast('success', 'Member updated successfully');
     } catch (err) {
@@ -910,7 +962,7 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
     } finally {
       setIsSaving(false);
     }
-  }, [formData, isSuperAdmin, memberRegistrationId, originalData, showToast]);
+  }, [documentFiles, formData, isSuperAdmin, memberRegistrationId, originalData, showToast]);
 
   const loadStates = useCallback(async () => {
     try {
@@ -2641,43 +2693,33 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
                     <label className="block text-sm font-medium text-foreground mb-1">
                       {resolveFieldLabel('gst_certificate_url', 'GST Certificate')} {!isAdminMode && isFieldRequired('gst_certificate_url') && <span className="text-destructive">*</span>}
                     </label>
-                    {isAdminMode ? (
-                      formData.gst_certificate_url ? (
-                        <a href={formData.gst_certificate_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
-                          View GST Certificate
+                    <>
+                      <input
+                        id="gst_certificate_url"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(event) => handleDocumentFileChange('gstCertificate', event.target.files?.[0] || null)}
+                        className="sr-only"
+                      />
+                      <label
+                        htmlFor="gst_certificate_url"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                          errors.gst_certificate_url ? 'border-destructive' : 'border-border'
+                        }`}
+                      >
+                        <Upload className="w-4 h-4" />
+                        {(formData.gst_certificate_url || documentFiles.gstCertificate) ? 'Upload New File' : 'Upload File'}
+                      </label>
+                      {documentFiles.gstCertificate && (
+                        <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.gstCertificate.name}</p>
+                      )}
+                      {!documentFiles.gstCertificate && formData.gst_certificate_url && (
+                        <a href={formData.gst_certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                          View current GST certificate
                         </a>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No document on file</p>
-                      )
-                    ) : (
-                      <>
-                        <input
-                          id="gst_certificate_url"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(event) => handleDocumentFileChange('gstCertificate', event.target.files?.[0] || null)}
-                          className="sr-only"
-                        />
-                        <label
-                          htmlFor="gst_certificate_url"
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
-                            errors.gst_certificate_url ? 'border-destructive' : 'border-border'
-                          }`}
-                        >
-                          <Upload className="w-4 h-4" />
-                          {(formData.gst_certificate_url || documentFiles.gstCertificate) ? 'Upload New File' : 'Upload File'}
-                        </label>
-                        {documentFiles.gstCertificate && (
-                          <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.gstCertificate.name}</p>
-                        )}
-                        {!documentFiles.gstCertificate && formData.gst_certificate_url && (
-                          <a href={formData.gst_certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
-                            View current GST certificate
-                          </a>
-                        )}
-                        {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
-                      </>
-                    )}
+                      )}
+                      {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
+                    </>
                   </div>
                 )}
 
@@ -2756,43 +2798,33 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
                     <label className="block text-sm font-medium text-foreground mb-1">
                       {resolveFieldLabel('udyam_certificate_url', 'UDYAM Certificate')} {!isAdminMode && isFieldRequired('udyam_certificate_url') && <span className="text-destructive">*</span>}
                     </label>
-                    {isAdminMode ? (
-                      formData.udyam_certificate_url ? (
-                        <a href={formData.udyam_certificate_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
-                          View UDYAM Certificate
+                    <>
+                      <input
+                        id="udyam_certificate_url"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(event) => handleDocumentFileChange('udyamCertificate', event.target.files?.[0] || null)}
+                        className="sr-only"
+                      />
+                      <label
+                        htmlFor="udyam_certificate_url"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
+                          errors.udyam_certificate_url ? 'border-destructive' : 'border-border'
+                        }`}
+                      >
+                        <Upload className="w-4 h-4" />
+                        {(formData.udyam_certificate_url || documentFiles.udyamCertificate) ? 'Upload New File' : 'Upload File'}
+                      </label>
+                      {documentFiles.udyamCertificate && (
+                        <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.udyamCertificate.name}</p>
+                      )}
+                      {!documentFiles.udyamCertificate && formData.udyam_certificate_url && (
+                        <a href={formData.udyam_certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                          View current UDYAM certificate
                         </a>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No document on file</p>
-                      )
-                    ) : (
-                      <>
-                        <input
-                          id="udyam_certificate_url"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(event) => handleDocumentFileChange('udyamCertificate', event.target.files?.[0] || null)}
-                          className="sr-only"
-                        />
-                        <label
-                          htmlFor="udyam_certificate_url"
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm text-foreground bg-card hover:bg-muted/50 cursor-pointer transition-colors ${
-                            errors.udyam_certificate_url ? 'border-destructive' : 'border-border'
-                          }`}
-                        >
-                          <Upload className="w-4 h-4" />
-                          {(formData.udyam_certificate_url || documentFiles.udyamCertificate) ? 'Upload New File' : 'Upload File'}
-                        </label>
-                        {documentFiles.udyamCertificate && (
-                          <p className="text-xs text-muted-foreground mt-1">Selected: {documentFiles.udyamCertificate.name}</p>
-                        )}
-                        {!documentFiles.udyamCertificate && formData.udyam_certificate_url && (
-                          <a href={formData.udyam_certificate_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
-                            View current UDYAM certificate
-                          </a>
-                        )}
-                        {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}
-                      </>
-                    )}
+                      )}
+                      {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}
+                    </>
                   </div>
                 )}
 
@@ -2937,13 +2969,15 @@ const MemberEditProfile: React.FC<{ adminRegistrationId?: string; isSuperAdmin?:
                 </div>
                 )}
 
-                {/* Payment Proof — read-only link in admin mode (doc URL persistence requires COD-UNIFIED-EDIT-BE-001) */}
                 {isFieldVisible('payment_proof_url') && (
                   <div>
                     <label htmlFor="payment_proof_upload" className="block text-sm font-medium text-foreground mb-1">
-                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')} {!isAdminMode && isFieldRequired('payment_proof_url') && <span className="text-destructive">*</span>}
+                      {resolveFieldLabel('payment_proof_url', 'Payment Proof')}
+                      {isAdminMode && isSuperAdmin && <span className="ml-1 text-xs text-muted-foreground">(super admin)</span>}
+                      {!isAdminMode && isFieldRequired('payment_proof_url') && <span className="text-destructive">*</span>}
                     </label>
-                    {isAdminMode ? (
+                    {/* Admin mode — non-super-admin sees read-only link; super admin gets upload control */}
+                    {isAdminMode && !isSuperAdmin ? (
                       formData.payment_proof_url ? (
                         <a href={formData.payment_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
                           View Payment Proof
