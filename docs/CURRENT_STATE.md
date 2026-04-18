@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-04-17
-**Updated by:** Claude (`CLAUDE-UNIFIED-EDIT-UI-001`)
+**Last updated:** 2026-04-18
+**Updated by:** Claude (`CLAUDE-UNIFIED-EDIT-DOC-UPLOAD-001`)
 
 ---
 
@@ -34,6 +34,8 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 **Current handoff state:** All in-flight slices complete. Ready queue is open.
 
 Most recently completed streams:
+- **CLAUDE-UNIFIED-EDIT-DOC-UPLOAD-001**: Enabled document uploads in admin edit mode following `COD-UNIFIED-EDIT-BE-001` backend unblock. GST and UDYAM certificate upload controls are now active in admin mode (previously read-only view links). Payment Proof shows upload control for super admin in admin mode; non-super-admin still sees read-only view link (server enforces the permission). `handleAdminSave` now uploads selected document files to storage via `fileUploadService.uploadFile` before the RPC call, mirrors the member save path, reflects new URLs back into form state after save so the UI updates immediately, and clears `documentFiles` state. Lint: 0 errors / 3 expected warnings. Build: PASS.
+- **COD-UNIFIED-EDIT-BE-001**: Completed the backend unblock for unified admin/member edit document uploads. Added migration 20260417100000_extend_admin_update_rpc_document_urls.sql, redefining update_member_registration(uuid, uuid, jsonb, boolean) without changing its signature or return type. The admin update RPC now persists gst_certificate_url and udyam_certificate_url for authorized admins, and persists payment_proof_url only for super admins by moving the strip logic behind the existing p_is_super_admin gate. The session wrapper update_member_registration_with_session and src/lib/supabase.ts client wrapper were intentionally left unchanged. Validation passed: targeted migration audit/apply, lint (0 errors / 3 expected warnings), build, and Phase1 readonly smoke (3 passed / 12 skipped). This removes the backend blocker for unified admin edit document uploads.
 - **CLAUDE-UNIFIED-EDIT-UI-001**: Full Phase B unification of admin + member edit form. `MemberEditProfile.tsx` extended with optional `adminRegistrationId?: string` + `isSuperAdmin?: boolean` props. When in admin mode: loads member via `getApplicationDetails(registrationId, sessionToken)`; saves via `updateMemberRegistration(registrationId, updates, sessionToken)` (no verify/normalize step); shows admin-specific heading ("Edit Member — [Name]"), back-button target (/admin/members/registrations), banner with AlertCircle and super-admin note, "Save as Admin" button replacing Verify+Submit. Admin-only fields (payment section, member_id) rendered; member-only UI (credential change buttons, FieldCorrectionStepper, ChangeCredentialModal) guarded with `!isAdminMode`. Document URL fields (GST, UDYAM, payment proof) are read-only in admin mode — shows view link or "No document on file" — because the admin RPC (`update_member_registration_with_session`) does not yet persist them (unblocked by `COD-UNIFIED-EDIT-BE-001`). New thin wrapper `AdminMemberEdit.tsx` placed inside AdminLayoutWrapper extracts `isSuperAdmin` from AdminContext and passes both props to `MemberEditProfile`. Route `/admin/members/registrations/:registrationId/edit` added to `App.tsx`. `AdminRegistrations.tsx` "Edit" action now navigates to the new route via `useNavigate` instead of opening the modal; `EditMemberModal` import removed (component kept with `@deprecated` comment for Phase C cleanup). Lint: 0 errors / 3 expected warnings. Build: PASS.
 - **CLAUDE-EDIT-MODAL-CONFIG-FIX-001**: Fixed admin Edit Member modal ignoring Form Builder V2 config. `EditMemberModal.tsx` now calls `useFormFieldConfig({ source: 'builder_live', formKey: 'member_edit' })` and `useValidation({ formKey: 'member_edit' })` instead of the no-arg defaults (`legacy` / `join_lub`). Admin-only fields (payment, member_id) remain rendered outside builder config using the existing `isSuperAdmin` override — untouched. Two-line change, no migration, no RPC changes.
 - **COD-THEME-LINK-DASH-001**: Corrected remaining theme-link drift on the member dashboard surface. In `src/pages/MemberDashboard.tsx`, replaced hardcoded yellow/green/red dashboard status badges, icons, and the registration-lookup warning panel with theme-token-based styling (`primary`, `secondary`, `destructive`) while preserving the existing dashboard flow and status semantics. In `src/components/Header.tsx`, replaced the fallback logo tile and `LUB` brand text orange hardcodes with `primary` / `primary-foreground` tokens so the visible header branding on the dashboard now follows Theme Settings. Validation passed: lint (0 errors / 3 expected warnings), build, and Phase1 readonly smoke.
@@ -107,8 +109,8 @@ Deferred by decision:
 
 ## Last Verified
 
-- **When:** 2026-04-17
-- **What:** Phase B unified admin+member edit form (`CLAUDE-UNIFIED-EDIT-UI-001`)
+- **When:** 2026-04-18
+- **What:** Admin edit document uploads enabled (`CLAUDE-UNIFIED-EDIT-DOC-UPLOAD-001`)
 - **Result:** PASS
 - **Commands:**
   ```
@@ -146,5 +148,7 @@ When forms stream is complete, next top candidates are:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+
+
 
 
