@@ -25,7 +25,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface UserRole {
   id?: string;
   user_id: string;
-  role: 'super_admin' | 'admin' | 'editor' | 'viewer';
+  role: 'super_admin' | 'admin' | 'manager' | 'editor' | 'viewer';
   state?: string;
   district?: string;
   is_member_linked: boolean;
@@ -5095,6 +5095,1194 @@ export const validationRulesService = {
       return { success: false, error: 'An unexpected error occurred' };
     }
   }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Activities CMS — types
+// ─────────────────────────────────────────────────────────────
+
+export type ActivityStatus = 'draft' | 'published' | 'archived';
+export type ActivityMediaStorageProvider = 'supabase_storage' | 'cloudflare_r2' | string;
+
+/** Returned by get_published_activities (public) */
+export interface PublicActivity {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  activity_date: string | null;
+  location: string | null;
+  cover_image_url: string | null;
+  is_featured: boolean;
+  published_at: string | null;
+}
+
+/** Returned by get_activity_by_slug (public) */
+export interface PublicActivityDetail extends PublicActivity {
+  description: string | null;
+  youtube_urls: string[];
+  media: ActivityMediaItem[];
+}
+
+/** Returned by get_all_activities_with_session (admin list) */
+export interface AdminActivityListItem {
+  id: string;
+  slug: string;
+  title: string;
+  status: ActivityStatus;
+  is_featured: boolean;
+  activity_date: string | null;
+  location: string | null;
+  cover_image_url: string | null;
+  published_at: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  media_count: number;
+}
+
+/** Returned by get_activity_by_id_with_session (admin edit) */
+export interface AdminActivityDetail {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  description: string | null;
+  activity_date: string | null;
+  location: string | null;
+  status: ActivityStatus;
+  is_featured: boolean;
+  cover_image_url: string | null;
+  cover_storage_provider?: ActivityMediaStorageProvider | null;
+  cover_original_object_key?: string | null;
+  cover_original_filename?: string | null;
+  cover_original_mime_type?: string | null;
+  cover_original_bytes?: number | null;
+  cover_original_width?: number | null;
+  cover_original_height?: number | null;
+  youtube_urls: string[];
+  created_by: string | null;
+  created_at: string;
+  published_by: string | null;
+  published_at: string | null;
+  media: ActivityMediaItem[];
+}
+
+export interface ActivityMediaItem {
+  id: string;
+  activity_id: string;
+  storage_url: string;
+  storage_provider?: ActivityMediaStorageProvider | null;
+  original_object_key?: string | null;
+  original_filename?: string | null;
+  mime_type?: string | null;
+  file_size_bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  display_order: number;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
+export interface ActivityCoverMediaPayload {
+  cover_image_url?: string | null;
+  cover_storage_provider?: ActivityMediaStorageProvider | null;
+  cover_original_object_key?: string | null;
+  cover_original_filename?: string | null;
+  cover_original_mime_type?: string | null;
+  cover_original_bytes?: number | null;
+  cover_original_width?: number | null;
+  cover_original_height?: number | null;
+}
+
+export interface ActivityGalleryMediaPayload {
+  storage_url: string;
+  storage_provider?: ActivityMediaStorageProvider | null;
+  original_object_key?: string | null;
+  original_filename?: string | null;
+  mime_type?: string | null;
+  file_size_bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  display_order?: number | null;
+}
+
+export interface ActivitySettings {
+  max_gallery_images?: string;
+  max_youtube_links?: string;
+}
+
+/**
+ * Structured error codes returned by `draft-activity-content` edge function.
+ * Mirrored on the client so the AI panel can render the right tone/copy
+ * instead of dumping raw error strings.
+ */
+export type ActivityDraftErrorCode =
+  | 'ai_disabled'
+  | 'provider_unsupported'
+  | 'no_api_key'
+  | 'session_invalid'
+  | 'permission_denied'
+  | 'generation_failed';
+
+/**
+ * AI providers that the Activities drafting edge function actually supports
+ * end-to-end today. Keep in sync with the provider router inside
+ * `supabase/functions/draft-activity-content/index.ts`. Frontend gating uses
+ * this set so the UI stops over-promising.
+ */
+export const ACTIVITY_AI_SUPPORTED_PROVIDERS: readonly AIProvider[] = ['openai'] as const;
+
+export interface ActivityLimits {
+  maxGalleryImages: number;
+  maxYoutubeLinks: number;
+}
+
+export interface ActivitySummaryMetrics {
+  total: number;
+  published: number;
+  drafts: number;
+  archived: number;
+  featured: number;
+  total_photos: number;
+  last_published_at: string | null;
+}
+
+interface ActivitiesRpcEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  total?: number;
+  error?: string;
+}
+
+export interface ActivityMediaUploadResult {
+  success: boolean;
+  error?: string;
+  storage_provider?: ActivityMediaStorageProvider;
+  original_object_key?: string;
+  original_filename?: string;
+  mime_type?: string;
+  bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  display_url_seed?: string;
+}
+
+export interface ActivityOriginalDownloadResult {
+  success: boolean;
+  error?: string;
+  url?: string;
+  filename?: string | null;
+}
+
+async function invokeEdgeFormData<T>(
+  functionName: string,
+  formData: FormData
+): Promise<T> {
+  const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      apikey: supabaseAnonKey,
+    },
+    body: formData,
+  });
+
+  const raw = await response.text();
+  const parsed = raw ? JSON.parse(raw) as T : ({} as T);
+  if (!response.ok) {
+    throw new Error((parsed as { error?: string })?.error || `Edge function ${functionName} failed`);
+  }
+  return parsed;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Activities Service
+// ─────────────────────────────────────────────────────────────
+
+export const activitiesService = {
+  defaultLimits: {
+    maxGalleryImages: 20,
+    maxYoutubeLinks: 5,
+  } satisfies ActivityLimits,
+
+  // ── Public RPCs ──────────────────────────────────────────
+
+  async getPublished(limit = 20, offset = 0): Promise<PublicActivity[]> {
+    const { data, error } = await supabase.rpc('get_published_activities', {
+      p_limit: limit,
+      p_offset: offset,
+    });
+    if (error) {
+      console.error('[activitiesService.getPublished]', error);
+      throw error;
+    }
+    const result = data as ActivitiesRpcEnvelope<PublicActivity[]> | null;
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to load published activities');
+    }
+    return result.data ?? [];
+  },
+
+  async getBySlug(slug: string): Promise<PublicActivityDetail | null> {
+    const { data, error } = await supabase.rpc('get_activity_by_slug', {
+      p_slug: slug,
+    });
+    if (error) {
+      console.error('[activitiesService.getBySlug]', error);
+      throw error;
+    }
+    const result = data as ActivitiesRpcEnvelope<PublicActivityDetail> | null;
+    if (!result?.success) {
+      if (result?.error === 'Activity not found') {
+        return null;
+      }
+      throw new Error(result?.error || 'Failed to load activity');
+    }
+    return result.data ?? null;
+  },
+
+  // ── Admin read RPCs ──────────────────────────────────────
+
+  async getAll(
+    sessionToken: string
+  ): Promise<AdminActivityListItem[]> {
+    const { data, error } = await supabase.rpc(
+      'get_all_activities_with_session',
+      { p_session_token: sessionToken }
+    );
+    if (error) {
+      console.error('[activitiesService.getAll]', error);
+      throw error;
+    }
+    const result = data as ActivitiesRpcEnvelope<AdminActivityListItem[]> | null;
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to load activities');
+    }
+    return result.data ?? [];
+  },
+
+  async getById(
+    sessionToken: string,
+    activityId: string
+  ): Promise<AdminActivityDetail | null> {
+    const { data, error } = await supabase.rpc(
+      'get_activity_by_id_with_session',
+      { p_session_token: sessionToken, p_activity_id: activityId }
+    );
+    if (error) {
+      console.error('[activitiesService.getById]', error);
+      throw error;
+    }
+    const result = data as ActivitiesRpcEnvelope<AdminActivityDetail> | null;
+    if (!result?.success) {
+      if (result?.error === 'Activity not found') {
+        return null;
+      }
+      throw new Error(result?.error || 'Failed to load activity');
+    }
+    return result.data ?? null;
+  },
+
+  async getSettings(sessionToken: string): Promise<ActivitySettings> {
+    const { data, error } = await supabase.rpc(
+      'get_activity_settings_with_session',
+      { p_session_token: sessionToken }
+    );
+    if (error) {
+      console.error('[activitiesService.getSettings]', error);
+      throw error;
+    }
+    const result = data as ActivitiesRpcEnvelope<ActivitySettings> | null;
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to load activity settings');
+    }
+    return result.data ?? {};
+  },
+
+  getLimits(settings?: ActivitySettings | null): ActivityLimits {
+    const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+      if (!value) return fallback;
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+    };
+
+    return {
+      maxGalleryImages: parsePositiveInt(
+        settings?.max_gallery_images,
+        activitiesService.defaultLimits.maxGalleryImages
+      ),
+      maxYoutubeLinks: parsePositiveInt(
+        settings?.max_youtube_links,
+        activitiesService.defaultLimits.maxYoutubeLinks
+      ),
+    };
+  },
+
+  // ── Admin write RPCs ─────────────────────────────────────
+
+  async create(
+    sessionToken: string,
+    payload: {
+      title: string;
+      slug: string;
+      excerpt?: string | null;
+      description?: string | null;
+      activity_date?: string | null;
+      location?: string | null;
+      is_featured?: boolean;
+      cover_image_url?: string | null;
+      clear_cover?: boolean;
+      cover_storage_provider?: ActivityMediaStorageProvider | null;
+      cover_original_object_key?: string | null;
+      cover_original_filename?: string | null;
+      cover_original_mime_type?: string | null;
+      cover_original_bytes?: number | null;
+      cover_original_width?: number | null;
+      cover_original_height?: number | null;
+      youtube_urls?: string[];
+    }
+  ): Promise<{ success: boolean; activity_id?: string; slug?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('create_activity_with_session', {
+      p_session_token: sessionToken,
+      p_title: payload.title,
+      p_slug: payload.slug,
+      p_excerpt: payload.excerpt ?? null,
+      p_description: payload.description ?? null,
+      p_activity_date: payload.activity_date ?? null,
+      p_location: payload.location ?? null,
+      p_is_featured: payload.is_featured ?? false,
+      p_cover_image_url: payload.cover_image_url ?? null,
+      p_cover_storage_provider: payload.cover_storage_provider ?? null,
+      p_cover_original_object_key: payload.cover_original_object_key ?? null,
+      p_cover_original_filename: payload.cover_original_filename ?? null,
+      p_cover_original_mime_type: payload.cover_original_mime_type ?? null,
+      p_cover_original_bytes: payload.cover_original_bytes ?? null,
+      p_cover_original_width: payload.cover_original_width ?? null,
+      p_cover_original_height: payload.cover_original_height ?? null,
+      p_youtube_urls: payload.youtube_urls ?? [],
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; activity_id?: string; id?: string; slug?: string; error?: string };
+    return result?.success
+      ? { success: true, activity_id: result.activity_id ?? result.id, slug: result.slug }
+      : (result ?? { success: false, error: 'Unknown error' });
+  },
+
+  async update(
+    sessionToken: string,
+    activityId: string,
+    payload: {
+      title?: string;
+      slug?: string;
+      excerpt?: string | null;
+      description?: string | null;
+      activity_date?: string | null;
+      location?: string | null;
+      is_featured?: boolean;
+      cover_image_url?: string | null;
+      clear_cover?: boolean;
+      cover_storage_provider?: ActivityMediaStorageProvider | null;
+      cover_original_object_key?: string | null;
+      cover_original_filename?: string | null;
+      cover_original_mime_type?: string | null;
+      cover_original_bytes?: number | null;
+      cover_original_width?: number | null;
+      cover_original_height?: number | null;
+      youtube_urls?: string[];
+    }
+  ): Promise<{ success: boolean; slug?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('update_activity_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+      p_title: payload.title ?? null,
+      p_slug: payload.slug ?? null,
+      p_excerpt: payload.excerpt ?? null,
+      p_description: payload.description ?? null,
+      p_activity_date: payload.activity_date ?? null,
+      p_location: payload.location ?? null,
+      p_is_featured: payload.is_featured ?? null,
+      p_cover_image_url: payload.cover_image_url ?? null,
+      p_clear_cover: payload.clear_cover ?? false,
+      p_cover_storage_provider: payload.cover_storage_provider ?? null,
+      p_cover_original_object_key: payload.cover_original_object_key ?? null,
+      p_cover_original_filename: payload.cover_original_filename ?? null,
+      p_cover_original_mime_type: payload.cover_original_mime_type ?? null,
+      p_cover_original_bytes: payload.cover_original_bytes ?? null,
+      p_cover_original_width: payload.cover_original_width ?? null,
+      p_cover_original_height: payload.cover_original_height ?? null,
+      p_youtube_urls: payload.youtube_urls ?? null,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; slug?: string; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async publish(
+    sessionToken: string,
+    activityId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('publish_activity_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async unpublish(
+    sessionToken: string,
+    activityId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('unpublish_activity_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async archive(
+    sessionToken: string,
+    activityId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('archive_activity_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async delete(
+    sessionToken: string,
+    activityId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('delete_activity_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async addMedia(
+    sessionToken: string,
+    activityId: string,
+    payload: ActivityGalleryMediaPayload
+  ): Promise<{ success: boolean; media_id?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('add_activity_media_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+      p_storage_url: payload.storage_url,
+      p_storage_provider: payload.storage_provider ?? null,
+      p_original_object_key: payload.original_object_key ?? null,
+      p_original_filename: payload.original_filename ?? null,
+      p_mime_type: payload.mime_type ?? null,
+      p_file_size_bytes: payload.file_size_bytes ?? null,
+      p_width: payload.width ?? null,
+      p_height: payload.height ?? null,
+      p_display_order: payload.display_order ?? 0,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; media_id?: string; id?: string; error?: string };
+    return result?.success
+      ? { success: true, media_id: result.media_id ?? result.id }
+      : (result ?? { success: false, error: 'Unknown error' });
+  },
+
+  async removeMedia(
+    sessionToken: string,
+    mediaId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('remove_activity_media_with_session', {
+      p_session_token: sessionToken,
+      p_media_id: mediaId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async reorderMedia(
+    sessionToken: string,
+    activityId: string,
+    orderedIds: string[]
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('reorder_activity_media_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+      p_media_ids: orderedIds,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async uploadMedia(
+    sessionToken: string,
+    activityId: string,
+    mediaKind: 'cover' | 'gallery',
+    file: File,
+    transform?: {
+      trim?: {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+      } | null;
+    }
+  ): Promise<ActivityMediaUploadResult> {
+    try {
+      const formData = new FormData();
+      formData.set('session_token', sessionToken);
+      formData.set('activity_id', activityId);
+      formData.set('media_kind', mediaKind);
+      formData.set('file', file);
+      if (transform) {
+        formData.set('transform', JSON.stringify(transform));
+      }
+      return await invokeEdgeFormData<ActivityMediaUploadResult>('activity-media-upload', formData);
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Media upload failed.',
+      };
+    }
+  },
+
+  async deleteOriginalObject(
+    sessionToken: string,
+    activityId: string,
+    objectKey: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('activity-media-delete', {
+        body: {
+          session_token: sessionToken,
+          activity_id: activityId,
+          object_key: objectKey,
+        },
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return (data as { success: boolean; error?: string }) ?? { success: false, error: 'Delete failed.' };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Delete failed.',
+      };
+    }
+  },
+
+  async getOriginalDownloadUrl(
+    sessionToken: string,
+    payload: { activityId: string; mediaId?: string | null }
+  ): Promise<ActivityOriginalDownloadResult> {
+    try {
+      const { data, error } = await supabase.functions.invoke('activity-media-original-download', {
+        body: {
+          session_token: sessionToken,
+          activity_id: payload.activityId,
+          media_id: payload.mediaId ?? null,
+        },
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return (data as ActivityOriginalDownloadResult) ?? { success: false, error: 'Download link failed.' };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Download link failed.',
+      };
+    }
+  },
+
+  async updateSetting(
+    sessionToken: string,
+    key: string,
+    value: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('update_activity_setting_with_session', {
+      p_session_token: sessionToken,
+      p_key: key,
+      p_value: value,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  /**
+   * Generate AI-assisted draft content (title, slug, excerpt, description) for
+   * an Activities post. Routes through the `draft-activity-content` edge
+   * function which validates the session token + permission server-side and
+   * loads the AI provider/model/key from `ai_runtime_settings` via service
+   * role. Browser never sees the API key.
+   *
+   * Optional `source_files` (≤ 3 items, JPEG / PNG / PDF) are sent to the
+   * edge function as base64 + mime + name and consumed via OpenAI Responses
+   * API on the server side as additional source material. Caller is
+   * responsible for size limiting before encoding.
+   */
+  async draftContent(
+    sessionToken: string,
+    inputs: {
+      activity_date?: string | null;
+      location?: string | null;
+      participants?: string | null;
+      purpose?: string | null;
+      host?: string | null;
+      highlights?: string | null;
+      outcome?: string | null;
+      additional_notes?: string | null;
+    },
+    sourceFiles?: Array<{ name: string; mime: string; base64: string }>
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    error_code?: ActivityDraftErrorCode;
+    data?: { title: string; slug: string; excerpt: string; description: string };
+  }> {
+    try {
+      const body: Record<string, unknown> = { session_token: sessionToken, inputs };
+      if (Array.isArray(sourceFiles) && sourceFiles.length > 0) {
+        body.source_files = sourceFiles;
+      }
+      const { data, error } = await supabase.functions.invoke('draft-activity-content', {
+        body,
+      });
+      if (error) {
+        return {
+          success: false,
+          error: error.message ?? 'AI drafting failed.',
+          error_code: 'generation_failed',
+        };
+      }
+      const result = data as {
+        success?: boolean;
+        error?: string;
+        error_code?: ActivityDraftErrorCode;
+        data?: { title?: string; slug?: string; excerpt?: string; description?: string };
+      } | null;
+      if (!result?.success || !result.data) {
+        return {
+          success: false,
+          error: result?.error ?? 'AI drafting returned no content.',
+          error_code: result?.error_code ?? 'generation_failed',
+        };
+      }
+      return {
+        success: true,
+        data: {
+          title: typeof result.data.title === 'string' ? result.data.title : '',
+          slug: typeof result.data.slug === 'string' ? result.data.slug : '',
+          excerpt: typeof result.data.excerpt === 'string' ? result.data.excerpt : '',
+          description: typeof result.data.description === 'string' ? result.data.description : '',
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI drafting failed.';
+      return { success: false, error: message, error_code: 'generation_failed' };
+    }
+  },
+
+  /**
+   * Calls `draft-activity-content` in `extract_fields` mode. Sends source
+   * files and returns structured guided-input field values extracted by AI
+   * from the document content. Used for auto-prefill in the AI panel.
+   *
+   * Returns `{ success: true, fields: {...} }` on success where each field
+   * key is only present when the AI was able to determine it from the
+   * documents. Returns `{ success: false, fields: {} }` on any failure —
+   * callers should fall through gracefully (no error surface to the user).
+   */
+  async extractFields(
+    sessionToken: string,
+    sourceFiles: Array<{ name: string; mime: string; base64: string }>
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    error_code?: ActivityDraftErrorCode;
+    fields: {
+      activity_date?: string;
+      activity_date_options?: string[];
+      location?: string;
+      location_options?: string[];
+      participants?: string;
+      host?: string;
+      purpose?: string;
+      highlights?: string;
+      outcome?: string;
+      additional_notes?: string;
+    };
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-activity-content', {
+        body: {
+          session_token: sessionToken,
+          mode: 'extract_fields',
+          source_files: sourceFiles,
+        },
+      });
+      if (error) {
+        return {
+          success: false,
+          error: error.message ?? 'Extraction failed.',
+          error_code: 'generation_failed',
+          fields: {},
+        };
+      }
+      const result = data as {
+        success?: boolean;
+        error?: string;
+        error_code?: ActivityDraftErrorCode;
+        fields?: Record<string, unknown>;
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error ?? 'Extraction returned no content.',
+          error_code: result?.error_code ?? 'generation_failed',
+          fields: {},
+        };
+      }
+      const raw = result.fields ?? {};
+      const readStringArray = (key: string): string[] | undefined => {
+        const value = raw[key];
+        if (!Array.isArray(value)) return undefined;
+        const values = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+        return values.length > 0 ? values : undefined;
+      };
+      return {
+        success: true,
+        fields: {
+          activity_date: typeof raw.activity_date === 'string' ? raw.activity_date : undefined,
+          activity_date_options: readStringArray('activity_date_options'),
+          location: typeof raw.location === 'string' ? raw.location : undefined,
+          location_options: readStringArray('location_options'),
+          participants: typeof raw.participants === 'string' ? raw.participants : undefined,
+          host: typeof raw.host === 'string' ? raw.host : undefined,
+          purpose: typeof raw.purpose === 'string' ? raw.purpose : undefined,
+          highlights: typeof raw.highlights === 'string' ? raw.highlights : undefined,
+          outcome: typeof raw.outcome === 'string' ? raw.outcome : undefined,
+          additional_notes: typeof raw.additional_notes === 'string' ? raw.additional_notes : undefined,
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Extraction failed.';
+      return { success: false, error: message, error_code: 'generation_failed', fields: {} };
+    }
+  },
+
+  // ── Derived helpers ──────────────────────────────────────
+
+  /** Compute summary metrics from a list returned by getAll(). */
+  computeMetrics(items: AdminActivityListItem[]): ActivitySummaryMetrics {
+    const total = items.length;
+    const published = items.filter((a) => a.status === 'published').length;
+    const drafts = items.filter((a) => a.status === 'draft').length;
+    const archived = items.filter((a) => a.status === 'archived').length;
+    const featured = items.filter((a) => a.is_featured).length;
+    const total_photos = items.reduce((sum, a) => sum + (a.media_count ?? 0), 0);
+    const publishedItems = items.filter((a) => a.published_at);
+    publishedItems.sort((a, b) =>
+      (b.published_at ?? '').localeCompare(a.published_at ?? '')
+    );
+    const last_published_at = publishedItems.length > 0 ? publishedItems[0].published_at : null;
+    return { total, published, drafts, archived, featured, total_photos, last_published_at };
+  },
+};
+
+// ─── Roles & Privileges Types ────────────────────────────────────────────────
+
+export interface RoleCatalog {
+  name: string;
+  display_name: string;
+  description: string | null;
+  is_system: boolean;
+  is_paused: boolean;
+  sort_order: number;
+  created_by: string | null;
+  permission_count: number;
+  user_count: number;
+}
+
+export interface UserSearchResult {
+  user_id: string;
+  email: string;
+  mobile_number: string | null;
+  account_type: string;
+  current_role: string | null;
+  role_record_id: string | null;
+  full_name: string | null;
+  company_name: string | null;
+}
+
+export interface RolePermissionItem {
+  code: string;
+  name: string;
+  category: string;
+  description: string | null;
+  is_granted: boolean;
+}
+
+export interface PermissionCatalogItem {
+  code: string;
+  name: string;
+  description: string | null;
+  category: string;
+}
+
+export interface UserWithRole {
+  user_id: string;
+  email: string;
+  account_type: string;
+  role: string | null;
+  role_record_id: string | null;
+  override_count: number;
+}
+
+export interface UserPermissionOverride {
+  id: string;
+  permission_code: string;
+  permission_name: string;
+  category: string;
+  override_type: 'grant' | 'revoke';
+  reason: string | null;
+  created_at: string;
+}
+
+export interface UserEffectivePermission {
+  code: string;
+  name: string;
+  category: string;
+  source: 'role' | 'grant';
+}
+
+export interface RolesMetrics {
+  total_roles: number;
+  users_with_overrides: number;
+  total_overrides: number;
+  users_per_role: Record<string, number>;
+}
+
+export interface RolesManagementAccess {
+  can_manage: boolean;
+  can_view: boolean;
+  is_super_admin: boolean;
+}
+
+// ─── Roles Service ────────────────────────────────────────────────────────────
+
+export const rolesService = {
+  async listRoles(sessionToken: string): Promise<RoleCatalog[]> {
+    const { data, error } = await supabase.rpc('list_roles_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: RoleCatalog[]; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to list roles');
+    return result.data ?? [];
+  },
+
+  async listRolePermissions(sessionToken: string, roleName: string): Promise<RolePermissionItem[]> {
+    const { data, error } = await supabase.rpc('list_role_permissions_with_session', {
+      p_session_token: sessionToken,
+      p_role_name: roleName,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: RolePermissionItem[]; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to list role permissions');
+    return result.data ?? [];
+  },
+
+  async listPermissionsCatalog(sessionToken: string): Promise<PermissionCatalogItem[]> {
+    const { data, error } = await supabase.rpc('list_permissions_catalog_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: PermissionCatalogItem[]; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to list permissions');
+    return result.data ?? [];
+  },
+
+  async listUsersWithRoles(sessionToken: string): Promise<UserWithRole[]> {
+    const { data, error } = await supabase.rpc('list_users_with_roles_for_admin_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: UserWithRole[]; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to list users');
+    return result.data ?? [];
+  },
+
+  async getUserPermissionOverrides(sessionToken: string, targetUserId: string): Promise<UserPermissionOverride[]> {
+    const { data, error } = await supabase.rpc('get_user_permission_overrides_with_session', {
+      p_session_token: sessionToken,
+      p_target_user_id: targetUserId,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: UserPermissionOverride[]; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to get overrides');
+    return result.data ?? [];
+  },
+
+  async getUserEffectivePermissions(sessionToken: string, targetUserId: string): Promise<{ permissions: UserEffectivePermission[]; role: string | null }> {
+    const { data, error } = await supabase.rpc('get_user_effective_permissions_with_session', {
+      p_session_token: sessionToken,
+      p_target_user_id: targetUserId,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: UserEffectivePermission[]; role?: string | null; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to get effective permissions');
+    return { permissions: result.data ?? [], role: result.role ?? null };
+  },
+
+  async getMetrics(sessionToken: string): Promise<RolesMetrics> {
+    const { data, error } = await supabase.rpc('get_roles_metrics_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string } & RolesMetrics;
+    if (!result.success) throw new Error(result.error ?? 'Failed to get metrics');
+    return {
+      total_roles: result.total_roles,
+      users_with_overrides: result.users_with_overrides,
+      total_overrides: result.total_overrides,
+      users_per_role: result.users_per_role,
+    };
+  },
+
+  async grantRolePermission(sessionToken: string, role: string, permissionCode: string): Promise<void> {
+    const { data, error } = await supabase.rpc('grant_role_permission_with_session', {
+      p_session_token: sessionToken,
+      p_role: role,
+      p_permission_code: permissionCode,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to grant permission');
+  },
+
+  async revokeRolePermission(sessionToken: string, role: string, permissionCode: string): Promise<void> {
+    const { data, error } = await supabase.rpc('revoke_role_permission_with_session', {
+      p_session_token: sessionToken,
+      p_role: role,
+      p_permission_code: permissionCode,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to revoke permission');
+  },
+
+  async addUserGrantOverride(sessionToken: string, targetUserId: string, permissionCode: string, reason?: string): Promise<void> {
+    const { data, error } = await supabase.rpc('add_user_grant_override_with_session', {
+      p_session_token: sessionToken,
+      p_target_user_id: targetUserId,
+      p_permission_code: permissionCode,
+      p_reason: reason ?? null,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to add grant override');
+  },
+
+  async addUserRevokeOverride(sessionToken: string, targetUserId: string, permissionCode: string, reason?: string): Promise<void> {
+    const { data, error } = await supabase.rpc('add_user_revoke_override_with_session', {
+      p_session_token: sessionToken,
+      p_target_user_id: targetUserId,
+      p_permission_code: permissionCode,
+      p_reason: reason ?? null,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to add revoke override');
+  },
+
+  async removeUserOverride(sessionToken: string, overrideId: string): Promise<void> {
+    const { data, error } = await supabase.rpc('remove_user_permission_override_with_session', {
+      p_session_token: sessionToken,
+      p_override_id: overrideId,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to remove override');
+  },
+
+  async clearUserOverrides(sessionToken: string, targetUserId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('clear_user_permission_overrides_with_session', {
+      p_session_token: sessionToken,
+      p_target_user_id: targetUserId,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; deleted_count?: number; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to clear overrides');
+    return result.deleted_count ?? 0;
+  },
+
+  async checkManagementAccess(sessionToken: string): Promise<RolesManagementAccess> {
+    const { data, error } = await supabase.rpc('check_roles_management_access_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string } & RolesManagementAccess;
+    if (!result.success) throw new Error(result.error ?? 'Failed to check access');
+    return {
+      can_manage: result.can_manage,
+      can_view: result.can_view,
+      is_super_admin: result.is_super_admin,
+    };
+  },
+
+  // ─── Custom role lifecycle ────────────────────────────────────────────────
+
+  async createRole(
+    sessionToken: string,
+    name: string,
+    displayName: string,
+    description?: string,
+  ): Promise<{ name: string }> {
+    const { data, error } = await supabase.rpc('create_role_with_session', {
+      p_session_token: sessionToken,
+      p_name: name,
+      p_display_name: displayName,
+      p_description: description ?? null,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; name?: string; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to create role');
+    return { name: result.name ?? name };
+  },
+
+  async updateRole(
+    sessionToken: string,
+    roleName: string,
+    updates: { display_name?: string; description?: string | null },
+  ): Promise<void> {
+    const { data, error } = await supabase.rpc('update_role_with_session', {
+      p_session_token: sessionToken,
+      p_role_name: roleName,
+      p_display_name: updates.display_name ?? null,
+      p_description: updates.description ?? null,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to update role');
+  },
+
+  async cloneRole(
+    sessionToken: string,
+    sourceRole: string,
+    newName: string,
+    newDisplayName: string,
+    newDescription?: string,
+  ): Promise<{ name: string; permissions_copied: number }> {
+    const { data, error } = await supabase.rpc('clone_role_with_session', {
+      p_session_token: sessionToken,
+      p_source_role: sourceRole,
+      p_new_name: newName,
+      p_new_display: newDisplayName,
+      p_new_description: newDescription ?? null,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; name?: string; permissions_copied?: number; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to clone role');
+    return { name: result.name ?? newName, permissions_copied: result.permissions_copied ?? 0 };
+  },
+
+  async pauseRole(sessionToken: string, roleName: string): Promise<void> {
+    const { data, error } = await supabase.rpc('pause_role_with_session', {
+      p_session_token: sessionToken,
+      p_role_name: roleName,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to pause role');
+  },
+
+  async unpauseRole(sessionToken: string, roleName: string): Promise<void> {
+    const { data, error } = await supabase.rpc('unpause_role_with_session', {
+      p_session_token: sessionToken,
+      p_role_name: roleName,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to unpause role');
+  },
+
+  async deleteRole(sessionToken: string, roleName: string): Promise<void> {
+    const { data, error } = await supabase.rpc('delete_role_with_session', {
+      p_session_token: sessionToken,
+      p_role_name: roleName,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to delete role');
+  },
+
+  // ─── User-role assignment ─────────────────────────────────────────────────
+
+  async assignUserRole(
+    sessionToken: string,
+    targetUserId: string,
+    roleName: string,
+  ): Promise<void> {
+    const { data, error } = await supabase.rpc('assign_user_role_with_session', {
+      p_session_token: sessionToken,
+      p_target_user_id: targetUserId,
+      p_role_name: roleName,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to assign role');
+  },
+
+  async changeUserRole(
+    sessionToken: string,
+    roleRecordId: string,
+    newRoleName: string,
+  ): Promise<void> {
+    const { data, error } = await supabase.rpc('change_user_role_with_session', {
+      p_session_token: sessionToken,
+      p_role_record_id: roleRecordId,
+      p_new_role_name: newRoleName,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to change role');
+  },
+
+  async removeUserRoleSafe(sessionToken: string, roleRecordId: string): Promise<void> {
+    const { data, error } = await supabase.rpc('remove_user_role_safe_with_session', {
+      p_session_token: sessionToken,
+      p_role_record_id: roleRecordId,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to remove role');
+  },
+
+  async searchUsersForRoleAssignment(
+    sessionToken: string,
+    query: string,
+    limit = 25,
+  ): Promise<UserSearchResult[]> {
+    const { data, error } = await supabase.rpc('search_users_for_role_assignment_with_session', {
+      p_session_token: sessionToken,
+      p_query: query,
+      p_limit: limit,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; data?: UserSearchResult[]; error?: string };
+    if (!result.success) throw new Error(result.error ?? 'Failed to search users');
+    return result.data ?? [];
+  },
 };
 
 // Leadership Service
