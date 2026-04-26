@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -10,7 +10,8 @@ import {
   Shield,
   BarChart3,
   LogOut,
-  PanelLeftClose
+  PanelLeftClose,
+  Image,
 } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -39,6 +40,7 @@ import { ChevronRight } from "lucide-react";
 import { useAdmin } from "../../contexts/useAdmin";
 import { useOrganisationProfile } from "../../hooks/useOrganisationProfile";
 import { logoutService } from "../../lib/logoutService";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface NavChild {
   label: string;
@@ -51,6 +53,8 @@ interface NavSection {
   icon: React.ComponentType<{ className?: string }>;
   children: NavChild[];
   disabled?: boolean;
+  /** If set, section is only shown when the user has this permission code. */
+  requiredPermission?: string;
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -60,20 +64,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { pendingRegistrationsCount, pendingCitiesCount } = useAdmin();
   const { profile: orgProfile } = useOrganisationProfile();
 
+  // Permission checks for sidebar section visibility
+  // Fail-closed: hooks return false while loading, so sections hide until resolved
+  const canViewMembers      = useHasPermission('members.view');
+  const canViewLocations    = useHasPermission('locations.states.manage');
+  const canViewOrganization = useHasPermission('organization.profile.edit');
+  const canViewSettings     = useHasPermission('settings.forms.view');
+  const canViewAdmin        = useHasPermission('users.edit');
+  const canViewContent      = useHasPermission('activities.view');
+
   // Close mobile sidebar on navigation
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
   }, [location.pathname, isMobile, setOpenMobile]);
 
-  const navSections: NavSection[] = [
+  const allSections: NavSection[] = useMemo(() => [
     {
       label: "Dashboard",
       icon: LayoutDashboard,
       children: [{ label: "Overview", path: "/admin/dashboard" }]
     },
     {
+      label: "Events & Activities",
+      icon: Image,
+      requiredPermission: "activities.view",
+      children: [
+        { label: "Activities", path: "/admin/content/activities" }
+      ]
+    },
+    {
       label: "Members",
       icon: Users,
+      requiredPermission: "members.view",
       children: [
         {
           label: "Registrations",
@@ -88,6 +110,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       label: "Locations",
       icon: MapPin,
+      requiredPermission: "locations.states.manage",
       children: [
         { label: "States", path: "/admin/locations/states" },
         { label: "Cities", path: "/admin/locations/cities" },
@@ -102,6 +125,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       label: "Organization",
       icon: Building2,
+      requiredPermission: "organization.profile.edit",
       children: [
         { label: "Profile", path: "/admin/organization/profile" },
         { label: "Designations", path: "/admin/organization/designations" }
@@ -110,6 +134,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       label: "Settings",
       icon: Settings,
+      requiredPermission: "settings.forms.view",
       children: [
         { label: "Settings Hub", path: "/admin/settings" },
         { label: "Form Configuration", path: "/admin/settings/forms" },
@@ -123,7 +148,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       label: "Administration",
       icon: Shield,
-      children: [{ label: "Users", path: "/admin/administration/users" }]
+      requiredPermission: "users.edit",
+      children: [
+        { label: "Users", path: "/admin/administration/users" },
+        { label: "Roles & Privileges", path: "/admin/administration/roles" },
+      ]
     },
     {
       label: "Analytics",
@@ -131,7 +160,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       disabled: true,
       children: [{ label: "Coming Soon", path: "#" }]
     }
-  ];
+  ], [pendingRegistrationsCount, pendingCitiesCount]);
+
+  // Build permission map so we can filter without calling hooks in a loop
+  const permissionMap: Record<string, boolean> = useMemo(() => ({
+    'members.view': canViewMembers,
+    'locations.states.manage': canViewLocations,
+    'organization.profile.edit': canViewOrganization,
+    'settings.forms.view': canViewSettings,
+    'users.edit': canViewAdmin,
+    'activities.view': canViewContent,
+  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent]);
+
+  const navSections = useMemo(
+    () =>
+      allSections.filter((s) =>
+        s.requiredPermission === undefined ? true : permissionMap[s.requiredPermission] === true
+      ),
+    [allSections, permissionMap]
+  );
 
   // Determine which section is active based on current path
   const activeSectionLabel = navSections.find((s) =>

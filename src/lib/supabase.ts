@@ -5134,6 +5134,7 @@ export interface AdminActivityListItem {
   activity_date: string | null;
   location: string | null;
   cover_image_url: string | null;
+  first_media_url?: string | null;
   published_at: string | null;
   created_at: string;
   created_by_name: string | null;

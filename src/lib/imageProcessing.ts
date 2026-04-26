@@ -104,6 +104,94 @@ export async function processProfilePhoto(
   return compressedBlob;
 }
 
+/**
+ * Generic crop + compress for any aspect ratio / output size.
+ * Used by activity cover images and gallery photos.
+ */
+export async function cropAndCompressImage(
+  imageSrc: string,
+  pixelCrop: CroppedAreaPixels,
+  outputWidth: number,
+  outputHeight: number
+): Promise<Blob> {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) throw new Error('Failed to get canvas context');
+
+  canvas.width = outputWidth;
+  canvas.height = outputHeight;
+
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    outputWidth,
+    outputHeight
+  );
+
+  const rawBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) { reject(new Error('Canvas is empty')); return; }
+        resolve(blob);
+      },
+      'image/jpeg',
+      0.92
+    );
+  });
+
+  return compressImage(rawBlob);
+}
+
+/**
+ * Resize + compress a source image to JPEG without cropping.
+ * Used when admin uploads gallery photos in "Original" ratio mode — the asset
+ * keeps its native aspect ratio but is downscaled to a sensible max edge and
+ * re-encoded as JPEG so we never store full-resolution phone snaps.
+ */
+export async function compressImageOnly(
+  source: Blob | File,
+  options?: {
+    maxEdge?: number;     // default 1600
+    quality?: number;     // default 0.88 (initialQuality)
+    targetMaxMB?: number; // default 0.5 MB
+  }
+): Promise<Blob> {
+  const maxEdge = options?.maxEdge ?? 1600;
+  const quality = options?.quality ?? 0.88;
+  const targetMaxMB = options?.targetMaxMB ?? 0.5;
+
+  const compressionOptions = {
+    maxSizeMB: targetMaxMB,
+    maxWidthOrHeight: maxEdge,
+    useWebWorker: true,
+    fileType: 'image/jpeg',
+    initialQuality: quality,
+  };
+
+  try {
+    const compressed = await imageCompression(source as File, compressionOptions);
+    if (compressed.size > targetMaxMB * 1024 * 1024) {
+      // Second-pass tighten if still over target
+      return await imageCompression(compressed, {
+        ...compressionOptions,
+        maxSizeMB: Math.max(0.3, targetMaxMB * 0.8),
+        initialQuality: Math.max(0.7, quality - 0.05),
+      });
+    }
+    return compressed;
+  } catch (error) {
+    console.error('Error compressing image (no-crop):', error);
+    throw new Error('Failed to compress image');
+  }
+}
+
 export function generatePhotoFileName(): string {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');

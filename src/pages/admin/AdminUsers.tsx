@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Filter, Mail, Phone, Shield, Lock, ChevronUp, ChevronDown, MoreHorizontal, Edit3, Ban, Trash2, ShieldCheck } from 'lucide-react';
 import { PermissionGate } from '../../components/permissions/PermissionGate';
-import { supabase } from '../../lib/supabase';
+import { rolesService, supabase, type RoleCatalog } from '../../lib/supabase';
+import { sessionManager } from '../../lib/sessionManager';
 import Toast from '../../components/Toast';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useHasPermission } from '../../hooks/usePermissions';
@@ -44,6 +45,7 @@ const AdminUsers: React.FC = () => {
   const [accountTypeFilter, setAccountTypeFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [roleCatalog, setRoleCatalog] = useState<RoleCatalog[]>([]);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -70,6 +72,16 @@ const AdminUsers: React.FC = () => {
   const loadUsers = useCallback(async () => {
     try {
       setIsLoading(true);
+
+      const sessionToken = sessionManager.getSessionToken();
+      if (sessionToken) {
+        try {
+          const roles = await rolesService.listRoles(sessionToken);
+          setRoleCatalog(roles);
+        } catch (roleCatalogError) {
+          console.error('[AdminUsers] Error loading roles catalog:', roleCatalogError);
+        }
+      }
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
@@ -215,19 +227,14 @@ const AdminUsers: React.FC = () => {
   };
 
   const formatRoleName = (role: string): string => {
-    const roleNames: Record<string, string> = {
-      'super_admin': 'Super Admin',
-      'admin': 'Admin',
-      'editor': 'Editor',
-      'viewer': 'Viewer',
-      'state_president': 'State President',
-      'state_general_secretary': 'State General Secretary',
-      'district_president': 'District President',
-      'district_general_secretary': 'District General Secretary',
-      'it_division_head': 'IT Division Head',
-      'accounts_head': 'Accounts Head'
-    };
-    return roleNames[role] || role;
+    const match = roleCatalog.find((catalogRole) => catalogRole.name === role);
+    if (match) {
+      return match.display_name;
+    }
+
+    return role
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   };
 
   const getAccountTypeDisplay = (user: User): string => {
@@ -300,7 +307,7 @@ const AdminUsers: React.FC = () => {
     <PermissionGate
       permission="users.view"
       fallback={
-        <div className="flex items-center justify-center p-8">
+        <div className="flex items-center justify-center py-16">
           <div className="text-center">
             <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Lock className="w-10 h-10 text-destructive" />
@@ -319,7 +326,7 @@ const AdminUsers: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6">
+      <div>
         <Toast
           type={toast.type}
           message={toast.message}

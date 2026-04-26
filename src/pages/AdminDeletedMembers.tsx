@@ -148,7 +148,7 @@ const AdminDeletedMembers: React.FC = () => {
       permission="members.restore"
       fallback={
         <div className="py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+          <div className="max-w-7xl mx-auto py-8 text-center">
             <Lock className="w-16 h-16 text-destructive/70 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Restricted</h2>
             <p className="text-muted-foreground">Only users with restore permissions can access the deleted members archive.</p>
@@ -156,7 +156,7 @@ const AdminDeletedMembers: React.FC = () => {
         </div>
       }
     >
-    <div className="p-6">
+    <div>
       <Toast
         type={toast.type}
         message={toast.message}

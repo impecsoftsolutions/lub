@@ -201,7 +201,7 @@ const AdminAppearanceSettings: React.FC = () => {
     (THEMES.find((t) => t.id === activeTheme)?.swatches.primary ?? '#1e293b');
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="max-w-4xl">
       <PageHeader
         title="Theme"
         subtitle="Customise the colour theme, brand colour, corner style, and display mode for the admin portal"

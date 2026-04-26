@@ -258,7 +258,7 @@ const AdminNormalizationSettings: React.FC = () => {
     <PermissionGate
       permission="settings.normalization.view"
       fallback={
-        <div className="p-6">
+        <div>
           <PageHeader
             title="Normalization Rules"
             subtitle="You do not have permission to view normalization configuration."
@@ -266,7 +266,7 @@ const AdminNormalizationSettings: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         <Link
           to="/admin/settings"
           className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"

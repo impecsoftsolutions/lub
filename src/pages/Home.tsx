@@ -31,10 +31,10 @@ const Home: React.FC = () => {
                 </Link>
               )}
               <Link
-                to="/members"
+                to="/activities"
                 className="border-2 border-white text-white hover:bg-white hover:text-blue-900 px-8 py-3 rounded-lg font-semibold text-lg transition-colors duration-200"
               >
-                Explore Directory
+                Explore Activities
               </Link>
             </div>
           </div>

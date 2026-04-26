@@ -116,7 +116,7 @@ const AdminSettingsHub: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div>
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <span className="ml-3 text-sm text-muted-foreground">Loading settings hub...</span>
@@ -126,7 +126,7 @@ const AdminSettingsHub: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Settings Hub"
         subtitle="Choose an area to configure portal-level settings."

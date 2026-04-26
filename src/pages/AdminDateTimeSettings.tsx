@@ -125,7 +125,7 @@ const AdminDateTimeSettings: React.FC = () => {
     <PermissionGate
       permission="settings.datetime.view"
       fallback={
-        <div className="p-6">
+        <div>
           <PageHeader
             title="Date & Time Settings"
             subtitle="You do not have permission to view global date and time display settings."
@@ -133,7 +133,7 @@ const AdminDateTimeSettings: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         <Link
           to="/admin/settings"
           className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"

@@ -230,7 +230,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8">
+      <div>
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -247,7 +247,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
     <PermissionGate
       permission="settings.forms.view"
       fallback={
-        <div className="flex items-center justify-center p-8">
+        <div className="flex items-center justify-center">
           <div className="text-center">
             <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
@@ -256,7 +256,7 @@ const AdminFormFieldConfiguration: React.FC = () => {
         </div>
       }
     >
-      <div className="p-8">
+      <div>
       <Toast
         type={toast.type}
         message={toast.message}

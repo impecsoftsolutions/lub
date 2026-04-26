@@ -30,7 +30,7 @@ const AdminDashboardOverview: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6">
+      <div>
       <PageHeader
         title="Dashboard"
         subtitle="Overview of your organisation's membership activity"

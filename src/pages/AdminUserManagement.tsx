@@ -227,7 +227,7 @@ const AdminUserManagement: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6">
+      <div>
         <Toast
           type={toast.type}
           message={toast.message}

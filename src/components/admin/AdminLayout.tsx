@@ -3,15 +3,20 @@ import { useEffect, useState } from 'react';
 import { sessionManager } from '../../lib/sessionManager';
 import { customAuth } from '../../lib/customAuth';
 import { logoutService } from '../../lib/logoutService';
+import { permissionService } from '../../lib/permissionService';
 import { LogOut } from 'lucide-react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { Separator } from '@/components/ui/separator';
 
+type AuthState =
+  | { status: 'loading' }
+  | { status: 'unauthenticated' }
+  | { status: 'authenticated-unauthorized' }
+  | { status: 'authorized'; userEmail: string };
+
 export function AdminLayout() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState('');
+  const [authState, setAuthState] = useState<AuthState>({ status: 'loading' });
 
   useEffect(() => {
     let isMounted = true;
@@ -22,16 +27,14 @@ export function AdminLayout() {
 
         if (!sessionToken) {
           if (!isMounted) return;
-          setIsAuthenticated(false);
-          setIsLoading(false);
+          setAuthState({ status: 'unauthenticated' });
           return;
         }
 
         if (sessionManager.isSessionExpired()) {
           sessionManager.clearSession();
           if (!isMounted) return;
-          setIsAuthenticated(false);
-          setIsLoading(false);
+          setAuthState({ status: 'unauthenticated' });
           return;
         }
 
@@ -40,22 +43,36 @@ export function AdminLayout() {
         if (!isMounted) return;
 
         if (!userData) {
-          setIsAuthenticated(false);
-          setIsLoading(false);
+          setAuthState({ status: 'unauthenticated' });
           return;
         }
 
-        const hasAdminAccess =
+        // Primary gate: account_type
+        // Secondary gate: portal.admin_access permission (enables pure-member accounts
+        // with explicit portal access grant to enter the admin shell)
+        const accountTypeAccess =
           userData.account_type === 'admin' ||
           userData.account_type === 'both';
 
-        setIsAuthenticated(hasAdminAccess);
-        setUserEmail(userData.email || '');
-        setIsLoading(false);
+        let hasAdminAccess = accountTypeAccess;
+        if (!accountTypeAccess) {
+          hasAdminAccess = await permissionService.hasPermission(userData.id, 'portal.admin_access');
+        }
+
+        if (!isMounted) return;
+
+        if (hasAdminAccess) {
+          setAuthState({ status: 'authorized', userEmail: userData.email || '' });
+        } else {
+          // Authenticated but lacks admin access — send to member dashboard.
+          // Redirecting to /signin here would loop: SignIn re-reads the stored
+          // pre-signin route and sends the user right back to /admin/*.
+          setAuthState({ status: 'authenticated-unauthorized' });
+        }
       } catch (error) {
         console.error('Auth check failed:', error);
-        setIsAuthenticated(false);
-        setIsLoading(false);
+        if (!isMounted) return;
+        setAuthState({ status: 'unauthenticated' });
       }
     };
 
@@ -70,7 +87,7 @@ export function AdminLayout() {
     await logoutService.logoutAdmin();
   };
 
-  if (isLoading) {
+  if (authState.status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
         <div className="text-center">
@@ -81,9 +98,15 @@ export function AdminLayout() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (authState.status === 'unauthenticated') {
     return <Navigate to="/signin" replace />;
   }
+
+  if (authState.status === 'authenticated-unauthorized') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const userEmail = authState.userEmail;
 
   return (
     <SidebarProvider>
@@ -106,7 +129,7 @@ export function AdminLayout() {
           </div>
         </header>
         {/* Page content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto p-4 sm:p-6">
           <Outlet />
         </div>
       </SidebarInset>

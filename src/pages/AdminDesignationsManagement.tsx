@@ -853,7 +853,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
 
   return (
-    <div className="p-6">
+    <div>
       <Toast
         type={toast.type}
         message={toast.message}

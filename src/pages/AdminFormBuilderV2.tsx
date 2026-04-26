@@ -200,7 +200,7 @@ const AdminFormBuilderV2: React.FC = () => {
     <PermissionGate
       permission="settings.forms.view"
       fallback={
-        <div className="flex items-center justify-center p-8 text-center">
+        <div className="flex items-center justify-center py-16 text-center">
           <div>
             <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
@@ -209,7 +209,7 @@ const AdminFormBuilderV2: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Toast type={toast.type} message={toast.message} isVisible={toast.isVisible} onClose={hideToast} />
 
         <div className="mb-4 flex items-center justify-between">

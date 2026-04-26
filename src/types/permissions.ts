@@ -111,7 +111,7 @@ export interface ExtendedUser extends User {
    *
    * @example 'super_admin', 'admin', 'editor', 'viewer', or null
    */
-  primaryRole: 'super_admin' | 'admin' | 'editor' | 'viewer' | null;
+  primaryRole: 'super_admin' | 'admin' | 'manager' | 'editor' | 'viewer' | null;
 }
 
 /**

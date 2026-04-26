@@ -177,7 +177,7 @@ export default function AdminPendingCities() {
     <PermissionGate
       permission="locations.cities.view"
       fallback={
-        <div className="flex items-center justify-center p-8">
+        <div className="flex items-center justify-center py-16">
           <div className="text-center">
             <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
@@ -186,7 +186,7 @@ export default function AdminPendingCities() {
         </div>
       }
     >
-      <div className="p-6">
+      <div>
       <div>
         <PageHeader
           title="Pending Cities Review"

@@ -51,12 +51,13 @@ const cache: PermissionCacheStore = {};
  */
 function calculatePrimaryRole(
   roles: UserRole[]
-): 'super_admin' | 'admin' | 'editor' | 'viewer' | null {
+): 'super_admin' | 'admin' | 'manager' | 'editor' | 'viewer' | null {
   if (!roles || roles.length === 0) return null;
 
   const priority: Record<string, number> = {
-    super_admin: 4,
-    admin: 3,
+    super_admin: 5,
+    admin: 4,
+    manager: 3,
     editor: 2,
     viewer: 1,
   };
@@ -300,7 +301,7 @@ export const permissionService = {
    *   // Show all features
    * }
    */
-  async getCurrentUserRole(): Promise<'super_admin' | 'admin' | 'editor' | 'viewer' | null> {
+  async getCurrentUserRole(): Promise<'super_admin' | 'admin' | 'manager' | 'editor' | 'viewer' | null> {
     try {
       // Get current user from session
       const user = await customAuth.getCurrentUserFromSession();

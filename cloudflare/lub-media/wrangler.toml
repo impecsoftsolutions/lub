@@ -1,0 +1,15 @@
+name = "lub-media"
+main = "src/index.ts"
+compatibility_date = "2026-04-20"
+workers_dev = false
+
+routes = [
+  { pattern = "media.lub.org.in/*", zone_name = "lub.org.in" }
+]
+
+[[r2_buckets]]
+binding = "MEDIA_ORIGINALS"
+bucket_name = "lub"
+
+[images]
+binding = "IMAGES"

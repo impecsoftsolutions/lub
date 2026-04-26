@@ -151,7 +151,7 @@ const AdminAISettings: React.FC = () => {
     <PermissionGate
       permission="settings.ai.view"
       fallback={
-        <div className="p-6">
+        <div>
           <PageHeader
             title="AI Settings"
             subtitle="You do not have permission to view AI runtime configuration."
@@ -159,7 +159,7 @@ const AdminAISettings: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         <Link
           to="/admin/settings"
           className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"

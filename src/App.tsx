@@ -1,11 +1,14 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Directory from './pages/Directory';
 import Events from './pages/Events';
 import News from './pages/News';
-import Activities from './pages/Activities';
+import ActivityDetail from './pages/ActivityDetail';
+import AdminActivities from './pages/AdminActivities';
+import AdminActivityForm from './pages/AdminActivityForm';
+import AdminActivitySettings from './pages/AdminActivitySettings';
 import Leadership from './pages/Leadership';
 import Join from './pages/Join';
 import MembershipBenefits from './pages/MembershipBenefits';
@@ -24,6 +27,7 @@ import MemberSettings from './pages/MemberSettings';
 import AdminRegistrations from './pages/AdminRegistrations';
 import AdminProfileSettings from './pages/AdminProfileSettings';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminRolesPrivileges from './pages/AdminRolesPrivileges';
 import AdminStateManagement from './pages/AdminStateManagement';
 import AdminLocationManagement from './pages/AdminLocationManagement';
 import AdminDesignationsManagement from './pages/AdminDesignationsManagement';
@@ -59,6 +63,11 @@ import { DateTimeFormatBootstrap } from './components/DateTimeFormatBootstrap';
 applyStoredTheme();
 
 const LAST_NON_SIGNIN_ROUTE_KEY = 'lub:last_non_signin_route';
+
+function ActivitySlugRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/events/${slug ?? ''}`} replace />;
+}
 
 function RouteHistoryTracker() {
   const location = useLocation();
@@ -115,8 +124,10 @@ function App() {
             <Route path="/members" element={<Directory />} />
             <Route path="/member/:id/:companySlug/:nameSlug" element={<MemberProfile />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/events/:slug" element={<ActivityDetail />} />
             <Route path="/news" element={<News />} />
-            <Route path="/activities" element={<Activities />} />
+            <Route path="/activities" element={<Navigate to="/events" replace />} />
+            <Route path="/activities/:slug" element={<ActivitySlugRedirect />} />
             <Route path="/leadership" element={<Leadership />} />
             <Route path="/join" element={<Join />} />
             <Route path="/membership-benefits" element={<MembershipBenefits />} />
@@ -188,6 +199,13 @@ function App() {
             <Route path="/admin/settings/ai" element={<AdminAISettings />} />
 
             <Route path="/admin/administration/users" element={<AdminUsers />} />
+            <Route path="/admin/administration/roles" element={<AdminRolesPrivileges />} />
+
+            {/* Content — Activities CMS */}
+            <Route path="/admin/content/activities" element={<AdminActivities />} />
+            <Route path="/admin/content/activities/new" element={<AdminActivityForm />} />
+            <Route path="/admin/content/activities/:id/edit" element={<AdminActivityForm />} />
+            <Route path="/admin/content/activities/settings" element={<AdminActivitySettings />} />
           </Route>
           </Routes>
           </MemberContextProvider>

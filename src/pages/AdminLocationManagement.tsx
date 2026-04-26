@@ -370,7 +370,7 @@ const AdminLocationManagement: React.FC = () => {
     <PermissionGate
       permission="locations.districts.view"
       fallback={
-        <div className="flex items-center justify-center p-8">
+        <div className="flex items-center justify-center py-16">
           <div className="text-center">
             <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
@@ -387,7 +387,7 @@ const AdminLocationManagement: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto">
         {/* Back to State Management Button */}
         <div className="mb-6">
           <button

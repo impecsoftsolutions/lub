@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Shield, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { userRolesService } from '../../../lib/supabase';
+import {
+  rolesService,
+  type RoleCatalog,
+  type UserRole,
+  userRolesService,
+} from '../../../lib/supabase';
+import { sessionManager } from '../../../lib/sessionManager';
 
-type AssignableRole = 'super_admin' | 'admin' | 'editor' | 'viewer';
-type RoleSelection = AssignableRole | 'remove_role' | '';
+type RoleSelection = string;
 
 interface CurrentRole {
   id: string;
@@ -23,40 +28,21 @@ interface AssignRoleModalProps {
   currentRole: CurrentRole | null;
 }
 
-const ROLE_OPTIONS: Array<{ value: AssignableRole; label: string; description: string }> = [
-  {
-    value: 'super_admin',
-    label: 'Super Admin',
-    description: 'Full control over the entire portal and permission system.'
-  },
-  {
-    value: 'admin',
-    label: 'Admin',
-    description: 'Operational access across members, locations, payments, and roles.'
-  },
-  {
-    value: 'editor',
-    label: 'Editor',
-    description: 'Edit-focused access for members, documents, and organization data.'
-  },
-  {
-    value: 'viewer',
-    label: 'Viewer',
-    description: 'Read-only access for admin-facing data.'
-  }
-];
+const REMOVE_ROLE = 'remove_role';
 
-const formatRoleLabel = (role: string | null | undefined): string => {
+const formatRoleLabel = (role: string | null | undefined, roles: RoleCatalog[]): string => {
   if (!role) {
     return 'No role assigned';
   }
 
-  const match = ROLE_OPTIONS.find((option) => option.value === role);
+  const match = roles.find((option) => option.name === role);
   if (match) {
-    return match.label;
+    return match.display_name;
   }
 
-  return role.replace(/_/g, ' ');
+  return role
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
@@ -66,18 +52,57 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
   user,
   currentRole
 }) => {
+  const [availableRoles, setAvailableRoles] = useState<RoleCatalog[]>([]);
   const [selectedRole, setSelectedRole] = useState<RoleSelection>('');
   const [error, setError] = useState('');
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      setSelectedRole(currentRole?.role && ROLE_OPTIONS.some((option) => option.value === currentRole.role as AssignableRole)
-        ? (currentRole.role as AssignableRole)
-        : '');
-      setError('');
-      setIsSubmitting(false);
+    if (!isOpen) {
+      return;
     }
+
+    let isMounted = true;
+
+    const loadRoles = async () => {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        if (isMounted) {
+          setError('User session not found. Please log in again.');
+          setAvailableRoles([]);
+        }
+        return;
+      }
+
+      setIsLoadingRoles(true);
+      try {
+        const roles = await rolesService.listRoles(sessionToken);
+        if (!isMounted) {
+          return;
+        }
+        setAvailableRoles(roles);
+      } catch (loadError) {
+        console.error('Error loading roles catalog:', loadError);
+        if (isMounted) {
+          setAvailableRoles([]);
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load roles');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingRoles(false);
+        }
+      }
+    };
+
+    setSelectedRole(currentRole?.role ?? '');
+    setError('');
+    setIsSubmitting(false);
+    void loadRoles();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, currentRole]);
 
   const handleClose = () => {
@@ -86,14 +111,18 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     }
   };
 
-  const selectedRoleMeta = ROLE_OPTIONS.find((option) => option.value === selectedRole);
+  const selectedRoleMeta = useMemo(
+    () => availableRoles.find((option) => option.name === selectedRole),
+    [availableRoles, selectedRole]
+  );
+
   const hasRoleSelection = selectedRole !== '';
   const currentRoleValue = currentRole?.role ?? null;
   const hasMeaningfulChange =
-    selectedRole === 'remove_role' ||
+    selectedRole === REMOVE_ROLE ||
     (!currentRoleValue && selectedRole !== '') ||
     (currentRoleValue !== null && selectedRole !== '' && selectedRole !== currentRoleValue);
-  const canSubmit = hasRoleSelection && hasMeaningfulChange && !isSubmitting;
+  const canSubmit = hasRoleSelection && hasMeaningfulChange && !isSubmitting && !isLoadingRoles;
 
   const handleSubmit = async () => {
     if (!canSubmit) {
@@ -106,15 +135,16 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
 
       let result: { success: boolean; error?: string };
       let successMessage = 'Role updated successfully';
+      const selectedAssignableRole = selectedRole as UserRole['role'];
 
-      if (!currentRole && selectedRole && selectedRole !== 'remove_role') {
-        result = await userRolesService.addUserRole(user.email, selectedRole, false);
+      if (!currentRole && selectedRole && selectedRole !== REMOVE_ROLE) {
+        result = await userRolesService.addUserRole(user.email, selectedAssignableRole, false);
         successMessage = 'Role assigned successfully';
-      } else if (currentRole && selectedRole === 'remove_role') {
+      } else if (currentRole && selectedRole === REMOVE_ROLE) {
         result = await userRolesService.removeUserRole(currentRole.id);
         successMessage = 'Role removed successfully';
-      } else if (currentRole && selectedRole && selectedRole !== 'remove_role') {
-        result = await userRolesService.updateUserRole(currentRole.id, { role: selectedRole });
+      } else if (currentRole && selectedRole && selectedRole !== REMOVE_ROLE) {
+        result = await userRolesService.updateUserRole(currentRole.id, { role: selectedAssignableRole });
       } else {
         setError('Please select a valid role action.');
         return;
@@ -143,16 +173,16 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
     <div className="fixed inset-0 z-[80] overflow-y-auto">
       <div className="relative flex min-h-screen items-center justify-center px-4 py-6 text-center sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-black/50"
+          className="fixed inset-0 bg-black/50 transition-opacity"
           onClick={handleClose}
         />
 
         <div className="relative z-10 inline-block w-full max-w-lg transform overflow-hidden rounded-xl border border-border bg-card text-left shadow-2xl transition-all">
-          <div className="bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="flex items-start justify-between mb-4">
+          <div className="bg-card px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+            <div className="mb-4 flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full">
-                  <Shield className="w-5 h-5 text-primary" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <Shield className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-section font-semibold text-foreground">Assign Role</h3>
@@ -161,9 +191,9 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
               </div>
               <button
                 onClick={handleClose}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground transition-colors hover:text-foreground"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -174,7 +204,7 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
               </div>
               <div className="text-sm">
                 <span className="font-medium text-foreground">Current role:</span>{' '}
-                <span className="text-foreground">{formatRoleLabel(currentRole?.role)}</span>
+                <span className="text-foreground">{formatRoleLabel(currentRole?.role, availableRoles)}</span>
               </div>
             </div>
 
@@ -196,19 +226,22 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
                   id="assign-role-select"
                   value={selectedRole}
                   onChange={(e) => {
-                    setSelectedRole(e.target.value as RoleSelection);
+                    setSelectedRole(e.target.value);
                     setError('');
                   }}
-                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-ring focus:ring-2 focus:ring-ring"
+                  disabled={isLoadingRoles}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-ring focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="">Select a role</option>
-                  {ROLE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <option value="">
+                    {isLoadingRoles ? 'Loading roles...' : 'Select a role'}
+                  </option>
+                  {availableRoles.map((option) => (
+                    <option key={option.name} value={option.name}>
+                      {option.display_name}
                     </option>
                   ))}
                   {currentRole && (
-                    <option value="remove_role">Remove Role</option>
+                    <option value={REMOVE_ROLE}>Remove Role</option>
                   )}
                 </select>
               </div>
@@ -219,7 +252,7 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
                 </div>
               )}
 
-              {selectedRole === 'remove_role' && (
+              {selectedRole === REMOVE_ROLE && (
                 <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
                   Removing the role will leave this user without admin role access.
                 </div>
@@ -227,12 +260,12 @@ const AssignRoleModal: React.FC<AssignRoleModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-muted/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
+          <div className="gap-3 bg-muted/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="w-full inline-flex justify-center rounded-lg border border-transparent bg-primary px-4 py-2 text-base font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm"
+              className="inline-flex w-full justify-center rounded-lg border border-transparent bg-primary px-4 py-2 text-base font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-sm"
             >
               {isSubmitting ? (
                 <span className="inline-flex items-center gap-2">

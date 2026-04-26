@@ -262,7 +262,7 @@ const AdminFormEditorV2: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 flex items-center justify-center py-16">
+      <div className="flex items-center justify-center py-16">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <span className="ml-3 text-muted-foreground">Loading form schema…</span>
       </div>
@@ -271,7 +271,7 @@ const AdminFormEditorV2: React.FC = () => {
 
   if (notFound) {
     return (
-      <div className="p-8 text-center">
+      <div className="text-center">
         <h2 className="text-xl font-semibold text-foreground mb-2">Form not found</h2>
         <p className="text-muted-foreground mb-4">No form exists with key <code className="bg-muted px-2 py-1 rounded">{formKey}</code>.</p>
         <button
@@ -290,7 +290,7 @@ const AdminFormEditorV2: React.FC = () => {
     <PermissionGate
       permission="settings.forms.view"
       fallback={
-        <div className="flex items-center justify-center p-8 text-center">
+        <div className="flex items-center justify-center text-center">
           <div>
             <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
@@ -299,7 +299,7 @@ const AdminFormEditorV2: React.FC = () => {
         </div>
       }
     >
-      <div className="p-6">
+      <div>
         <Toast type={toast.type} message={toast.message} isVisible={toast.isVisible} onClose={hideToast} />
 
         <div className="mb-4 flex items-center gap-3 flex-wrap">

@@ -512,14 +512,14 @@ const AdminRegistrations: React.FC = () => {
     <PermissionGate
       permission="members.view"
       fallback={
-        <div className="p-6 text-center py-16">
+        <div className="text-center py-16">
           <Lock className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-1">Access Denied</h2>
           <p className="text-sm text-muted-foreground">You don't have permission to view member registrations.</p>
         </div>
       }
     >
-    <div className="p-6">
+    <div>
       <Toast
         type={toast.type}
         message={toast.message}

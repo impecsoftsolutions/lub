@@ -87,7 +87,7 @@ const AdminDirectoryVisibility: React.FC = () => {
       permission="settings.directory.view"
       fallback={
         <div className="py-8">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+          <div className="max-w-5xl mx-auto py-8 text-center">
             <Lock className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
             <p className="text-muted-foreground">You don't have permission to view directory settings.</p>
@@ -95,7 +95,7 @@ const AdminDirectoryVisibility: React.FC = () => {
         </div>
       }
     >
-    <div className="p-6">
+    <div>
       <div>
         <div className="mb-4">
           <Link
