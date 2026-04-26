@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
+const isCoreReactModule = (id: string) =>
+  /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id);
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -71,7 +74,7 @@ export default defineConfig({
             return undefined;
           }
 
-          if (id.includes('react') || id.includes('scheduler')) {
+          if (isCoreReactModule(id)) {
             return 'vendor-react';
           }
 
