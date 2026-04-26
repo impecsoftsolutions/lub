@@ -8,6 +8,7 @@ Rules:
 - Codex owns backend/data/runtime slices by default.
 - Do not start a new slice until `In Progress` is updated.
 - Move a task to `Blocked` instead of improvising across ownership boundaries.
+- Commit hygiene is mandatory: stage only the slice manifest files (no `git add .` in dirty worktrees), verify with `git diff --cached --name-only`, then commit scoped changes only.
 
 ## Ready
 
