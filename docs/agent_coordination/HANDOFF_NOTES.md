@@ -34,3 +34,13 @@ No active handoff. `CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017` is closed.
 
 ### Remaining
 None for this slice.
+
+---
+
+## Coordination Update (2026-04-26)
+
+- Commit policy is now strict slice-manifest staging for both Codex and Claude:
+  - Stage only files that belong to the active slice handoff/manifest.
+  - Do not use `git add .` in this repository while the worktree is dirty.
+  - Before commit, verify staged scope with `git diff --cached --name-only`.
+  - Keep one commit per slice (or explicit docs-closeout companion commit).

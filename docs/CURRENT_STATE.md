@@ -69,6 +69,7 @@ Most recently completed streams:
 ## In Progress / Dirty State
 
 - Repo worktree is dirty from multiple prior slices and handoffs. Treat the current tree as collaborative state; do not revert unrelated changes.
+- Commit-scope policy is active: stage and commit only explicit slice-manifest files; do not use broad staging (`git add .`) in this repo state.
 
 ## Deferred / Next Candidate Work
 
