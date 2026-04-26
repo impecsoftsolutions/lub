@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-04-25
-**Updated by:** Codex (`COD-ACTIVITIES-CLOUDFLARE-MEDIA-012` runtime closeout)
+**Last updated:** 2026-04-26
+**Updated by:** Codex (`CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017` runtime closeout)
 
 ---
 
@@ -29,11 +29,14 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 ## Active Stream
 
 **Active stream:** None.
-**Current owner:** None
+**Current owner:** None.
 **Task board:** `docs/agent_coordination/TASK_BOARD.md`
-**Current handoff state:** All Cloudflare Activities media runtime work is complete. Ready queue is open.
+**Current handoff state:** No active handoff.
 
 Most recently completed streams:
+- **CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017**: Closed after Codex deploy/runtime verification. Smart Upload now renders `Import Data` below the queued document list, GST extraction returns `field_options.company_name` with Trade and Legal candidates, and GST adds a `full_name` fallback while Aadhaar precedence is preserved (`FIELD_SOURCE_PRIORITY.full_name = ['aadhaar_card', 'gst_certificate']`). Codex deployed `extract-document` and live-invoked `AA370425004153O_RC07042025.pdf`: HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, default `company_name: D S R CASHEWS` (Trade), `full_name: DOKI SANKARA RAO HUF`, with both candidate options returned. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
+- **CLAUDE-SMART-UPLOAD-PDF-DATE-016**: Closed after Claude implemented and Codex deployed/runtime-verified the Smart Upload PDF/date fixes. `extract-document` now has a deterministic GST REG-06 text fallback: GSTIN regex anchor plus label-anchored captures of legal/trade name, city, district, state, PIN, and the principal-place address block. The fallback merges with AI when AI is readable, substitutes when AI parse fails or returns `is_readable=false`, and only falls through to `pdf_vision` when no deterministic result exists. Smart Upload review (`Join.tsx`), summary, and conflict modal (`SmartUploadDocument.tsx`) now display dates via `formatDateValue` so the configured portal Date & Time admin format is honored while canonical `YYYY-MM-DD` storage, autofill, comparison, and form date inputs remain unchanged. Codex deployed `extract-document` and live-invoked the shared GST PDF (`AA370425004153O_RC07042025.pdf`): HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, expected GST fields returned. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
+- **COD-ACTIVITIES-COVER-LIST-FALLBACK-015**: Closed after Codex fixed the admin Activities list thumbnail fallback. Migration `20260426090000_activity_effective_cover_fallback.sql` normalizes existing gallery-route cover seeds to cover-route seeds and updates public/admin list/detail RPCs so `cover_image_url` falls back to the first gallery image when no explicit cover exists. Follow-up migration `20260426093000_activity_admin_list_first_media_url.sql` adds `first_media_url` to the admin list RPC so the UI can retry the first gallery image if a cover variant fails. The admin list now shows an explicit `Photo` column with a hardened thumbnail fallback. Live RPC probe confirmed `cover-card` returns HTTP 200 image content. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
 - **COD-ACTIVITIES-SLUG-SEARCH-014**: Closed after Codex added server-side Activities slug normalization/de-duplication and public Events smart search. Migration `20260425150000_activity_slug_uniqueness_and_search.sql` is applied; create/update now generate unique slugs by appending counters instead of returning duplicate-slug errors. Admin slug UI now shows canonical `/events/` and clarifies that changing a published slug breaks old direct links only, not listing visibility. Public `/events` now includes ranked search plus All/Featured/Upcoming/Past filters. Lint/build/Phase 1 readonly smoke PASS on 2026-04-25.
 - **COD-ACTIVITIES-MEDIA-AI-FOLLOWUP-013**: Closed after Codex fixed the Activities gallery batch queue, added first-gallery-image cover fallback when no explicit cover is selected, and extended Activities source-document extraction to return selectable date/location candidates. `draft-activity-content` was redeployed with stronger extraction guidance: multi-day activities use the first activity day as `activity_date`, and multiple detected dates/locations are returned as options for the admin to choose. Lint/build/Phase 1 readonly smoke PASS on 2026-04-25.
 - **COD-ACTIVITIES-CLOUDFLARE-MEDIA-012**: Closed after Codex runtime deployment and verification. Activities media now targets private Cloudflare R2 bucket `lub` for originals, Worker `lub-media` serves transformed variants on `media.lub.org.in`, and Supabase Edge Functions `activity-media-upload`, `activity-media-original-download`, and `activity-media-delete` are deployed. Migration `20260420130000_activities_cloudflare_media_support.sql` is applied. Live disposable probe passed: created a temporary Activity, uploaded cover and gallery originals through the Edge Function, verified Worker display variants, verified signed original downloads for cover and gallery, confirmed no-variant public requests return `400`, then deleted the temporary R2 objects and Activity. Setup guide: `docs/cloudflare_events_media_setup.md`.
@@ -49,13 +52,13 @@ Most recently completed streams:
 
 ## Last Verified
 
-- **When:** 2026-04-25
-- **What:** `COD-ACTIVITIES-SLUG-SEARCH-014` implementation + runtime closeout
-- **Result:** PASS for Activities slug de-duplication migration, public Events smart search, lint, build, and Phase 1 readonly smoke.
+- **When:** 2026-04-26
+- **What:** `CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017` deploy + runtime closeout
+- **Result:** PASS for `extract-document` deploy, shared GST PDF live invoke including Trade/Legal company-name candidates and GST `full_name` fallback, plus lint, build, and Phase 1 readonly smoke.
 - **Commands:**
   ```
-  npm run db:migrations:audit -> PASS
-  npm run db:migration:apply:single -- --version=20260425150000 -> PASS
+  supabase functions deploy extract-document -> PASS
+  live extract-document invoke with AA370425004153O_RC07042025.pdf -> PASS (HTTP 200, is_readable true, detected_type gst_certificate)
   npm run lint -> PASS (0 errors / 3 expected warnings)
   npm run build -> PASS
   npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
@@ -89,10 +92,12 @@ Most recently completed streams:
 - Migration safety workflow remains mandatory: audit first, apply only targeted versions, verify after each apply.
 - Activities settings are now live with `max_gallery_images = 20`.
 - Activities gallery multi-select now processes the whole selected batch through the crop modal queue; if no explicit cover is selected, the first active gallery image becomes the saved cover fallback.
+- Activities public/admin list RPCs now return an effective cover URL from the first gallery image when no explicit cover exists.
 - Activities source-document extraction now asks AI for first-day activity dates plus selectable date/location options when multiple candidates are present.
 - Phase 1 destructive smoke does not yet cover Activities form mutations.
 - Join legacy settings page still exists by design until UAT sign-off on Builder and Studio workflows.
 - Smart Upload now gives Aadhaar gender precedence over signup/account prefill within the member registration flow only; it does not silently rewrite the underlying account record.
+- Smart Upload text-based GST REG-06 PDFs now have deterministic extraction fallback inside `extract-document`; the shared sample GST PDF is live-verified readable. Smart Upload date review/summary/conflict display honors portal Date & Time settings while keeping canonical internal date values.
 
 ---
 
@@ -102,3 +107,4 @@ Most recently completed streams:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+

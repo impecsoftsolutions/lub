@@ -9,7 +9,23 @@ import {
   X as XIcon,
   Zap,
 } from 'lucide-react';
-import { extractDocument, SmartDocType, DetectedDocType, ReasonCode, PipelineUsed } from '../lib/documentExtraction';
+import { extractDocument, SmartDocType, DetectedDocType, ReasonCode, PipelineUsed, ExtractedFieldOption } from '../lib/documentExtraction';
+import { formatDateValue } from '../lib/dateTimeManager';
+
+const DATE_FIELD_KEYS = new Set(['payment_date', 'date_of_birth']);
+
+/**
+ * Display-format a Smart Upload extracted field value.
+ * Date fields render via the configured portal date format; all other fields render raw.
+ * Internal/canonical values are NOT mutated — this is presentation-only.
+ */
+function formatExtractedFieldValueForDisplay(fieldKey: string, value: string): string {
+  if (!value) return value;
+  if (DATE_FIELD_KEYS.has(fieldKey)) {
+    return formatDateValue(value) || value;
+  }
+  return value;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,6 +40,7 @@ interface SmartUploadItem {
   detectedDocType: DetectedDocType | null;
   status: DocStatus;
   extractedFields: Record<string, string>;
+  fieldOptions: Record<string, ExtractedFieldOption[]> | null;
   reasonCode: ReasonCode | null;
   pipelineUsed: PipelineUsed | null;
   detectedMime: string | null;
@@ -46,6 +63,12 @@ export interface SmartUploadDocumentProps {
   onConflictResolved: (chosenFields: Record<string, string>) => void;
   /** Called when a document file should be routed to a specific upload slot */
   onFileReady: (slot: 'paymentProof' | 'gstCertificate' | 'udyamCertificate', file: File) => void;
+  /** Optional hook to surface raw extracted fields for review, even if nothing needed autofill */
+  onExtractedFieldsDetected?: (fields: Record<string, string>) => void;
+  /** Optional hook to surface candidate field_options (e.g. company_name Trade vs Legal) */
+  onExtractedFieldOptionsDetected?: (options: Record<string, ExtractedFieldOption[]>) => void;
+  /** Fields where document extraction should override an existing current value without conflict UI */
+  forceDocumentPrecedenceFields?: string[];
   /** Optional hook to canonicalize extracted values before comparison/autofill */
   normalizeExtractedFields?: (fields: Record<string, string>) => Record<string, string>;
   /** Optional extra controls rendered in the action row */
@@ -92,7 +115,9 @@ const FIELD_LABELS: Record<string, string> = {
  * Only listed doc types are allowed to fill the given field.
  */
 const FIELD_SOURCE_PRIORITY: Record<string, SmartDocType[]> = {
-  full_name: ['aadhaar_card'],
+  // Aadhaar wins for full_name; GST is allowed as a lower-priority fallback so
+  // the registration form can be prefilled when no Aadhaar is uploaded.
+  full_name: ['aadhaar_card', 'gst_certificate'],
   date_of_birth: ['aadhaar_card'],
   gender: ['aadhaar_card'],
   payment_date: ['payment_proof'],
@@ -148,7 +173,7 @@ function generateId(): string {
 
 function buildExtractionSummary(fields: Record<string, string>): string {
   const parts: string[] = [];
-  if (fields.payment_date) parts.push(`Date: ${fields.payment_date}`);
+  if (fields.payment_date) parts.push(`Date: ${formatExtractedFieldValueForDisplay('payment_date', fields.payment_date)}`);
   if (fields.transaction_id) parts.push(`Txn: ${fields.transaction_id.slice(0, 12)}…`);
   if (fields.gst_number) parts.push(`GST: ${fields.gst_number}`);
   if (fields.pan_company) parts.push(`PAN: ${fields.pan_company}`);
@@ -309,7 +334,9 @@ function ConflictModal({ conflicts, choices, onChoiceChange, onConfirm, onDismis
                   <p className="font-medium mb-0.5 text-[10px] uppercase tracking-wide text-primary/70">
                     From document
                   </p>
-                  <p className="break-all leading-snug">{conflict.extractedValue}</p>
+                  <p className="break-all leading-snug">
+                    {formatExtractedFieldValueForDisplay(conflict.fieldKey, conflict.extractedValue)}
+                  </p>
                 </button>
                 {/* Keep current option */}
                 <button
@@ -324,7 +351,9 @@ function ConflictModal({ conflicts, choices, onChoiceChange, onConfirm, onDismis
                   <p className="font-medium mb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                     Keep current
                   </p>
-                  <p className="break-all leading-snug">{conflict.currentValue}</p>
+                  <p className="break-all leading-snug">
+                    {formatExtractedFieldValueForDisplay(conflict.fieldKey, conflict.currentValue)}
+                  </p>
                 </button>
               </div>
             </div>
@@ -364,6 +393,9 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
   onAutofill,
   onConflictResolved,
   onFileReady,
+  onExtractedFieldsDetected,
+  onExtractedFieldOptionsDetected,
+  forceDocumentPrecedenceFields = [],
   normalizeExtractedFields,
   extraControls,
   disabled = false,
@@ -429,6 +461,15 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         const finalType: SmartDocType | null =
           detectedType !== 'unknown' ? (detectedType as SmartDocType) : null;
 
+        if (onExtractedFieldsDetected) {
+          onExtractedFieldsDetected(normalizedExtractedFields);
+        }
+
+        const resultFieldOptions = result.field_options ?? null;
+        if (onExtractedFieldOptionsDetected && resultFieldOptions) {
+          onExtractedFieldOptionsDetected(resultFieldOptions);
+        }
+
         setItems(prev =>
           prev.map(item =>
             item.id === itemId
@@ -437,6 +478,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
                   status: 'extracted',
                   detectedDocType: detectedType,
                   extractedFields: normalizedExtractedFields,
+                  fieldOptions: resultFieldOptions,
                   reasonCode: result.reason_code,
                   pipelineUsed: result.pipeline_used,
                   detectedMime: result.detected_mime,
@@ -459,6 +501,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         const sourceUpdatesForAutofill: Record<string, DetectedDocType> = {};
         const conflicts: ConflictField[] = [];
         const currentSourceMap = fieldSourceMapRef.current;
+        const forcedDocumentFields = new Set(forceDocumentPrecedenceFields);
 
         for (const [key, extractedVal] of Object.entries(normalizedExtractedFields)) {
           if (!AUTOFILL_FIELDS.has(key)) continue;
@@ -480,6 +523,9 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
           }
 
           if (!currentVal) {
+            toAutofill[key] = extractedVal;
+            sourceUpdatesForAutofill[key] = finalType;
+          } else if (forcedDocumentFields.has(key)) {
             toAutofill[key] = extractedVal;
             sourceUpdatesForAutofill[key] = finalType;
           } else if (!areEquivalentValues(key, currentVal, extractedVal)) {
@@ -521,7 +567,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         );
       }
     },
-    [normalizeExtractedFields, onAutofill, onFileReady]
+    [forceDocumentPrecedenceFields, normalizeExtractedFields, onAutofill, onExtractedFieldOptionsDetected, onExtractedFieldsDetected, onFileReady]
   );
 
   // -------------------------------------------------------------------------
@@ -538,6 +584,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         detectedDocType: null,
         status: 'queued',
         extractedFields: {},
+        fieldOptions: null,
         reasonCode: null,
         pipelineUsed: null,
         detectedMime: null,
@@ -681,28 +728,6 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
           {extraControls}
         </div>
 
-        {/* Action row — import trigger */}
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => { void handleImportData(); }}
-            disabled={importDisabled}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Importing…
-              </>
-            ) : (
-              <>
-                <Zap className="h-4 w-4" />
-                Import Data{queuedCount > 0 ? ` (${queuedCount})` : ''}
-              </>
-            )}
-          </button>
-        </div>
-
         {/* Document list */}
         {items.length > 0 && (
           <div className="space-y-2">
@@ -787,6 +812,28 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
             })}
           </div>
         )}
+
+        {/* Action row — import trigger (below the document list per UX direction) */}
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => { void handleImportData(); }}
+            disabled={importDisabled}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Importing…
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4" />
+                Import Data{queuedCount > 0 ? ` (${queuedCount})` : ''}
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Hidden file inputs */}

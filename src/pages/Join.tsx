@@ -34,9 +34,13 @@ import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../
 import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import FieldCorrectionStepper, { type FieldCorrectionStep } from '../components/FieldCorrectionStepper';
 import SmartUploadDocument from '../components/SmartUploadDocument';
+import type { ExtractedFieldOption } from '../lib/documentExtraction';
 import { useMember } from '../contexts/useMember';
 import { supabase } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
+import { formatDateValue } from '../lib/dateTimeManager';
+
+const SMART_UPLOAD_DATE_FIELD_KEYS = new Set(['payment_date', 'date_of_birth']);
 
 const correctionFieldLabels: Record<string, string> = {
   full_name: 'Full Name',
@@ -330,6 +334,8 @@ const Join: React.FC = () => {
     isPreviewMode ? 'form' : 'choice'
   );
   const [smartUploadDraft, setSmartUploadDraft] = useState<Record<string, string>>({});
+  const [smartUploadReviewData, setSmartUploadReviewData] = useState<Record<string, string>>({});
+  const [smartUploadFieldOptions, setSmartUploadFieldOptions] = useState<Record<string, ExtractedFieldOption[]>>({});
   const [smartUploadGuideDoc, setSmartUploadGuideDoc] = useState<string>('payment_proof');
   const applyPrefillFromSources = useCallback((
     current: JoinFormData,
@@ -1224,7 +1230,7 @@ const Join: React.FC = () => {
     const updates: Partial<JoinFormData> = {};
     for (const [key, value] of Object.entries(fields)) {
       if (SMART_AUTOFILL_ALLOWED.has(key) && Object.prototype.hasOwnProperty.call(current, key)) {
-        (updates as Record<string, string>)[key] = value;
+        (updates as Record<string, string>)[key] = key === 'gender' ? value.toLowerCase() : value;
       }
     }
     return { ...current, ...updates };
@@ -1235,6 +1241,16 @@ const Join: React.FC = () => {
 
     if (normalized.payment_date) {
       normalized.payment_date = normalizeDateField(normalized.payment_date);
+    }
+
+    if (normalized.gender) {
+      // Backend emits lowercase `male` / `female`. Match case-insensitively
+      // against the configured gender options so the form dropdown selects cleanly.
+      const genderOptions = resolveFieldOptions('gender', ['Male', 'Female']);
+      const matchedGender = findCaseInsensitiveMatch(genderOptions, normalized.gender);
+      if (matchedGender) {
+        normalized.gender = matchedGender;
+      }
     }
 
     if (normalized.state) {
@@ -1284,7 +1300,7 @@ const Join: React.FC = () => {
     }
 
     return normalized;
-  }, [availableCities, availableDistricts, availableStates]);
+  }, [availableCities, availableDistricts, availableStates, resolveFieldOptions]);
 
   const hydrateSmartUploadLocationFields = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = { ...fields };
@@ -1382,6 +1398,44 @@ const Join: React.FC = () => {
     setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
   }, [hydrateSmartUploadLocationFields]);
 
+  const handleSmartDraftExtractedFields = useCallback(async (fields: Record<string, string>) => {
+    const hydratedFields = await hydrateSmartUploadLocationFields(fields);
+    setSmartUploadReviewData(prev => ({ ...prev, ...hydratedFields }));
+  }, [hydrateSmartUploadLocationFields]);
+
+  const handleSmartDraftFieldOptionsDetected = useCallback(
+    (incoming: Record<string, ExtractedFieldOption[]>) => {
+      if (!incoming || Object.keys(incoming).length === 0) return;
+      setSmartUploadFieldOptions(prev => {
+        const next: Record<string, ExtractedFieldOption[]> = { ...prev };
+        for (const [key, options] of Object.entries(incoming)) {
+          if (!Array.isArray(options) || options.length === 0) continue;
+          const existing = next[key] ?? [];
+          const seen = new Set(
+            existing.map(opt => opt.value.trim().replace(/\s+/g, ' ').toLowerCase())
+          );
+          const merged = [...existing];
+          for (const opt of options) {
+            if (!opt || typeof opt.value !== 'string') continue;
+            const value = opt.value.trim();
+            if (!value) continue;
+            const normalized = value.replace(/\s+/g, ' ').toLowerCase();
+            if (seen.has(normalized)) continue;
+            seen.add(normalized);
+            merged.push({
+              value,
+              ...(opt.label ? { label: opt.label } : {}),
+              ...(opt.source ? { source: opt.source } : {}),
+            });
+          }
+          if (merged.length > 0) next[key] = merged;
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   const handleSmartDraftConflictResolved = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = await hydrateSmartUploadLocationFields(fields);
     setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
@@ -1393,9 +1447,54 @@ const Join: React.FC = () => {
       setFormData(prev => applySmartFieldsToJoinData(prev, hydratedFields));
     }
     setSmartUploadDraft({});
+    setSmartUploadReviewData({});
+    setSmartUploadFieldOptions({});
     setRegistrationEntryStage('form');
     setIsVerifiedForSubmit(false);
   }, [applySmartFieldsToJoinData, hydrateSmartUploadLocationFields, smartUploadDraft]);
+
+  /**
+   * Display-format a Smart Upload review value. Date fields render via the
+   * configured portal date format. All other fields render raw.
+   * Internal/canonical values stored in `smartUploadReviewData` and `smartUploadDraft`
+   * are not mutated — this is presentation-only.
+   */
+  const handleSmartUploadCandidateSelect = useCallback(
+    (fieldKey: string, value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      setSmartUploadReviewData(prev => ({ ...prev, [fieldKey]: trimmed }));
+      setSmartUploadDraft(prev => ({ ...prev, [fieldKey]: trimmed }));
+    },
+    []
+  );
+
+  const formatSmartUploadReviewValue = useCallback((fieldKey: string, value: string) => {
+    if (!value) return value;
+    if (SMART_UPLOAD_DATE_FIELD_KEYS.has(fieldKey)) {
+      return formatDateValue(value) || value;
+    }
+    return value;
+  }, []);
+
+  const getSmartUploadReviewSourceText = useCallback((fieldKey: string, extractedValue: string) => {
+    const currentValue = String(formData[fieldKey as keyof JoinFormData] ?? '').trim();
+    if (!currentValue) {
+      return 'Document extracted value';
+    }
+
+    const currentComparable = normalizeComparableValue(currentValue);
+    const extractedComparable = normalizeComparableValue(extractedValue);
+    if (currentComparable === extractedComparable) {
+      return 'Document matches current account/form value';
+    }
+
+    if (fieldKey === 'gender') {
+      return 'Document overrides current account/form value';
+    }
+
+    return 'Document differs from current account/form value';
+  }, [formData]);
 
   const handleSmartFileReady = useCallback(
     (slot: 'paymentProof' | 'gstCertificate' | 'udyamCertificate', file: File) => {
@@ -2084,7 +2183,17 @@ const Join: React.FC = () => {
     !isPreviewMode &&
     hasRegistrationRecord === false &&
     registrationEntryStage !== 'form';
-  const smartUploadDraftEntries = Object.entries(smartUploadDraft).filter(([, value]) => value.trim() !== '');
+  // Aadhaar-style identity context is detected whenever smart upload produced a
+  // full name or date of birth. When that context is present but gender was
+  // not extracted, we surface a clear notice so the member knows to pick it
+  // themselves on the final registration form.
+  const smartUploadIdentityContext = Boolean(
+    (smartUploadReviewData.full_name ?? '').trim() || (smartUploadReviewData.date_of_birth ?? '').trim()
+  );
+  const smartUploadGenderMissing =
+    smartUploadIdentityContext && !(smartUploadReviewData.gender ?? '').trim();
+  const smartUploadDraftEntries = Object.entries(smartUploadReviewData)
+    .filter(([, value]) => value.trim() !== '');
 
   return (
     <div className="min-h-screen py-8">
@@ -2158,6 +2267,9 @@ const Join: React.FC = () => {
                   onAutofill={handleSmartDraftAutofill}
                   onConflictResolved={handleSmartDraftConflictResolved}
                   onFileReady={handleSmartFileReady}
+                  onExtractedFieldsDetected={handleSmartDraftExtractedFields}
+                  onExtractedFieldOptionsDetected={handleSmartDraftFieldOptionsDetected}
+                  forceDocumentPrecedenceFields={['gender']}
                   normalizeExtractedFields={normalizeSmartUploadFields}
                   extraControls={
                     <select
@@ -2178,16 +2290,60 @@ const Join: React.FC = () => {
 
                 <div className="rounded-lg border border-border bg-card p-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3">Extracted data review</h3>
-                  {smartUploadDraftEntries.length > 0 ? (
+                  {smartUploadDraftEntries.length > 0 || smartUploadIdentityContext ? (
                     <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-                      {smartUploadDraftEntries.map(([fieldKey, value]) => (
-                        <div key={fieldKey} className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                            {resolveFieldLabel(fieldKey, fallbackFieldLabel(fieldKey))}
-                          </p>
-                          <p className="text-sm text-foreground break-words">{value}</p>
-                        </div>
-                      ))}
+                      {smartUploadDraftEntries.map(([fieldKey, value]) => {
+                        const options = smartUploadFieldOptions[fieldKey] ?? [];
+                        const showCandidates = options.length >= 2;
+                        const normalizedSelected = value.trim().replace(/\s+/g, ' ').toLowerCase();
+                        return (
+                          <div key={fieldKey} className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {resolveFieldLabel(fieldKey, fallbackFieldLabel(fieldKey))}
+                            </p>
+                            {showCandidates ? (
+                              <div className="mt-1 space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {options.map((opt) => {
+                                    const optNormalized = opt.value.trim().replace(/\s+/g, ' ').toLowerCase();
+                                    const isSelected = optNormalized === normalizedSelected;
+                                    return (
+                                      <button
+                                        key={`${fieldKey}-${opt.label ?? opt.value}-${opt.value}`}
+                                        type="button"
+                                        onClick={() => handleSmartUploadCandidateSelect(fieldKey, opt.value)}
+                                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                          isSelected
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/50'
+                                        }`}
+                                        aria-pressed={isSelected}
+                                      >
+                                        {opt.label ? `${opt.label}: ${opt.value}` : opt.value}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <p className="text-sm text-foreground break-words">
+                                  {formatSmartUploadReviewValue(fieldKey, value)}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-foreground break-words">
+                                {formatSmartUploadReviewValue(fieldKey, value)}
+                              </p>
+                            )}
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              {getSmartUploadReviewSourceText(fieldKey, value)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      {smartUploadGenderMissing && (
+                        <p className="italic text-sm text-red-800 dark:text-red-400">
+                          Unable to extract gender
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -2256,6 +2412,7 @@ const Join: React.FC = () => {
               onAutofill={handleSmartAutofill}
               onConflictResolved={handleSmartConflictResolved}
               onFileReady={handleSmartFileReady}
+              forceDocumentPrecedenceFields={['gender']}
               normalizeExtractedFields={normalizeSmartUploadFields}
               disabled={isPreviewMode}
             />

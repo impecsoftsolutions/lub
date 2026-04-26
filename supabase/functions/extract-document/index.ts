@@ -52,10 +52,22 @@ type PipelineUsed =
   | 'office_pipeline'
   | 'none';
 
+interface ExtractedFieldOption {
+  value: string;
+  label?: string;
+  source?: string;
+}
+
 interface ExtractionEnvelope {
   detected_type: DetectedDocType;
   is_readable: boolean;
   extracted_fields: Record<string, string>;
+  /**
+   * Optional per-field candidate options for user-driven selection.
+   * Currently used for GST `company_name` (Trade vs Legal).
+   * Backward-compatible: omitted when no options are produced.
+   */
+  field_options?: Record<string, ExtractedFieldOption[]>;
   reason_code: ReasonCode;
   pipeline_used: PipelineUsed;
   input_mime: string;
@@ -74,6 +86,11 @@ interface ParsedAIResult {
   detected_type: string;
   is_readable: boolean;
   extracted_fields: Record<string, unknown>;
+  /**
+   * Optional candidate options. Today only deterministic extractors populate this;
+   * AI never produces it directly so it stays undefined on the AI path.
+   */
+  field_options?: Record<string, ExtractedFieldOption[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +125,11 @@ const DOC_TYPE_FIELD_POLICY: Record<DetectedDocType, Set<string>> = {
     'district',
     'city',
     'industry',
+    // GST registrations carry an identifiable person name (Proprietor / Karta /
+    // Managing Director / etc. in Annexure B). Allow `full_name` so it can be
+    // surfaced as a fallback identity source when no Aadhaar is uploaded.
+    // Aadhaar still wins via the client-side FIELD_SOURCE_PRIORITY map.
+    'full_name',
   ]),
   udyam_certificate: new Set([
     'company_name',
@@ -221,6 +243,14 @@ const KEY_SYNONYMS: Record<string, string> = {
   birthdate: 'date_of_birth',
   // gender
   sex: 'gender',
+  gender_sex: 'gender',
+  sex_gender: 'gender',
+  gender_m_f: 'gender',
+  m_f: 'gender',
+  'm/f': 'gender',
+  mf: 'gender',
+  male_female: 'gender',
+  gender_code: 'gender',
   // transaction_id
   transaction_reference: 'transaction_id',
   txn_reference: 'transaction_id',
@@ -336,8 +366,11 @@ function normalizeExtractedKeys(raw: Record<string, unknown>): Record<string, un
 
 function normalizeGender(raw: string): string {
   const lower = raw.toLowerCase().trim();
-  if (lower === 'm' || lower === 'male') return 'male';
-  if (lower === 'f' || lower === 'female') return 'female';
+  if (lower === 'm' || lower === 'male' || lower === 'पुरुष') return 'male';
+  if (lower === 'f' || lower === 'female' || lower === 'महिला' || lower === 'स्त्री') return 'female';
+  // Tolerate short OCR/AI variants that embed the word (e.g. "sex: male", "gender - female")
+  if (/\bfemale\b/.test(lower) || /\bमहिला\b/.test(lower) || /\bस्त्री\b/.test(lower)) return 'female';
+  if (/\bmale\b/.test(lower) || /\bपुरुष\b/.test(lower)) return 'male';
   return lower;
 }
 
@@ -627,6 +660,292 @@ async function extractPdfText(bytes: Uint8Array): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
+// Deterministic text-PDF extraction (GST certificates today)
+//
+// Goal: when a text-readable government PDF (e.g. GST REG-06) is uploaded but
+// the AI parse path fails or returns is_readable=false, we still surface
+// directly-parsed labelled fields so the user is not blocked with an
+// "Unreadable" status. For GST PDFs, deterministic fields also win over AI
+// because they are pulled straight from the certificate text, while AI still
+// adds value for fields that are harder to label-anchor.
+// ---------------------------------------------------------------------------
+
+const GSTIN_RE = /\b(\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9])\b/;
+
+function captureBetween(text: string, labelRe: RegExp, stopRes: RegExp[]): string {
+  const m = text.match(labelRe);
+  if (!m || m.index === undefined) return '';
+  const startIdx = m.index + m[0].length;
+  let endIdx = text.length;
+  for (const stop of stopRes) {
+    const cloned = new RegExp(stop.source, stop.flags.includes('g') ? stop.flags : `${stop.flags}g`);
+    cloned.lastIndex = startIdx;
+    const sm = cloned.exec(text);
+    if (sm && sm.index !== undefined && sm.index >= startIdx && sm.index < endIdx) {
+      endIdx = sm.index;
+    }
+  }
+  return text.slice(startIdx, endIdx).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Trim leading punctuation and trailing numbered-list markers that bleed in
+ * when a sibling form field starts on the same line (e.g. "DOKI SANKARA RAO HUF 2.").
+ */
+function trimGstFieldValue(value: string): string {
+  return value
+    .replace(/^[:\s-]+/, '')
+    .replace(/\s+\d+\.\s*$/, '')
+    .replace(/\s+\d+\.\s+[A-Z][\s\S]*$/, '')
+    .trim();
+}
+
+function extractGstLegalName(text: string): string {
+  const bounded = captureBetween(
+    text,
+    /(?:^|\b)(?:1\.\s*)?Legal\s+Name\b\s*/i,
+    [
+      /\bTrade\s+Name\b/i,
+      /\bAdditional\s+trade\s+names\b/i,
+      /\bConstitution\s+of\s+Business\b/i,
+      /\bAddress\s+of\s+Principal\s+Place\b/i,
+    ]
+  );
+  if (bounded) return trimGstFieldValue(bounded);
+
+  const inline = text.match(
+    /\b(?:\d+\.\s*)?Legal\s+Name\s*[-:]?\s*([\s\S]{1,220}?)(?=\s+(?:Trade\s+Name|Additional\s+trade\s+names|Constitution\s+of\s+Business|Address\s+of\s+Principal\s+Place)\b|$)/i
+  );
+  return inline ? trimGstFieldValue(inline[1]) : '';
+}
+
+function extractGstTradeName(text: string): string {
+  const bounded = captureBetween(
+    text,
+    /\bTrade\s+Name(?:\s*,?\s*if\s+any)?\b\s*/i,
+    [
+      /\bAdditional\s+trade\s+names\b/i,
+      /\bConstitution\s+of\s+Business\b/i,
+      /\bAddress\s+of\s+Principal\s+Place\b/i,
+      /\bDate\s+of\s+Liability\b/i,
+    ]
+  );
+  if (bounded) return trimGstFieldValue(bounded);
+
+  const inline = text.match(
+    /\bTrade\s+Name(?:\s*,?\s*if\s+any)?\s*[-:]?\s*([\s\S]{1,220}?)(?=\s+(?:Additional\s+trade\s+names|Constitution\s+of\s+Business|Address\s+of\s+Principal\s+Place|Date\s+of\s+Liability)\b|$)/i
+  );
+  return inline ? trimGstFieldValue(inline[1]) : '';
+}
+
+function buildDeterministicGstExtraction(rawText: string): ParsedAIResult | null {
+  if (!rawText) return null;
+  const text = rawText.replace(/\r\n?/g, '\n');
+
+  // Quick gate: must look like a GST certificate
+  const looksGst =
+    /Form\s+GST\s+REG[\s-]?06/i.test(text) ||
+    (/Goods\s+and\s+Services\s+Tax/i.test(text) && /Registration\s+Certificate/i.test(text)) ||
+    GSTIN_RE.test(text);
+  if (!looksGst) return null;
+
+  const gstinMatch = text.match(GSTIN_RE);
+  if (!gstinMatch) return null;
+
+  const fields: Record<string, string> = {
+    gst_number: gstinMatch[1],
+  };
+  const fieldOptions: Record<string, ExtractedFieldOption[]> = {};
+
+  // Legal Name vs Trade Name. Prefer Trade Name when present.
+  const cleanedLegal = extractGstLegalName(text);
+  const cleanedTrade = extractGstTradeName(text);
+  if (cleanedTrade && cleanedTrade.length > 0 && cleanedTrade.length <= 200) {
+    fields.company_name = cleanedTrade;
+  } else if (cleanedLegal && cleanedLegal.length > 0 && cleanedLegal.length <= 200) {
+    fields.company_name = cleanedLegal;
+  }
+
+  // Surface Trade Name + Legal Name as user-selectable candidates for company_name.
+  // Deduped case-insensitively after trim/whitespace collapse.
+  const companyOptions: ExtractedFieldOption[] = [];
+  const seenCompanyValues = new Set<string>();
+  const pushCompanyOption = (value: string, label: string) => {
+    if (!value) return;
+    if (value.length > 200) return;
+    const normalized = value.trim().replace(/\s+/g, ' ').toLowerCase();
+    if (!normalized || seenCompanyValues.has(normalized)) return;
+    seenCompanyValues.add(normalized);
+    companyOptions.push({ value, label, source: 'gst_certificate' });
+  };
+  if (cleanedTrade) pushCompanyOption(cleanedTrade, 'Trade Name');
+  if (cleanedLegal) pushCompanyOption(cleanedLegal, 'Legal Name');
+  if (companyOptions.length > 0) {
+    fieldOptions.company_name = companyOptions;
+  }
+
+  // GST `full_name`: prefer the Annexure B Karta/Proprietor `Name`, otherwise fall back
+  // to Legal Name. The Annexure B section starts with "Details of Karta" (or
+  // "Details of Proprietor / Karta / Managing Director ..."), and the actual person
+  // name lives on a numbered row that looks like:
+  //   `1 Name <FULL NAME> Designation/Status <role>`
+  // We anchor on the numbered prefix to avoid accidentally matching "Legal Name"
+  // earlier in the same section.
+  let kartaName = '';
+  const kartaSectionMatch = text.match(/Details\s+of\s+(?:Proprietor|Karta|Managing\s+Director)[\s\S]*$/i);
+  if (kartaSectionMatch) {
+    const kartaSection = kartaSectionMatch[0];
+    const numberedMatch = kartaSection.match(/(?:^|\s)\d+\s+Name\s+([\s\S]+?)\s+Designation(?:\/Status)?\b/i);
+    if (numberedMatch) {
+      kartaName = trimGstFieldValue(numberedMatch[1]);
+    }
+  }
+  const fullName = kartaName || cleanedLegal;
+  if (fullName && fullName.length > 0 && fullName.length <= 200) {
+    fields.full_name = fullName;
+  }
+
+  // City / Town / Village
+  const city = captureBetween(
+    text,
+    /\bCity\s*\/\s*Town\s*\/\s*Village\b\s*[:-]?\s*/i,
+    [/\bDistrict\b/i, /\bState\b/i, /\bPIN\s*Code\b/i, /\bDate\s+of\s+Liability\b/i]
+  );
+  if (city && city.length <= 120) {
+    const cleaned = trimGstFieldValue(city);
+    if (cleaned) fields.city = cleaned;
+  }
+
+  // District
+  const district = captureBetween(
+    text,
+    /\bDistrict\b\s*[:-]?\s*/i,
+    [/\bState\b/i, /\bPIN\s*Code\b/i, /\bDate\s+of\s+Liability\b/i]
+  );
+  if (district && district.length <= 120) {
+    const cleaned = trimGstFieldValue(district);
+    if (cleaned) fields.district = cleaned;
+  }
+
+  // State (avoid matching "State of registration" headers — anchor on standalone label)
+  const state = captureBetween(
+    text,
+    /\bState\b\s*[:-]?\s*/i,
+    [/\bPIN\s*Code\b/i, /\bDate\s+of\s+Liability\b/i, /\bPeriod\s+of\s+Validity\b/i]
+  );
+  if (state && state.length <= 120) {
+    const cleaned = trimGstFieldValue(state);
+    if (cleaned) fields.state = cleaned;
+  }
+
+  // PIN Code
+  const pinMatch = text.match(/\bPIN\s*Code\b\s*[:-]?\s*(\d{6})\b/i);
+  if (pinMatch) fields.pin_code = pinMatch[1];
+
+  // Address: pull the whole "Address of Principal Place of Business" block and condense
+  const addrBlock = text.match(
+    /\bAddress\s+of\s+Principal\s+Place\s+of\s+Business\b([\s\S]*?)(?=\bDate\s+of\s+Liability\b|\bPeriod\s+of\s+Validity\b|\bType\s+of\s+Registration\b|$)/i
+  );
+  if (addrBlock) {
+    let addr = addrBlock[1]
+      // Strip the inline labels that prefix each address subfield
+      .replace(/\bBuilding\s+No\.?\s*\/?\s*Flat\s+No\.?\b/gi, ' ')
+      .replace(/\bName\s+of\s+Premises\s*\/?\s*Building\b/gi, ' ')
+      .replace(/\bRoad\s*\/?\s*Street\b/gi, ' ')
+      .replace(/\bCity\s*\/\s*Town\s*\/\s*Village\b/gi, ' ')
+      .replace(/\bDistrict\b/gi, ' ')
+      .replace(/\bState\b/gi, ' ')
+      .replace(/\bPIN\s*Code\b/gi, ' ')
+      .replace(/\bLatitude\b/gi, ' ')
+      .replace(/\bLongitude\b/gi, ' ');
+    // Convert leftover ":" subfield separators into commas, drop stray periods
+    addr = addr
+      .replace(/\s*:\s*/g, ', ')
+      .replace(/(?:^|\s)\.(?=\s|,|$)/g, ' ')
+      // Drop the trailing next-item number e.g. " 6."
+      .replace(/\s+\d+\.\s*$/, '')
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s,;:-]+|[\s,;:-]+$/g, '')
+      // Collapse repeated comma/spaces
+      .replace(/(?:,\s*){2,}/g, ', ')
+      .trim();
+    if (addr.length > 0 && addr.length < 400) {
+      fields.company_address = addr;
+    }
+  }
+
+  if (Object.keys(fields).length <= 1) {
+    // Only have GSTIN — still useful but don't claim a richer result
+    // Returning is fine; the merge layer/policy filter will pass GSTIN through.
+  }
+
+  return {
+    detected_type: 'gst_certificate',
+    is_readable: true,
+    extracted_fields: fields as Record<string, unknown>,
+    field_options: Object.keys(fieldOptions).length > 0 ? fieldOptions : undefined,
+  };
+}
+
+function buildDeterministicTextExtraction(text: string, selectedDocType: string): ParsedAIResult | null {
+  if (!text) return null;
+  // GST is the first deterministic doc supported. Do not gate on selectedDocType
+  // because pass 1 typically receives 'unknown' — we let the GSTIN anchor decide.
+  const gst = buildDeterministicGstExtraction(text);
+  if (gst) return gst;
+  // Future: deterministic UDYAM / PAN parsers can be added here.
+  void selectedDocType;
+  return null;
+}
+
+function mergeFieldOptions(
+  ...sources: Array<Record<string, ExtractedFieldOption[]> | undefined>
+): Record<string, ExtractedFieldOption[]> | undefined {
+  const merged: Record<string, ExtractedFieldOption[]> = {};
+  for (const source of sources) {
+    if (!source) continue;
+    for (const [key, options] of Object.entries(source)) {
+      if (!Array.isArray(options) || options.length === 0) continue;
+      const target = merged[key] ?? [];
+      const seen = new Set(target.map((opt) => opt.value.trim().replace(/\s+/g, ' ').toLowerCase()));
+      for (const opt of options) {
+        if (!opt || typeof opt.value !== 'string') continue;
+        const value = opt.value.trim();
+        if (!value) continue;
+        const normalized = value.replace(/\s+/g, ' ').toLowerCase();
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        target.push({
+          value,
+          ...(typeof opt.label === 'string' && opt.label ? { label: opt.label } : {}),
+          ...(typeof opt.source === 'string' && opt.source ? { source: opt.source } : {}),
+        });
+      }
+      if (target.length > 0) merged[key] = target;
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+function mergeParsedWithDeterministic(
+  parsed: ParsedAIResult | null,
+  deterministic: ParsedAIResult | null
+): ParsedAIResult | null {
+  if (!deterministic) return parsed;
+  if (!parsed || !parsed.is_readable) return deterministic;
+  // Deterministic fields win for the labels they extract.
+  return {
+    detected_type: deterministic.detected_type || parsed.detected_type,
+    is_readable: true,
+    extracted_fields: {
+      ...parsed.extracted_fields,
+      ...deterministic.extracted_fields,
+    },
+    field_options: mergeFieldOptions(parsed.field_options, deterministic.field_options),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // OpenAI Responses API call
 // POST /v1/responses — replaces chat/completions
 // response_format is intentionally NOT used (incompatible with many models)
@@ -809,9 +1128,9 @@ function getDocTypePriorityHint(selectedDocType: string): string {
     case 'pan_card':
       return 'PRIORITY for this doc type: pan_company (10-char PAN).';
     case 'aadhaar_card':
-      return 'PRIORITY for this doc type: full_name, date_of_birth (DOB, usually DD/MM/YYYY), gender (IMPORTANT: on Indian Aadhaar cards, gender may appear as a standalone word "Male" or "Female" without any "Gender" label prefix; extract that standalone word as gender when clearly visible).';
+      return 'PRIORITY for this doc type: full_name, date_of_birth (DOB, usually DD/MM/YYYY), and gender. GENDER EXTRACTION IS REQUIRED: on Indian Aadhaar cards, the sex/gender almost always appears as a standalone English word "Male" or "Female" (sometimes alongside a Hindi word "पुरुष"/"महिला"/"स्त्री") near the DOB or name. You MUST scan the entire card — front and back — for that standalone word and return it as gender. Do not omit gender unless the card image is so degraded that neither English nor Hindi word is legible anywhere.';
     default:
-      return 'Extract all registration-relevant fields visible on this document.';
+      return 'Extract all registration-relevant fields visible on this document. If the document appears to be an Indian Aadhaar card or identity document, always try to extract gender (Male/Female) even when shown as a standalone word without a "Gender:" label.';
   }
 }
 
@@ -853,7 +1172,7 @@ Rules:
 - gst_number: uppercase alphanumeric, exactly 15 chars
 - Return only fields that truly belong to the document type; do not infer or guess identity fields from non-identity documents.
 - For payment receipts/screenshots, do NOT treat payee/merchant organization text as company_name/company_address.
-- For Aadhaar cards, if "Male" or "Female" appears as a standalone word near the identity details, extract it as gender even without a "Gender:" label.
+- For Aadhaar cards, gender is ALWAYS present. Look for a standalone English word "Male" or "Female" (possibly near Hindi "पुरुष" / "महिला" / "स्त्री") anywhere on the card, even without a "Gender:" label, and return it as gender. Never omit gender from an Aadhaar card unless the entire card is unreadable.
 - For UDYAM / MSME certificates:
   - map "NAME OF ENTERPRISE" to company_name
   - map "OFFICAL ADDRESS OF ENTERPRISE" or "OFFICIAL ADDRESS OF ENTERPRISE" to company_address
@@ -1152,10 +1471,39 @@ Deno.serve(async (req: Request) => {
 
       case 'pdf_text': {
         pipelineUsed = 'pdf_pipeline';
+        const deterministic = buildDeterministicTextExtraction(route.text, selectedDocType);
+        if (deterministic) {
+          const detFieldCount = Object.keys(deterministic.extracted_fields ?? {}).length;
+          console.log(
+            `[extract-document] deterministic_text_extraction detected_type="${deterministic.detected_type}" fields=${detFieldCount}`
+          );
+        }
+
         const r = await runPdfPipeline(apiKey, model, route.text, selectedDocType, reasoningEffort);
         parsed = r.parsed;
         aiError = r.aiError;
-        if (!aiError && (!parsed || parsed.is_readable === false)) {
+
+        // Merge deterministic into a readable AI result (deterministic wins for its labels).
+        if (deterministic && parsed && parsed.is_readable) {
+          parsed = mergeParsedWithDeterministic(parsed, deterministic);
+        }
+
+        // If AI didn't produce a readable result but deterministic did, use deterministic
+        // and clear any AI error so we return ok rather than failing the whole envelope.
+        if (deterministic && (!parsed || parsed.is_readable !== true)) {
+          if (aiError) {
+            console.log(
+              `[extract-document] AI parse failed ("${aiError}") — using deterministic_text_extraction fallback`
+            );
+            aiError = null;
+          } else {
+            console.log('[extract-document] AI returned no readable result — using deterministic_text_extraction fallback');
+          }
+          parsed = deterministic;
+        }
+
+        // Fall through to pdf_vision retry only when deterministic is absent and the AI text path failed.
+        if (!aiError && !deterministic && (!parsed || parsed.is_readable === false)) {
           console.log('[extract-document] pdf_text parse/unreadable, retrying with pdf_vision');
           const retry = await runPdfVisionPipeline(
             apiKey,
@@ -1270,9 +1618,15 @@ Deno.serve(async (req: Request) => {
           enriched = null;
       }
 
-      if (!enriched?.aiError && enriched?.parsed?.is_readable) {
+      // Accept enriched fields from pass 2 even when that pass flagged is_readable=false.
+      // Pass 1 already confirmed the image is readable for this document, so any extra
+      // fields pass 2 produces under the doc-type hint are safe to merge additively.
+      if (!enriched?.aiError && enriched?.parsed) {
         const enrichedFields = sanitizeExtractedFields(enriched.parsed.extracted_fields);
         if (Object.keys(enrichedFields).length > 0) {
+          // Preserve field_options from the parsed result (deterministic-merge output)
+          // since AI enrichment never produces them and re-creating finalParsed would otherwise drop them.
+          const preservedOptions = mergeFieldOptions(finalParsed.field_options, enriched.parsed.field_options);
           finalParsed = {
             detected_type: effectiveDocType,
             is_readable: true,
@@ -1280,6 +1634,7 @@ Deno.serve(async (req: Request) => {
               ...sanitizedFields,
               ...enrichedFields,
             },
+            field_options: preservedOptions,
           };
           sanitizedFields = sanitizeExtractedFields(finalParsed.extracted_fields);
           effectiveDocType = getEffectiveDocType(selectedDocType, finalParsed.detected_type, sanitizedFields);
@@ -1297,10 +1652,27 @@ Deno.serve(async (req: Request) => {
       `fields=${fieldCount} pipeline=${pipelineUsed} detected_type="${finalParsed.detected_type}" effective_doc_type="${effectiveDocType}"`
     );
 
+    // Filter field_options by the same doc-type policy that gates extracted_fields,
+    // so we don't surface candidate options for fields the policy strips.
+    let policyFieldOptions: Record<string, ExtractedFieldOption[]> | undefined;
+    if (finalParsed.field_options) {
+      const allowed = DOC_TYPE_FIELD_POLICY[effectiveDocType];
+      const filtered: Record<string, ExtractedFieldOption[]> = {};
+      for (const [key, opts] of Object.entries(finalParsed.field_options)) {
+        if (!allowed?.has(key)) continue;
+        if (!Array.isArray(opts) || opts.length === 0) continue;
+        filtered[key] = opts;
+      }
+      if (Object.keys(filtered).length > 0) {
+        policyFieldOptions = filtered;
+      }
+    }
+
     return respond({
       detected_type: toSafeDetectedType(finalParsed.detected_type),
       is_readable: finalParsed.is_readable,
       extracted_fields: policyFields,
+      ...(policyFieldOptions ? { field_options: policyFieldOptions } : {}),
       reason_code: 'ok',
       pipeline_used: pipelineUsed,
       input_mime: inputMime,

@@ -24,10 +24,21 @@ export type PipelineUsed =
   | 'office_pipeline'
   | 'none';
 
+export interface ExtractedFieldOption {
+  value: string;
+  label?: string;
+  source?: string;
+}
+
 export interface ExtractionResult {
   detected_type: DetectedDocType;
   is_readable: boolean;
   extracted_fields: Record<string, string>;
+  /**
+   * Optional candidate options keyed by field name (e.g. `company_name`).
+   * Today produced for GST `company_name` (Trade vs Legal); may be empty/undefined.
+   */
+  field_options?: Record<string, ExtractedFieldOption[]>;
   /** Why the extraction succeeded or failed */
   reason_code: ReasonCode;
   /** Which internal pipeline processed the file */
@@ -65,6 +76,32 @@ function buildFailureResult(reasonCode: ReasonCode = 'ai_error'): ExtractionResu
     input_mime: '',
     detected_mime: '',
   };
+}
+
+/**
+ * Defensive parser for the optional `field_options` envelope field.
+ * Drops malformed entries (non-string values, blank values) and ensures
+ * the returned shape is `Record<string, ExtractedFieldOption[]>` or undefined.
+ */
+function parseFieldOptions(raw: unknown): Record<string, ExtractedFieldOption[]> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const result: Record<string, ExtractedFieldOption[]> = {};
+  for (const [key, list] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    const cleaned: ExtractedFieldOption[] = [];
+    for (const entry of list) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+      const e = entry as Record<string, unknown>;
+      const value = typeof e.value === 'string' ? e.value.trim() : '';
+      if (!value) continue;
+      const opt: ExtractedFieldOption = { value };
+      if (typeof e.label === 'string' && e.label.trim()) opt.label = e.label.trim();
+      if (typeof e.source === 'string' && e.source.trim()) opt.source = e.source.trim();
+      cleaned.push(opt);
+    }
+    if (cleaned.length > 0) result[key] = cleaned;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
@@ -136,10 +173,13 @@ export async function extractDocument(
         ? (raw.pipeline_used as PipelineUsed)
         : 'none';
 
+    const fieldOptions = parseFieldOptions(raw.field_options);
+
     return {
       detected_type: detectedType,
       is_readable: Boolean(raw.is_readable),
       extracted_fields: extractedFields,
+      ...(fieldOptions ? { field_options: fieldOptions } : {}),
       reason_code: reasonCode,
       pipeline_used: pipelineUsed,
       input_mime: typeof raw.input_mime === 'string' ? raw.input_mime : '',
