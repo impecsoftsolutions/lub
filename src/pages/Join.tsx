@@ -24,7 +24,9 @@ import {
   DistrictOption,
   CityOption,
   DesignationMaster,
-  type JoinDraftConfigurationErrorCode
+  registrationDraftService,
+  type JoinDraftConfigurationErrorCode,
+  type RegistrationDraftExpectedDocType
 } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { useFormFieldConfig } from '../hooks/useFormFieldConfig';
@@ -34,6 +36,7 @@ import { readFileAsDataURL, validateImageFile, generatePhotoFileName } from '../
 import { normalizeMemberData, type NormalizationResult } from '../lib/normalization';
 import FieldCorrectionStepper, { type FieldCorrectionStep } from '../components/FieldCorrectionStepper';
 import SmartUploadDocument from '../components/SmartUploadDocument';
+import type { SmartDocType, DetectedDocType, ReasonCode } from '../lib/documentExtraction';
 import type { ExtractedFieldOption } from '../lib/documentExtraction';
 import { useMember } from '../contexts/useMember';
 import { supabase } from '../lib/supabase';
@@ -97,7 +100,19 @@ const EMPTY_JOIN_FORM_DATA = {
 };
 
 type JoinFormData = typeof EMPTY_JOIN_FORM_DATA;
-type RegistrationEntryStage = 'choice' | 'smart' | 'form';
+type RegistrationEntryStage = 'smart_steps' | 'smart_review' | 'form';
+
+type GuidedDocType = SmartDocType;
+type GuidedDocStatus = 'pending' | 'completed' | 'skipped' | 'no_document' | 'unreadable_confirmed';
+type GuidedStepMessageTone = 'neutral' | 'success' | 'error';
+
+interface GuidedDocConfig {
+  docType: GuidedDocType;
+  label: string;
+  optional: boolean;
+  supportsNoDocument: boolean;
+  guidance: string;
+}
 
 const JOIN_PREFILL_FIELD_KEYS: Array<keyof JoinFormData> = [
   'full_name',
@@ -196,38 +211,61 @@ const derivePanFromGstNumber = (gstNumber: string): string | null => {
   return sanitized.slice(2, 12);
 };
 
-const SMART_UPLOAD_REQUIRED_DOC_OPTIONS = [
-  {
-    value: 'aadhaar_card',
-    label: 'Aadhaar Card',
-    guidance: 'Useful for name, date of birth, and gender autofill.',
-  },
-  {
-    value: 'gst_certificate',
+const GUIDED_DOC_ORDER: GuidedDocType[] = [
+  'gst_certificate',
+  'udyam_certificate',
+  'pan_card',
+  'aadhaar_card',
+  'payment_proof',
+];
+
+const GUIDED_DOC_CONFIGS: Record<GuidedDocType, GuidedDocConfig> = {
+  gst_certificate: {
+    docType: 'gst_certificate',
     label: 'GST Certificate',
-    guidance: 'Useful for GST number, business name, address, and location autofill.',
+    optional: true,
+    supportsNoDocument: true,
+    guidance: "Upload your GST certificate. Skip if you don't have GST.",
   },
-  {
-    value: 'pan_card',
-    label: 'PAN Card (Company)',
-    guidance: 'Useful when PAN is not clearly available from GST data.',
+  udyam_certificate: {
+    docType: 'udyam_certificate',
+    label: 'Udyam Certificate',
+    optional: true,
+    supportsNoDocument: true,
+    guidance: "Upload your Udyam certificate. Skip if you don't have one.",
   },
-  {
-    value: 'payment_proof',
+  pan_card: {
+    docType: 'pan_card',
+    label: 'Company PAN Card',
+    optional: true,
+    supportsNoDocument: false,
+    guidance: 'Upload your company PAN card to auto-fill PAN details.',
+  },
+  aadhaar_card: {
+    docType: 'aadhaar_card',
+    label: 'Aadhaar Card',
+    optional: true,
+    supportsNoDocument: false,
+    guidance: 'Optional. Upload Aadhaar to auto-fill name, DOB, and gender.',
+  },
+  payment_proof: {
+    docType: 'payment_proof',
     label: 'Payment Proof',
-    guidance: 'Required to complete registration payment verification.',
+    optional: false,
+    supportsNoDocument: false,
+    guidance: 'Required to submit. Upload your payment receipt or screenshot.',
   },
-  {
-    value: 'udyam_certificate',
-    label: 'UDYAM Certificate',
-    guidance: 'Useful for MSME business details, activity type, and products/services.',
-  },
-  {
-    value: 'others',
-    label: 'Others',
-    guidance: '',
-  },
-] as const;
+};
+
+const STORABLE_DRAFT_TYPES: ReadonlySet<GuidedDocType> = new Set<GuidedDocType>([
+  'gst_certificate',
+  'udyam_certificate',
+  'payment_proof',
+]);
+const EXTRACT_ONLY_DRAFT_TYPES: ReadonlySet<GuidedDocType> = new Set<GuidedDocType>([
+  'pan_card',
+  'aadhaar_card',
+]);
 
 const SMART_AUTOFILL_ALLOWED = new Set([
   'full_name', 'date_of_birth', 'gender',
@@ -331,12 +369,33 @@ const Join: React.FC = () => {
   // Form state
   const [formData, setFormData] = useState<JoinFormData>(EMPTY_JOIN_FORM_DATA);
   const [registrationEntryStage, setRegistrationEntryStage] = useState<RegistrationEntryStage>(
-    isPreviewMode ? 'form' : 'choice'
+    isPreviewMode ? 'form' : 'smart_steps'
   );
   const [smartUploadDraft, setSmartUploadDraft] = useState<Record<string, string>>({});
   const [smartUploadReviewData, setSmartUploadReviewData] = useState<Record<string, string>>({});
   const [smartUploadFieldOptions, setSmartUploadFieldOptions] = useState<Record<string, ExtractedFieldOption[]>>({});
-  const [smartUploadGuideDoc, setSmartUploadGuideDoc] = useState<string>('payment_proof');
+  const guidedSelectedDocs: GuidedDocType[] = GUIDED_DOC_ORDER;
+  const [guidedStepIndex, setGuidedStepIndex] = useState(0);
+  const [guidedDocStatus, setGuidedDocStatus] = useState<Record<GuidedDocType, GuidedDocStatus>>({
+    gst_certificate: 'pending',
+    udyam_certificate: 'pending',
+    pan_card: 'pending',
+    aadhaar_card: 'pending',
+    payment_proof: 'pending',
+  });
+  const [guidedStepMessage, setGuidedStepMessage] = useState<string>('');
+  const [guidedStepMessageTone, setGuidedStepMessageTone] = useState<GuidedStepMessageTone>('neutral');
+  // Per-doc extracted fields, captured at extraction time so the inline
+  // preview panel can show only the current step's extracted values.
+  const [perDocExtractedFields, setPerDocExtractedFields] = useState<
+    Partial<Record<GuidedDocType, Record<string, string>>>
+  >({});
+  // Server-side draft document IDs for re-extract / cleanup. Populated as
+  // saveDocument / uploadDocumentFile RPCs return them.
+  const [draftDocumentIds, setDraftDocumentIds] = useState<
+    Partial<Record<GuidedDocType, string>>
+  >({});
+  const hasHydratedDraftRef = useRef(false);
   const applyPrefillFromSources = useCallback((
     current: JoinFormData,
     sources: Array<Record<string, unknown>>
@@ -445,6 +504,25 @@ const Join: React.FC = () => {
 
   const hideToast = useCallback(() => {
     setToast(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  // Ensure a hard refresh on /join always starts from top instead of restoring
+  // browser scroll position near the footer.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    const forceTop = () => window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    forceTop();
+    const rafId = window.requestAnimationFrame(forceTop);
+    const timeoutId = window.setTimeout(forceTop, 120);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
   }, []);
 
   const isFieldApplicable = useCallback(
@@ -1207,7 +1285,7 @@ const Join: React.FC = () => {
     }
   };
 
-  const handleFileChange = (fileType: keyof typeof files, file: File | null) => {
+  const handleFileChange = useCallback((fileType: keyof typeof files, file: File | null) => {
     setFiles(prev => ({ ...prev, [fileType]: file }));
     const errorKeyMap: Record<keyof typeof files, string> = {
       gstCertificate: 'gst_certificate_url',
@@ -1215,15 +1293,16 @@ const Join: React.FC = () => {
       paymentProof: 'payment_proof_url'
     };
     const errorKey = errorKeyMap[fileType];
-    if (errorKey && errors[errorKey]) {
+    if (errorKey) {
       setErrors(prev => {
+        if (!prev[errorKey]) return prev;
         const next = { ...prev };
         delete next[errorKey];
         return next;
       });
     }
     setIsVerifiedForSubmit(false);
-  };
+  }, []);
 
   // Smart Upload callbacks
   const applySmartFieldsToJoinData = useCallback((current: JoinFormData, fields: Record<string, string>) => {
@@ -1301,6 +1380,175 @@ const Join: React.FC = () => {
 
     return normalized;
   }, [availableCities, availableDistricts, availableStates, resolveFieldOptions]);
+
+  // Restore server-side Smart Upload draft state for the current user.
+  // This keeps guided-step progress and extracted details visible across refreshes.
+  useEffect(() => {
+    if (isPreviewMode || isLoadingAuth || !isAuthenticated || hasRegistrationRecord !== false) {
+      return;
+    }
+    // Session token can arrive slightly after auth state on hard refresh.
+    // Avoid locking hydration as "done" until a token-backed draft fetch succeeds
+    // (or we definitively learn no draft exists).
+    const sessionToken = sessionManager.getSessionToken();
+    if (!sessionToken) {
+      return;
+    }
+    if (hasHydratedDraftRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    let retryTimer: number | null = null;
+    let retryCount = 0;
+    const maxInvalidSessionRetries = 4;
+
+    const hydrateDraft = async () => {
+      const draftResult = await registrationDraftService.getDraft();
+      if (cancelled) {
+        return;
+      }
+      if (!draftResult.success) {
+        if (draftResult.errorCode === 'invalid_session' && retryCount < maxInvalidSessionRetries) {
+          retryCount += 1;
+          retryTimer = window.setTimeout(() => {
+            void hydrateDraft();
+          }, 350);
+          return;
+        }
+        if (draftResult.errorCode !== 'no_draft') {
+          console.warn('[Join] Draft hydration failed (non-blocking):', draftResult.error ?? draftResult.errorCode ?? 'unknown_error');
+        }
+        hasHydratedDraftRef.current = true;
+        return;
+      }
+      if (!draftResult.draft) {
+        hasHydratedDraftRef.current = true;
+        return;
+      }
+
+      const nextStatuses: Record<GuidedDocType, GuidedDocStatus> = {
+        gst_certificate: 'pending',
+        udyam_certificate: 'pending',
+        pan_card: 'pending',
+        aadhaar_card: 'pending',
+        payment_proof: 'pending',
+      };
+      const nextDraftDocumentIds: Partial<Record<GuidedDocType, string>> = {};
+      const nextPerDocFields: Partial<Record<GuidedDocType, Record<string, string>>> = {};
+      const mergedReviewData: Record<string, string> = {};
+      const mergedDraftData: Record<string, string> = {};
+      const mergedFieldOptions: Record<string, ExtractedFieldOption[]> = {};
+
+      for (const doc of draftResult.documents) {
+        const expected = doc.expected_doc_type as GuidedDocType;
+        if (!GUIDED_DOC_ORDER.includes(expected)) {
+          continue;
+        }
+
+        nextDraftDocumentIds[expected] = doc.id;
+        switch (doc.status) {
+          case 'extracted':
+            nextStatuses[expected] = 'completed';
+            break;
+          case 'unreadable':
+            nextStatuses[expected] = 'unreadable_confirmed';
+            break;
+          case 'skipped':
+            nextStatuses[expected] = 'skipped';
+            break;
+          case 'no_document':
+            nextStatuses[expected] = 'no_document';
+            if (expected === 'gst_certificate') {
+              mergedDraftData.gst_registered = 'no';
+            }
+            break;
+          default:
+            nextStatuses[expected] = 'pending';
+        }
+
+        const rawFields =
+          doc.extracted_fields && typeof doc.extracted_fields === 'object'
+            ? (doc.extracted_fields as Record<string, unknown>)
+            : {};
+        const stringFields: Record<string, string> = {};
+        for (const [fieldKey, fieldValue] of Object.entries(rawFields)) {
+          const text = String(fieldValue ?? '').trim();
+          if (!text) continue;
+          stringFields[fieldKey] = text;
+        }
+        const normalizedFields = normalizeSmartUploadFields(stringFields);
+        if (Object.keys(normalizedFields).length > 0) {
+          nextPerDocFields[expected] = normalizedFields;
+          Object.assign(mergedReviewData, normalizedFields);
+          Object.assign(mergedDraftData, normalizedFields);
+        }
+
+        const rawOptions =
+          doc.field_options && typeof doc.field_options === 'object'
+            ? (doc.field_options as Record<string, unknown>)
+            : {};
+        for (const [fieldKey, list] of Object.entries(rawOptions)) {
+          if (!Array.isArray(list)) continue;
+          const existing = mergedFieldOptions[fieldKey] ?? [];
+          const seen = new Set(
+            existing.map(opt => opt.value.trim().replace(/\s+/g, ' ').toLowerCase())
+          );
+          const merged = [...existing];
+          for (const option of list) {
+            if (!option || typeof option !== 'object') continue;
+            const value = String((option as { value?: unknown }).value ?? '').trim();
+            if (!value) continue;
+            const normalized = value.replace(/\s+/g, ' ').toLowerCase();
+            if (seen.has(normalized)) continue;
+            seen.add(normalized);
+            const labelRaw = (option as { label?: unknown }).label;
+            const sourceRaw = (option as { source?: unknown }).source;
+            merged.push({
+              value,
+              ...(typeof labelRaw === 'string' && labelRaw.trim() ? { label: labelRaw.trim() } : {}),
+              ...(typeof sourceRaw === 'string' && sourceRaw.trim() ? { source: sourceRaw.trim() } : {}),
+            });
+          }
+          if (merged.length > 0) {
+            mergedFieldOptions[fieldKey] = merged;
+          }
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      hasHydratedDraftRef.current = true;
+      setGuidedDocStatus(nextStatuses);
+      setDraftDocumentIds(nextDraftDocumentIds);
+      setPerDocExtractedFields(nextPerDocFields);
+      setSmartUploadReviewData(prev => ({ ...prev, ...mergedReviewData }));
+      setSmartUploadDraft(prev => ({ ...prev, ...mergedDraftData }));
+      setSmartUploadFieldOptions(prev => ({ ...prev, ...mergedFieldOptions }));
+
+      const firstIncompleteIndex = GUIDED_DOC_ORDER.findIndex(docType => {
+        const status = nextStatuses[docType];
+        return status !== 'completed' && status !== 'skipped' && status !== 'no_document' && status !== 'unreadable_confirmed';
+      });
+
+      if (firstIncompleteIndex === -1) {
+        setRegistrationEntryStage('smart_review');
+      } else {
+        setRegistrationEntryStage('smart_steps');
+        setGuidedStepIndex(firstIncompleteIndex);
+      }
+    };
+
+    void hydrateDraft();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+      }
+    };
+  }, [hasRegistrationRecord, isAuthenticated, isLoadingAuth, isPreviewMode, normalizeSmartUploadFields]);
 
   const hydrateSmartUploadLocationFields = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = { ...fields };
@@ -1393,6 +1641,12 @@ const Join: React.FC = () => {
     products_services: smartUploadDraft.products_services ?? formData.products_services,
   };
 
+  const currentGuidedDocType: GuidedDocType | null = guidedSelectedDocs[guidedStepIndex] ?? null;
+  const currentGuidedDocConfig = currentGuidedDocType ? GUIDED_DOC_CONFIGS[currentGuidedDocType] : null;
+  const currentGuidedStatus = currentGuidedDocType ? guidedDocStatus[currentGuidedDocType] : null;
+  const guidedTotalSteps = guidedSelectedDocs.length;
+  const guidedStepNumber = currentGuidedDocType ? guidedStepIndex + 1 : 0;
+
   const handleSmartDraftAutofill = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = await hydrateSmartUploadLocationFields(fields);
     setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
@@ -1441,6 +1695,268 @@ const Join: React.FC = () => {
     setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
   }, [hydrateSmartUploadLocationFields]);
 
+  const moveGuidedStep = useCallback((direction: 'next' | 'back') => {
+    if (direction === 'back') {
+      setGuidedStepIndex(prev => Math.max(0, prev - 1));
+      setGuidedStepMessage('');
+      setGuidedStepMessageTone('neutral');
+      return;
+    }
+
+    if (guidedStepIndex >= guidedSelectedDocs.length - 1) {
+      setRegistrationEntryStage('smart_review');
+      setGuidedStepMessage('');
+      setGuidedStepMessageTone('neutral');
+      return;
+    }
+    setGuidedStepIndex(prev => Math.min(guidedSelectedDocs.length - 1, prev + 1));
+    setGuidedStepMessage('');
+    setGuidedStepMessageTone('neutral');
+  }, [guidedSelectedDocs, guidedStepIndex]);
+
+  const markCurrentGuidedDoc = useCallback((
+    status: GuidedDocStatus,
+    message = '',
+    tone: GuidedStepMessageTone = 'neutral'
+  ) => {
+    if (!currentGuidedDocType) return;
+    setGuidedDocStatus(prev => ({ ...prev, [currentGuidedDocType]: status }));
+    setGuidedStepMessage(message);
+    setGuidedStepMessageTone(tone);
+  }, [currentGuidedDocType]);
+
+  const persistDraftSkip = useCallback(async (
+    docType: GuidedDocType,
+    skipStatus: 'skipped' | 'no_document',
+  ) => {
+    try {
+      const isExtractOnly = EXTRACT_ONLY_DRAFT_TYPES.has(docType);
+      // If we previously saved a stored file for this doc, drop it now so
+      // server state matches the user's "skip" intent.
+      const existingId = draftDocumentIds[docType];
+      if (existingId) {
+        await registrationDraftService.deleteDocument(existingId);
+        setDraftDocumentIds(prev => {
+          const next = { ...prev };
+          delete next[docType];
+          return next;
+        });
+      }
+      const result = await registrationDraftService.saveDocument({
+        expectedDocType: docType as RegistrationDraftExpectedDocType,
+        status: skipStatus,
+        isExtractOnly,
+        extractedFields: {},
+        fieldOptions: {},
+      });
+      if (result.success && result.documentId) {
+        setDraftDocumentIds(prev => ({ ...prev, [docType]: result.documentId! }));
+      }
+    } catch (err) {
+      // Best effort — never block the flow on draft persistence failures.
+      console.warn('[Join] persistDraftSkip failed:', err);
+    }
+  }, [draftDocumentIds]);
+
+  const persistDraftExtraction = useCallback(async (
+    docType: GuidedDocType,
+    event: {
+      status: 'extracted' | 'unreadable' | 'failed';
+      detectedDocType: DetectedDocType;
+      extractedFields: Record<string, string>;
+      reasonCode: ReasonCode | null;
+      file: File;
+    },
+  ) => {
+    try {
+      const isStorable = STORABLE_DRAFT_TYPES.has(docType);
+      const isExtractOnly = EXTRACT_ONLY_DRAFT_TYPES.has(docType);
+      const optionsForDoc: Record<string, ExtractedFieldOption[]> = {};
+      for (const fieldKey of Object.keys(event.extractedFields ?? {})) {
+        const opts = smartUploadFieldOptions[fieldKey];
+        if (opts && opts.length > 0) optionsForDoc[fieldKey] = opts;
+      }
+
+      // Map smart-upload event status to the persistence enum.
+      const persistedStatus =
+        event.status === 'extracted' ? 'extracted'
+        : event.status === 'unreadable' ? 'unreadable'
+        : 'failed';
+
+      let storagePath: string | null = null;
+      let fileMime: string | null = null;
+      let fileSizeBytes: number | null = null;
+      let originalFilename: string | null = null;
+      let documentIdFromUpload: string | undefined;
+
+      // Replace any prior storage object for this doc-type before re-uploading.
+      if (isStorable) {
+        const existingId = draftDocumentIds[docType];
+        if (existingId) {
+          await registrationDraftService.deleteDocument(existingId);
+        }
+        const upload = await registrationDraftService.uploadDocumentFile(
+          docType as RegistrationDraftExpectedDocType,
+          event.file,
+        );
+        if (upload.success) {
+          storagePath = upload.storagePath ?? null;
+          fileMime = upload.fileMime ?? event.file.type ?? null;
+          fileSizeBytes = upload.fileSizeBytes ?? event.file.size ?? null;
+          originalFilename = upload.originalFilename ?? event.file.name ?? null;
+          documentIdFromUpload = upload.documentId;
+        } else {
+          console.warn('[Join] draft upload failed (non-blocking):', upload.error);
+        }
+      }
+
+      const result = await registrationDraftService.saveDocument({
+        expectedDocType: docType as RegistrationDraftExpectedDocType,
+        status: persistedStatus,
+        detectedDocType: event.detectedDocType ?? null,
+        reasonCode: event.reasonCode ?? null,
+        isExtractOnly,
+        storagePath,
+        fileMime,
+        fileSizeBytes,
+        originalFilename,
+        extractedFields: event.extractedFields ?? {},
+        fieldOptions: optionsForDoc,
+        selectedOptions: {},
+      });
+      const finalDocId = result.documentId ?? documentIdFromUpload;
+      if (result.success && finalDocId) {
+        setDraftDocumentIds(prev => ({ ...prev, [docType]: finalDocId }));
+      }
+    } catch (err) {
+      console.warn('[Join] persistDraftExtraction failed:', err);
+    }
+  }, [draftDocumentIds, smartUploadFieldOptions]);
+
+  const handleGuidedSkipCurrent = useCallback(() => {
+    if (!currentGuidedDocType) return;
+    let skipStatus: 'skipped' | 'no_document' = 'skipped';
+    if (currentGuidedDocType === 'gst_certificate') {
+      setFormData(prev => ({
+        ...prev,
+        gst_registered: 'no',
+        gst_number: '',
+      }));
+      handleFileChange('gstCertificate', null);
+      markCurrentGuidedDoc('no_document');
+      skipStatus = 'no_document';
+    } else if (currentGuidedDocType === 'udyam_certificate') {
+      handleFileChange('udyamCertificate', null);
+      markCurrentGuidedDoc('skipped');
+    } else {
+      markCurrentGuidedDoc('skipped');
+    }
+    setPerDocExtractedFields(prev => {
+      const next = { ...prev };
+      delete next[currentGuidedDocType];
+      return next;
+    });
+    void persistDraftSkip(currentGuidedDocType, skipStatus);
+    setIsVerifiedForSubmit(false);
+    setGuidedStepMessage('');
+    setGuidedStepMessageTone('neutral');
+    moveGuidedStep('next');
+  }, [currentGuidedDocType, handleFileChange, markCurrentGuidedDoc, moveGuidedStep, persistDraftSkip]);
+
+  const handleGuidedDocumentProcessed = useCallback((event: {
+    status: 'extracted' | 'unreadable' | 'failed';
+    detectedDocType: DetectedDocType;
+    extractedFields: Record<string, string>;
+    reasonCode: ReasonCode | null;
+    file: File;
+  }) => {
+    if (!currentGuidedDocType || registrationEntryStage !== 'smart_steps') {
+      return;
+    }
+
+    // Capture per-doc extracted fields for the inline review panel,
+    // regardless of whether the doc is storable or extract-only.
+    if (event.status === 'extracted' && event.extractedFields) {
+      setPerDocExtractedFields(prev => ({
+        ...prev,
+        [currentGuidedDocType]: { ...event.extractedFields },
+      }));
+    }
+
+    if (currentGuidedDocType === 'payment_proof') {
+      if (event.status === 'failed') {
+        setGuidedStepMessage('Payment proof upload failed. Please retry.');
+        setGuidedStepMessageTone('error');
+        void persistDraftExtraction(currentGuidedDocType, event);
+        return;
+      }
+      // Payment proof upload itself counts for submit gating; extraction can be unreadable.
+      handleFileChange('paymentProof', event.file);
+      if (event.status === 'unreadable') {
+        markCurrentGuidedDoc('unreadable_confirmed', 'Payment proof uploaded. Extraction was unreadable; you can fill payment details manually.', 'error');
+      } else {
+        markCurrentGuidedDoc('completed', 'Payment proof uploaded and processed.', 'success');
+      }
+      void persistDraftExtraction(currentGuidedDocType, event);
+      return;
+    }
+
+    if (event.status === 'failed' || event.status === 'unreadable') {
+      setGuidedStepMessage('Document could not be read clearly. Retry or skip this step.');
+      setGuidedStepMessageTone('error');
+      void persistDraftExtraction(currentGuidedDocType, event);
+      return;
+    }
+
+    if (event.detectedDocType === currentGuidedDocType) {
+      markCurrentGuidedDoc('completed', `${GUIDED_DOC_CONFIGS[currentGuidedDocType].label} processed.`, 'success');
+      void persistDraftExtraction(currentGuidedDocType, event);
+      return;
+    }
+
+    setGuidedStepMessage(
+      `Uploaded document was detected as ${
+        event.detectedDocType === 'unknown' ? 'Unknown' : event.detectedDocType.replace(/_/g, ' ')
+      }. Please upload a valid ${GUIDED_DOC_CONFIGS[currentGuidedDocType].label}.`
+    );
+    setGuidedStepMessageTone('error');
+    // Persist the wrong-doc detection so the draft reflects user's last
+    // attempt; skip storage upload (file is not what they expected).
+    void persistDraftExtraction(currentGuidedDocType, { ...event, status: 'failed' });
+  }, [currentGuidedDocType, handleFileChange, markCurrentGuidedDoc, persistDraftExtraction, registrationEntryStage]);
+
+  const canAdvanceCurrentGuidedStep = (() => {
+    if (!currentGuidedDocType || !currentGuidedStatus) return false;
+    if (currentGuidedDocType === 'payment_proof') {
+      return (
+        currentGuidedStatus === 'skipped' ||
+        currentGuidedStatus === 'completed' || currentGuidedStatus === 'unreadable_confirmed'
+      ) || Boolean(files.paymentProof);
+    }
+    return currentGuidedStatus === 'completed' || currentGuidedStatus === 'skipped' || currentGuidedStatus === 'no_document';
+  })();
+
+  // Single Next handler that replaces the previous Skip + Continue pattern.
+  // - If the step is already in an advanceable state, just move forward.
+  // - Otherwise, for non-payment optional docs, auto-skip via the existing
+  //   skip pipeline (which handles persistence and advance).
+  // - On payment_proof, we always allow advancing to review; the final
+  //   submit gate (validateForm) still requires the file before submission.
+  const handleGuidedNext = useCallback(() => {
+    if (!currentGuidedDocType) return;
+    if (canAdvanceCurrentGuidedStep) {
+      moveGuidedStep('next');
+      return;
+    }
+    if (currentGuidedDocType === 'payment_proof') {
+      moveGuidedStep('next');
+      return;
+    }
+    // GST / Udyam / PAN / Aadhaar — auto-skip when the user has not done
+    // anything actionable on this step yet.
+    handleGuidedSkipCurrent();
+  }, [canAdvanceCurrentGuidedStep, currentGuidedDocType, handleGuidedSkipCurrent, moveGuidedStep]);
+
   const handleContinueFromSmartDraft = useCallback(async () => {
     if (Object.keys(smartUploadDraft).length > 0) {
       const hydratedFields = await hydrateSmartUploadLocationFields(smartUploadDraft);
@@ -1449,6 +1965,8 @@ const Join: React.FC = () => {
     setSmartUploadDraft({});
     setSmartUploadReviewData({});
     setSmartUploadFieldOptions({});
+    setGuidedStepMessage('');
+    setGuidedStepMessageTone('neutral');
     setRegistrationEntryStage('form');
     setIsVerifiedForSubmit(false);
   }, [applySmartFieldsToJoinData, hydrateSmartUploadLocationFields, smartUploadDraft]);
@@ -1480,20 +1998,20 @@ const Join: React.FC = () => {
   const getSmartUploadReviewSourceText = useCallback((fieldKey: string, extractedValue: string) => {
     const currentValue = String(formData[fieldKey as keyof JoinFormData] ?? '').trim();
     if (!currentValue) {
-      return 'Document extracted value';
+      return 'From your document';
     }
 
     const currentComparable = normalizeComparableValue(currentValue);
     const extractedComparable = normalizeComparableValue(extractedValue);
     if (currentComparable === extractedComparable) {
-      return 'Document matches current account/form value';
+      return 'Matches your account';
     }
 
     if (fieldKey === 'gender') {
-      return 'Document overrides current account/form value';
+      return 'Replaces your earlier entry';
     }
 
-    return 'Document differs from current account/form value';
+    return 'Different from your earlier entry';
   }, [formData]);
 
   const handleSmartFileReady = useCallback(
@@ -1620,6 +2138,12 @@ const Join: React.FC = () => {
         }
       }
     });
+
+    // Product requirement: payment proof must exist before final submit,
+    // even when users choose to fill the form manually first.
+    if (!isPreviewMode && !files.paymentProof) {
+      newErrors.payment_proof_url = 'Payment Proof is required';
+    }
 
     // Conditional city validation based on is_custom_city flag
     // This handles both standard city selection and custom "Other" city entry
@@ -2214,53 +2738,79 @@ const Join: React.FC = () => {
         {/* Registration Form */}
         <div className="bg-card rounded-lg shadow-sm p-8">
           {shouldShowRegistrationEntryStage ? (
-            registrationEntryStage === 'choice' ? (
+            registrationEntryStage === 'smart_steps' ? (
               <div className="space-y-6">
-                <div className="rounded-lg border border-border bg-muted/20 p-5">
-                  <h2 className="text-section font-semibold text-foreground mb-2">Choose how you want to complete registration</h2>
-                  <p className="text-sm text-muted-foreground">
-                    You can upload documents first for smart prefill, or open the form directly and fill it manually.
-                  </p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setRegistrationEntryStage('smart')}
-                    className="rounded-xl border border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/10"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Upload className="h-5 w-5 text-primary" />
-                      <h3 className="text-base font-semibold text-foreground">Use Smart Upload</h3>
+                {currentGuidedDocConfig ? (
+                  <div className="space-y-3">
+                    {/* Compact progress stepper */}
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {GUIDED_DOC_ORDER.map((docType, idx) => {
+                        const isCurrent = idx === guidedStepIndex;
+                        const isCompleted = idx < guidedStepIndex;
+                        const shortLabels: Record<GuidedDocType, string> = {
+                          gst_certificate: 'GST',
+                          udyam_certificate: 'Udyam',
+                          pan_card: 'PAN',
+                          aadhaar_card: 'Aadhaar',
+                          payment_proof: 'Payment',
+                        };
+                        return (
+                          <React.Fragment key={docType}>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all ${
+                                  isCurrent
+                                    ? 'bg-primary text-primary-foreground ring-2 ring-primary/25 shadow-sm'
+                                    : isCompleted
+                                      ? 'bg-primary/15 text-primary'
+                                      : 'bg-muted text-muted-foreground'
+                                }`}
+                                aria-current={isCurrent ? 'step' : undefined}
+                              >
+                                {isCompleted ? '✓' : idx + 1}
+                              </span>
+                              <span
+                                className={`hidden sm:inline text-xs font-medium ${
+                                  isCurrent
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground'
+                                }`}
+                              >
+                                {shortLabels[docType]}
+                              </span>
+                            </div>
+                            {idx < GUIDED_DOC_ORDER.length - 1 && (
+                              <span
+                                aria-hidden="true"
+                                className={`h-px flex-1 min-w-[8px] ${
+                                  isCompleted ? 'bg-primary/40' : 'bg-border'
+                                }`}
+                              />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Upload your documents first, review the extracted details, then continue to the registration form with matching fields prefilled.
-                    </p>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setRegistrationEntryStage('form')}
-                    className="rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <h3 className="text-base font-semibold text-foreground">Fill Form Manually</h3>
+                    {/* Now-uploading focus card */}
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/80">
+                        Now uploading · Step {guidedStepNumber} of {guidedTotalSteps}
+                      </p>
+                      <h2 className="mt-1 text-lg sm:text-xl font-semibold text-foreground">
+                        {currentGuidedDocConfig.label}
+                      </h2>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {currentGuidedDocConfig.guidance}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Open the Member Registration form directly. The in-form Smart Upload block will still remain available if you need it later.
-                    </p>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-5">
-                  <h2 className="text-section font-semibold text-foreground mb-2">Smart Upload-assisted registration</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Upload the documents you have, import the extracted data, review it, and then continue to the Member Registration form.
-                  </p>
-                </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-5">
+                    <h2 className="text-section font-semibold text-foreground mb-2">Smart Upload-assisted registration</h2>
+                    <p className="text-sm text-muted-foreground">Upload your selected documents in sequence.</p>
+                  </div>
+                )}
 
                 <SmartUploadDocument
                   formFieldValues={smartUploadDraftFieldValues}
@@ -2269,24 +2819,114 @@ const Join: React.FC = () => {
                   onFileReady={handleSmartFileReady}
                   onExtractedFieldsDetected={handleSmartDraftExtractedFields}
                   onExtractedFieldOptionsDetected={handleSmartDraftFieldOptionsDetected}
+                  onDocumentProcessed={handleGuidedDocumentProcessed}
+                  selectedDocType={currentGuidedDocType ?? 'unknown'}
                   forceDocumentPrecedenceFields={['gender']}
                   normalizeExtractedFields={normalizeSmartUploadFields}
-                  extraControls={
-                    <select
-                      value={smartUploadGuideDoc}
-                      onChange={(event) => setSmartUploadGuideDoc(event.target.value)}
-                      className="min-w-[220px] rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                      aria-label="Document type"
-                    >
-                      {SMART_UPLOAD_REQUIRED_DOC_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  }
+                  disableConflictModal={registrationEntryStage === 'smart_steps'}
                   disabled={false}
                 />
+
+                {guidedStepMessage && (
+                  <p className={`text-xs ${
+                    guidedStepMessageTone === 'error'
+                      ? 'text-red-600 dark:text-red-400'
+                      : guidedStepMessageTone === 'success'
+                        ? 'text-green-700 dark:text-green-400'
+                        : 'text-muted-foreground'
+                  }`}>
+                    {guidedStepMessage}
+                  </p>
+                )}
+
+                <div className="flex flex-row gap-3 justify-between items-center">
+                  <button
+                    type="button"
+                    onClick={() => moveGuidedStep('back')}
+                    disabled={guidedStepIndex === 0}
+                    className={`inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      guidedStepIndex === 0
+                        ? 'text-muted-foreground/60 cursor-not-allowed'
+                        : 'text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGuidedNext}
+                    className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    {guidedStepIndex >= guidedSelectedDocs.length - 1 ? 'Review Details' : 'Next'}
+                  </button>
+                </div>
+
+                {currentGuidedDocType && perDocExtractedFields[currentGuidedDocType] && (() => {
+                  const fields = perDocExtractedFields[currentGuidedDocType] ?? {};
+                  const entries = Object.entries(fields).filter(([, v]) => String(v ?? '').trim() !== '');
+                  if (entries.length === 0) return null;
+                  return (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/80">
+                          Auto-filled details
+                        </p>
+                        <span className="text-[11px] text-muted-foreground">
+                          {entries.length} field{entries.length === 1 ? '' : 's'} from {currentGuidedDocConfig?.label}
+                        </span>
+                      </div>
+                      <dl className="space-y-2">
+                        {entries.map(([fieldKey, value]) => {
+                          const options = smartUploadFieldOptions[fieldKey] ?? [];
+                          const showCandidates = options.length >= 2;
+                          const normalizedSelected = String(value).trim().replace(/\s+/g, ' ').toLowerCase();
+                          return (
+                            <div key={fieldKey} className="flex flex-col gap-1">
+                              <dt className="text-[11px] font-bold uppercase tracking-wide text-foreground/90">
+                                {resolveFieldLabel(fieldKey, fallbackFieldLabel(fieldKey))}
+                              </dt>
+                              <dd className="text-sm text-foreground break-words">
+                                {formatSmartUploadReviewValue(fieldKey, String(value))}
+                              </dd>
+                              {showCandidates && (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {options.map((opt) => {
+                                    const optNormalized = opt.value.trim().replace(/\s+/g, ' ').toLowerCase();
+                                    const isSelected = optNormalized === normalizedSelected;
+                                    return (
+                                      <button
+                                        key={`${fieldKey}-${opt.label ?? opt.value}-${opt.value}`}
+                                        type="button"
+                                        onClick={() => handleSmartUploadCandidateSelect(fieldKey, opt.value)}
+                                        className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                                          isSelected
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/50'
+                                        }`}
+                                        aria-pressed={isSelected}
+                                      >
+                                        {opt.label ? `${opt.label}: ${opt.value}` : opt.value}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </dl>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-5">
+                  <h2 className="text-section font-semibold text-foreground mb-2">Review your details</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Check the details below. Where we found more than one option, pick the right one. Then continue.
+                  </p>
+                </div>
 
                 <div className="rounded-lg border border-border bg-card p-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3">Extracted data review</h3>
@@ -2341,13 +2981,13 @@ const Join: React.FC = () => {
                       })}
                       {smartUploadGenderMissing && (
                         <p className="italic text-sm text-red-800 dark:text-red-400">
-                          Unable to extract gender
+                          Gender not found — please pick it on the form.
                         </p>
                       )}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No extracted fields yet. Upload documents and click Import Data to prepare prefill before continuing.
+                      Nothing was auto-filled. You can continue and enter details on the form.
                     </p>
                   )}
                 </div>
@@ -2355,23 +2995,17 @@ const Join: React.FC = () => {
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.history.length > 1) {
-                        navigate(-1);
-                      } else {
-                        navigate('/');
-                      }
-                    }}
+                    onClick={() => setRegistrationEntryStage('smart_steps')}
                     className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
                   >
-                    Back
+                    Back to Uploads
                   </button>
                   <button
                     type="button"
                     onClick={handleContinueFromSmartDraft}
                     className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                   >
-                    Continue to Member Registration Form
+                    Continue to Form
                   </button>
                 </div>
               </div>

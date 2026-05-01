@@ -49,6 +49,25 @@ const Header: React.FC = () => {
   }, [member]);
 
   useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setIsJoinDropdownOpen(false);
+    setIsUserDropdownOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        setIsJoinDropdownOpen(false);
+        setIsUserDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
         setIsUserDropdownOpen(false);
@@ -121,20 +140,20 @@ const Header: React.FC = () => {
   return (
     <header className="bg-card border-b-2 border-border sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-14 sm:h-16">
           <Link to="/" className="flex items-center space-x-3">
             {orgLogo ? (
               <img 
                 src={orgLogo} 
                 alt="LUB Logo" 
-                className="w-10 h-10 object-contain rounded-lg"
+                className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-lg"
               />
             ) : (
-              <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">L</span>
               </div>
             )}
-            <span className="text-2xl font-bold text-orange-500">LUB</span>
+            <span className="text-xl sm:text-2xl font-bold text-orange-500">LUB</span>
           </Link>
 
           <nav className="hidden md:flex items-center space-x-8">
@@ -309,20 +328,22 @@ const Header: React.FC = () => {
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-border py-4">
-            <div className="flex flex-col space-y-3">
+          <div className="md:hidden border-t border-border py-3 max-h-[calc(100vh-3.5rem)] overflow-y-auto">
+            <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`px-3 py-2 text-base font-medium transition-colors duration-200 ${
+                  className={`rounded-lg px-3 py-3 text-base font-medium transition-colors duration-200 ${
                     isActiveLink(link.path)
                       ? 'text-primary bg-primary/10'
                       : 'text-foreground hover:text-primary'
@@ -338,7 +359,7 @@ const Header: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="px-3 py-2 text-base font-medium transition-colors duration-200 flex items-center gap-2 text-foreground hover:text-primary"
+                  className="rounded-lg px-3 py-3 text-base font-medium transition-colors duration-200 flex items-center gap-2 text-foreground hover:text-primary"
                 >
                   <Shield className="w-4 h-4" />
                   Admin Panel
@@ -347,13 +368,13 @@ const Header: React.FC = () => {
 
               {shouldShowJoinOptions && (
                 <>
-                  <div className="px-3 py-2 text-base font-medium text-foreground border-t border-border mt-2 pt-4">
+                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground border-t border-border mt-2 pt-4 uppercase tracking-wide">
                     Join
                   </div>
                   <Link
                     to="/membership-benefits"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`px-6 py-2 text-base font-medium transition-colors duration-200 ${
+                    className={`rounded-lg px-6 py-3 text-base font-medium transition-colors duration-200 ${
                       isActiveLink('/membership-benefits')
                         ? 'text-primary bg-primary/10'
                         : 'text-foreground hover:text-primary'
@@ -364,7 +385,7 @@ const Header: React.FC = () => {
                   <Link
                     to="/signup"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`px-6 py-2 text-base font-medium transition-colors duration-200 ${
+                    className={`rounded-lg px-6 py-3 text-base font-medium transition-colors duration-200 ${
                       isActiveLink('/signup')
                         ? 'text-primary bg-primary/10'
                         : 'text-foreground hover:text-primary'
@@ -375,7 +396,7 @@ const Header: React.FC = () => {
                 </>
               )}
 
-              <div className="flex items-center justify-between pt-3 border-t border-border">
+              <div className="flex items-center justify-between pt-3 mt-2 border-t border-border">
                 {isAnyUserAuthenticated ? (
                   <div className="flex flex-col gap-2 w-full">
                     <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
@@ -405,11 +426,51 @@ const Header: React.FC = () => {
                         )}
                       </div>
                     </div>
+                    {member && (
+                      <div className="flex flex-col gap-1">
+                        <Link
+                          to="/dashboard"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium transition-colors duration-200 ${
+                            isActiveLink('/dashboard')
+                              ? 'text-primary bg-primary/10'
+                              : 'text-foreground hover:text-primary'
+                          }`}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Dashboard
+                        </Link>
+                        <Link
+                          to="/dashboard/profile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium transition-colors duration-200 ${
+                            isActiveLink('/dashboard/profile')
+                              ? 'text-primary bg-primary/10'
+                              : 'text-foreground hover:text-primary'
+                          }`}
+                        >
+                          <User className="w-4 h-4" />
+                          My Profile
+                        </Link>
+                        <Link
+                          to="/dashboard/settings"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium transition-colors duration-200 ${
+                            isActiveLink('/dashboard/settings')
+                              ? 'text-primary bg-primary/10'
+                              : 'text-foreground hover:text-primary'
+                          }`}
+                        >
+                          <Key className="w-4 h-4" />
+                          Settings
+                        </Link>
+                      </div>
+                    )}
                     {!member && (
                       <Link
                         to="/join"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+                        className="flex items-center gap-2 px-3 py-3 text-sm font-medium text-foreground hover:text-primary transition-colors"
                       >
                         <User className="w-4 h-4" />
                         Complete Registration
@@ -418,7 +479,7 @@ const Header: React.FC = () => {
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <LogOut className="w-4 h-4" />
                       {isLoggingOut ? 'Logging out...' : 'Logout'}
@@ -428,7 +489,7 @@ const Header: React.FC = () => {
                   <Link
                     to="/signin"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-3 rounded-lg text-sm font-medium text-center transition-colors duration-200"
                   >
                     Sign In
                   </Link>
