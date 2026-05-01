@@ -135,12 +135,12 @@ const Events: React.FC = () => {
     <div className="bg-background text-foreground">
       {/* Hero */}
       <section className="border-b border-border bg-muted/40">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="max-w-3xl space-y-4">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16">
+          <div className="max-w-3xl space-y-3 sm:space-y-4">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
               LUB Events
             </h1>
-            <p className="text-lg leading-8 text-muted-foreground sm:text-xl">
+            <p className="text-base leading-7 text-muted-foreground sm:text-xl sm:leading-8">
               Conferences, workshops, networking meets, and advocacy efforts — a record of
               LUB's work with the MSME community.
             </p>
@@ -149,8 +149,8 @@ const Events: React.FC = () => {
       </section>
 
       {/* Content */}
-      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mb-8 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+        <div className="mb-6 rounded-lg border border-border bg-card p-4 shadow-sm sm:mb-8 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -160,7 +160,7 @@ const Events: React.FC = () => {
                   setSearchQuery(event.target.value);
                   setVisibleCount(PAGE_SIZE);
                 }}
-                placeholder="Search events by title, location, date, topic, or programme..."
+                placeholder="Search events..."
                 className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-10 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
               />
               {searchQuery && (
@@ -175,7 +175,7 @@ const Events: React.FC = () => {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
               {([
                 ['all', 'All'],
                 ['featured', 'Featured'],
@@ -189,7 +189,7 @@ const Events: React.FC = () => {
                     setFilter(value);
                     setVisibleCount(PAGE_SIZE);
                   }}
-                  className={`rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`shrink-0 rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
                     filter === value
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -209,23 +209,23 @@ const Events: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-32 text-muted-foreground gap-2">
+          <div className="flex items-center justify-center py-16 sm:py-32 text-muted-foreground gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading events…
           </div>
         ) : error ? (
-          <div className="py-32 text-center text-muted-foreground">
+          <div className="py-16 sm:py-32 text-center text-muted-foreground">
             <p>Unable to load events. Please try again later.</p>
           </div>
         ) : allOrdered.length === 0 ? (
-          <div className="py-32 text-center text-muted-foreground">
+          <div className="py-16 sm:py-32 text-center text-muted-foreground">
             <ImageIcon className="mx-auto h-12 w-12 opacity-20 mb-4" />
             <p className="text-lg">{searchActive ? 'No events match your search.' : 'No events published yet.'}</p>
             <p className="text-sm mt-1">{searchActive ? 'Try a different title, location, date, or topic.' : 'Check back soon.'}</p>
           </div>
         ) : (
           <>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
               {visibleEvents.map((activity) => (
                 <EventCard key={activity.id} activity={activity} />
               ))}
@@ -265,7 +265,7 @@ const EventCard: React.FC<EventCardProps> = ({ activity }) => {
   return (
     <Link
       to={`/events/${activity.slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-shadow"
+      className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow"
     >
       {/* Cover image */}
       <div className="relative aspect-video overflow-hidden bg-muted">
@@ -290,7 +290,7 @@ const EventCard: React.FC<EventCardProps> = ({ activity }) => {
       </div>
 
       {/* Card body */}
-      <div className="flex flex-1 flex-col gap-3 p-5">
+      <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
         {/* Meta */}
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {activity.activity_date && (

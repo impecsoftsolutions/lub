@@ -73,6 +73,23 @@ export interface SmartUploadDocumentProps {
   normalizeExtractedFields?: (fields: Record<string, string>) => Record<string, string>;
   /** Optional extra controls rendered in the action row */
   extraControls?: React.ReactNode;
+  /**
+   * Optional guided selected document type hint.
+   * When provided, the extractor receives this value instead of "unknown".
+   */
+  selectedDocType?: SmartDocType | 'unknown';
+  /**
+   * Optional callback for guided flows to react to extraction status changes.
+   */
+  onDocumentProcessed?: (event: {
+    status: 'extracted' | 'unreadable' | 'failed';
+    detectedDocType: DetectedDocType;
+    extractedFields: Record<string, string>;
+    reasonCode: ReasonCode | null;
+    file: File;
+  }) => void;
+  /** Guided flows can suppress conflict UI and apply extracted values directly. */
+  disableConflictModal?: boolean;
   disabled?: boolean;
 }
 
@@ -398,6 +415,9 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
   forceDocumentPrecedenceFields = [],
   normalizeExtractedFields,
   extraControls,
+  selectedDocType = 'unknown',
+  onDocumentProcessed,
+  disableConflictModal = false,
   disabled = false,
 }) => {
   const [items, setItems] = useState<SmartUploadItem[]>([]);
@@ -433,8 +453,8 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
       );
 
       try {
-        // Always pass 'unknown' — the backend auto-detects doc type from content
-        const result = await extractDocument(file);
+        // Guided flows can provide a selected document type hint.
+        const result = await extractDocument(file, selectedDocType);
 
         if (!result.is_readable) {
           setItems(prev =>
@@ -451,6 +471,15 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
                 : item
             )
           );
+          if (onDocumentProcessed) {
+            onDocumentProcessed({
+              status: 'unreadable',
+              detectedDocType: result.detected_type,
+              extractedFields: {},
+              reasonCode: result.reason_code,
+              file,
+            });
+          }
           return;
         }
 
@@ -463,6 +492,15 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
 
         if (onExtractedFieldsDetected) {
           onExtractedFieldsDetected(normalizedExtractedFields);
+        }
+        if (onDocumentProcessed) {
+          onDocumentProcessed({
+            status: 'extracted',
+            detectedDocType: detectedType,
+            extractedFields: normalizedExtractedFields,
+            reasonCode: result.reason_code,
+            file,
+          });
         }
 
         const resultFieldOptions = result.field_options ?? null;
@@ -546,6 +584,21 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         }
 
         if (conflicts.length > 0) {
+          if (disableConflictModal) {
+            const extractedConflictValues: Record<string, string> = {};
+            const sourceUpdatesForConflicts: Record<string, DetectedDocType> = {};
+            for (const conflict of conflicts) {
+              extractedConflictValues[conflict.fieldKey] = conflict.extractedValue;
+              sourceUpdatesForConflicts[conflict.fieldKey] = conflict.sourceDocType;
+            }
+            onAutofill(extractedConflictValues);
+            setFieldSourceMap(prev => ({ ...prev, ...sourceUpdatesForConflicts }));
+            setItems(prev =>
+              prev.map(item => (item.id === itemId ? { ...item, status: 'mapped' } : item))
+            );
+            return;
+          }
+
           const defaultChoices: Record<string, 'extracted' | 'keep'> = {};
           conflicts.forEach(c => {
             defaultChoices[c.fieldKey] = 'extracted';
@@ -565,9 +618,28 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         setItems(prev =>
           prev.map(item => (item.id === itemId ? { ...item, status: 'failed' } : item))
         );
+        if (onDocumentProcessed) {
+          onDocumentProcessed({
+            status: 'failed',
+            detectedDocType: 'unknown',
+            extractedFields: {},
+            reasonCode: 'ai_error',
+            file,
+          });
+        }
       }
     },
-    [forceDocumentPrecedenceFields, normalizeExtractedFields, onAutofill, onExtractedFieldOptionsDetected, onExtractedFieldsDetected, onFileReady]
+    [
+      forceDocumentPrecedenceFields,
+      normalizeExtractedFields,
+      onAutofill,
+      disableConflictModal,
+      onDocumentProcessed,
+      onExtractedFieldOptionsDetected,
+      onExtractedFieldsDetected,
+      onFileReady,
+      selectedDocType,
+    ]
   );
 
   // -------------------------------------------------------------------------
@@ -696,9 +768,15 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-primary flex-shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-foreground">Smart Upload Any Document</p>
+            <p className="text-sm font-semibold text-foreground">
+              {selectedDocType !== 'unknown'
+                ? `Upload ${DOC_TYPE_LABELS[selectedDocType]}`
+                : 'Smart Upload'}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Upload all documents, then click Import Data to auto-fill matching fields
+              {selectedDocType !== 'unknown'
+                ? "We'll auto-fill matching fields after extraction."
+                : 'Upload one or more documents, then tap Import to auto-fill matching fields.'}
             </p>
           </div>
         </div>
@@ -747,7 +825,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
                 EXTRACT_ONLY_TYPES.has(item.detectedDocType as SmartDocType);
               const unreadableMessage =
                 item.status === 'unreadable' && item.reasonCode
-                  ? (REASON_CODE_MESSAGES[item.reasonCode] ?? 'Could not read this document. You can retry or fill in the fields manually.')
+                  ? (REASON_CODE_MESSAGES[item.reasonCode] ?? "We couldn't read this document. Retry, or enter the details on the form.")
                   : null;
 
               return (
@@ -792,7 +870,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
                       </span>
                       {isExtractOnly && (
                         <span className="text-muted-foreground italic">
-                          (data extracted only — file not uploaded)
+                          Used for auto-fill only — file is not attached to your registration.
                         </span>
                       )}
                     </div>
@@ -824,12 +902,14 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
             {isProcessing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Importing…
+                Extracting…
               </>
             ) : (
               <>
                 <Zap className="h-4 w-4" />
-                Import Data{queuedCount > 0 ? ` (${queuedCount})` : ''}
+                {selectedDocType !== 'unknown'
+                  ? 'Extract details'
+                  : `Extract details from ${queuedCount} document${queuedCount === 1 ? '' : 's'}`}
               </>
             )}
           </button>

@@ -267,6 +267,13 @@ const EXTRACT_ONLY_DRAFT_TYPES: ReadonlySet<GuidedDocType> = new Set<GuidedDocTy
   'aadhaar_card',
 ]);
 
+// Smart Upload normalization is now data-driven via the admin-managed
+// `member_normalization_rules` table (CLAUDE-SMART-UPLOAD-NORMALIZATION-
+// DYNAMIC-FIELDS-036). The previous static `RULES_ENGINE_FIELDS` gate was
+// removed: `normalizeViaRulesEngine` now sends every extracted string-keyed
+// field that matches the runtime field-key regex, and the runtime applies
+// rules only to keys with an active rule.
+
 const SMART_AUTOFILL_ALLOWED = new Set([
   'full_name', 'date_of_birth', 'gender',
   'payment_date', 'transaction_id', 'bank_reference',
@@ -1528,17 +1535,13 @@ const Join: React.FC = () => {
       setSmartUploadDraft(prev => ({ ...prev, ...mergedDraftData }));
       setSmartUploadFieldOptions(prev => ({ ...prev, ...mergedFieldOptions }));
 
-      const firstIncompleteIndex = GUIDED_DOC_ORDER.findIndex(docType => {
-        const status = nextStatuses[docType];
-        return status !== 'completed' && status !== 'skipped' && status !== 'no_document' && status !== 'unreadable_confirmed';
-      });
-
-      if (firstIncompleteIndex === -1) {
-        setRegistrationEntryStage('smart_review');
-      } else {
-        setRegistrationEntryStage('smart_steps');
-        setGuidedStepIndex(firstIncompleteIndex);
-      }
+      // Always land on Step 1 (GST) on initial entry, even when prior
+      // draft state shows every step complete. The user can still reach
+      // review via the Step 5 navigation. Hydrated statuses, extracted
+      // fields, field options, and draftDocumentIds are kept intact so
+      // moving forward through the flow surfaces previously saved data.
+      setRegistrationEntryStage('smart_steps');
+      setGuidedStepIndex(0);
     };
 
     void hydrateDraft();
@@ -1647,15 +1650,69 @@ const Join: React.FC = () => {
   const guidedTotalSteps = guidedSelectedDocs.length;
   const guidedStepNumber = currentGuidedDocType ? guidedStepIndex + 1 : 0;
 
+  // ── Rules-engine normalization
+  // CLAUDE-SMART-UPLOAD-NORMALIZE-RULES-032 wired this in for a fixed
+  // 9-key set. CLAUDE-SMART-UPLOAD-NORMALIZATION-DYNAMIC-FIELDS-036
+  // makes it dynamic: every available extracted/string field flows to
+  // `normalize-member` so any admin-added rule (e.g. `city`) takes
+  // effect without a `/join` code change. The runtime applies rules
+  // only for keys that have an active rule and passes everything else
+  // through unchanged. We never blank-overwrite a non-empty raw value
+  // with an empty normalized one. Best-effort: any failure returns the
+  // input unchanged so the user is never blocked by a normalization
+  // outage.
+  const normalizeViaRulesEngine = useCallback(
+    async (fields: Record<string, string>): Promise<Record<string, string>> => {
+      const payload: Record<string, string> = {};
+      for (const [key, rawValue] of Object.entries(fields)) {
+        if (!key || key.startsWith('_')) continue;
+        // Match the runtime field-key regex so we don't ship invalid
+        // keys to the edge function. Pre-existing per-field sanitisers
+        // (gst/pan/pin/date/gender/location matching) already ran via
+        // `normalizeSmartUploadFields` upstream, so values arriving here
+        // are already canonical at the per-field level.
+        if (!/^[a-z][a-z0-9_]{1,63}$/.test(key)) continue;
+        const v = String(rawValue ?? '').trim();
+        if (v) payload[key] = v;
+      }
+      if (Object.keys(payload).length === 0) return fields;
+
+      try {
+        const result = await normalizeMemberData(payload);
+        const normalized = (result?.normalized ?? null) as Record<string, string> | null;
+        if (!normalized) return fields;
+
+        const merged: Record<string, string> = { ...fields };
+        // Iterate over the keys we sent so we don't accidentally
+        // surface noise the runtime echoed back. Blank-overwrite guard
+        // protects non-empty raw values when the rule is empty / no-op.
+        for (const key of Object.keys(payload)) {
+          const cleanedRaw = (fields[key] ?? '').trim();
+          const cleanedNorm = String(normalized[key] ?? '').trim();
+          if (cleanedNorm && cleanedNorm !== cleanedRaw) {
+            merged[key] = cleanedNorm;
+          }
+        }
+        return merged;
+      } catch (err) {
+        console.warn('[Join] rules-engine normalization failed (using raw values):', err);
+        return fields;
+      }
+    },
+    [],
+  );
+
   const handleSmartDraftAutofill = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = await hydrateSmartUploadLocationFields(fields);
-    setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
-  }, [hydrateSmartUploadLocationFields]);
+    const ruleNormalized = await normalizeViaRulesEngine(hydratedFields);
+    setSmartUploadDraft(prev => ({ ...prev, ...ruleNormalized }));
+  }, [hydrateSmartUploadLocationFields, normalizeViaRulesEngine]);
 
   const handleSmartDraftExtractedFields = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = await hydrateSmartUploadLocationFields(fields);
-    setSmartUploadReviewData(prev => ({ ...prev, ...hydratedFields }));
-  }, [hydrateSmartUploadLocationFields]);
+    const ruleNormalized = await normalizeViaRulesEngine(hydratedFields);
+    setSmartUploadReviewData(prev => ({ ...prev, ...ruleNormalized }));
+  }, [hydrateSmartUploadLocationFields, normalizeViaRulesEngine]);
 
   const handleSmartDraftFieldOptionsDetected = useCallback(
     (incoming: Record<string, ExtractedFieldOption[]>) => {
@@ -1692,8 +1749,9 @@ const Join: React.FC = () => {
 
   const handleSmartDraftConflictResolved = useCallback(async (fields: Record<string, string>) => {
     const hydratedFields = await hydrateSmartUploadLocationFields(fields);
-    setSmartUploadDraft(prev => ({ ...prev, ...hydratedFields }));
-  }, [hydrateSmartUploadLocationFields]);
+    const ruleNormalized = await normalizeViaRulesEngine(hydratedFields);
+    setSmartUploadDraft(prev => ({ ...prev, ...ruleNormalized }));
+  }, [hydrateSmartUploadLocationFields, normalizeViaRulesEngine]);
 
   const moveGuidedStep = useCallback((direction: 'next' | 'back') => {
     if (direction === 'back') {
@@ -1810,6 +1868,11 @@ const Join: React.FC = () => {
         }
       }
 
+      // Persist rules-engine-normalized extracted fields (CLAUDE-SMART-UPLOAD-NORMALIZE-RULES-032)
+      // so a hydrated draft on resume rehydrates with the same canonical
+      // values the UI will render. Best-effort: falls back to raw on error.
+      const fieldsForPersist = await normalizeViaRulesEngine(event.extractedFields ?? {});
+
       const result = await registrationDraftService.saveDocument({
         expectedDocType: docType as RegistrationDraftExpectedDocType,
         status: persistedStatus,
@@ -1820,7 +1883,7 @@ const Join: React.FC = () => {
         fileMime,
         fileSizeBytes,
         originalFilename,
-        extractedFields: event.extractedFields ?? {},
+        extractedFields: fieldsForPersist,
         fieldOptions: optionsForDoc,
         selectedOptions: {},
       });
@@ -1831,7 +1894,7 @@ const Join: React.FC = () => {
     } catch (err) {
       console.warn('[Join] persistDraftExtraction failed:', err);
     }
-  }, [draftDocumentIds, smartUploadFieldOptions]);
+  }, [draftDocumentIds, normalizeViaRulesEngine, smartUploadFieldOptions]);
 
   const handleGuidedSkipCurrent = useCallback(() => {
     if (!currentGuidedDocType) return;
@@ -1876,11 +1939,17 @@ const Join: React.FC = () => {
 
     // Capture per-doc extracted fields for the inline review panel,
     // regardless of whether the doc is storable or extract-only.
+    // Run the rules-engine normalization (CLAUDE-SMART-UPLOAD-NORMALIZE-RULES-032)
+    // so the panel shows canonical, form-compatible values.
     if (event.status === 'extracted' && event.extractedFields) {
-      setPerDocExtractedFields(prev => ({
-        ...prev,
-        [currentGuidedDocType]: { ...event.extractedFields },
-      }));
+      const docTypeForUpdate = currentGuidedDocType;
+      void (async () => {
+        const normalized = await normalizeViaRulesEngine({ ...event.extractedFields });
+        setPerDocExtractedFields(prev => ({
+          ...prev,
+          [docTypeForUpdate]: normalized,
+        }));
+      })();
     }
 
     if (currentGuidedDocType === 'payment_proof') {
@@ -1923,7 +1992,7 @@ const Join: React.FC = () => {
     // Persist the wrong-doc detection so the draft reflects user's last
     // attempt; skip storage upload (file is not what they expected).
     void persistDraftExtraction(currentGuidedDocType, { ...event, status: 'failed' });
-  }, [currentGuidedDocType, handleFileChange, markCurrentGuidedDoc, persistDraftExtraction, registrationEntryStage]);
+  }, [currentGuidedDocType, handleFileChange, markCurrentGuidedDoc, normalizeViaRulesEngine, persistDraftExtraction, registrationEntryStage]);
 
   const canAdvanceCurrentGuidedStep = (() => {
     if (!currentGuidedDocType || !currentGuidedStatus) return false;
@@ -2714,8 +2783,29 @@ const Join: React.FC = () => {
   const smartUploadIdentityContext = Boolean(
     (smartUploadReviewData.full_name ?? '').trim() || (smartUploadReviewData.date_of_birth ?? '').trim()
   );
+  // Map review-screen warnings to the doc types whose extraction would
+  // legitimately supply that field. Mirrors SmartUploadDocument's
+  // FIELD_SOURCE_PRIORITY but kept narrow to the fields that actually
+  // raise review warnings today.
+  const FIELD_WARNING_CONTRIBUTORS: Partial<Record<string, GuidedDocType[]>> = {
+    gender: ['aadhaar_card'],
+  };
+  // A contributing doc counts as "actually uploaded and processed" when
+  // its guided status is 'completed' or 'unreadable_confirmed'. Skipped /
+  // no_document / pending do not justify a missing-field warning, because
+  // the user never gave us a chance to extract that field.
+  const isWarningRelevantForField = (fieldKey: string): boolean => {
+    const contributors = FIELD_WARNING_CONTRIBUTORS[fieldKey];
+    if (!contributors || contributors.length === 0) return false;
+    return contributors.some((docType) => {
+      const status = guidedDocStatus[docType];
+      return status === 'completed' || status === 'unreadable_confirmed';
+    });
+  };
   const smartUploadGenderMissing =
-    smartUploadIdentityContext && !(smartUploadReviewData.gender ?? '').trim();
+    smartUploadIdentityContext &&
+    !(smartUploadReviewData.gender ?? '').trim() &&
+    isWarningRelevantForField('gender');
   const smartUploadDraftEntries = Object.entries(smartUploadReviewData)
     .filter(([, value]) => value.trim() !== '');
 
@@ -2867,7 +2957,7 @@ const Join: React.FC = () => {
                   if (entries.length === 0) return null;
                   return (
                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                      <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center justify-between gap-2 mb-4">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/80">
                           Auto-filled details
                         </p>
@@ -2875,17 +2965,20 @@ const Join: React.FC = () => {
                           {entries.length} field{entries.length === 1 ? '' : 's'} from {currentGuidedDocConfig?.label}
                         </span>
                       </div>
-                      <dl className="space-y-2">
-                        {entries.map(([fieldKey, value]) => {
+                      <dl className="divide-y divide-primary/10">
+                        {entries.map(([fieldKey, value], idx) => {
                           const options = smartUploadFieldOptions[fieldKey] ?? [];
                           const showCandidates = options.length >= 2;
                           const normalizedSelected = String(value).trim().replace(/\s+/g, ' ').toLowerCase();
                           return (
-                            <div key={fieldKey} className="flex flex-col gap-1">
+                            <div
+                              key={fieldKey}
+                              className={`flex flex-col gap-1.5 py-3 ${idx === 0 ? 'pt-0' : ''} ${idx === entries.length - 1 ? 'pb-0' : ''}`}
+                            >
                               <dt className="text-[11px] font-bold uppercase tracking-wide text-foreground/90">
                                 {resolveFieldLabel(fieldKey, fallbackFieldLabel(fieldKey))}
                               </dt>
-                              <dd className="text-sm text-foreground break-words">
+                              <dd className="text-sm text-foreground break-words leading-relaxed">
                                 {formatSmartUploadReviewValue(fieldKey, String(value))}
                               </dd>
                               {showCandidates && (
@@ -2929,20 +3022,20 @@ const Join: React.FC = () => {
                 </div>
 
                 <div className="rounded-lg border border-border bg-card p-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Extracted data review</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-4">Extracted data review</h3>
                   {smartUploadDraftEntries.length > 0 || smartUploadIdentityContext ? (
-                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                    <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                       {smartUploadDraftEntries.map(([fieldKey, value]) => {
                         const options = smartUploadFieldOptions[fieldKey] ?? [];
                         const showCandidates = options.length >= 2;
                         const normalizedSelected = value.trim().replace(/\s+/g, ' ').toLowerCase();
                         return (
-                          <div key={fieldKey} className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                          <div key={fieldKey} className="rounded-lg border border-border bg-muted/20 px-4 py-3 space-y-1.5">
                             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                               {resolveFieldLabel(fieldKey, fallbackFieldLabel(fieldKey))}
                             </p>
                             {showCandidates ? (
-                              <div className="mt-1 space-y-2">
+                              <div className="space-y-2">
                                 <div className="flex flex-wrap gap-2">
                                   {options.map((opt) => {
                                     const optNormalized = opt.value.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -2964,23 +3057,23 @@ const Join: React.FC = () => {
                                     );
                                   })}
                                 </div>
-                                <p className="text-sm text-foreground break-words">
+                                <p className="text-sm text-foreground break-words leading-relaxed">
                                   {formatSmartUploadReviewValue(fieldKey, value)}
                                 </p>
                               </div>
                             ) : (
-                              <p className="text-sm text-foreground break-words">
+                              <p className="text-sm text-foreground break-words leading-relaxed">
                                 {formatSmartUploadReviewValue(fieldKey, value)}
                               </p>
                             )}
-                            <p className="mt-1 text-[11px] text-muted-foreground">
+                            <p className="pt-1 text-[11px] text-muted-foreground">
                               {getSmartUploadReviewSourceText(fieldKey, value)}
                             </p>
                           </div>
                         );
                       })}
                       {smartUploadGenderMissing && (
-                        <p className="italic text-sm text-red-800 dark:text-red-400">
+                        <p className="italic text-sm text-red-800 dark:text-red-400 pt-1">
                           Gender not found — please pick it on the form.
                         </p>
                       )}

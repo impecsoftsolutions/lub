@@ -2485,6 +2485,317 @@ export const lubRolesService = {
   }
 };
 
+// ─── Registration Draft (Smart Upload temp persist) ─────────────────────────
+
+export type RegistrationDraftDocStatus =
+  | 'pending'
+  | 'extracting'
+  | 'extracted'
+  | 'unreadable'
+  | 'failed'
+  | 'skipped'
+  | 'no_document';
+
+export type RegistrationDraftExpectedDocType =
+  | 'gst_certificate'
+  | 'udyam_certificate'
+  | 'pan_card'
+  | 'aadhaar_card'
+  | 'payment_proof';
+
+export interface RegistrationDraftDocumentRow {
+  id: string;
+  expected_doc_type: RegistrationDraftExpectedDocType;
+  detected_doc_type: string | null;
+  status: RegistrationDraftDocStatus;
+  reason_code: string | null;
+  is_extract_only: boolean;
+  storage_path: string | null;
+  file_mime: string | null;
+  file_size_bytes: number | null;
+  original_filename: string | null;
+  extracted_fields: Record<string, unknown>;
+  field_options: Record<string, unknown>;
+  selected_options: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegistrationDraftRow {
+  id: string;
+  status: 'in_progress' | 'finalized' | 'expired';
+  last_activity_at: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegistrationDraftFetchResult {
+  success: boolean;
+  draft: RegistrationDraftRow | null;
+  documents: RegistrationDraftDocumentRow[];
+  error?: string;
+  errorCode?: string;
+}
+
+export interface RegistrationDraftSaveDocumentInput {
+  expectedDocType: RegistrationDraftExpectedDocType;
+  status: RegistrationDraftDocStatus;
+  detectedDocType?: string | null;
+  reasonCode?: string | null;
+  isExtractOnly?: boolean;
+  storagePath?: string | null;
+  fileMime?: string | null;
+  fileSizeBytes?: number | null;
+  originalFilename?: string | null;
+  extractedFields?: Record<string, unknown>;
+  fieldOptions?: Record<string, unknown>;
+  selectedOptions?: Record<string, unknown>;
+}
+
+export interface RegistrationDraftSaveDocumentResult {
+  success: boolean;
+  draftId?: string;
+  documentId?: string;
+  expiresAt?: string;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface RegistrationDraftUploadResult {
+  success: boolean;
+  draftId?: string;
+  documentId?: string;
+  expiresAt?: string;
+  storagePath?: string;
+  fileMime?: string | null;
+  fileSizeBytes?: number;
+  originalFilename?: string;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface RegistrationDraftDeleteResult {
+  success: boolean;
+  releasedStoragePath: string | null;
+  error?: string;
+}
+
+const DRAFT_UPLOAD_FUNCTION_PATH = '/functions/v1/registration-draft-upload';
+const DRAFT_DELETE_FUNCTION_PATH = '/functions/v1/registration-draft-delete';
+
+const SUPABASE_FUNCTION_BASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
+
+function buildFunctionUrl(path: string): string {
+  if (!SUPABASE_FUNCTION_BASE_URL) {
+    throw new Error('VITE_SUPABASE_URL is not configured');
+  }
+  return `${SUPABASE_FUNCTION_BASE_URL}${path}`;
+}
+
+export const registrationDraftService = {
+  async getDraft(): Promise<RegistrationDraftFetchResult> {
+    const sessionToken = sessionManager.getSessionToken();
+    if (!sessionToken) {
+      return { success: false, draft: null, documents: [], errorCode: 'invalid_session', error: 'No session' };
+    }
+    try {
+      const { data, error } = await supabase.rpc('get_registration_draft_with_session', {
+        p_session_token: sessionToken,
+      });
+      if (error) {
+        console.error('[registrationDraftService.getDraft] RPC error:', error);
+        return { success: false, draft: null, documents: [], error: error.message };
+      }
+      const payload = (data ?? {}) as {
+        success?: boolean;
+        global_error_code?: string;
+        global_error?: string;
+        draft?: RegistrationDraftRow | null;
+        documents?: RegistrationDraftDocumentRow[];
+      };
+      if (!payload.success) {
+        return {
+          success: false,
+          draft: null,
+          documents: [],
+          errorCode: payload.global_error_code,
+          error: payload.global_error,
+        };
+      }
+      return {
+        success: true,
+        draft: payload.draft ?? null,
+        documents: Array.isArray(payload.documents) ? payload.documents : [],
+      };
+    } catch (err) {
+      console.error('[registrationDraftService.getDraft] Exception:', err);
+      return { success: false, draft: null, documents: [], error: 'Unexpected error' };
+    }
+  },
+
+  async saveDocument(input: RegistrationDraftSaveDocumentInput): Promise<RegistrationDraftSaveDocumentResult> {
+    const sessionToken = sessionManager.getSessionToken();
+    if (!sessionToken) {
+      return { success: false, errorCode: 'invalid_session', error: 'No session' };
+    }
+    try {
+      const { data, error } = await supabase.rpc(
+        'save_registration_draft_document_with_session',
+        {
+          p_session_token: sessionToken,
+          p_expected_doc_type: input.expectedDocType,
+          p_status: input.status,
+          p_detected_doc_type: input.detectedDocType ?? null,
+          p_reason_code: input.reasonCode ?? null,
+          p_is_extract_only: input.isExtractOnly ?? false,
+          p_storage_path: input.storagePath ?? null,
+          p_file_mime: input.fileMime ?? null,
+          p_file_size_bytes: input.fileSizeBytes ?? null,
+          p_original_filename: input.originalFilename ?? null,
+          p_extracted_fields: input.extractedFields ?? {},
+          p_field_options: input.fieldOptions ?? {},
+          p_selected_options: input.selectedOptions ?? {},
+        },
+      );
+      if (error) {
+        console.error('[registrationDraftService.saveDocument] RPC error:', error);
+        return { success: false, error: error.message };
+      }
+      const payload = (data ?? {}) as {
+        success?: boolean;
+        global_error_code?: string;
+        global_error?: string;
+        draft_id?: string;
+        document_id?: string;
+        expires_at?: string;
+      };
+      if (!payload.success) {
+        return {
+          success: false,
+          errorCode: payload.global_error_code,
+          error: payload.global_error,
+        };
+      }
+      return {
+        success: true,
+        draftId: payload.draft_id,
+        documentId: payload.document_id,
+        expiresAt: payload.expires_at,
+      };
+    } catch (err) {
+      console.error('[registrationDraftService.saveDocument] Exception:', err);
+      return { success: false, error: 'Unexpected error' };
+    }
+  },
+
+  async uploadDocumentFile(
+    expectedDocType: RegistrationDraftExpectedDocType,
+    file: File,
+  ): Promise<RegistrationDraftUploadResult> {
+    const sessionToken = sessionManager.getSessionToken();
+    if (!sessionToken) {
+      return { success: false, errorCode: 'invalid_session', error: 'No session' };
+    }
+    try {
+      const formData = new FormData();
+      formData.append('session_token', sessionToken);
+      formData.append('expected_doc_type', expectedDocType);
+      formData.append('file', file, file.name);
+
+      const response = await fetch(buildFunctionUrl(DRAFT_UPLOAD_FUNCTION_PATH), {
+        method: 'POST',
+        body: formData,
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        error?: string;
+        error_code?: string;
+        draft_id?: string;
+        document_id?: string;
+        expires_at?: string;
+        storage_path?: string;
+        file_mime?: string | null;
+        file_size_bytes?: number;
+        original_filename?: string;
+      };
+      if (!response.ok || !payload.success) {
+        return {
+          success: false,
+          errorCode: payload.error_code,
+          error: payload.error ?? `HTTP ${response.status}`,
+        };
+      }
+      return {
+        success: true,
+        draftId: payload.draft_id,
+        documentId: payload.document_id,
+        expiresAt: payload.expires_at,
+        storagePath: payload.storage_path,
+        fileMime: payload.file_mime,
+        fileSizeBytes: payload.file_size_bytes,
+        originalFilename: payload.original_filename,
+      };
+    } catch (err) {
+      console.error('[registrationDraftService.uploadDocumentFile] Exception:', err);
+      return { success: false, error: 'Unexpected error' };
+    }
+  },
+
+  async deleteDocument(documentId: string): Promise<RegistrationDraftDeleteResult> {
+    const sessionToken = sessionManager.getSessionToken();
+    if (!sessionToken) {
+      return { success: false, releasedStoragePath: null, error: 'No session' };
+    }
+    try {
+      const response = await fetch(buildFunctionUrl(DRAFT_DELETE_FUNCTION_PATH), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_token: sessionToken,
+          document_id: documentId,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        error?: string;
+        released_storage_path?: string | null;
+      };
+      if (!response.ok || !payload.success) {
+        return {
+          success: false,
+          releasedStoragePath: payload.released_storage_path ?? null,
+          error: payload.error ?? `HTTP ${response.status}`,
+        };
+      }
+      return {
+        success: true,
+        releasedStoragePath: payload.released_storage_path ?? null,
+      };
+    } catch (err) {
+      console.error('[registrationDraftService.deleteDocument] Exception:', err);
+      return { success: false, releasedStoragePath: null, error: 'Unexpected error' };
+    }
+  },
+};
+
+// ─── Bulk Assignment Types ────────────────────────────────────────────────────
+
+export interface MemberRoleAssignmentBulkSkip {
+  member_id: string;
+  reason_code: string;
+  reason: string;
+}
+
+export interface MemberRoleAssignmentBulkResult {
+  success: boolean;
+  addedCount: number;
+  skippedCount: number;
+  addedMemberIds: string[];
+  skipped: MemberRoleAssignmentBulkSkip[];
+  error?: string;
+}
+
 // Member LUB Role Assignments Service
 export const memberLubRolesService = {
   async getAllAssignments(params: { search?: string }): Promise<MemberLubRoleAssignment[]> {
@@ -2731,6 +3042,84 @@ export const memberLubRolesService = {
     } catch (error) {
       console.error('Error searching members:', error);
       return [];
+    }
+  },
+
+  async createAssignmentsBulk(params: {
+    member_ids: string[];
+    role_id: string;
+    level: 'national' | 'state' | 'district' | 'city';
+    state?: string;
+    district?: string;
+    role_start_date?: string | null;
+    role_end_date?: string | null;
+    committee_year?: string;
+  }): Promise<MemberRoleAssignmentBulkResult> {
+    const empty: MemberRoleAssignmentBulkResult = {
+      success: false,
+      addedCount: 0,
+      skippedCount: 0,
+      addedMemberIds: [],
+      skipped: [],
+    };
+
+    try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { ...empty, error: 'User session not found. Please log in again.' };
+      }
+
+      if (params.member_ids.length === 0) {
+        return { ...empty, error: 'At least one member must be selected.' };
+      }
+
+      if (params.member_ids.length > 50) {
+        return { ...empty, error: 'Cannot assign more than 50 members at once.' };
+      }
+
+      if (params.committee_year && !/^\d{4}$/.test(params.committee_year)) {
+        return { ...empty, error: 'Committee year must be a 4-digit year (e.g., 2025)' };
+      }
+
+      if (params.role_start_date && params.role_end_date) {
+        if (new Date(params.role_end_date) < new Date(params.role_start_date)) {
+          return { ...empty, error: 'Period To date cannot be before Period From date' };
+        }
+      }
+
+      const { data, error } = await supabase.rpc('admin_assign_member_lub_roles_bulk_with_session', {
+        p_session_token:   sessionToken,
+        p_member_ids:      params.member_ids,
+        p_role_id:         params.role_id,
+        p_level:           params.level,
+        p_state:           params.state || null,
+        p_district:        params.district || null,
+        p_role_start_date: params.role_start_date || null,
+        p_role_end_date:   params.role_end_date || null,
+        p_committee_year:  params.committee_year || null,
+      });
+
+      if (error) {
+        console.error('[memberLubRolesService.createAssignmentsBulk] RPC error:', error);
+        return { ...empty, error: error.message };
+      }
+
+      if (!data || data.success === false) {
+        const errorMsg = (data?.global_error as string | undefined) || 'Unknown error during bulk assignment';
+        console.error('[memberLubRolesService.createAssignmentsBulk] RPC returned error:', errorMsg);
+        return { ...empty, error: errorMsg };
+      }
+
+      return {
+        success:        true,
+        addedCount:     (data.added_count as number)   ?? 0,
+        skippedCount:   (data.skipped_count as number) ?? 0,
+        addedMemberIds: (data.added_member_ids as string[]) ?? [],
+        skipped:        (data.skipped as MemberRoleAssignmentBulkSkip[]) ?? [],
+      };
+    } catch (error) {
+      console.error('[memberLubRolesService.createAssignmentsBulk] Exception:', error);
+      return { ...empty, error: 'An unexpected error occurred' };
     }
   }
 };
@@ -4804,6 +5193,101 @@ export const normalizationRulesService = {
         : { success: false, error: result?.error || 'Failed to reorder normalization rules' };
     } catch (error) {
       console.error('Error reordering normalization rules:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  // COD-NORMALIZATION-RULES-ADD-DELETE-034
+  async createRule(
+    input: {
+      fieldKey: string;
+      label: string;
+      category: NormalizationRuleCategory;
+      instructionText: string;
+      isEnabled?: boolean;
+    },
+    sessionToken?: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    errorCode?: string;
+    id?: string;
+    reactivated?: boolean;
+  }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('create_normalization_rule_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: input.fieldKey,
+        p_label: input.label,
+        p_category: input.category,
+        p_instruction_text: input.instructionText,
+        p_is_enabled: typeof input.isEnabled === 'boolean' ? input.isEnabled : true
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as {
+        success?: boolean;
+        error?: string;
+        error_code?: string;
+        id?: string;
+        reactivated?: boolean;
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error || 'Failed to create normalization rule',
+          errorCode: result?.error_code
+        };
+      }
+      return {
+        success: true,
+        id: result.id,
+        reactivated: Boolean(result.reactivated)
+      };
+    } catch (error) {
+      console.error('Error creating normalization rule:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
+  async deleteRule(
+    fieldKey: string,
+    sessionToken?: string
+  ): Promise<{ success: boolean; error?: string; alreadyRetired?: boolean }> {
+    try {
+      const resolvedSessionToken = sessionToken || sessionManager.getSessionToken();
+      if (!resolvedSessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      const { data, error } = await supabase.rpc('delete_normalization_rule_with_session', {
+        p_session_token: resolvedSessionToken,
+        p_field_key: fieldKey
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const result = data as {
+        success?: boolean;
+        error?: string;
+        already_retired?: boolean;
+      } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error || 'Failed to delete normalization rule' };
+      }
+      return { success: true, alreadyRetired: Boolean(result.already_retired) };
+    } catch (error) {
+      console.error('Error deleting normalization rule:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }

@@ -9,7 +9,9 @@ import {
   Edit3,
   Info,
   Loader2,
+  Plus,
   RotateCcw,
+  Trash2,
   X,
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
@@ -61,6 +63,51 @@ const CATEGORY_ORDER: NormalizationRuleCategory[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Field catalog (CLAUDE-NORMALIZATION-RULE-UX-035)
+// Single source of truth for the Add Rule dropdown. The catalog covers
+// every member-registration field that we may want admins to normalize,
+// pre-mapped to a label and category so admins never have to type those.
+// Fields outside this catalog can still be added later by extending the
+// list; the underlying RPC accepts any valid field_key.
+// ---------------------------------------------------------------------------
+
+interface FieldCatalogEntry {
+  field_key: string;
+  label: string;
+  category: NormalizationRuleCategory;
+}
+
+const FIELD_CATALOG: FieldCatalogEntry[] = [
+  // Identity
+  { field_key: 'full_name', label: 'Full Name', category: 'identity' },
+
+  // Contact
+  { field_key: 'email', label: 'Email Address', category: 'contact' },
+  { field_key: 'mobile_number', label: 'Mobile Number', category: 'contact' },
+  { field_key: 'alternate_contact_name', label: 'Alternate Contact Name', category: 'contact' },
+  { field_key: 'alternate_mobile', label: 'Alternate Mobile', category: 'contact' },
+
+  // Company
+  { field_key: 'company_name', label: 'Company Name', category: 'company' },
+  { field_key: 'company_address', label: 'Company Address', category: 'company' },
+  { field_key: 'state', label: 'State', category: 'company' },
+  { field_key: 'district', label: 'District', category: 'company' },
+  { field_key: 'city', label: 'City / Town', category: 'company' },
+  { field_key: 'pin_code', label: 'PIN Code', category: 'company' },
+  { field_key: 'gst_number', label: 'GST Number', category: 'company' },
+  { field_key: 'pan_company', label: 'PAN (Company)', category: 'company' },
+
+  // Business
+  { field_key: 'products_services', label: 'Products & Services', category: 'business' },
+  { field_key: 'industry', label: 'Industry', category: 'business' },
+  { field_key: 'activity_type', label: 'Activity Type', category: 'business' },
+  { field_key: 'brand_names', label: 'Brand Names', category: 'business' },
+
+  // Referral
+  { field_key: 'referred_by', label: 'Referred By', category: 'referral' },
+];
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -75,6 +122,21 @@ const AdminNormalizationSettings: React.FC = () => {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editedText, setEditedText] = useState('');
   const [isSavingKey, setIsSavingKey] = useState<string | null>(null);
+
+  // Add Rule modal state (COD-NORMALIZATION-RULES-ADD-DELETE-034 +
+  // CLAUDE-NORMALIZATION-RULE-UX-035: field is now picked from a catalog,
+  // label/category derived from the chosen field_key).
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newInstruction, setNewInstruction] = useState('');
+  const [newIsEnabled, setNewIsEnabled] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Delete confirmation state
+  const [pendingDelete, setPendingDelete] = useState<NormalizationRule | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const FIELD_KEY_REGEX = /^[a-z][a-z0-9_]{1,63}$/;
 
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -251,6 +313,100 @@ const AdminNormalizationSettings: React.FC = () => {
   };
 
   // -------------------------------------------------------------------------
+  // Add Rule (COD-NORMALIZATION-RULES-ADD-DELETE-034)
+  // -------------------------------------------------------------------------
+
+  // Map of currently-active rules (not retired) by field_key, used to mark
+  // catalog options as already-taken in the Add Rule dropdown.
+  const activeRuleByFieldKey: Record<string, NormalizationRule> = {};
+  for (const rule of rules) {
+    activeRuleByFieldKey[rule.field_key] = rule;
+  }
+
+  const selectedCatalogEntry = newFieldKey
+    ? FIELD_CATALOG.find((entry) => entry.field_key === newFieldKey) ?? null
+    : null;
+
+  const resetAddForm = () => {
+    setNewFieldKey('');
+    setNewInstruction('');
+    setNewIsEnabled(true);
+  };
+
+  const closeAddModal = () => {
+    if (isCreating) return;
+    setShowAddModal(false);
+    resetAddForm();
+  };
+
+  const handleAddRuleSubmit = async () => {
+    if (!canManage) return;
+    const trimmedInstruction = newInstruction.trim();
+
+    if (!selectedCatalogEntry) {
+      showToast('error', 'Please choose a field from the list.');
+      return;
+    }
+    if (activeRuleByFieldKey[selectedCatalogEntry.field_key]) {
+      showToast('error', `A rule already exists for "${selectedCatalogEntry.label}".`);
+      return;
+    }
+    if (!FIELD_KEY_REGEX.test(selectedCatalogEntry.field_key)) {
+      // Defensive: catalog entries should always pass this, but blocks save
+      // cleanly if a future catalog edit drifts from the runtime regex.
+      showToast('error', 'Selected field has an invalid key.');
+      return;
+    }
+    if (trimmedInstruction.length > 2000) {
+      showToast('error', 'Instruction must be 2000 characters or fewer.');
+      return;
+    }
+
+    setIsCreating(true);
+    const result = await normalizationRulesService.createRule({
+      fieldKey: selectedCatalogEntry.field_key,
+      label: selectedCatalogEntry.label,
+      category: selectedCatalogEntry.category,
+      instructionText: trimmedInstruction,
+      isEnabled: newIsEnabled,
+    });
+    setIsCreating(false);
+
+    if (!result.success) {
+      showToast('error', result.error || 'Failed to create rule');
+      return;
+    }
+    showToast(
+      'success',
+      result.reactivated
+        ? `"${selectedCatalogEntry.label}" reactivated`
+        : `"${selectedCatalogEntry.label}" added`
+    );
+    setShowAddModal(false);
+    resetAddForm();
+    await loadRules();
+  };
+
+  // -------------------------------------------------------------------------
+  // Delete (soft retire)
+  // -------------------------------------------------------------------------
+
+  const handleDeleteConfirm = async () => {
+    if (!canManage || !pendingDelete) return;
+    setIsDeleting(true);
+    const result = await normalizationRulesService.deleteRule(pendingDelete.field_key);
+    setIsDeleting(false);
+
+    if (!result.success) {
+      showToast('error', result.error || 'Failed to delete rule');
+      return;
+    }
+    showToast('success', `"${pendingDelete.label}" removed`);
+    setPendingDelete(null);
+    await loadRules();
+  };
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -275,10 +431,22 @@ const AdminNormalizationSettings: React.FC = () => {
           Back to Settings Hub
         </Link>
 
-        <PageHeader
-          title="Normalization Rules"
-          subtitle="Configure AI-assisted text cleanup applied at member verification (Verify step)."
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <PageHeader
+            title="Normalization Rules"
+            subtitle="Configure AI-assisted text cleanup applied at member verification (Verify step)."
+          />
+          {canManage && (
+            <Button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="gap-2 self-start sm:self-end"
+            >
+              <Plus className="h-4 w-4" />
+              Add Rule
+            </Button>
+          )}
+        </div>
 
         {/* Scope info banner */}
         <div className="rounded-lg border border-border bg-primary/5 p-4">
@@ -481,6 +649,15 @@ const AdminNormalizationSettings: React.FC = () => {
                                         <RotateCcw className="h-3.5 w-3.5" />
                                       </button>
                                     )}
+                                    <button
+                                      type="button"
+                                      title="Delete rule"
+                                      onClick={() => setPendingDelete(rule)}
+                                      disabled={isSaving}
+                                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -517,6 +694,215 @@ const AdminNormalizationSettings: React.FC = () => {
           isVisible={toast.isVisible}
           onClose={hideToast}
         />
+
+        {/* Add Rule modal (COD-NORMALIZATION-RULES-ADD-DELETE-034) */}
+        {showAddModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            role="dialog"
+            aria-modal="true"
+            onClick={closeAddModal}
+          >
+            <div
+              className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Add normalization rule</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    The runtime starts applying this rule to the named field as soon as you save.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeAddModal}
+                  disabled={isCreating}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Field
+                  </label>
+                  <select
+                    value={newFieldKey}
+                    onChange={(e) => setNewFieldKey(e.target.value)}
+                    autoFocus
+                    disabled={isCreating}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Choose a field…</option>
+                    {CATEGORY_ORDER.map((cat) => {
+                      const entries = FIELD_CATALOG.filter((e) => e.category === cat);
+                      if (entries.length === 0) return null;
+                      return (
+                        <optgroup key={cat} label={CATEGORY_META[cat].label}>
+                          {entries.map((entry) => {
+                            const taken = Boolean(activeRuleByFieldKey[entry.field_key]);
+                            return (
+                              <option
+                                key={entry.field_key}
+                                value={entry.field_key}
+                                disabled={taken}
+                              >
+                                {entry.label}
+                                {taken ? ' (Rule exists)' : ''}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      );
+                    })}
+                  </select>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Fields already covered by an active rule are shown disabled.
+                    Deleting a rule re-enables its field here.
+                  </p>
+                </div>
+
+                {selectedCatalogEntry && (
+                  <div className="rounded-md border border-border bg-muted/20 px-3 py-2 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Label
+                      </span>
+                      <span className="text-sm text-foreground">
+                        {selectedCatalogEntry.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Category
+                      </span>
+                      <span className="text-sm text-foreground">
+                        {CATEGORY_META[selectedCatalogEntry.category].label}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Field key
+                      </span>
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                        {selectedCatalogEntry.field_key}
+                      </code>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Instruction text
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newInstruction}
+                    onChange={(e) => setNewInstruction(e.target.value)}
+                    placeholder="e.g. Title Case, trim extra spaces"
+                    disabled={isCreating}
+                    className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Sent to the AI as the normalization instruction for this field. Up to 2000 characters.
+                    Leave empty to passthrough (no transformation).
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={newIsEnabled}
+                    onChange={(e) => setNewIsEnabled(e.target.checked)}
+                    disabled={isCreating}
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
+                  Enabled
+                </label>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={closeAddModal}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleAddRuleSubmit()}
+                  disabled={
+                    isCreating ||
+                    !selectedCatalogEntry ||
+                    Boolean(
+                      selectedCatalogEntry &&
+                        activeRuleByFieldKey[selectedCatalogEntry.field_key]
+                    )
+                  }
+                  className="gap-1.5"
+                >
+                  {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Save Rule
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete confirmation modal */}
+        {pendingDelete && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !isDeleting && setPendingDelete(null)}
+          >
+            <div
+              className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-foreground">Delete normalization rule?</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                This retires the rule for{' '}
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                  {pendingDelete.field_key}
+                </code>
+                . The runtime stops applying it immediately. You can re-add the same field key later
+                to reactivate it.
+              </p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPendingDelete(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => void handleDeleteConfirm()}
+                  disabled={isDeleting}
+                  className="gap-1.5"
+                >
+                  {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PermissionGate>
   );

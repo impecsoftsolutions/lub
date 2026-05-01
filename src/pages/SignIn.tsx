@@ -490,7 +490,7 @@ const SignIn: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex items-center justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -498,13 +498,13 @@ const SignIn: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-md w-full space-y-8">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-foreground">Portal Sign In</h2>
           <p className="mt-2 text-muted-foreground">Sign in with your email address and mobile number</p>
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm border border-border p-8">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 sm:p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {visibleFields.map(field => (
               <div key={field.field_key}>
@@ -544,7 +544,7 @@ const SignIn: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-primary hover:text-primary/80 font-medium">
+              <Link to="/signup" className="inline-flex min-h-11 items-center px-2 -mx-2 text-primary hover:text-primary/80 font-medium">
                 Sign Up
               </Link>
             </p>

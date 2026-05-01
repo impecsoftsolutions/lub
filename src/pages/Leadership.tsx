@@ -257,14 +257,14 @@ const Leadership: React.FC = () => {
   const committeePeriod = getCommitteePeriod();
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <div className="mb-12">
-        <div className="text-center mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-16">
+      <div className="mb-8 sm:mb-12">
+        <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-xl font-semibold text-foreground mb-4">Leadership</h1>
           <p className="text-muted-foreground">LUB Leadership committees and their members</p>
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6 space-y-6">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-4 sm:p-6 space-y-6">
           <h2 className="text-section font-semibold text-foreground mb-4">Select Committee</h2>
 
           <div className="space-y-4">
@@ -276,7 +276,7 @@ const Leadership: React.FC = () => {
                 value={committeeYear}
                 onChange={(e) => setCommitteeYear(e.target.value)}
                 disabled={isLoadingCommitteeYears || !!committeeYearsError || availableCommitteeYears.length === 0}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
               >
                 <option value="">Select Committee Year</option>
                 {availableCommitteeYears.map(year => (
@@ -300,7 +300,7 @@ const Leadership: React.FC = () => {
               <select
                 value={level}
                 onChange={(e) => setLevel(e.target.value as 'national' | 'state' | 'district')}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                className="w-full px-3 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
               >
                 <option value="">Select Level</option>
                 <option value="national">National</option>
@@ -322,7 +322,7 @@ const Leadership: React.FC = () => {
                   <select
                     value={stateName}
                     onChange={(e) => setStateName(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                    className="w-full px-3 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select State</option>
                     {states.map((state) => (
@@ -348,7 +348,7 @@ const Leadership: React.FC = () => {
                   <select
                     value={districtName}
                     onChange={(e) => setDistrictName(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                    className="w-full px-3 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select District</option>
                     {districts.map((district) => (
@@ -365,7 +365,7 @@ const Leadership: React.FC = () => {
               <button
                 onClick={handleLoadCommittee}
                 disabled={isLoadButtonDisabled() || isLoadingAssignments}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {isLoadingAssignments ? (
                   <>
@@ -404,13 +404,13 @@ const Leadership: React.FC = () => {
             </div>
           ) : (
             <div>
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-foreground mb-2 flex items-center gap-3">
-                  <MapPin className="w-8 h-8 text-primary" />
+              <div className="mb-6 sm:mb-8">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2 flex items-start gap-3">
+                  <MapPin className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
                   {committeeName} – {committeeYear}
                 </h2>
                 {committeePeriod && (
-                  <p className="text-muted-foreground ml-11">
+                  <p className="text-muted-foreground sm:ml-11">
                     ({committeePeriod})
                   </p>
                 )}
@@ -418,7 +418,7 @@ const Leadership: React.FC = () => {
 
               <div className="space-y-8">
                 {groupedRoles.map((roleGroup) => (
-                  <div key={roleGroup.roleName} className="bg-card rounded-lg shadow-sm border border-border p-6">
+                  <div key={roleGroup.roleName} className="bg-card rounded-lg shadow-sm border border-border p-4 sm:p-6">
                     <h3 className="text-section font-semibold text-foreground mb-4 pb-3 border-b border-border">
                       {roleGroup.roleName}
                     </h3>

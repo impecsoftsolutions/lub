@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Plus, Search, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
+import { Building2, Plus, Search, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock, MoreHorizontal, Edit3, Trash2, ListChecks } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
-import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
+import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, MemberRoleAssignmentBulkSkip, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
 import { formatDateTimeValue } from '../lib/dateTimeManager';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -88,6 +88,29 @@ const AdminDesignationsManagement: React.FC = () => {
   const [memberSearchResults, setMemberSearchResults] = useState<MemberSearchResult[]>([]);
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+
+  // Bulk Assignment State
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+  const [bulkForm, setBulkForm] = useState({
+    role_id: '',
+    level: '' as 'national' | 'state' | 'district' | 'city' | '',
+    state: '',
+    district: '',
+    committee_year: '',
+    role_start_date: '',
+    role_end_date: ''
+  });
+  const [bulkSelectedMembers, setBulkSelectedMembers] = useState<MemberSearchResult[]>([]);
+  const [bulkMemberSearchTerm, setBulkMemberSearchTerm] = useState('');
+  const [bulkMemberSearchResults, setBulkMemberSearchResults] = useState<MemberSearchResult[]>([]);
+  const [isBulkSearchingMembers, setIsBulkSearchingMembers] = useState(false);
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  const [bulkAvailableDistricts, setBulkAvailableDistricts] = useState<DistrictOption[]>([]);
+  const [bulkResult, setBulkResult] = useState<{
+    addedCount: number;
+    skippedCount: number;
+    skipped: MemberRoleAssignmentBulkSkip[];
+  } | null>(null);
 
   // Geographic data
   const [allStates, setAllStates] = useState<StateMaster[]>([]);
@@ -720,6 +743,152 @@ const AdminDesignationsManagement: React.FC = () => {
     setMemberSearchResults([]);
   };
 
+  // ─── Bulk Assignment Handlers ───────────────────────────────────────────────
+
+  const loadBulkDistricts = useCallback(async (stateName: string) => {
+    try {
+      const districts = await locationsService.getActiveDistrictsByStateName(stateName);
+      setBulkAvailableDistricts(districts);
+    } catch (error) {
+      console.error('[AdminDesignationsManagement] Error loading bulk districts:', error);
+      showToast('error', 'Failed to load districts');
+    }
+  }, [showToast]);
+
+  const searchBulkMembers = async (searchTerm: string, alreadySelected: MemberSearchResult[]) => {
+    if (!searchTerm.trim() || searchTerm.length < 2) {
+      setBulkMemberSearchResults([]);
+      return;
+    }
+    try {
+      setIsBulkSearchingMembers(true);
+      const results = await memberLubRolesService.searchMembers(searchTerm);
+      // Filter out already-selected members so the dropdown stays clean
+      setBulkMemberSearchResults(results.filter(r => !alreadySelected.some(s => s.id === r.id)));
+    } catch (error) {
+      console.error('[AdminDesignationsManagement] Error searching bulk members:', error);
+      showToast('error', 'Failed to search members');
+    } finally {
+      setIsBulkSearchingMembers(false);
+    }
+  };
+
+  const handleBulkMemberAdd = (member: MemberSearchResult) => {
+    setBulkSelectedMembers(prev => {
+      if (prev.some(s => s.id === member.id)) return prev;
+      return [...prev, member];
+    });
+    setBulkMemberSearchTerm('');
+    setBulkMemberSearchResults([]);
+  };
+
+  const handleBulkMemberRemove = (memberId: string) => {
+    setBulkSelectedMembers(prev => prev.filter(m => m.id !== memberId));
+  };
+
+  const resetBulkForm = () => {
+    setBulkForm({
+      role_id: '',
+      level: '',
+      state: '',
+      district: '',
+      committee_year: '',
+      role_start_date: '',
+      role_end_date: ''
+    });
+    setBulkSelectedMembers([]);
+    setBulkMemberSearchTerm('');
+    setBulkMemberSearchResults([]);
+    setBulkAvailableDistricts([]);
+    setBulkResult(null);
+  };
+
+  const handleBulkAssign = async () => {
+    if (bulkSelectedMembers.length === 0) {
+      showToast('error', 'Please select at least one member');
+      return;
+    }
+    if (bulkSelectedMembers.length > 50) {
+      showToast('error', 'Cannot assign more than 50 members at once');
+      return;
+    }
+    if (!bulkForm.role_id || !bulkForm.level) {
+      showToast('error', 'Please fill in LUB Role and Level');
+      return;
+    }
+    if ((bulkForm.level === 'state' || bulkForm.level === 'district' || bulkForm.level === 'city') && !bulkForm.state) {
+      showToast('error', 'State is required for this level');
+      return;
+    }
+    if ((bulkForm.level === 'district' || bulkForm.level === 'city') && !bulkForm.district) {
+      showToast('error', 'District is required for this level');
+      return;
+    }
+    if (!bulkForm.committee_year) {
+      showToast('error', 'Committee Year is required');
+      return;
+    }
+    if (!/^\d{4}$/.test(bulkForm.committee_year)) {
+      showToast('error', 'Please enter a valid Committee Year (e.g., 2025)');
+      return;
+    }
+    if (bulkForm.role_start_date && bulkForm.role_end_date) {
+      if (new Date(bulkForm.role_end_date) < new Date(bulkForm.role_start_date)) {
+        showToast('error', 'Period To date cannot be before Period From date');
+        return;
+      }
+    }
+
+    try {
+      setIsBulkSubmitting(true);
+      setBulkResult(null);
+
+      const result = await memberLubRolesService.createAssignmentsBulk({
+        member_ids:      bulkSelectedMembers.map(m => m.id),
+        role_id:         bulkForm.role_id,
+        level:           bulkForm.level as 'national' | 'state' | 'district' | 'city',
+        state:           bulkForm.state || undefined,
+        district:        bulkForm.district || undefined,
+        committee_year:  bulkForm.committee_year,
+        role_start_date: bulkForm.role_start_date || null,
+        role_end_date:   bulkForm.role_end_date || null,
+      });
+
+      if (!result.success) {
+        showToast('error', result.error || 'Bulk assignment failed');
+        return;
+      }
+
+      setBulkResult({
+        addedCount:   result.addedCount,
+        skippedCount: result.skippedCount,
+        skipped:      result.skipped,
+      });
+
+      if (result.addedCount > 0) {
+        await loadMemberAssignments();
+      }
+
+      if (result.skippedCount === 0) {
+        // Full success — close and reset
+        showToast('success', `${result.addedCount} member${result.addedCount !== 1 ? 's' : ''} assigned successfully`);
+        setShowBulkAssignModal(false);
+        resetBulkForm();
+      } else {
+        // Partial success — keep modal open so admin can review skipped reasons
+        showToast(
+          result.addedCount > 0 ? 'success' : 'error',
+          `Added ${result.addedCount}, skipped ${result.skippedCount}`
+        );
+      }
+    } catch (error) {
+      console.error('[AdminDesignationsManagement] Bulk assign error:', error);
+      showToast('error', 'An unexpected error occurred during bulk assignment');
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
   const handleMemberSearchChange = (value: string) => {
     setMemberSearchTerm(value);
     if (value.length >= 2) {
@@ -1290,13 +1459,22 @@ const AdminDesignationsManagement: React.FC = () => {
                       />
                     </div>
                     {canManageDesignations && (
-                      <button
-                        onClick={() => setShowAddAssignmentModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Assignment
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowBulkAssignModal(true)}
+                          className="inline-flex items-center px-4 py-2 border border-border bg-background text-foreground rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <ListChecks className="w-4 h-4 mr-2" />
+                          Bulk Assign
+                        </button>
+                        <button
+                          onClick={() => setShowAddAssignmentModal(true)}
+                          className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Assignment
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -1979,6 +2157,311 @@ const AdminDesignationsManagement: React.FC = () => {
                 className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSavingAssignment ? 'Adding...' : 'Add Assignment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Member Assignment Modal */}
+      {showBulkAssignModal && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-section font-semibold text-foreground">Bulk Role Assignment</h3>
+              <button
+                onClick={() => { setShowBulkAssignModal(false); resetBulkForm(); }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Result Panel (visible after submit with partial/full outcome) */}
+            {bulkResult && (
+              <div className={`mb-6 p-4 rounded-lg border ${
+                bulkResult.skippedCount > 0
+                  ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800'
+                  : 'bg-primary/5 border-border'
+              }`}>
+                <div className="font-medium text-foreground mb-1">
+                  Result: Added {bulkResult.addedCount}, Skipped {bulkResult.skippedCount}
+                </div>
+                {bulkResult.skippedCount > 0 && (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Review the skipped members below. Use "Remove Skipped" to clear them from your selection and retry with the remaining members.
+                    </p>
+                    <div className="space-y-2 mb-3">
+                      {bulkResult.skipped.map(skip => {
+                        const skippedMember = bulkSelectedMembers.find(m => m.id === skip.member_id);
+                        return (
+                          <div key={skip.member_id} className="flex items-start gap-2 text-sm">
+                            <span className="text-destructive font-semibold shrink-0 mt-0.5">✗</span>
+                            <div>
+                              <span className="font-medium">{skippedMember?.full_name ?? skip.member_id}</span>
+                              <span className="text-muted-foreground"> — {skip.reason}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const skippedIds = new Set(bulkResult.skipped.map(s => s.member_id));
+                        setBulkSelectedMembers(prev => prev.filter(m => !skippedIds.has(m.id)));
+                        setBulkResult(null);
+                      }}
+                      className="text-sm font-medium text-primary hover:text-primary/80 underline underline-offset-2"
+                    >
+                      Remove skipped members from selection
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {/* Multi-Member Selector */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Members <span className="text-destructive">*</span>
+                  <span className="ml-2 text-muted-foreground font-normal">(max 50)</span>
+                </label>
+
+                {/* Selected member chips */}
+                {bulkSelectedMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {bulkSelectedMembers.map(m => (
+                      <span
+                        key={m.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                      >
+                        {m.full_name}
+                        <button
+                          type="button"
+                          onClick={() => handleBulkMemberRemove(m.id)}
+                          className="hover:text-primary/70 ml-0.5"
+                          aria-label={`Remove ${m.full_name}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Search input — hidden when cap reached */}
+                {bulkSelectedMembers.length < 50 && (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={bulkMemberSearchTerm}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setBulkMemberSearchTerm(val);
+                        void searchBulkMembers(val, bulkSelectedMembers);
+                      }}
+                      placeholder="Type name or email to search approved members…"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                    />
+                    {isBulkSearchingMembers && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Search results dropdown */}
+                {bulkMemberSearchResults.length > 0 && (
+                  <div className="mt-2 border border-border rounded-lg max-h-48 overflow-y-auto">
+                    {bulkMemberSearchResults.map(member => (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => handleBulkMemberAdd(member)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-muted/30 border-b border-border last:border-b-0"
+                      >
+                        <div className="font-medium text-foreground text-sm">{member.full_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {member.company_name} · {member.city}, {member.district} · {member.email}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {bulkSelectedMembers.length === 0
+                    ? 'Type at least 2 characters to search for approved members.'
+                    : `${bulkSelectedMembers.length} member${bulkSelectedMembers.length !== 1 ? 's' : ''} selected.`}
+                </p>
+              </div>
+
+              {/* Shared Assignment Fields (mirrors single-add form) */}
+
+              {/* Role */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  LUB Role <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={bulkForm.role_id}
+                  onChange={(e) => setBulkForm(prev => ({ ...prev, role_id: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option value="">Select LUB Role</option>
+                  {lubRoles.filter(role => role.is_active).map(role => (
+                    <option key={role.id} value={role.id}>{role.role_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Level */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Level <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={bulkForm.level}
+                  onChange={(e) => {
+                    const lv = e.target.value as 'national' | 'state' | 'district' | 'city' | '';
+                    setBulkForm(prev => ({
+                      ...prev,
+                      level:    lv,
+                      state:    lv === 'national' ? '' : prev.state,
+                      district: (lv === 'national' || lv === 'state') ? '' : prev.district,
+                    }));
+                    setBulkAvailableDistricts([]);
+                  }}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option value="">Select Level</option>
+                  <option value="national">National</option>
+                  <option value="state">State</option>
+                  <option value="district">District</option>
+                  <option value="city">City</option>
+                </select>
+              </div>
+
+              {/* State */}
+              {(bulkForm.level === 'state' || bulkForm.level === 'district' || bulkForm.level === 'city') && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    State <span className="text-destructive">*</span>
+                  </label>
+                  {isLoadingStates ? (
+                    <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
+                      Loading states…
+                    </div>
+                  ) : (
+                    <select
+                      value={bulkForm.state}
+                      onChange={(e) => {
+                        const stateName = e.target.value;
+                        setBulkForm(prev => ({ ...prev, state: stateName, district: '' }));
+                        setBulkAvailableDistricts([]);
+                        if (stateName && (bulkForm.level === 'district' || bulkForm.level === 'city')) {
+                          void loadBulkDistricts(stateName);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                    >
+                      <option value="">Select State</option>
+                      {allStates.map(state => (
+                        <option key={state.id} value={state.state_name}>{state.state_name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* District */}
+              {(bulkForm.level === 'district' || bulkForm.level === 'city') && bulkForm.state && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    District <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={bulkForm.district}
+                    onChange={(e) => setBulkForm(prev => ({ ...prev, district: e.target.value }))}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                  >
+                    <option value="">Select District</option>
+                    {bulkAvailableDistricts.map(district => (
+                      <option key={district.district_id} value={district.district_name}>
+                        {district.district_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Committee Year */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Committee Year <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={bulkForm.committee_year}
+                  onChange={(e) => setBulkForm(prev => ({ ...prev, committee_year: e.target.value }))}
+                  placeholder="2025"
+                  maxLength={4}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                />
+              </div>
+
+              {/* Period From */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Period From <span className="text-muted-foreground">(optional)</span>
+                </label>
+                <input
+                  type="date"
+                  value={bulkForm.role_start_date}
+                  onChange={(e) => setBulkForm(prev => ({ ...prev, role_start_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                />
+              </div>
+
+              {/* Period To */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Period To <span className="text-muted-foreground">(optional)</span>
+                </label>
+                <input
+                  type="date"
+                  value={bulkForm.role_end_date}
+                  onChange={(e) => setBulkForm(prev => ({ ...prev, role_end_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-between mt-8 pt-6 border-t border-border">
+              <button
+                onClick={() => { setShowBulkAssignModal(false); resetBulkForm(); }}
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+              >
+                {bulkResult ? 'Close' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => { void handleBulkAssign(); }}
+                disabled={
+                  isBulkSubmitting ||
+                  bulkSelectedMembers.length === 0 ||
+                  !bulkForm.role_id ||
+                  !bulkForm.level ||
+                  !bulkForm.committee_year
+                }
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isBulkSubmitting
+                  ? 'Assigning…'
+                  : `Assign to ${bulkSelectedMembers.length} Member${bulkSelectedMembers.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

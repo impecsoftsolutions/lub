@@ -14,10 +14,10 @@ const Footer: React.FC = () => {
   return (
     <footer className="bg-blue-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid gap-8 md:grid-cols-3">
           {/* Logo and Description */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-3">
               {orgLogo ? (
                 <img
                   src={orgLogo}
@@ -29,7 +29,7 @@ const Footer: React.FC = () => {
                   <span className="text-white font-bold text-lg">L</span>
                 </div>
               )}
-              <span className="text-2xl font-bold">{orgName}</span>
+              <span className="text-xl sm:text-2xl font-bold leading-tight">{orgName}</span>
             </div>
             <p className="text-blue-100 text-sm leading-relaxed">
               Empowering Micro, Small and Medium Enterprises across India through
@@ -40,20 +40,20 @@ const Footer: React.FC = () => {
           {/* Quick Links */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Quick Links</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <Link to="/members" className="text-blue-100 hover:text-white transition-colors">
+            <div className="grid grid-cols-2 gap-x-2 text-sm">
+              <Link to="/members" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
                 Directory
               </Link>
-              <Link to="/events" className="text-blue-100 hover:text-white transition-colors">
+              <Link to="/events" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
                 Events
               </Link>
-              <Link to="/news" className="text-blue-100 hover:text-white transition-colors">
+              <Link to="/news" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
                 News
               </Link>
-              <Link to="/leadership" className="text-blue-100 hover:text-white transition-colors">
+              <Link to="/leadership" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
                 Leadership
               </Link>
-              <Link to="/join" className="text-blue-100 hover:text-white transition-colors">
+              <Link to="/join" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
                 Join
               </Link>
             </div>
@@ -63,10 +63,10 @@ const Footer: React.FC = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Contact</h3>
             <div className="space-y-2 text-sm">
-              <p className="text-blue-100">
+              <p className="text-blue-100 break-words">
                 Email: {orgEmail}
               </p>
-              <p className="text-blue-100">
+              <p className="text-blue-100 break-words">
                 Website: {orgWebsite}
               </p>
             </div>
@@ -74,12 +74,12 @@ const Footer: React.FC = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-blue-800 mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center">
+        <div className="border-t border-blue-800 mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
           <p className="text-blue-100 text-sm">
             © {currentYear} {orgName}. All rights reserved.
           </p>
-          <div className="flex space-x-4 mt-4 sm:mt-0">
-            <Link to="/styleguide" className="text-blue-100 hover:text-white text-sm transition-colors">
+          <div className="flex space-x-4">
+            <Link to="/styleguide" className="text-blue-100 hover:text-white text-sm transition-colors py-3 sm:py-1">
               Style Guide
             </Link>
           </div>

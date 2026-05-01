@@ -468,7 +468,7 @@ const Directory: React.FC = () => {
     return (
       <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         <div
-          className="p-6 hover:shadow-md transition-all duration-200 cursor-pointer group"
+          className="p-4 sm:p-6 hover:shadow-md transition-all duration-200 cursor-pointer group"
           onClick={handleCardClick}
         >
         <div className="flex items-start justify-between mb-3">
@@ -480,6 +480,7 @@ const Directory: React.FC = () => {
               {member.company_name}
             </p>
           </div>
+          <ChevronDown className={`w-5 h-5 text-muted-foreground flex-shrink-0 ml-2 mt-0.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
         </div>
 
         <div className="flex items-center text-sm text-muted-foreground mb-4">
@@ -686,7 +687,7 @@ const Directory: React.FC = () => {
 
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Show:</span>
           <select
             value={recordsPerPage}
@@ -762,9 +763,9 @@ const Directory: React.FC = () => {
   return (
     <div className="min-h-screen bg-background py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Users className="w-10 h-10 text-primary mr-3" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex flex-col items-center justify-center gap-3 mb-3 sm:mb-4 sm:flex-row sm:gap-0">
+            <Users className="w-10 h-10 text-primary sm:mr-3" />
             <h1 className="text-xl font-semibold text-foreground">Members Directory</h1>
           </div>
           <p className="text-muted-foreground max-w-3xl mx-auto">
@@ -773,13 +774,13 @@ const Directory: React.FC = () => {
 
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="flex-1 relative">
               <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search by name, company, location, or products..."
+                placeholder={isMobile ? 'Search members...' : 'Search by name, company, location, or products...'}
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -796,7 +797,7 @@ const Directory: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 sm:shrink-0">
               {!isMobile && (
                 <div className="inline-flex border border-border rounded-lg overflow-hidden bg-card">
                   <button
@@ -825,7 +826,7 @@ const Directory: React.FC = () => {
               )}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center px-6 py-3 border border-border rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors"
+                className="inline-flex w-full sm:w-auto items-center justify-center px-5 sm:px-6 py-3 border border-border rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors"
               >
                 <Filter className="w-5 h-5 mr-2" />
                 Filters
@@ -847,7 +848,7 @@ const Directory: React.FC = () => {
                       setSelectedCity('');
                       setCurrentPage(1);
                     }}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
+                    className="w-full px-4 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring"
                   >
                     <option value="">All States</option>
                     {uniqueStates.map(state => (
@@ -864,7 +865,7 @@ const Directory: React.FC = () => {
                       setSelectedCity('');
                       setCurrentPage(1);
                     }}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
                     disabled={!selectedState}
                   >
                     <option value="">{selectedState ? 'All Districts' : 'Select a state first'}</option>
@@ -881,7 +882,7 @@ const Directory: React.FC = () => {
                       setSelectedCity(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 sm:py-2 border border-border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring disabled:bg-muted/50 disabled:cursor-not-allowed"
                     disabled={!selectedDistrict}
                   >
                     <option value="">{selectedDistrict ? 'All Cities' : 'Select a district first'}</option>
@@ -902,7 +903,7 @@ const Directory: React.FC = () => {
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between text-sm">
+          <div className="mt-4 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
             <span className="text-muted-foreground">
               Showing <span className="font-semibold">{startRecord}-{endRecord}</span> of{' '}
               <span className="font-semibold">{filteredMembers.length}</span> members
@@ -928,7 +929,7 @@ const Directory: React.FC = () => {
           </div>
         ) : filteredMembers.length === 0 ? (
           <div className="text-center py-16 bg-card rounded-lg border border-border">
-            <Users className="w-20 h-20 text-muted-foreground/40 mx-auto mb-4" />
+            <Users className="w-14 h-14 sm:w-20 sm:h-20 text-muted-foreground/40 mx-auto mb-4" />
             <h3 className="text-section font-semibold text-foreground mb-2">No members found</h3>
             <p className="text-muted-foreground mb-6">
               {selectedCity && selectedDistrict

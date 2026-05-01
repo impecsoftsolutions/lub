@@ -4,7 +4,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const NORMALIZABLE_FIELDS = [
+// Hardcoded baseline that the legacy callers (Verify path in Join.tsx
+// and Smart Upload `normalizeViaRulesEngine`) still send and read from
+// the response. Always present in `original` and `normalized` so existing
+// typed callers keep working even when admins delete the matching rule.
+// Per COD-NORMALIZATION-RULES-ADD-DELETE-034 the runtime no longer GATES
+// on this list — admin-added field_keys (data-driven) flow through too.
+const LEGACY_BASELINE_FIELDS = [
   'full_name',
   'email',
   'mobile_number',
@@ -16,8 +22,15 @@ const NORMALIZABLE_FIELDS = [
   'referred_by',
 ] as const;
 
-type NormalizableField = (typeof NORMALIZABLE_FIELDS)[number];
-type NormalizationRecord = Record<NormalizableField, string>;
+// Cap on the number of normalization rules we apply per request, regardless
+// of how many admin-added rules exist. Guards against runaway prompt size.
+const MAX_NORMALIZABLE_FIELDS = 50;
+
+// Field key validation mirrors the migration's CHECK regex so any malformed
+// keys ever sneaking past the RPC layer are dropped here too.
+const FIELD_KEY_RE = /^[a-z][a-z0-9_]{1,63}$/;
+
+type NormalizationRecord = Record<string, string>;
 
 type GenericPayload = Record<string, unknown>;
 
@@ -30,10 +43,11 @@ interface AIRuntimeSettingsRow {
 }
 
 interface NormalizationRuleRow {
-  field_key: NormalizableField;
+  field_key: string;
   instruction_text: string;
   is_enabled: boolean;
   display_order: number;
+  is_retired?: boolean;
 }
 
 interface OpenAICompletionResponse {
@@ -48,7 +62,10 @@ interface OpenAICompletionResponse {
 }
 
 const VALID_REASONING_EFFORT = new Set(['low', 'medium', 'high', 'xhigh']);
-const DEFAULT_NORMALIZATION_RULES: Partial<Record<NormalizableField, string>> = {
+// Fallback used only when the runtime cannot read the rules table (env
+// missing / DB outage). Mirrors the original 9 baseline fields so callers
+// keep behaving the same in degraded mode.
+const DEFAULT_NORMALIZATION_RULES: Record<string, string> = {
   full_name: 'Title Case, trim extra spaces',
   company_name: 'Title Case, trim extra spaces',
   company_address: 'Trim extra spaces and normalize spacing',
@@ -65,10 +82,23 @@ function toStringValue(value: unknown): string {
   return String(value).trim();
 }
 
+/**
+ * Build the original record. We always include the legacy baseline keys
+ * (typed callers depend on them) and ALSO include any extra payload keys
+ * that pass field-key validation, so admin-added rules can be normalized
+ * end-to-end. `_ai_runtime` and other underscore-prefixed control keys
+ * are excluded.
+ */
 function buildOriginalRecord(payload: GenericPayload): NormalizationRecord {
-  const original = {} as NormalizationRecord;
-  for (const field of NORMALIZABLE_FIELDS) {
+  const original: NormalizationRecord = {};
+  for (const field of LEGACY_BASELINE_FIELDS) {
     original[field] = toStringValue(payload[field]);
+  }
+  for (const key of Object.keys(payload)) {
+    if (key.startsWith('_')) continue;
+    if (original[key] !== undefined) continue;
+    if (!FIELD_KEY_RE.test(key)) continue;
+    original[key] = toStringValue(payload[key]);
   }
   return original;
 }
@@ -130,7 +160,7 @@ async function loadNormalizationRules(): Promise<NormalizationRuleRow[] | null> 
 
   try {
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/member_normalization_rules?select=field_key,instruction_text,is_enabled,display_order&order=display_order.asc`,
+      `${supabaseUrl}/rest/v1/member_normalization_rules?select=field_key,instruction_text,is_enabled,display_order,is_retired&is_retired=eq.false&order=display_order.asc`,
       {
         method: 'GET',
         headers: {
@@ -158,37 +188,52 @@ async function loadNormalizationRules(): Promise<NormalizationRuleRow[] | null> 
 
 function buildEffectiveNormalizationRules(
   rows: NormalizationRuleRow[] | null
-): Partial<Record<NormalizableField, string>> {
+): Record<string, string> {
   if (!rows || rows.length === 0) {
     return { ...DEFAULT_NORMALIZATION_RULES };
   }
 
-  const rules: Partial<Record<NormalizableField, string>> = {};
+  const rules: Record<string, string> = {};
+  let count = 0;
 
   for (const row of rows) {
-    if (!NORMALIZABLE_FIELDS.includes(row.field_key)) continue;
+    if (count >= MAX_NORMALIZABLE_FIELDS) break;
+    if (row.is_retired === true) continue;
     if (!row.is_enabled) continue;
+
+    const fieldKey = toStringValue(row.field_key).toLowerCase();
+    if (!FIELD_KEY_RE.test(fieldKey)) continue;
 
     const instruction = toStringValue(row.instruction_text);
     if (!instruction) continue;
 
-    rules[row.field_key] = instruction;
+    rules[fieldKey] = instruction;
+    count += 1;
   }
 
   return rules;
 }
 
+/**
+ * Coerce the AI's normalized response into a record over the union of
+ * (legacy baseline keys, original payload keys). For each key:
+ *   - take the AI's normalized value when non-empty,
+ *   - else fall back to the original input value.
+ * This guarantees that callers never see an empty string for a key they
+ * provided, even when the AI omitted it.
+ */
 function coerceNormalizedRecord(raw: unknown, fallbackOriginal: NormalizationRecord): NormalizationRecord {
-  if (!raw || typeof raw !== 'object') {
-    return { ...fallbackOriginal };
-  }
+  const source = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {};
+  const normalized: NormalizationRecord = {};
 
-  const source = raw as Record<string, unknown>;
-  const normalized = {} as NormalizationRecord;
+  // Union of all keys we might want to pass through.
+  const keys = new Set<string>();
+  for (const k of LEGACY_BASELINE_FIELDS) keys.add(k);
+  for (const k of Object.keys(fallbackOriginal)) keys.add(k);
 
-  for (const field of NORMALIZABLE_FIELDS) {
+  for (const field of keys) {
     const value = source[field];
-    normalized[field] = toStringValue(value) || fallbackOriginal[field];
+    normalized[field] = toStringValue(value) || fallbackOriginal[field] || '';
   }
 
   return normalized;
@@ -217,7 +262,7 @@ async function callOpenAIForNormalization(
   model: string,
   reasoningEffort: string | null,
   original: NormalizationRecord,
-  rules: Partial<Record<NormalizableField, string>>
+  rules: Record<string, string>
 ): Promise<NormalizationRecord> {
   const systemInstruction =
     'You normalize member registration fields for consistency. Return strict JSON only with either {"normalized": {...}} or {"original": {...}, "normalized": {...}}. Keep email and mobile numbers unchanged.';

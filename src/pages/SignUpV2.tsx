@@ -566,7 +566,7 @@ const SignUpV2: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex items-center justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <Toast
         type={toast.type}
         message={toast.message}
@@ -574,13 +574,13 @@ const SignUpV2: React.FC = () => {
         onClose={hideToast}
       />
 
-      <div className="max-w-md w-full space-y-8">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-foreground">Create Your Account</h2>
           <p className="mt-2 text-muted-foreground">Sign up with your email address, mobile number, and state</p>
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm border border-border p-8">
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 sm:p-8">
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -627,7 +627,7 @@ const SignUpV2: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link to="/signin" className="text-primary hover:text-primary/80 font-medium">
+              <Link to="/signin" className="inline-flex min-h-11 items-center px-2 -mx-2 text-primary hover:text-primary/80 font-medium">
                 Sign In
               </Link>
             </p>

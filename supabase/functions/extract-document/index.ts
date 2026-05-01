@@ -374,6 +374,44 @@ function normalizeGender(raw: string): string {
   return lower;
 }
 
+/**
+ * Normalize a free-text field value into the canonical shape the /join
+ * registration form expects. Reduces friction when the user clicks
+ * `Verify`. Operations:
+ *   - Trim outer whitespace.
+ *   - Collapse runs of internal whitespace to a single space.
+ *   - Strip obvious leading/trailing punctuation noise (commas, periods,
+ *     colons, semicolons, hyphens, slashes, pipes).
+ *   - Collapse runs of repeated commas/spaces inside addresses into a
+ *     single ", " sequence.
+ * Does NOT change casing — entity suffixes such as `HUF`, `LLP`,
+ * `PVT LTD`, `PRIVATE LIMITED` are preserved as-is. Display formatting
+ * for dates is preserved separately by `normalizeDateField`.
+ */
+function normalizeFreeText(value: string): string {
+  if (!value) return value;
+  let out = value.replace(/\s+/g, ' ').trim();
+  out = out.replace(/^[\s,.;:\-/|]+|[\s,.;:\-/|]+$/g, '').trim();
+  out = out.replace(/(?:,\s*){2,}/g, ', ');
+  return out;
+}
+
+/** Free-text fields that should pass through `normalizeFreeText`. Excludes
+ * fields that already have stricter normalization (dates, gender, GST/PAN/PIN). */
+const FREE_TEXT_FIELD_KEYS = new Set<string>([
+  'full_name',
+  'company_name',
+  'company_address',
+  'state',
+  'district',
+  'city',
+  'industry',
+  'activity_type',
+  'products_services',
+  'transaction_id',
+  'bank_reference',
+]);
+
 // ---------------------------------------------------------------------------
 // Helpers: field sanitisation (runs key normalisation first)
 // ---------------------------------------------------------------------------
@@ -408,11 +446,157 @@ function sanitizeExtractedFields(raw: unknown): Record<string, string> {
       const digits = strVal.replace(/\D/g, '');
       const sixDigit = digits.match(/\d{6}/);
       strVal = sixDigit ? sixDigit[0] : digits;
+    } else if (FREE_TEXT_FIELD_KEYS.has(key)) {
+      strVal = normalizeFreeText(strVal);
     }
 
     if (strVal) result[key] = strVal;
   }
   return result;
+}
+
+/**
+ * Post-sanitisation policy guard for full_name.
+ *
+ * Problem this guards against (CLAUDE-SMART-UPLOAD-FULLNAME-MAPPING-031):
+ *   On GST certificates for entities (PRIVATE LIMITED, LLP, etc.) the AI
+ *   sometimes copies the company's Legal/Trade Name into `full_name`,
+ *   which corrupts the registration form's person-name field. The
+ *   deterministic GST extractor already drops the "fallback to legal
+ *   name" branch, but AI output can still leak the entity name when
+ *   there is no Annexure B Karta/Proprietor row.
+ *
+ * Rule:
+ *   - On GST docs, drop `full_name` if it matches `company_name` after
+ *     case-insensitive whitespace collapse. The user can pick on the
+ *     form, or rely on Aadhaar (which has identity precedence).
+ *   - On non-GST docs, no change.
+ *   - Person-name evidence (e.g. Aadhaar's full_name) is unaffected
+ *     because Aadhaar's policy never returns company_name.
+ */
+function applyFullNameVsCompanyNameGuard(
+  fields: Record<string, string>,
+  effectiveDocType: DetectedDocType,
+): Record<string, string> {
+  if (effectiveDocType !== 'gst_certificate') return fields;
+  const fullName = (fields.full_name ?? '').trim();
+  const companyName = (fields.company_name ?? '').trim();
+  if (!fullName || !companyName) return fields;
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (norm(fullName) === norm(companyName)) {
+    const next = { ...fields };
+    delete next.full_name;
+    return next;
+  }
+  return fields;
+}
+
+const INDIAN_STATE_CANONICAL: Record<string, string> = {
+  'andhra pradesh': 'Andhra Pradesh',
+  'arunachal pradesh': 'Arunachal Pradesh',
+  assam: 'Assam',
+  bihar: 'Bihar',
+  chhattisgarh: 'Chhattisgarh',
+  goa: 'Goa',
+  gujarat: 'Gujarat',
+  haryana: 'Haryana',
+  'himachal pradesh': 'Himachal Pradesh',
+  'jharkhand': 'Jharkhand',
+  karnataka: 'Karnataka',
+  kerala: 'Kerala',
+  'madhya pradesh': 'Madhya Pradesh',
+  maharashtra: 'Maharashtra',
+  manipur: 'Manipur',
+  meghalaya: 'Meghalaya',
+  mizoram: 'Mizoram',
+  nagaland: 'Nagaland',
+  odisha: 'Odisha',
+  punjab: 'Punjab',
+  rajasthan: 'Rajasthan',
+  sikkim: 'Sikkim',
+  'tamil nadu': 'Tamil Nadu',
+  telangana: 'Telangana',
+  tripura: 'Tripura',
+  'uttar pradesh': 'Uttar Pradesh',
+  uttarakhand: 'Uttarakhand',
+  'west bengal': 'West Bengal',
+  'andaman and nicobar islands': 'Andaman and Nicobar Islands',
+  chandigarh: 'Chandigarh',
+  'dadra and nagar haveli and daman and diu': 'Dadra and Nagar Haveli and Daman and Diu',
+  delhi: 'Delhi',
+  'nct of delhi': 'Delhi',
+  lakshadweep: 'Lakshadweep',
+  puducherry: 'Puducherry',
+  'jammu and kashmir': 'Jammu and Kashmir',
+  ladakh: 'Ladakh',
+};
+
+function normalizeStateToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferGstLocationFromAddress(fields: Record<string, string>): Record<string, string> {
+  const address = (fields.company_address ?? '').trim();
+  if (!address) return fields;
+
+  const next = { ...fields };
+
+  if (!next.pin_code) {
+    const pinMatches = [...address.matchAll(/\b(\d{6})\b/g)];
+    const lastPin = pinMatches.length > 0 ? pinMatches[pinMatches.length - 1]?.[1] : '';
+    if (lastPin) next.pin_code = lastPin;
+  }
+
+  const rawParts = address
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (rawParts.length === 0) return next;
+
+  // Remove a trailing PIN segment so state/city/district inference stays stable.
+  const parts = [...rawParts];
+  if (parts.length > 0 && /^\d{6}$/.test(parts[parts.length - 1])) {
+    parts.pop();
+  }
+  if (parts.length === 0) return next;
+
+  let stateIndex = -1;
+  let stateValue = '';
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const token = normalizeStateToken(parts[i]);
+    const canonical = INDIAN_STATE_CANONICAL[token];
+    if (canonical) {
+      stateIndex = i;
+      stateValue = canonical;
+      break;
+    }
+  }
+
+  if (!next.state && stateValue) {
+    next.state = stateValue;
+  }
+
+  const districtCandidate = stateIndex > 0 ? parts[stateIndex - 1] : '';
+  const cityCandidate = stateIndex > 1 ? parts[stateIndex - 2] : '';
+
+  if (!next.district && districtCandidate) {
+    next.district = districtCandidate;
+  }
+
+  if (!next.city) {
+    if (cityCandidate) {
+      next.city = cityCandidate;
+    } else if (districtCandidate) {
+      // Common GST addresses may only expose one locality token before state.
+      next.city = districtCandidate;
+    }
+  }
+
+  return next;
 }
 
 function hasAnyField(fields: Record<string, string>, keys: string[]): boolean {
@@ -738,6 +922,126 @@ function extractGstTradeName(text: string): string {
   return inline ? trimGstFieldValue(inline[1]) : '';
 }
 
+function trimUdyamFieldValue(value: string): string {
+  return value
+    .replace(/^[:\s-]+/, '')
+    .replace(/\s+\*+\s*$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function buildDeterministicUdyamExtraction(rawText: string): ParsedAIResult | null {
+  if (!rawText) return null;
+  const text = rawText.replace(/\r\n?/g, '\n');
+  const flat = text.replace(/\s+/g, ' ').trim();
+
+  const looksUdyam =
+    /\bUDYAM\b/i.test(flat) &&
+    (/\bREGISTRATION\s+CERTIFICATE\b/i.test(flat) || /\bUDYAM-[A-Z]{2}-\d{2}-\d{7}\b/i.test(flat));
+  if (!looksUdyam) return null;
+
+  const fields: Record<string, string> = {};
+
+  const companyName = captureBetween(
+    text,
+    /\bNAME\s+OF\s+ENTERPRISE\b\s*[:-]?\s*/i,
+    [
+      /\bTYPE\s+OF\s+ENTERPRISE\b/i,
+      /\bMAJOR\s+ACTIVITY\b/i,
+      /\bSOCIAL\s+CATEGORY\b/i,
+      /\bNAME\s+OF\s+UNIT/i,
+      /\bOFFI(?:C|CI|CIAL)?AL?\s+ADDRESS\s+OF\s+ENTERPRISE\b/i,
+    ]
+  );
+  if (companyName && companyName.length <= 220) {
+    const cleaned = trimUdyamFieldValue(companyName);
+    if (cleaned) fields.company_name = cleaned;
+  }
+
+  const activityType = captureBetween(
+    text,
+    /\bMAJOR\s+ACTIVITY\b\s*[:-]?\s*/i,
+    [
+      /\bSOCIAL\s+CATEGORY\b/i,
+      /\bNAME\s+OF\s+UNIT/i,
+      /\bOFFI(?:C|CI|CIAL)?AL?\s+ADDRESS\s+OF\s+ENTERPRISE\b/i,
+    ]
+  );
+  if (activityType && activityType.length <= 140) {
+    const cleaned = trimUdyamFieldValue(activityType);
+    if (cleaned) fields.activity_type = cleaned;
+  }
+
+  const addressBlockMatch = text.match(
+    /\bOFFI(?:C|CI|CIAL)?AL?\s+ADDRESS\s+OF\s+ENTERPRISE\b([\s\S]*?)(?=\bDATE\s+OF\s+INCORPORATION\b|\bDATE\s+OF\s+UDYAM\s+REGISTRATION\b|\bNATIONAL\s+INDUSTRY\b|$)/i
+  );
+  if (addressBlockMatch) {
+    const block = addressBlockMatch[1];
+
+    const cityMatch = block.match(/\bCity\b\s*[:-]?\s*([^\n,]+?)(?=\s+\bState\b|\s+\bDistrict\b|\s+\bPin\b|$)/i);
+    if (cityMatch) {
+      const cleaned = trimUdyamFieldValue(cityMatch[1]);
+      if (cleaned && cleaned.length <= 120) fields.city = cleaned;
+    }
+
+    const districtMatch = block.match(/\bDistrict\b\s*[:-]?\s*([^\n,]+?)(?=\s*,?\s*\bPin\b|$)/i);
+    if (districtMatch) {
+      const cleaned = trimUdyamFieldValue(districtMatch[1]);
+      if (cleaned && cleaned.length <= 120) fields.district = cleaned;
+    }
+
+    const stateMatch = block.match(/\bState\b\s*[:-]?\s*([^\n,]+?)(?=\s+\bDistrict\b|\s*,?\s*\bPin\b|$)/i);
+    if (stateMatch) {
+      const cleaned = trimUdyamFieldValue(stateMatch[1]);
+      if (cleaned && cleaned.length <= 120) fields.state = cleaned;
+    }
+
+    const pinMatch = block.match(/\bPin\b\s*[:-]?\s*(\d{6})\b/i);
+    if (pinMatch) {
+      fields.pin_code = pinMatch[1];
+    }
+
+    const normalizedAddress = block
+      .replace(/\bFlat\/Door\/Block\s+No\.?\b/gi, ' ')
+      .replace(/\bName\s+of\s+Premises\/?\s*Building\b/gi, ' ')
+      .replace(/\bVillage\/Town\b/gi, ' ')
+      .replace(/\bRoad\/Street\/Lane\b/gi, ' ')
+      .replace(/\bCity\b/gi, ' ')
+      .replace(/\bState\b/gi, ' ')
+      .replace(/\bDistrict\b/gi, ' ')
+      .replace(/\bPin\b/gi, ' ')
+      .replace(/\bMobile\b[\s\S]*$/i, ' ')
+      .replace(/\bEmail\b[\s\S]*$/i, ' ')
+      .replace(/\s*:\s*/g, ', ')
+      .replace(/\s+/g, ' ')
+      .replace(/(?:,\s*){2,}/g, ', ')
+      .replace(/^[\s,;:-]+|[\s,;:-]+$/g, '')
+      .trim();
+
+    if (normalizedAddress.length > 0 && normalizedAddress.length <= 450) {
+      fields.company_address = normalizedAddress;
+    }
+  }
+
+  const nicIndustryMatch =
+    flat.match(/\b(\d{2}\s*-\s*[A-Za-z][A-Za-z\s&/()-]{3,140}?)(?=\s+\d{4}\s*-\s*|\s+\d{5}\s*-\s*|\s+\b(?:Services|Manufacturing|Trading)\b|$)/i)
+    ?? flat.match(/\bNATIONAL\s+INDUSTRY[\s\S]*?\b(\d{2}\s*-\s*[A-Za-z][A-Za-z\s&/()-]{3,140})\b/i);
+  if (nicIndustryMatch) {
+    const cleaned = trimUdyamFieldValue(nicIndustryMatch[1]);
+    if (cleaned && cleaned.length <= 120) {
+      fields.industry = cleaned;
+    }
+  }
+
+  if (Object.keys(fields).length === 0) return null;
+
+  return {
+    detected_type: 'udyam_certificate',
+    is_readable: true,
+    extracted_fields: fields as Record<string, unknown>,
+  };
+}
+
 function buildDeterministicGstExtraction(rawText: string): ParsedAIResult | null {
   if (!rawText) return null;
   const text = rawText.replace(/\r\n?/g, '\n');
@@ -784,13 +1088,13 @@ function buildDeterministicGstExtraction(rawText: string): ParsedAIResult | null
     fieldOptions.company_name = companyOptions;
   }
 
-  // GST `full_name`: prefer the Annexure B Karta/Proprietor `Name`, otherwise fall back
-  // to Legal Name. The Annexure B section starts with "Details of Karta" (or
-  // "Details of Proprietor / Karta / Managing Director ..."), and the actual person
-  // name lives on a numbered row that looks like:
-  //   `1 Name <FULL NAME> Designation/Status <role>`
-  // We anchor on the numbered prefix to avoid accidentally matching "Legal Name"
-  // earlier in the same section.
+  // GST `full_name`: ONLY accept person-level evidence from the Annexure B
+  // Karta / Proprietor / Managing Director row. Do NOT fall back to Legal
+  // Name or Trade Name — those are entity names and silently injecting them
+  // into `full_name` corrupts the registration form's person-name field on
+  // company-form GST certificates (e.g. "M/S SRK INFRA PROJECTS PRIVATE
+  // LIMITED"). If no person-level row is present, leave full_name unset
+  // and let the user fill it on the form (or rely on Aadhaar precedence).
   let kartaName = '';
   const kartaSectionMatch = text.match(/Details\s+of\s+(?:Proprietor|Karta|Managing\s+Director)[\s\S]*$/i);
   if (kartaSectionMatch) {
@@ -800,9 +1104,8 @@ function buildDeterministicGstExtraction(rawText: string): ParsedAIResult | null
       kartaName = trimGstFieldValue(numberedMatch[1]);
     }
   }
-  const fullName = kartaName || cleanedLegal;
-  if (fullName && fullName.length > 0 && fullName.length <= 200) {
-    fields.full_name = fullName;
+  if (kartaName && kartaName.length > 0 && kartaName.length <= 200) {
+    fields.full_name = kartaName;
   }
 
   // City / Town / Village
@@ -889,6 +1192,8 @@ function buildDeterministicGstExtraction(rawText: string): ParsedAIResult | null
 
 function buildDeterministicTextExtraction(text: string, selectedDocType: string): ParsedAIResult | null {
   if (!text) return null;
+  const udyam = buildDeterministicUdyamExtraction(text);
+  if (udyam) return udyam;
   // GST is the first deterministic doc supported. Do not gate on selectedDocType
   // because pass 1 typically receives 'unknown' — we let the GSTIN anchor decide.
   const gst = buildDeterministicGstExtraction(text);
@@ -1122,7 +1427,10 @@ function getDocTypePriorityHint(selectedDocType: string): string {
     case 'payment_proof':
       return 'PRIORITY for this doc type: payment_date, transaction_id (UTR/RRN/UPI ref), bank_reference, amount_paid.';
     case 'gst_certificate':
-      return 'PRIORITY for this doc type: gst_number (15-char GSTIN), company_name, company_address, state, district, city, pin_code, industry.';
+      return 'PRIORITY for this doc type: gst_number (15-char GSTIN), company_name, company_address, state, district, city, pin_code, industry. ' +
+        'STRICT FULL_NAME RULE: full_name on a GST certificate must be a NATURAL PERSON name taken ONLY from the Annexure B "Details of Proprietor / Karta / Managing Director / Authorized Signatory" section (the numbered "Name <PERSON NAME> Designation/Status <role>" row). ' +
+        'Do NOT use Legal Name, Trade Name, Additional Trade Names, or any entity-form text (anything containing PRIVATE LIMITED, PVT LTD, LLP, LIMITED, COMPANY, ENTERPRISES, INFRA, INDUSTRIES, M/S, &, AND CO, AND CO., HUF as the whole value) as full_name. ' +
+        'If no person-level Annexure B row is visible, OMIT full_name entirely. Never copy the entity/company name into full_name as a fallback.';
     case 'udyam_certificate':
       return 'PRIORITY for this doc type: company_name, company_address, state, district, city, pin_code, industry, activity_type (look for the label "MAJOR ACTIVITY" on the certificate and map its value to activity_type), products_services.';
     case 'pan_card':
@@ -1483,6 +1791,12 @@ Deno.serve(async (req: Request) => {
         parsed = r.parsed;
         aiError = r.aiError;
 
+        // Capture AI text-path outcome BEFORE we reassign `parsed` to the
+        // deterministic fallback below. This is what drives the gap-fill
+        // pdf_vision retry (COD-SMART-UPLOAD-GST-FIELD-REGRESSION-033).
+        const aiTextPathFailed =
+          !!aiError || !r.parsed || r.parsed.is_readable !== true;
+
         // Merge deterministic into a readable AI result (deterministic wins for its labels).
         if (deterministic && parsed && parsed.is_readable) {
           parsed = mergeParsedWithDeterministic(parsed, deterministic);
@@ -1502,9 +1816,46 @@ Deno.serve(async (req: Request) => {
           parsed = deterministic;
         }
 
-        // Fall through to pdf_vision retry only when deterministic is absent and the AI text path failed.
-        if (!aiError && !deterministic && (!parsed || parsed.is_readable === false)) {
-          console.log('[extract-document] pdf_text parse/unreadable, retrying with pdf_vision');
+        // pdf_vision gap-fill retry (COD-SMART-UPLOAD-GST-FIELD-REGRESSION-033 +
+        // CLAUDE-SMART-UPLOAD-UDYAM-PDF-030):
+        //
+        // The pdfjs / legacy text extractor can return degraded glyph
+        // fragments on hybrid government PDFs (GST REG-06, Udyam, etc.)
+        // that look like text to the parser but read as garbage to the
+        // AI, producing parse_error / ai_error / is_readable=false.
+        //
+        // Pre-fix gate retried pdf_vision ONLY when there was no
+        // deterministic fallback. That meant readable GST PDFs whose
+        // deterministic extractor anchored gst_number / company_name /
+        // company_address but failed to anchor pin_code / city /
+        // district / state would arrive at the client with only those
+        // 3 server fields — the regression the user reported.
+        //
+        // New gate:
+        //   1) retry whenever AI text path failed, AND
+        //   2) for GST docs, also retry when key location fields are missing
+        //      even if AI text path reported readable (some PDFs return
+        //      semantically thin but "readable" JSON with only 2-3 fields).
+        //
+        // Vision result is then merged with deterministic so deterministic-
+        // anchored fields keep their canonical values while vision fills gaps.
+        const parsedSanitized = parsed ? sanitizeExtractedFields(parsed.extracted_fields) : {};
+        const parsedDocType = parsed
+          ? getEffectiveDocType(selectedDocType, parsed.detected_type, parsedSanitized)
+          : toSafeDetectedType(selectedDocType);
+        const gstLocationFieldsMissing =
+          parsedDocType === 'gst_certificate' &&
+          ['pin_code', 'city', 'district', 'state'].some((k) => !(parsedSanitized[k] ?? '').trim());
+
+        if (aiTextPathFailed || gstLocationFieldsMissing) {
+          const retryReason = aiTextPathFailed
+            ? 'AI text parse failed'
+            : 'GST location fields missing from text-path extraction';
+          console.log(
+            `[extract-document] ${retryReason} (deterministic=${
+              deterministic ? 'present' : 'absent'
+            }) — retrying with pdf_vision to fill missing fields`
+          );
           const retry = await runPdfVisionPipeline(
             apiKey,
             model,
@@ -1513,9 +1864,16 @@ Deno.serve(async (req: Request) => {
             selectedDocType,
             reasoningEffort
           );
-          if (!retry.aiError && retry.parsed) {
-            parsed = retry.parsed;
-          } else if (retry.aiError) {
+          if (!retry.aiError && retry.parsed && retry.parsed.is_readable) {
+            if (deterministic && deterministic.is_readable) {
+              parsed = mergeParsedWithDeterministic(retry.parsed, deterministic);
+            } else {
+              parsed = retry.parsed;
+            }
+            aiError = null;
+            pipelineUsed = 'pdf_pipeline';
+          } else if (!parsed && retry.aiError) {
+            // Only surface the retry error when we still have nothing.
             aiError = retry.aiError;
           }
         }
@@ -1645,7 +2003,12 @@ Deno.serve(async (req: Request) => {
     // ------------------------------------------------------------------
     // 8. Build final envelope
     // ------------------------------------------------------------------
-    const policyFields = filterFieldsByDocPolicy(sanitizedFields, effectiveDocType);
+    const guardedFields = applyFullNameVsCompanyNameGuard(sanitizedFields, effectiveDocType);
+    const gstBackfilledFields =
+      effectiveDocType === 'gst_certificate'
+        ? inferGstLocationFromAddress(guardedFields)
+        : guardedFields;
+    const policyFields = filterFieldsByDocPolicy(gstBackfilledFields, effectiveDocType);
     const fieldCount = Object.keys(policyFields).length;
     console.log(
       `[extract-document] ok is_readable=${finalParsed.is_readable} ` +
