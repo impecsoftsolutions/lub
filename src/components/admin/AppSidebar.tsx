@@ -72,6 +72,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const canViewSettings     = useHasPermission('settings.forms.view');
   const canViewAdmin        = useHasPermission('users.edit');
   const canViewContent      = useHasPermission('activities.view');
+  const canViewEvents       = useHasPermission('events.view');
 
   // Close mobile sidebar on navigation
   useEffect(() => {
@@ -87,8 +88,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       label: "Events & Activities",
       icon: Image,
-      requiredPermission: "activities.view",
+      requiredPermission: "events_or_activities.view",
       children: [
+        { label: "Events", path: "/admin/content/events" },
         { label: "Activities", path: "/admin/content/activities" }
       ]
     },
@@ -170,7 +172,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     'settings.forms.view': canViewSettings,
     'users.edit': canViewAdmin,
     'activities.view': canViewContent,
-  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent]);
+    'events.view': canViewEvents,
+    'events_or_activities.view': canViewContent || canViewEvents,
+  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent, canViewEvents]);
 
   const navSections = useMemo(
     () =>

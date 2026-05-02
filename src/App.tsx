@@ -9,6 +9,8 @@ import ActivityDetail from './pages/ActivityDetail';
 import AdminActivities from './pages/AdminActivities';
 import AdminActivityForm from './pages/AdminActivityForm';
 import AdminActivitySettings from './pages/AdminActivitySettings';
+import AdminEvents from './pages/AdminEvents';
+import AdminEventForm from './pages/AdminEventForm';
 import Leadership from './pages/Leadership';
 import Join from './pages/Join';
 import MembershipBenefits from './pages/MembershipBenefits';
@@ -58,7 +60,6 @@ import { AdminContextProvider } from './contexts/AdminContext';
 import { sessionManager } from './lib/sessionManager';
 import { applyStoredTheme } from './lib/themeManager';
 import { DateTimeFormatBootstrap } from './components/DateTimeFormatBootstrap';
-
 // Restore persisted theme and color mode before first render
 applyStoredTheme();
 
@@ -201,7 +202,10 @@ function App() {
             <Route path="/admin/administration/users" element={<AdminUsers />} />
             <Route path="/admin/administration/roles" element={<AdminRolesPrivileges />} />
 
-            {/* Content — Activities CMS */}
+            {/* Content — Events & Activities CMS */}
+            <Route path="/admin/content/events" element={<AdminEvents />} />
+            <Route path="/admin/content/events/new" element={<AdminEventForm />} />
+            <Route path="/admin/content/events/:id/edit" element={<AdminEventForm />} />
             <Route path="/admin/content/activities" element={<AdminActivities />} />
             <Route path="/admin/content/activities/new" element={<AdminActivityForm />} />
             <Route path="/admin/content/activities/:id/edit" element={<AdminActivityForm />} />

@@ -1,7 +1,7 @@
-# LUB Web Portal - Current State
+﻿# LUB Web Portal - Current State
 
-**Last updated:** 2026-04-26
-**Updated by:** Codex (`CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017` runtime closeout)
+**Last updated:** 2026-05-02
+**Updated by:** Codex (`COD-EVENTS-CMS-032` full implementation batch)
 
 ---
 
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-04-25, Codex runtime closeout) |
-| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-04-25, Codex runtime closeout) |
+| Build (`npm run build`) | PASS (2026-05-02, COD-EVENTS-CMS-032) |
+| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-02, COD-EVENTS-CMS-032) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13 baseline) |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-04-25, Codex runtime closeout) |
+| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-02, COD-EVENTS-CMS-032) |
 
 Phase 1 destructive baseline remains the non-negotiable floor.
 
@@ -28,12 +28,14 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 
 ## Active Stream
 
-**Active stream:** None.
-**Current owner:** None.
-**Task board:** `docs/agent_coordination/TASK_BOARD.md`
-**Current handoff state:** No active handoff.
+**Active stream:** `COD-EVENTS-CMS-032` (implemented in repo)
+**Current owner:** Codex
+**Task board:** `docs/agent_coordination/TASK_BOARD.md` â€” single source of truth.
+**Current handoff state:** Full Events CMS slice is now landed in repo. Added migration `20260503120000_events_cms_full.sql` with dedicated `events` table, `events.*` permissions, slug helpers, public read RPCs (`get_published_events`, `get_event_by_slug`), and secure `_with_session` admin CRUD/publish/archive/delete RPCs. Frontend now includes `eventsService`, real admin Events list/form routes, and public `/events` now reads both Events + Activities. `/events/:slug` resolves Event first, then Activity fallback.
 
 Most recently completed streams:
+- **COD-EVENTS-CMS-032**: Full Events CMS implementation batch complete in repo. Added migration supabase/migrations/20260503120000_events_cms_full.sql (events table, permissions, secure RPCs), wired eventsService in src/lib/supabase.ts, replaced admin placeholder with real AdminEvents and AdminEventForm flows, updated admin routing/sidebar, unified public /events to read both domains, and updated /events/:slug to resolve Event then Activity fallback. Validation on 2026-05-02: lint PASS (0 errors / 3 warnings), build PASS, readonly Phase 1 smoke PASS (3 passed / 12 skipped).
+- **CLAUDE-EVENTS-CMS-NON-MIGRATION-037**: Frontend-only single batch. Created `src/pages/AdminEvents.tsx` placeholder shell (gated on existing `activities.view`); wired routes `/admin/content/events`, `/admin/content/events/new`, `/admin/content/events/:id/edit` in `App.tsx` (all render the placeholder, no 404s); added `Events` child above `Activities` under the existing `Events & Activities` sidebar group. Public side: relabeled top-nav + footer to `Events & Activities`, retitled hero, restructured `Events.tsx` feed into two explicit sections (Upcoming Events for `activity_date >= today`, Activities for `activity_date < today` or null), shared search + filter chips, shared "Load more" budget. No migration, no RPC, no service, no submit-path changes. Local validation: `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped). Pending Codex live verification.
 - **CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017**: Closed after Codex deploy/runtime verification. Smart Upload now renders `Import Data` below the queued document list, GST extraction returns `field_options.company_name` with Trade and Legal candidates, and GST adds a `full_name` fallback while Aadhaar precedence is preserved (`FIELD_SOURCE_PRIORITY.full_name = ['aadhaar_card', 'gst_certificate']`). Codex deployed `extract-document` and live-invoked `AA370425004153O_RC07042025.pdf`: HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, default `company_name: D S R CASHEWS` (Trade), `full_name: DOKI SANKARA RAO HUF`, with both candidate options returned. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
 - **CLAUDE-SMART-UPLOAD-PDF-DATE-016**: Closed after Claude implemented and Codex deployed/runtime-verified the Smart Upload PDF/date fixes. `extract-document` now has a deterministic GST REG-06 text fallback: GSTIN regex anchor plus label-anchored captures of legal/trade name, city, district, state, PIN, and the principal-place address block. The fallback merges with AI when AI is readable, substitutes when AI parse fails or returns `is_readable=false`, and only falls through to `pdf_vision` when no deterministic result exists. Smart Upload review (`Join.tsx`), summary, and conflict modal (`SmartUploadDocument.tsx`) now display dates via `formatDateValue` so the configured portal Date & Time admin format is honored while canonical `YYYY-MM-DD` storage, autofill, comparison, and form date inputs remain unchanged. Codex deployed `extract-document` and live-invoked the shared GST PDF (`AA370425004153O_RC07042025.pdf`): HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, expected GST fields returned. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
 - **COD-ACTIVITIES-COVER-LIST-FALLBACK-015**: Closed after Codex fixed the admin Activities list thumbnail fallback. Migration `20260426090000_activity_effective_cover_fallback.sql` normalizes existing gallery-route cover seeds to cover-route seeds and updates public/admin list/detail RPCs so `cover_image_url` falls back to the first gallery image when no explicit cover exists. Follow-up migration `20260426093000_activity_admin_list_first_media_url.sql` adds `first_media_url` to the admin list RPC so the UI can retry the first gallery image if a cover variant fails. The admin list now shows an explicit `Photo` column with a hardened thumbnail fallback. Live RPC probe confirmed `cover-card` returns HTTP 200 image content. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
@@ -52,13 +54,11 @@ Most recently completed streams:
 
 ## Last Verified
 
-- **When:** 2026-04-26
-- **What:** `CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017` deploy + runtime closeout
-- **Result:** PASS for `extract-document` deploy, shared GST PDF live invoke including Trade/Legal company-name candidates and GST `full_name` fallback, plus lint, build, and Phase 1 readonly smoke.
+- **When:** 2026-05-02
+- **What:** `COD-EVENTS-CMS-032` implementation validation
+- **Result:** PASS for lint/build/readonly smoke after Events CMS backend + admin/public integration.
 - **Commands:**
   ```
-  supabase functions deploy extract-document -> PASS
-  live extract-document invoke with AA370425004153O_RC07042025.pdf -> PASS (HTTP 200, is_readable true, detected_type gst_certificate)
   npm run lint -> PASS (0 errors / 3 expected warnings)
   npm run build -> PASS
   npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
@@ -108,4 +108,6 @@ Most recently completed streams:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+
+
 

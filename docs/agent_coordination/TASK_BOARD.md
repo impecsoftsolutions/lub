@@ -1,4 +1,4 @@
-# LUB Agent Task Board
+﻿# LUB Agent Task Board
 
 Use this file as the strict shared queue between Codex and Claude Code.
 
@@ -33,6 +33,7 @@ Rules:
 
 | ID | Title | Owner | Scope | Files / Domains | Outcome |
 |----|-------|-------|-------|-----------------|---------|
+| COD-EVENTS-CMS-032 | Events CMS full implementation (schema + RPC + admin Events + unified public Events & Activities) | Codex | Completed end-to-end Events domain. Added dedicated events table, events.* permissions, secure _with_session CRUD/publish/archive/delete RPCs, public read RPCs with member-only visibility handling, service-layer eventsService, real admin Events list/form routes, and public /events integration that now reads both Events + Activities. /events/:slug now resolves Event first then Activity fallback. | supabase/migrations/20260503120000_events_cms_full.sql, src/lib/supabase.ts, src/pages/AdminEvents.tsx, src/pages/AdminEventForm.tsx, src/pages/Events.tsx, src/pages/ActivityDetail.tsx, src/components/admin/AppSidebar.tsx, src/App.tsx | Complete in repo. Validation PASS: lint (0 errors / 3 warnings), build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped). |
 
 | CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017 | Smart Upload - Import button placement, GST Trade/Legal candidates, GST full_name fallback | Claude + Codex | Added `field_options` support for extraction results, moved `Import Data` below queued docs, surfaced Trade/Legal company-name candidate chips in `/join`, and added GST `full_name` fallback with Aadhaar precedence preserved. | `supabase/functions/extract-document/index.ts`, `src/lib/documentExtraction.ts`, `src/components/SmartUploadDocument.tsx`, `src/pages/Join.tsx` | Complete. Codex deployed `extract-document`; live invoke of `AA370425004153O_RC07042025.pdf` returned HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, default Trade Name company value, GST `full_name`, and Trade+Legal options. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26. |
 | CLAUDE-SMART-UPLOAD-PDF-DATE-016 | Smart Upload deterministic GST PDF fallback + portal date display in review/conflict/summary | Claude + Codex | Added deterministic GST REG-06 text fallback in `extract-document` and formatted Smart Upload review/summary/conflict date displays via portal Date & Time settings while preserving canonical internal `YYYY-MM-DD` values. | `supabase/functions/extract-document/index.ts`, `src/components/SmartUploadDocument.tsx`, `src/pages/Join.tsx` | Complete. Codex deployed `extract-document`; live invoke of `AA370425004153O_RC07042025.pdf` returned HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, and expected GST fields. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26. |
@@ -50,6 +51,8 @@ Rules:
 | CLAUDE-ACTIVITIES-NEXT-003 | Activities: source-doc extraction prefill + sort controls + ranked search | Claude | Added AI source-document extraction prefill with 30 MB total cap, sort controls plus explicit `Actions` header, and ranked Activities admin search with Featured-only filtering. | `src/pages/AdminActivities.tsx`, `src/pages/AdminActivityForm.tsx`, `src/lib/supabase.ts`, `supabase/functions/draft-activity-content/index.ts` | Complete. Runtime handoff now closed by `COD-ACTIVITIES-HANDOFF-VERIFY-001`. |
 | CLAUDE-ACTIVITIES-FOLLOWUP-002 | Activities AI/provider/media follow-up | Claude | Added honest OpenAI-only AI gating, AI source-document support, structured `error_code` handling, and in-modal gallery ratio selection with portrait options. | `src/pages/AdminActivityForm.tsx`, `src/components/ImageCropModal.tsx`, `src/lib/supabase.ts`, `supabase/functions/draft-activity-content/index.ts` | Complete. Runtime handoff now closed. |
 | CLAUDE-ACTIVITIES-BATCH-001 | Activities batch: dropdown fix, limits UI, media UX, AI draft helper, homepage CTA | Claude | Fixed Activities row actions dropdown attempt, added Activities settings UI and higher default gallery cap, improved media handling, added AI draft helper foundation, and changed homepage CTA to `Explore Activities`. | `src/pages/AdminActivities.tsx`, `src/pages/AdminActivityForm.tsx`, `src/pages/AdminActivitySettings.tsx`, `src/pages/Home.tsx`, `src/lib/supabase.ts`, `src/lib/imageProcessing.ts`, `supabase/functions/draft-activity-content/index.ts`, `supabase/migrations/20260420000000_activities_limits_default_bump.sql` | Complete. Live runtime closeout done by Codex. |
+
+
 
 
 

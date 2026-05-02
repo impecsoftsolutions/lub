@@ -6770,6 +6770,292 @@ export const rolesService = {
   },
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Events CMS — types + service
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type EventStatus = 'draft' | 'published' | 'archived';
+export type EventVisibility = 'public' | 'member_only';
+export type EventType =
+  | 'workshop'
+  | 'seminar'
+  | 'webinar'
+  | 'meeting'
+  | 'exhibition'
+  | 'conference'
+  | 'networking'
+  | 'other'
+  | 'general';
+
+export interface EventAgendaItem {
+  title: string;
+  time?: string | null;
+  note?: string | null;
+}
+
+export interface PublicEvent {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  description: string | null;
+  event_type: EventType;
+  visibility: EventVisibility;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+  is_featured: boolean;
+  published_at: string | null;
+}
+
+export interface PublicEventDetail extends PublicEvent {
+  invitation_text: string | null;
+  agenda_items: EventAgendaItem[];
+}
+
+export interface AdminEventListItem {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  event_type: EventType;
+  visibility: EventVisibility;
+  status: EventStatus;
+  is_featured: boolean;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_name: string | null;
+}
+
+export interface AdminEventDetail {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  description: string | null;
+  event_type: EventType;
+  visibility: EventVisibility;
+  status: EventStatus;
+  is_featured: boolean;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+  invitation_text: string | null;
+  agenda_items: EventAgendaItem[];
+  created_by: string | null;
+  published_by: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventSummaryMetrics {
+  total: number;
+  published: number;
+  drafts: number;
+  archived: number;
+  featured: number;
+  member_only: number;
+  last_published_at: string | null;
+}
+
+interface EventsRpcEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  total?: number;
+  error?: string;
+}
+
+export const eventsService = {
+  async getPublished(
+    limit = 20,
+    offset = 0,
+    sessionToken?: string | null
+  ): Promise<PublicEvent[]> {
+    const { data, error } = await supabase.rpc('get_published_events', {
+      p_limit: limit,
+      p_offset: offset,
+      p_session_token: sessionToken ?? null,
+    });
+    if (error) {
+      console.error('[eventsService.getPublished]', error);
+      throw error;
+    }
+    const result = data as EventsRpcEnvelope<PublicEvent[]> | null;
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to load published events');
+    }
+    return result.data ?? [];
+  },
+
+  async getBySlug(
+    slug: string,
+    sessionToken?: string | null
+  ): Promise<PublicEventDetail | null> {
+    const { data, error } = await supabase.rpc('get_event_by_slug', {
+      p_slug: slug,
+      p_session_token: sessionToken ?? null,
+    });
+    if (error) {
+      console.error('[eventsService.getBySlug]', error);
+      throw error;
+    }
+    const result = data as EventsRpcEnvelope<PublicEventDetail> | null;
+    if (!result?.success) {
+      if (result?.error === 'Event not found') {
+        return null;
+      }
+      throw new Error(result?.error || 'Failed to load event');
+    }
+    return result.data ?? null;
+  },
+
+  async getAll(
+    sessionToken: string,
+    status?: EventStatus | null
+  ): Promise<AdminEventListItem[]> {
+    const { data, error } = await supabase.rpc('get_all_events_with_session', {
+      p_session_token: sessionToken,
+      p_status: status ?? null,
+    });
+    if (error) {
+      console.error('[eventsService.getAll]', error);
+      throw error;
+    }
+    const result = data as EventsRpcEnvelope<AdminEventListItem[]> | null;
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to load events');
+    }
+    return result.data ?? [];
+  },
+
+  async getById(
+    sessionToken: string,
+    eventId: string
+  ): Promise<AdminEventDetail | null> {
+    const { data, error } = await supabase.rpc('get_event_by_id_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) {
+      console.error('[eventsService.getById]', error);
+      throw error;
+    }
+    const result = data as EventsRpcEnvelope<AdminEventDetail> | null;
+    if (!result?.success) {
+      if (result?.error === 'Event not found') {
+        return null;
+      }
+      throw new Error(result?.error || 'Failed to load event');
+    }
+    return result.data ?? null;
+  },
+
+  async create(
+    sessionToken: string,
+    payload: Record<string, unknown>
+  ): Promise<{ success: boolean; event_id?: string; slug?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('create_event_with_session', {
+      p_session_token: sessionToken,
+      p_payload: payload,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; event_id?: string; id?: string; slug?: string; error?: string };
+    return result?.success
+      ? { success: true, event_id: result.event_id ?? result.id, slug: result.slug }
+      : (result ?? { success: false, error: 'Unknown error' });
+  },
+
+  async update(
+    sessionToken: string,
+    eventId: string,
+    payload: Record<string, unknown>
+  ): Promise<{ success: boolean; slug?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('update_event_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+      p_payload: payload,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; slug?: string; error?: string };
+    return result ?? { success: false, error: 'Unknown error' };
+  },
+
+  async publish(
+    sessionToken: string,
+    eventId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('publish_event_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (data as { success: boolean; error?: string }) ?? { success: false, error: 'Unknown error' };
+  },
+
+  async unpublish(
+    sessionToken: string,
+    eventId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('unpublish_event_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (data as { success: boolean; error?: string }) ?? { success: false, error: 'Unknown error' };
+  },
+
+  async archive(
+    sessionToken: string,
+    eventId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('archive_event_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (data as { success: boolean; error?: string }) ?? { success: false, error: 'Unknown error' };
+  },
+
+  async delete(
+    sessionToken: string,
+    eventId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('delete_event_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (data as { success: boolean; error?: string }) ?? { success: false, error: 'Unknown error' };
+  },
+
+  computeMetrics(items: AdminEventListItem[]): EventSummaryMetrics {
+    const total = items.length;
+    const published = items.filter((item) => item.status === 'published').length;
+    const drafts = items.filter((item) => item.status === 'draft').length;
+    const archived = items.filter((item) => item.status === 'archived').length;
+    const featured = items.filter((item) => item.is_featured).length;
+    const member_only = items.filter((item) => item.visibility === 'member_only').length;
+    const publishedItems = items.filter((item) => item.published_at);
+    publishedItems.sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''));
+    const last_published_at = publishedItems[0]?.published_at ?? null;
+
+    return {
+      total,
+      published,
+      drafts,
+      archived,
+      featured,
+      member_only,
+      last_published_at,
+    };
+  },
+};
+
 // Leadership Service
 export const leadershipService = {
   async getCommitteeYears(): Promise<string[]> {
