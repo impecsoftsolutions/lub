@@ -16,10 +16,10 @@
 //   (event_type, location, start_at, end_at, location_options[], date_options[]).
 //
 // Source file limits (match draft-activity-content for parity):
-//   - Max 3 files per request
-//   - Images (JPEG/PNG): <= 10 MB per file
-//   - PDFs:              <= 20 MB per file
-//   - Cumulative:        <= 30 MB
+//   - Max 5 files per request
+//   - Images (JPEG/PNG): <= 30 MB per file
+//   - PDFs:              <= 30 MB per file
+//   - Cumulative:        <= 150 MB
 //
 // Brief limit:
 //   - <= 4000 characters; truncated server-side beyond that.
@@ -144,10 +144,10 @@ const SUPPORTED_SOURCE_MIMES = new Set([
   'application/pdf',
 ]);
 
-const MAX_SOURCE_FILES = 3;
-const MAX_SOURCE_FILE_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_SOURCE_FILE_PDF_BYTES = 20 * 1024 * 1024;
-const MAX_SOURCE_FILES_TOTAL_BYTES = 30 * 1024 * 1024;
+const MAX_SOURCE_FILES = 5;
+const MAX_SOURCE_FILE_IMAGE_BYTES = 30 * 1024 * 1024;
+const MAX_SOURCE_FILE_PDF_BYTES = 30 * 1024 * 1024;
+const MAX_SOURCE_FILES_TOTAL_BYTES = 150 * 1024 * 1024;
 const MAX_BRIEF_CHARS = 4000;
 
 const ALLOWED_EVENT_TYPES = new Set([
@@ -663,7 +663,7 @@ function validateSourceFiles(
     }
     const sizeBytes = Math.ceil((base64.length * 3) / 4);
     const perFileLimit = mime === 'application/pdf' ? MAX_SOURCE_FILE_PDF_BYTES : MAX_SOURCE_FILE_IMAGE_BYTES;
-    const perFileLimitLabel = mime === 'application/pdf' ? '20 MB' : '10 MB';
+    const perFileLimitLabel = '30 MB';
     if (sizeBytes > perFileLimit) {
       return {
         ok: false,
@@ -673,7 +673,7 @@ function validateSourceFiles(
     }
     total += sizeBytes;
     if (total > MAX_SOURCE_FILES_TOTAL_BYTES) {
-      return { ok: false, error: 'Total source files size exceeds 30 MB.', code: 'files_too_large' };
+      return { ok: false, error: 'Total source files size exceeds 150 MB.', code: 'files_too_large' };
     }
     files.push({ name, mime, base64 });
   }
@@ -823,3 +823,4 @@ Deno.serve(async (req: Request) => {
     return failClosed(`AI drafting failed: ${message}`, 'generation_failed');
   }
 });
+

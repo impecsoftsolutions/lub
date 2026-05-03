@@ -51,10 +51,10 @@ const EVENT_TYPE_OPTIONS: Array<{ value: EventType; label: string }> = [
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,79})$/;
 const MAX_BRIEF_CHARS = 4000;
-const MAX_SOURCE_FILES = 3;
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_PDF_BYTES = 20 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 30 * 1024 * 1024;
+const MAX_SOURCE_FILES = 5;
+const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
+const MAX_PDF_BYTES = 30 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
 const ALLOWED_SOURCE_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
 
 function slugify(value: string): string {
@@ -315,12 +315,12 @@ const AdminEventForm: React.FC = () => {
       if (file.size > perFileLimit) {
         showToast(
           'error',
-          `"${file.name}" exceeds the per-file size limit (${mime === 'application/pdf' ? '20 MB' : '10 MB'}).`,
+          `"${file.name}" exceeds the per-file size limit (30 MB).`,
         );
         continue;
       }
       if (runningTotal + file.size > MAX_TOTAL_BYTES) {
-        showToast('error', 'Total attached size cannot exceed 30 MB.');
+        showToast('error', 'Total attached size cannot exceed 150 MB.');
         break;
       }
       runningTotal += file.size;
@@ -803,7 +803,7 @@ const AdminEventForm: React.FC = () => {
                   onChange={(e) => void onFilesPicked(e)}
                 />
                 <span className="text-[11px] text-muted-foreground">
-                  Up to {MAX_SOURCE_FILES} files (JPEG / PNG ≤ 10 MB, PDF ≤ 20 MB, total ≤ 30 MB)
+                  Up to {MAX_SOURCE_FILES} files (JPEG / PNG &lt;= 30 MB, PDF &lt;= 30 MB, total &lt;= 150 MB)
                 </span>
               </div>
 
@@ -1141,3 +1141,4 @@ const AdminEventForm: React.FC = () => {
 };
 
 export default AdminEventForm;
+
