@@ -6,10 +6,15 @@ import {
   Calendar,
   Check,
   Clock3,
+  Copy,
+  ExternalLink,
   Globe,
   GlobeLock,
+  Link2,
   Loader2,
   Lock,
+  MapPin,
+  MessageCircle,
   Paperclip,
   Pencil,
   Plus,
@@ -18,6 +23,7 @@ import {
   Sparkles,
   Trash2,
   Unlock,
+  Users,
   X,
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
@@ -27,6 +33,9 @@ import {
   type AdminEventDetail,
   type EventAIDraftSourceFile,
   type EventAgendaItem,
+  type EventRsvpRow,
+  type EventRsvpStatus,
+  type EventRsvpSummary,
   type EventType,
   type EventVisibility,
 } from '../lib/supabase';
@@ -137,6 +146,9 @@ const AdminEventForm: React.FC = () => {
   const canPublish = useHasPermission('events.publish');
   const canArchive = useHasPermission('events.archive');
   const canDelete = useHasPermission('events.delete');
+  const canCreateActivity = useHasPermission('activities.create');
+  const canViewRsvp = useHasPermission('events.rsvp.view');
+  const canManageRsvp = useHasPermission('events.rsvp.manage');
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
@@ -155,6 +167,32 @@ const AdminEventForm: React.FC = () => {
   const [agendaItems, setAgendaItems] = useState<EventAgendaItem[]>([{ title: '', time: '', note: '' }]);
   const [showAgendaPublicly, setShowAgendaPublicly] = useState(false);
   const [aiMetadata, setAiMetadata] = useState<Record<string, unknown> | null>(null);
+  const [venueMapUrl, setVenueMapUrl] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+
+  // RSVP config
+  const [rsvpEnabled, setRsvpEnabled] = useState(false);
+  const [rsvpCapacity, setRsvpCapacity] = useState<string>('');
+  const [rsvpDeadlineAt, setRsvpDeadlineAt] = useState('');
+  const [rsvpCollectPhone, setRsvpCollectPhone] = useState(true);
+  const [rsvpCollectCompany, setRsvpCollectCompany] = useState(true);
+  const [rsvpRequireLogin, setRsvpRequireLogin] = useState(true);
+
+  // RSVP roster
+  const [rsvpRows, setRsvpRows] = useState<EventRsvpRow[]>([]);
+  const [rsvpSummary, setRsvpSummary] = useState<EventRsvpSummary>({
+    total: 0,
+    confirmed: 0,
+    cancelled: 0,
+    pending: 0,
+    waitlisted: 0,
+  });
+  const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [rsvpStatusFilter, setRsvpStatusFilter] = useState<EventRsvpStatus | 'all'>('all');
+
+  // Bridge (event -> activity)
+  const [bridgeActivityId, setBridgeActivityId] = useState<string | null>(null);
+  const [isBridging, setIsBridging] = useState(false);
 
   const [original, setOriginal] = useState<AdminEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
@@ -214,6 +252,24 @@ const AdminEventForm: React.FC = () => {
         setInvitationText(data.invitation_text ?? '');
         setShowAgendaPublicly(Boolean(data.show_agenda_publicly));
         setAiMetadata(data.ai_metadata ?? null);
+        setVenueMapUrl(data.venue_map_url ?? '');
+        setWhatsappMessage(data.whatsapp_invitation_message ?? '');
+
+        const rsvpCfg = data.rsvp ?? {
+          enabled: false,
+          capacity: null,
+          deadline_at: null,
+          collect_phone: true,
+          collect_company: true,
+          require_login: true,
+        };
+        setRsvpEnabled(Boolean(rsvpCfg.enabled));
+        setRsvpCapacity(rsvpCfg.capacity != null ? String(rsvpCfg.capacity) : '');
+        setRsvpDeadlineAt(toDateTimeInput(rsvpCfg.deadline_at ?? null));
+        setRsvpCollectPhone(rsvpCfg.collect_phone !== false);
+        setRsvpCollectCompany(rsvpCfg.collect_company !== false);
+        setRsvpRequireLogin(rsvpCfg.require_login !== false);
+        setBridgeActivityId(data.bridge?.activity_id ?? null);
 
         const initialAgenda = Array.isArray(data.agenda_items) && data.agenda_items.length > 0
           ? data.agenda_items.map((item) => ({
@@ -386,6 +442,9 @@ const AdminEventForm: React.FC = () => {
       );
       setShowAgendaPublicly(Boolean(draft.show_agenda_publicly));
     }
+    if (typeof draft.whatsapp_invitation_message === 'string') {
+      setWhatsappMessage(draft.whatsapp_invitation_message);
+    }
   }, []);
 
   const runGenerate = useCallback(async () => {
@@ -481,23 +540,36 @@ const AdminEventForm: React.FC = () => {
   };
 
   // ── Save / publish / archive / delete ──────────────────────────────────────
-  const buildPayload = (): Record<string, unknown> => ({
-    title: title.trim(),
-    slug: slug.trim(),
-    slug_locked: slugLocked,
-    excerpt: excerpt.trim() || null,
-    description: description.trim() || null,
-    event_type: eventType,
-    visibility,
-    is_featured: isFeatured,
-    start_at: startAt ? new Date(startAt).toISOString() : null,
-    end_at: endAt ? new Date(endAt).toISOString() : null,
-    location: location.trim() || null,
-    invitation_text: invitationText.trim() || null,
-    agenda_items: normalizeAgendaItems(agendaItems),
-    show_agenda_publicly: showAgendaPublicly,
-    ai_metadata: aiMetadata ?? null,
-  });
+  const buildPayload = (): Record<string, unknown> => {
+    const capacityRaw = rsvpCapacity.trim();
+    const capacityNum = capacityRaw ? Number(capacityRaw) : null;
+    return {
+      title: title.trim(),
+      slug: slug.trim(),
+      slug_locked: slugLocked,
+      excerpt: excerpt.trim() || null,
+      description: description.trim() || null,
+      event_type: eventType,
+      visibility,
+      is_featured: isFeatured,
+      start_at: startAt ? new Date(startAt).toISOString() : null,
+      end_at: endAt ? new Date(endAt).toISOString() : null,
+      location: location.trim() || null,
+      invitation_text: invitationText.trim() || null,
+      agenda_items: normalizeAgendaItems(agendaItems),
+      show_agenda_publicly: showAgendaPublicly,
+      ai_metadata: aiMetadata ?? null,
+      venue_map_url: venueMapUrl.trim() || null,
+      whatsapp_invitation_message: whatsappMessage.trim() || null,
+      rsvp_enabled: rsvpEnabled,
+      rsvp_capacity:
+        capacityNum != null && Number.isFinite(capacityNum) && capacityNum > 0 ? capacityNum : null,
+      rsvp_deadline_at: rsvpDeadlineAt ? new Date(rsvpDeadlineAt).toISOString() : null,
+      rsvp_collect_phone: rsvpCollectPhone,
+      rsvp_collect_company: rsvpCollectCompany,
+      rsvp_require_login: rsvpRequireLogin,
+    };
+  };
 
   const slugBlocksSave =
     slugLocked && slugEditing &&
@@ -515,6 +587,24 @@ const AdminEventForm: React.FC = () => {
     if (startAt && endAt && new Date(endAt) < new Date(startAt)) {
       showToast('error', 'End time must be after start time.');
       return null;
+    }
+    if (venueMapUrl.trim()) {
+      const url = venueMapUrl.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        showToast('error', 'Venue map URL must start with http:// or https://');
+        return null;
+      }
+      if (url.length > 500) {
+        showToast('error', 'Venue map URL is too long (max 500 characters).');
+        return null;
+      }
+    }
+    if (rsvpEnabled && rsvpCapacity.trim()) {
+      const capNum = Number(rsvpCapacity.trim());
+      if (!Number.isFinite(capNum) || capNum <= 0) {
+        showToast('error', 'RSVP capacity must be a positive whole number.');
+        return null;
+      }
     }
     const token = sessionManager.getSessionToken();
     if (!token) {
@@ -605,6 +695,90 @@ const AdminEventForm: React.FC = () => {
       navigate('/admin/content/events');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // ── RSVP roster loader ────────────────────────────────────────────────────
+  const loadRsvps = useCallback(async () => {
+    if (!isEdit || !id) return;
+    if (!canViewRsvp && !canManageRsvp) return;
+    setRsvpLoading(true);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) return;
+      const status =
+        rsvpStatusFilter === 'all' ? null : (rsvpStatusFilter as EventRsvpStatus);
+      const result = await eventsService.getRsvps(token, id, status);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to load RSVPs');
+        return;
+      }
+      setRsvpRows(result.rows);
+      setRsvpSummary(result.summary);
+    } finally {
+      setRsvpLoading(false);
+    }
+  }, [canManageRsvp, canViewRsvp, id, isEdit, rsvpStatusFilter, showToast]);
+
+  useEffect(() => {
+    void loadRsvps();
+  }, [loadRsvps]);
+
+  const handleRsvpStatusChange = async (rsvpId: string, status: EventRsvpStatus) => {
+    if (!canManageRsvp) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    const result = await eventsService.updateRsvpStatus(token, rsvpId, status);
+    if (!result.success) {
+      showToast('error', result.error ?? 'Failed to update RSVP status.');
+      return;
+    }
+    showToast('success', 'RSVP updated.');
+    void loadRsvps();
+  };
+
+  // ── Bridge to activity ────────────────────────────────────────────────────
+  const handleBridgeToActivity = async () => {
+    if (!isEdit || !id) {
+      showToast('error', 'Save the event before creating an activity from it.');
+      return;
+    }
+    if (!canCreateActivity) {
+      showToast('error', 'You do not have permission to create activities.');
+      return;
+    }
+    const token = sessionManager.getSessionToken();
+    if (!token) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    setIsBridging(true);
+    try {
+      const result = await eventsService.bridgeToActivity(token, id);
+      if (!result.success || !result.activity_id) {
+        showToast('error', result.error ?? 'Failed to create activity from event.');
+        return;
+      }
+      showToast(
+        'success',
+        result.reused ? 'Opening existing activity draft.' : 'Activity draft created from event.',
+      );
+      navigate(`/admin/content/activities/${result.activity_id}/edit`);
+    } finally {
+      setIsBridging(false);
+    }
+  };
+
+  const copyWhatsappMessage = async () => {
+    if (!whatsappMessage.trim()) return;
+    try {
+      await navigator.clipboard.writeText(whatsappMessage);
+      showToast('success', 'WhatsApp message copied to clipboard.');
+    } catch {
+      showToast('error', 'Could not copy. Select and copy manually.');
     }
   };
 
@@ -977,6 +1151,36 @@ const AdminEventForm: React.FC = () => {
             </div>
 
             <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-foreground inline-flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Venue Google Maps link
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="url"
+                  value={venueMapUrl}
+                  onChange={(event) => setVenueMapUrl(event.target.value)}
+                  placeholder="https://maps.google.com/..."
+                  maxLength={500}
+                />
+                {venueMapUrl.trim() && /^https?:\/\//i.test(venueMapUrl.trim()) && (
+                  <a
+                    href={venueMapUrl.trim()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open
+                  </a>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Optional. Members see an "Open in Maps" button on the event page.
+              </p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-foreground">Excerpt</label>
               <Textarea
                 rows={2}
@@ -1004,6 +1208,42 @@ const AdminEventForm: React.FC = () => {
                 onChange={(event) => setInvitationText(event.target.value)}
                 placeholder="Invitation copy for this event"
               />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-foreground inline-flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp invitation message
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    {whatsappMessage.length} / 1200
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copyWhatsappMessage()}
+                    disabled={!whatsappMessage.trim()}
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copy
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                rows={6}
+                value={whatsappMessage}
+                onChange={(event) =>
+                  setWhatsappMessage(event.target.value.slice(0, 1200))
+                }
+                placeholder={'A short, ready-to-share WhatsApp invitation message.\nGenerated by AI from the brief, fully editable.'}
+                className="font-mono text-[13px] leading-snug whitespace-pre-wrap"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Plain-text, &lt;= 1200 chars. Members see a "Share on WhatsApp" copy action on the event page.
+              </p>
             </div>
 
             <div className="space-y-3 md:col-span-2">
@@ -1082,6 +1322,224 @@ const AdminEventForm: React.FC = () => {
                 Mark as featured
               </label>
             </div>
+
+            {/* RSVP config */}
+            <div className="md:col-span-2 rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  RSVP / Registration
+                </h3>
+                <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={rsvpEnabled}
+                    onChange={(event) => setRsvpEnabled(event.target.checked)}
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
+                  Enable RSVP
+                </label>
+              </div>
+
+              {rsvpEnabled && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">Capacity (optional)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={rsvpCapacity}
+                      onChange={(event) => setRsvpCapacity(event.target.value)}
+                      placeholder="Leave blank for unlimited"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">RSVP deadline (optional)</label>
+                    <Input
+                      type="datetime-local"
+                      value={rsvpDeadlineAt}
+                      onChange={(event) => setRsvpDeadlineAt(event.target.value)}
+                    />
+                  </div>
+                  <div className="md:col-span-2 grid gap-2 sm:grid-cols-3">
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rsvpCollectPhone}
+                        onChange={(event) => setRsvpCollectPhone(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Collect phone
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rsvpCollectCompany}
+                        onChange={(event) => setRsvpCollectCompany(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Collect company
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rsvpRequireLogin}
+                        onChange={(event) => setRsvpRequireLogin(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Require sign-in
+                    </label>
+                  </div>
+                  {visibility === 'member_only' && !rsvpRequireLogin && (
+                    <p className="md:col-span-2 text-[11px] text-amber-700 dark:text-amber-400">
+                      Note: members-only events always require a signed-in member regardless of this toggle.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* RSVP roster (edit mode only) */}
+            {isEdit && (canViewRsvp || canManageRsvp) && (
+              <div className="md:col-span-2 rounded-lg border border-border bg-card p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    RSVP roster
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">
+                      Total {rsvpSummary.total} · Confirmed {rsvpSummary.confirmed} · Cancelled {rsvpSummary.cancelled}
+                      {rsvpSummary.waitlisted > 0 ? ` · Waitlisted ${rsvpSummary.waitlisted}` : ''}
+                    </span>
+                    <select
+                      value={rsvpStatusFilter}
+                      onChange={(event) =>
+                        setRsvpStatusFilter(event.target.value as EventRsvpStatus | 'all')
+                      }
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="pending">Pending</option>
+                      <option value="waitlisted">Waitlisted</option>
+                    </select>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void loadRsvps()}
+                      disabled={rsvpLoading}
+                    >
+                      {rsvpLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+
+                {rsvpRows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {rsvpLoading ? 'Loading…' : 'No RSVPs yet.'}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="px-2 py-1">Name</th>
+                          <th className="px-2 py-1">Email</th>
+                          <th className="px-2 py-1">Phone</th>
+                          <th className="px-2 py-1">Company</th>
+                          <th className="px-2 py-1">Status</th>
+                          {canManageRsvp && <th className="px-2 py-1 text-right">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rsvpRows.map((row) => (
+                          <tr key={row.id} className="border-t border-border align-top">
+                            <td className="px-2 py-1.5 text-foreground">{row.full_name}</td>
+                            <td className="px-2 py-1.5 text-muted-foreground break-all">
+                              {row.email}
+                            </td>
+                            <td className="px-2 py-1.5 text-muted-foreground">{row.phone ?? '—'}</td>
+                            <td className="px-2 py-1.5 text-muted-foreground">{row.company ?? '—'}</td>
+                            <td className="px-2 py-1.5">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                  row.status === 'confirmed'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                    : row.status === 'cancelled'
+                                      ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                      : row.status === 'waitlisted'
+                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                        : 'bg-muted text-muted-foreground'
+                                }`}
+                              >
+                                {row.status}
+                              </span>
+                            </td>
+                            {canManageRsvp && (
+                              <td className="px-2 py-1.5 text-right">
+                                <select
+                                  value={row.status}
+                                  onChange={(event) =>
+                                    void handleRsvpStatusChange(
+                                      row.id,
+                                      event.target.value as EventRsvpStatus,
+                                    )
+                                  }
+                                  className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                >
+                                  <option value="confirmed">Confirmed</option>
+                                  <option value="cancelled">Cancelled</option>
+                                  <option value="pending">Pending</option>
+                                  <option value="waitlisted">Waitlisted</option>
+                                </select>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bridge to activity (edit mode only) */}
+            {isEdit && canCreateActivity && (
+              <div className="md:col-span-2 rounded-lg border border-border bg-muted/20 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    Activity bridge
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Pull this event into a new (or existing) Activity draft. Idempotent — clicking again
+                    re-opens the linked activity.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleBridgeToActivity()}
+                  disabled={isBridging}
+                >
+                  {isBridging ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4 mr-2" />
+                  )}
+                  {bridgeActivityId ? 'Open linked Activity' : 'Create Activity from Event'}
+                </Button>
+              </div>
+            )}
 
             <div className="md:col-span-2 pt-2 flex flex-wrap gap-2">
               {canEdit && (

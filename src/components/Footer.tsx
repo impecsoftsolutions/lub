@@ -45,7 +45,7 @@ const Footer: React.FC = () => {
                 Directory
               </Link>
               <Link to="/events" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
-                Events
+                Events &amp; Activities
               </Link>
               <Link to="/news" className="text-blue-100 hover:text-white transition-colors block py-3 sm:py-1">
                 News

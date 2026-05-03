@@ -6808,10 +6808,25 @@ export interface PublicEvent {
   published_at: string | null;
 }
 
+export interface EventRsvpPublicConfig {
+  enabled: boolean;
+  open: boolean;
+  deadline_at: string | null;
+  capacity: number | null;
+  used_count: number;
+  remaining: number | null;
+  collect_phone: boolean;
+  collect_company: boolean;
+  require_login: boolean;
+}
+
 export interface PublicEventDetail extends PublicEvent {
   invitation_text: string | null;
   agenda_items: EventAgendaItem[];
   show_agenda_publicly?: boolean;
+  venue_map_url?: string | null;
+  whatsapp_invitation_message?: string | null;
+  rsvp?: EventRsvpPublicConfig | null;
 }
 
 export interface AdminEventListItem {
@@ -6832,6 +6847,21 @@ export interface AdminEventListItem {
   created_by_name: string | null;
 }
 
+export interface EventRsvpAdminConfig {
+  enabled: boolean;
+  capacity: number | null;
+  deadline_at: string | null;
+  collect_phone: boolean;
+  collect_company: boolean;
+  require_login: boolean;
+  used_count?: number;
+}
+
+export interface EventBridgeInfo {
+  activity_id: string | null;
+  has_activity: boolean;
+}
+
 export interface AdminEventDetail {
   id: string;
   slug: string;
@@ -6850,11 +6880,51 @@ export interface AdminEventDetail {
   show_agenda_publicly: boolean;
   slug_locked: boolean;
   ai_metadata: Record<string, unknown> | null;
+  venue_map_url: string | null;
+  whatsapp_invitation_message: string | null;
+  rsvp: EventRsvpAdminConfig;
+  bridge: EventBridgeInfo;
   created_by: string | null;
   published_by: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039
+export type EventRsvpStatus = 'confirmed' | 'cancelled' | 'pending' | 'waitlisted';
+
+export interface EventRsvpRow {
+  id: string;
+  event_id: string;
+  user_id: string | null;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+  notes: string | null;
+  status: EventRsvpStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventRsvpSummary {
+  total: number;
+  confirmed: number;
+  cancelled: number;
+  pending: number;
+  waitlisted: number;
+}
+
+export interface EligibleEventRow {
+  id: string;
+  slug: string;
+  title: string;
+  status: EventStatus;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+  bridged_activity_id: string | null;
 }
 
 // COD-EVENTS-CMS-AI-AUTOFILL-038
@@ -6888,6 +6958,7 @@ export interface EventAIDraftResult {
     invitation_text: string;
     agenda_items: EventAgendaItem[];
     show_agenda_publicly: boolean;
+    whatsapp_invitation_message?: string;
   };
   ai?: {
     model: string;
@@ -7210,6 +7281,155 @@ export const eventsService = {
         errorCode: 'generation_failed',
       };
     }
+  },
+
+  // COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039
+  async submitRsvp(args: {
+    eventSlug: string;
+    fullName: string;
+    email: string;
+    phone?: string | null;
+    company?: string | null;
+    notes?: string | null;
+    sessionToken?: string | null;
+  }): Promise<{
+    success: boolean;
+    rsvp_id?: string;
+    status?: EventRsvpStatus;
+    error?: string;
+    error_code?: string;
+  }> {
+    const { data, error } = await supabase.rpc('submit_event_rsvp', {
+      p_event_slug: args.eventSlug,
+      p_full_name: args.fullName,
+      p_email: args.email,
+      p_phone: args.phone ?? null,
+      p_company: args.company ?? null,
+      p_notes: args.notes ?? null,
+      p_session_token: args.sessionToken ?? null,
+    });
+    if (error) return { success: false, error: error.message };
+    return (
+      (data as {
+        success: boolean;
+        rsvp_id?: string;
+        status?: EventRsvpStatus;
+        error?: string;
+        error_code?: string;
+      }) ?? { success: false, error: 'Unknown error' }
+    );
+  },
+
+  async getRsvps(
+    sessionToken: string,
+    eventId: string,
+    status?: EventRsvpStatus | null,
+  ): Promise<{
+    success: boolean;
+    rows: EventRsvpRow[];
+    summary: EventRsvpSummary;
+    error?: string;
+  }> {
+    const { data, error } = await supabase.rpc('get_event_rsvps_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+      p_status: status ?? null,
+    });
+    if (error) {
+      return {
+        success: false,
+        rows: [],
+        summary: { total: 0, confirmed: 0, cancelled: 0, pending: 0, waitlisted: 0 },
+        error: error.message,
+      };
+    }
+    const result = data as {
+      success?: boolean;
+      data?: EventRsvpRow[];
+      summary?: EventRsvpSummary;
+      error?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        rows: [],
+        summary: { total: 0, confirmed: 0, cancelled: 0, pending: 0, waitlisted: 0 },
+        error: result?.error ?? 'Failed to load RSVPs',
+      };
+    }
+    return {
+      success: true,
+      rows: result.data ?? [],
+      summary:
+        result.summary ?? { total: 0, confirmed: 0, cancelled: 0, pending: 0, waitlisted: 0 },
+    };
+  },
+
+  async updateRsvpStatus(
+    sessionToken: string,
+    rsvpId: string,
+    status: EventRsvpStatus,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('update_event_rsvp_status_with_session', {
+      p_session_token: sessionToken,
+      p_rsvp_id: rsvpId,
+      p_status: status,
+    });
+    if (error) return { success: false, error: error.message };
+    return (
+      (data as { success: boolean; error?: string; error_code?: string }) ?? {
+        success: false,
+        error: 'Unknown error',
+      }
+    );
+  },
+
+  async getEligibleForActivity(
+    sessionToken: string,
+    limit = 50,
+  ): Promise<{ success: boolean; rows: EligibleEventRow[]; error?: string }> {
+    const { data, error } = await supabase.rpc('get_eligible_events_for_activity_with_session', {
+      p_session_token: sessionToken,
+      p_limit: limit,
+    });
+    if (error) return { success: false, rows: [], error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: EligibleEventRow[];
+      error?: string;
+    } | null;
+    if (!result?.success) {
+      return { success: false, rows: [], error: result?.error ?? 'Failed to load events' };
+    }
+    return { success: true, rows: result.data ?? [] };
+  },
+
+  async bridgeToActivity(
+    sessionToken: string,
+    eventId: string,
+  ): Promise<{
+    success: boolean;
+    activity_id?: string;
+    slug?: string;
+    reused?: boolean;
+    error?: string;
+    error_code?: string;
+  }> {
+    const { data, error } = await supabase.rpc('create_activity_from_event_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (
+      (data as {
+        success: boolean;
+        activity_id?: string;
+        slug?: string;
+        reused?: boolean;
+        error?: string;
+        error_code?: string;
+      }) ?? { success: false, error: 'Unknown error' }
+    );
   },
 
   computeMetrics(items: AdminEventListItem[]): EventSummaryMetrics {

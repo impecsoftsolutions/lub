@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-03
-**Updated by:** Codex (`COD-EVENTS-CMS-AI-AUTOFILL-038` runtime closeout + limits update)
+**Updated by:** Codex (`COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039` runtime closeout)
 
 ---
 
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-05-03, COD-EVENTS-CMS-AI-AUTOFILL-038) |
-| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-03, COD-EVENTS-CMS-AI-AUTOFILL-038) |
+| Build (`npm run build`) | PASS (2026-05-03, COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039) |
+| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-03, COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13 baseline) |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-03, COD-EVENTS-CMS-AI-AUTOFILL-038) |
+| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-03, COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039) |
 
 Phase 1 destructive baseline remains the non-negotiable floor.
 
@@ -28,12 +28,13 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 
 ## Active Stream
 
-**Active stream:** `COD-EVENTS-CMS-AI-AUTOFILL-038` (implemented in repo)
+**Active stream:** None (039 closed)
 **Current owner:** Codex
-**Task board:** `docs/agent_coordination/TASK_BOARD.md` � single source of truth.
-**Current handoff state:** 038 is complete end-to-end. Runtime closeout done by Codex: repaired remote migration history drift entries, applied migrations `20260503120000_events_cms_full.sql`, `20260504000000_events_ai_autofill_and_slug_lock.sql`, and `20260504010000_seed_event_drafting_ai_runtime.sql`; deployed `draft-event-content`; validated callable slug RPC and callable edge function with invalid-session probes; and implemented follow-up limits update (5 files, 30 MB each, 150 MB total). Local lint/build/Phase-1 readonly smoke are PASS.
+**Task board:** `docs/agent_coordination/TASK_BOARD.md` — single source of truth.
+**Current handoff state:** 039 is fully closed. Codex applied migration `supabase/migrations/20260505000000_events_rsvp_bridge_maps_whatsapp.sql`, redeployed edge function `draft-event-content`, and executed runtime SQL probes against remote DB (transactional rollback for probe fixtures). Verified outcomes: RSVP capacity (`confirmed` then `capacity_full`), member-only without session (`permission_denied`), past-deadline RSVP (`rsvp_deadline_passed`), idempotent event→activity bridge (`reused: true` on second call), public slug payload includes `venue_map_url` and `whatsapp_invitation_message`, and editor cannot manage RSVP status (`permission_denied`). Edge function invoke check returns structured `session_invalid` for invalid tokens.
 
 Most recently completed streams:
+- **COD-EVENTS-CMS-AI-AUTOFILL-038**: Closed. Codex applied remote migration history repairs and applied `20260503120000_events_cms_full.sql`, `20260504000000_events_ai_autofill_and_slug_lock.sql`, `20260504010000_seed_event_drafting_ai_runtime.sql`; deployed `draft-event-content`; verified callable surfaces with invalid-session probes; updated source-file limits to 5 files, 30 MB each, 150 MB total.
 - **COD-EVENTS-CMS-032**: Full Events CMS implementation batch complete in repo. Added migration supabase/migrations/20260503120000_events_cms_full.sql (events table, permissions, secure RPCs), wired eventsService in src/lib/supabase.ts, replaced admin placeholder with real AdminEvents and AdminEventForm flows, updated admin routing/sidebar, unified public /events to read both domains, and updated /events/:slug to resolve Event then Activity fallback. Validation on 2026-05-02: lint PASS (0 errors / 3 warnings), build PASS, readonly Phase 1 smoke PASS (3 passed / 12 skipped).
 - **CLAUDE-EVENTS-CMS-NON-MIGRATION-037**: Frontend-only single batch. Created `src/pages/AdminEvents.tsx` placeholder shell (gated on existing `activities.view`); wired routes `/admin/content/events`, `/admin/content/events/new`, `/admin/content/events/:id/edit` in `App.tsx` (all render the placeholder, no 404s); added `Events` child above `Activities` under the existing `Events & Activities` sidebar group. Public side: relabeled top-nav + footer to `Events & Activities`, retitled hero, restructured `Events.tsx` feed into two explicit sections (Upcoming Events for `activity_date >= today`, Activities for `activity_date < today` or null), shared search + filter chips, shared "Load more" budget. No migration, no RPC, no service, no submit-path changes. Local validation: `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped). Pending Codex live verification.
 - **CLAUDE-SMART-UPLOAD-GST-CANDIDATES-017**: Closed after Codex deploy/runtime verification. Smart Upload now renders `Import Data` below the queued document list, GST extraction returns `field_options.company_name` with Trade and Legal candidates, and GST adds a `full_name` fallback while Aadhaar precedence is preserved (`FIELD_SOURCE_PRIORITY.full_name = ['aadhaar_card', 'gst_certificate']`). Codex deployed `extract-document` and live-invoked `AA370425004153O_RC07042025.pdf`: HTTP 200, `is_readable: true`, `detected_type: gst_certificate`, default `company_name: D S R CASHEWS` (Trade), `full_name: DOKI SANKARA RAO HUF`, with both candidate options returned. Lint/build/Phase 1 readonly smoke PASS on 2026-04-26.
@@ -55,8 +56,8 @@ Most recently completed streams:
 ## Last Verified
 
 - **When:** 2026-05-03
-- **What:** `COD-EVENTS-CMS-AI-AUTOFILL-038` runtime closeout + limits update validation
-- **Result:** PASS for lint/build/readonly smoke, migration apply, function deploy, and runtime probe checks.
+- **What:** `COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039` implementation batch local validation
+- **Result:** PASS for lint, build, and Phase 1 readonly smoke. Remote migration applied and edge function redeployed; runtime probes passed.
 - **Commands:**
   ```
   npm run lint -> PASS (0 errors / 3 expected warnings)
@@ -99,6 +100,7 @@ Most recently completed streams:
 - Join legacy settings page still exists by design until UAT sign-off on Builder and Studio workflows.
 - Smart Upload now gives Aadhaar gender precedence over signup/account prefill within the member registration flow only; it does not silently rewrite the underlying account record.
 - Smart Upload text-based GST REG-06 PDFs now have deterministic extraction fallback inside `extract-document`; the shared sample GST PDF is live-verified readable. Smart Upload date review/summary/conflict display honors portal Date & Time settings while keeping canonical internal date values.
+- **039 (closed):** Events now expose RSVP, venue map link, WhatsApp invitation message, and a one-click bridge into Activities. RSVP roster is admin-only and gated by new permissions `events.rsvp.view` (super_admin/admin/editor) and `events.rsvp.manage` (super_admin/admin). RSVP idempotency is enforced via partial unique index on `(event_id, lower(email))` for active rows. Activity bridge idempotency is enforced via partial unique index `activities_source_event_id_active_uidx` on non-archived activities. Member-only events enforce signed-in member.
 
 ---
 

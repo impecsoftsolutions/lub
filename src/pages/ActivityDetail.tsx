@@ -1,14 +1,18 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
+  Check,
   Clock3,
+  ExternalLink,
   Loader2,
   MapPin,
+  MessageCircle,
   Play,
   ChevronLeft,
   ChevronRight,
+  Users,
   X,
   Tag,
   Globe,
@@ -111,6 +115,388 @@ const Lightbox: React.FC<LightboxProps> = ({ images, startIndex, onClose }) => {
 
 type ContentType = 'event' | 'activity';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Event view sub-component — lifts RSVP / share state out of the parent so the
+// state isn't created when an activity is being shown.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface EventViewProps {
+  eventDetail: PublicEventDetail;
+  onRefresh: () => Promise<void>;
+}
+
+const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
+  const agendaItems = Array.isArray(eventDetail.agenda_items) ? eventDetail.agenda_items : [];
+  const venueMapUrl = (eventDetail.venue_map_url ?? '').trim();
+  const whatsappMessage = (eventDetail.whatsapp_invitation_message ?? '').trim();
+  const rsvp = eventDetail.rsvp ?? null;
+  const rsvpOpen = Boolean(rsvp?.enabled && rsvp?.open);
+
+  // RSVP form state
+  const [rsvpName, setRsvpName] = useState('');
+  const [rsvpEmail, setRsvpEmail] = useState('');
+  const [rsvpPhone, setRsvpPhone] = useState('');
+  const [rsvpCompany, setRsvpCompany] = useState('');
+  const [rsvpNotes, setRsvpNotes] = useState('');
+  const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [rsvpSuccess, setRsvpSuccess] = useState(false);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
+
+  const [whatsappCopied, setWhatsappCopied] = useState(false);
+
+  const onCopyWhatsapp = async () => {
+    if (!whatsappMessage) return;
+    try {
+      await navigator.clipboard.writeText(whatsappMessage);
+      setWhatsappCopied(true);
+      window.setTimeout(() => setWhatsappCopied(false), 2500);
+    } catch {
+      // best-effort: leave the textarea selectable below
+    }
+  };
+
+  const onShareWhatsapp = () => {
+    if (!whatsappMessage) return;
+    const encoded = encodeURIComponent(whatsappMessage);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const submitRsvp = async () => {
+    setRsvpError(null);
+    if (!rsvpName.trim()) {
+      setRsvpError('Please enter your full name.');
+      return;
+    }
+    if (!rsvpEmail.trim() || !/^.+@.+\..+$/.test(rsvpEmail.trim())) {
+      setRsvpError('Please enter a valid email address.');
+      return;
+    }
+    setRsvpSubmitting(true);
+    try {
+      const token = sessionManager.getSessionToken();
+      const result = await eventsService.submitRsvp({
+        eventSlug: eventDetail.slug,
+        fullName: rsvpName.trim(),
+        email: rsvpEmail.trim(),
+        phone: rsvp?.collect_phone ? rsvpPhone.trim() || null : null,
+        company: rsvp?.collect_company ? rsvpCompany.trim() || null : null,
+        notes: rsvpNotes.trim() || null,
+        sessionToken: token,
+      });
+      if (!result.success) {
+        const messages: Record<string, string> = {
+          login_required: 'Please sign in as a member to RSVP for this event.',
+          permission_denied: 'This event is open to members only.',
+          rsvp_closed: 'RSVPs are closed for this event.',
+          rsvp_deadline_passed: 'The RSVP deadline has passed.',
+          capacity_full: 'This event is fully booked.',
+          invalid_full_name: 'Please enter your full name.',
+          invalid_email: 'Please enter a valid email address.',
+          invalid_phone: 'Please enter a valid phone number.',
+          invalid_company: 'Please enter a valid company name.',
+          invalid_notes: 'Notes are too long (max 1000 characters).',
+        };
+        setRsvpError(messages[result.error_code ?? ''] ?? result.error ?? 'Could not submit RSVP.');
+        return;
+      }
+      setRsvpSuccess(true);
+      void onRefresh();
+    } finally {
+      setRsvpSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-background text-foreground">
+      <div className="border-b border-border bg-muted/40">
+        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+          <Link
+            to="/events"
+            className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            All Events & Activities
+          </Link>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              <Tag className="h-3 w-3" />
+              {eventDetail.event_type}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              {eventDetail.visibility === 'member_only' ? (
+                <><GlobeLock className="h-3 w-3" /> Member only</>
+              ) : (
+                <><Globe className="h-3 w-3" /> Public</>
+              )}
+            </span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{eventDetail.title}</h1>
+          {eventDetail.excerpt && (
+            <p className="mt-3 text-lg text-muted-foreground">{eventDetail.excerpt}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="border-b border-border">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6 lg:px-8 text-sm text-muted-foreground">
+          {eventDetail.start_at && (
+            <div className="flex items-center gap-1.5">
+              <Clock3 className="h-4 w-4 shrink-0" />
+              {new Date(eventDetail.start_at).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </div>
+          )}
+          {eventDetail.end_at && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-4 w-4 shrink-0" />
+              Ends {new Date(eventDetail.end_at).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </div>
+          )}
+          {eventDetail.location && (
+            <div className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 shrink-0" />
+              {eventDetail.location}
+            </div>
+          )}
+          {(venueMapUrl || whatsappMessage) && (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {venueMapUrl && /^https?:\/\//i.test(venueMapUrl) && (
+                <a
+                  href={venueMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in Maps
+                </a>
+              )}
+              {whatsappMessage && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void onCopyWhatsapp()}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+                  >
+                    {whatsappCopied ? (
+                      <Check className="h-3.5 w-3.5 text-green-700 dark:text-green-400" />
+                    ) : (
+                      <MessageCircle className="h-3.5 w-3.5" />
+                    )}
+                    {whatsappCopied ? 'Copied' : 'Copy WhatsApp invite'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onShareWhatsapp}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[#25D366] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1da851]"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Share on WhatsApp
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
+        {eventDetail.description && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">About this Event</h2>
+            <div className="whitespace-pre-wrap leading-7 text-foreground">{eventDetail.description}</div>
+          </section>
+        )}
+
+        {eventDetail.invitation_text && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Invitation</h2>
+            <div className="rounded-lg border border-border bg-muted/30 p-4 whitespace-pre-wrap leading-7 text-foreground">
+              {eventDetail.invitation_text}
+            </div>
+          </section>
+        )}
+
+        {agendaItems.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Agenda</h2>
+            <div className="space-y-3">
+              {agendaItems.map((item, index) => (
+                <div key={`agenda-${index}`} className="rounded-lg border border-border bg-card p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.time && (
+                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {item.time}
+                      </span>
+                    )}
+                    <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                  </div>
+                  {item.note && (
+                    <p className="mt-2 text-sm text-muted-foreground leading-6">{item.note}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* RSVP block */}
+        {rsvp?.enabled && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight inline-flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              RSVP
+            </h2>
+            <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+              {rsvpSuccess ? (
+                <div className="flex items-start gap-3 rounded-md bg-green-50 dark:bg-green-900/20 p-4">
+                  <Check className="h-5 w-5 text-green-700 dark:text-green-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                      Thanks for your RSVP — we have you on the list.
+                    </p>
+                    <p className="mt-1 text-xs text-green-700 dark:text-green-400">
+                      We&rsquo;ll send event details to {rsvpEmail.trim()}.
+                    </p>
+                  </div>
+                </div>
+              ) : !rsvpOpen ? (
+                <p className="text-sm text-muted-foreground">
+                  RSVPs are currently closed for this event.
+                  {rsvp.deadline_at && (
+                    <> Deadline was {new Date(rsvp.deadline_at).toLocaleString('en-IN')}.</>
+                  )}
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    {rsvp.capacity != null && (
+                      <span>
+                        Capacity: <strong className="text-foreground">{rsvp.capacity}</strong>
+                        {' · '}
+                        Remaining: <strong className="text-foreground">{rsvp.remaining ?? rsvp.capacity - rsvp.used_count}</strong>
+                      </span>
+                    )}
+                    {rsvp.deadline_at && (
+                      <span>
+                        Deadline: <strong className="text-foreground">{new Date(rsvp.deadline_at).toLocaleString('en-IN')}</strong>
+                      </span>
+                    )}
+                    {rsvp.require_login && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                        <GlobeLock className="h-3 w-3" />
+                        Sign-in required
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Full name *</label>
+                      <input
+                        type="text"
+                        value={rsvpName}
+                        onChange={(e) => setRsvpName(e.target.value)}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        disabled={rsvpSubmitting}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Email *</label>
+                      <input
+                        type="email"
+                        value={rsvpEmail}
+                        onChange={(e) => setRsvpEmail(e.target.value)}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        disabled={rsvpSubmitting}
+                      />
+                    </div>
+                    {rsvp.collect_phone && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">Phone</label>
+                        <input
+                          type="tel"
+                          value={rsvpPhone}
+                          onChange={(e) => setRsvpPhone(e.target.value)}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        />
+                      </div>
+                    )}
+                    {rsvp.collect_company && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">Company</label>
+                        <input
+                          type="text"
+                          value={rsvpCompany}
+                          onChange={(e) => setRsvpCompany(e.target.value)}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-medium text-foreground">Notes (optional)</label>
+                      <textarea
+                        rows={3}
+                        value={rsvpNotes}
+                        onChange={(e) => setRsvpNotes(e.target.value.slice(0, 1000))}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        disabled={rsvpSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  {rsvpError && (
+                    <p className="text-sm text-destructive">{rsvpError}</p>
+                  )}
+
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void submitRsvp()}
+                      disabled={rsvpSubmitting}
+                      className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {rsvpSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Submit RSVP
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        <div className="pt-4 border-t border-border">
+          <Link
+            to="/events"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to all events & activities
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ActivityDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
 
@@ -121,55 +507,48 @@ const ActivityDetail: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  useEffect(() => {
+  const loadDetail = useCallback(async () => {
     if (!slug) {
       setNotFound(true);
       setIsLoading(false);
       return;
     }
+    setIsLoading(true);
+    setNotFound(false);
 
-    let cancelled = false;
+    try {
+      const token = sessionManager.getSessionToken();
+      const eventData = await eventsService.getBySlug(slug, token);
+      if (eventData) {
+        setContentType('event');
+        setEventDetail(eventData);
+        setActivityDetail(null);
+        return;
+      }
 
-    const load = async () => {
-      setIsLoading(true);
-      setNotFound(false);
+      const activityData = await activitiesService.getBySlug(slug);
+      if (activityData) {
+        setContentType('activity');
+        setActivityDetail(activityData);
+        setEventDetail(null);
+        return;
+      }
+
       setContentType(null);
       setEventDetail(null);
       setActivityDetail(null);
-
-      try {
-        const token = sessionManager.getSessionToken();
-        const eventData = await eventsService.getBySlug(slug, token);
-        if (cancelled) return;
-        if (eventData) {
-          setContentType('event');
-          setEventDetail(eventData);
-          return;
-        }
-
-        const activityData = await activitiesService.getBySlug(slug);
-        if (cancelled) return;
-        if (activityData) {
-          setContentType('activity');
-          setActivityDetail(activityData);
-          return;
-        }
-
-        setNotFound(true);
-      } catch (err) {
-        console.error('[ActivityDetail] load error:', err);
-        setNotFound(true);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
+      setNotFound(true);
+    } catch (err) {
+      console.error('[ActivityDetail] load error:', err);
+      setNotFound(true);
+    } finally {
+      setIsLoading(false);
+    }
   }, [slug]);
+
+  useEffect(() => {
+    void loadDetail();
+  }, [loadDetail]);
 
   if (isLoading) {
     return (
@@ -199,125 +578,7 @@ const ActivityDetail: React.FC = () => {
   }
 
   if (contentType === 'event' && eventDetail) {
-    const agendaItems = Array.isArray(eventDetail.agenda_items) ? eventDetail.agenda_items : [];
-    return (
-      <div className="bg-background text-foreground">
-        <div className="border-b border-border bg-muted/40">
-          <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-            <Link
-              to="/events"
-              className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              All Events & Activities
-            </Link>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                <Tag className="h-3 w-3" />
-                {eventDetail.event_type}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                {eventDetail.visibility === 'member_only' ? (
-                  <><GlobeLock className="h-3 w-3" /> Member only</>
-                ) : (
-                  <><Globe className="h-3 w-3" /> Public</>
-                )}
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{eventDetail.title}</h1>
-            {eventDetail.excerpt && (
-              <p className="mt-3 text-lg text-muted-foreground">{eventDetail.excerpt}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="border-b border-border">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6 lg:px-8 text-sm text-muted-foreground">
-            {eventDetail.start_at && (
-              <div className="flex items-center gap-1.5">
-                <Clock3 className="h-4 w-4 shrink-0" />
-                {new Date(eventDetail.start_at).toLocaleString('en-IN', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
-            )}
-            {eventDetail.end_at && (
-              <div className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 shrink-0" />
-                Ends {new Date(eventDetail.end_at).toLocaleString('en-IN', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
-            )}
-            {eventDetail.location && (
-              <div className="flex items-center gap-1.5">
-                <MapPin className="h-4 w-4 shrink-0" />
-                {eventDetail.location}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
-          {eventDetail.description && (
-            <section className="space-y-3">
-              <h2 className="text-xl font-semibold tracking-tight">About this Event</h2>
-              <div className="whitespace-pre-wrap leading-7 text-foreground">{eventDetail.description}</div>
-            </section>
-          )}
-
-          {eventDetail.invitation_text && (
-            <section className="space-y-3">
-              <h2 className="text-xl font-semibold tracking-tight">Invitation</h2>
-              <div className="rounded-lg border border-border bg-muted/30 p-4 whitespace-pre-wrap leading-7 text-foreground">
-                {eventDetail.invitation_text}
-              </div>
-            </section>
-          )}
-
-          {agendaItems.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-xl font-semibold tracking-tight">Agenda</h2>
-              <div className="space-y-3">
-                {agendaItems.map((item, index) => (
-                  <div key={`agenda-${index}`} className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {item.time && (
-                        <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                          {item.time}
-                        </span>
-                      )}
-                      <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
-                    </div>
-                    {item.note && (
-                      <p className="mt-2 text-sm text-muted-foreground leading-6">{item.note}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <div className="pt-4 border-t border-border">
-            <Link
-              to="/events"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to all events & activities
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    return <EventView eventDetail={eventDetail} onRefresh={loadDetail} />;
   }
 
   const activity = activityDetail as PublicActivityDetail;

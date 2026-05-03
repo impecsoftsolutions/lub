@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Image,
+  Link2,
+  Loader2,
   Plus,
   Search,
   MoreHorizontal,
@@ -17,15 +19,18 @@ import {
   RefreshCw,
   Settings,
   ArrowUpDown,
+  X,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
   activitiesService,
+  eventsService,
   type AdminActivityListItem,
   type ActivitySummaryMetrics,
   type ActivityStatus,
+  type EligibleEventRow,
 } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
@@ -123,6 +128,12 @@ const AdminActivities: React.FC = () => {
   const [sortKey, setSortKey] = useState<SortKey>('activity_date_desc');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Import-from-Event modal
+  const [importOpen, setImportOpen] = useState(false);
+  const [eligibleEvents, setEligibleEvents] = useState<EligibleEventRow[]>([]);
+  const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [importingEventId, setImportingEventId] = useState<string | null>(null);
+
   // Toast
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
@@ -214,6 +225,53 @@ const AdminActivities: React.FC = () => {
     }
   }, [loadActivities, showToast]);
 
+  // ── Import from Event ───────────────────────────────────────
+
+  const openImportModal = useCallback(async () => {
+    setImportOpen(true);
+    setEligibleLoading(true);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      const result = await eventsService.getEligibleForActivity(token, 50);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to load events.');
+        setEligibleEvents([]);
+        return;
+      }
+      setEligibleEvents(result.rows);
+    } finally {
+      setEligibleLoading(false);
+    }
+  }, [showToast]);
+
+  const handleImportEvent = useCallback(async (eventId: string) => {
+    setImportingEventId(eventId);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      const result = await eventsService.bridgeToActivity(token, eventId);
+      if (!result.success || !result.activity_id) {
+        showToast('error', result.error ?? 'Failed to import event.');
+        return;
+      }
+      showToast(
+        'success',
+        result.reused ? 'Opening existing activity draft.' : 'Activity draft created from event.',
+      );
+      setImportOpen(false);
+      navigate(`/admin/content/activities/${result.activity_id}/edit`);
+    } finally {
+      setImportingEventId(null);
+    }
+  }, [navigate, showToast]);
+
   // ── Filter + search + sort ───────────────────────────────────
 
   const filteredActivities = useMemo(() => {
@@ -285,6 +343,12 @@ const AdminActivities: React.FC = () => {
                     <Settings className="h-4 w-4 mr-1.5" />
                     Settings
                   </Link>
+                </Button>
+              )}
+              {canCreate && (
+                <Button variant="outline" onClick={() => void openImportModal()}>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Import from Event
                 </Button>
               )}
               {canCreate && (
@@ -620,6 +684,98 @@ const AdminActivities: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Import from Event modal */}
+        {importOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            onClick={() => setImportOpen(false)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="w-full max-w-2xl rounded-lg border border-border bg-card p-5 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground inline-flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    Import from Event
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pick a completed (or draft) event to pull into a new Activity draft. Already-bridged events open their existing activity.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setImportOpen(false)}
+                  className="rounded-md p-1 text-muted-foreground hover:bg-muted/50"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 max-h-[60vh] overflow-y-auto">
+                {eligibleLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading events…
+                  </div>
+                ) : eligibleEvents.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    No eligible events. Events become eligible once they have ended (published or archived) or are still in your draft.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {eligibleEvents.map((evt) => {
+                      const busy = importingEventId === evt.id;
+                      return (
+                        <li key={evt.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground truncate">
+                                {evt.title}
+                              </span>
+                              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                                {evt.status}
+                              </span>
+                              {evt.bridged_activity_id && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                                  <Link2 className="h-3 w-3" />
+                                  Already bridged
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              /{evt.slug}
+                              {evt.start_at ? ` · ${new Date(evt.start_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
+                              {evt.location ? ` · ${evt.location}` : ''}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={evt.bridged_activity_id ? 'outline' : 'default'}
+                            onClick={() => void handleImportEvent(evt.id)}
+                            disabled={busy}
+                          >
+                            {busy ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            ) : (
+                              <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            {evt.bridged_activity_id ? 'Open' : 'Import'}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PermissionGate>
   );

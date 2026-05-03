@@ -1,42 +1,43 @@
 # LUB Agent Handoff Notes
 
-Keep this file short and overwrite it instead of appending a journal.
-
 ## Single-Board Rule
 
 Only `docs/agent_coordination/TASK_BOARD.md` is authoritative.
 Do not edit task rows in worktree-local board copies.
 
-## Current Owner — Codex
+## Current Owner â€” Codex
 
-## Current Slice — COD-EVENTS-CMS-AI-AUTOFILL-038 (Closed)
+## Current Slice â€” COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039 (Closed)
 
 ## Status
 
-Completed end-to-end.
+Runtime closeout completed by Codex.
 
-## What was finished by Codex
+## Runtime closeout completed
 
-- Applied remote migration-history repairs for missing legacy entries so safe push could proceed.
-- Applied remote migrations:
-  - `20260503120000_events_cms_full.sql`
-  - `20260504000000_events_ai_autofill_and_slug_lock.sql`
-  - `20260504010000_seed_event_drafting_ai_runtime.sql`
-- Deployed Edge Function `draft-event-content`.
-- Verified callable runtime surfaces:
-  - `check_event_slug_available_with_session` returns `invalid_session` for bad token.
-  - `draft-event-content` returns `session_invalid` for bad token.
-- Implemented requested limits update:
-  - max files: 5
-  - per file: 30 MB (JPEG/PNG/PDF)
-  - total: 150 MB
+1. Applied migration:
+   - `supabase/migrations/20260505000000_events_rsvp_bridge_maps_whatsapp.sql`
+2. Redeployed edge function:
+   - `draft-event-content` on project `qskziirjtzomrtckpzas`
+3. Ran runtime probes against remote DB (transactional fixtures with rollback):
+   - RSVP capacity test:
+     - first submit => `confirmed`
+     - second submit => `capacity_full`
+   - Member-only event with no session => `permission_denied`
+   - RSVP after deadline => `rsvp_deadline_passed`
+   - Eventâ†’Activity bridge called twice => same `activity_id`, second call `reused: true`
+   - `get_event_by_slug` returns `venue_map_url` + `whatsapp_invitation_message`
+   - `update_event_rsvp_status_with_session` with editor session => `permission_denied`
+4. Edge function invoke check:
+   - invalid token returns structured `session_invalid`
 
-## Validation
+## Validation baseline (already green in this slice)
 
-- `npm run lint` ? PASS (0 errors / 3 expected warnings)
-- `npm run build` ? PASS
-- `npm run test:e2e:phase1:local` ? PASS (3 passed / 12 skipped)
+- `npm run lint` => PASS (0 errors / 3 expected warnings)
+- `npm run build` => PASS
+- `npm run test:e2e:phase1:local` => PASS (3 passed / 12 skipped)
 
 ## Notes
 
-- Unrelated pre-existing dirty items remain in worktree (handshake doc deletions, header/footer edits, temp/untracked dirs). They were not included in this slice.
+- Probe fixtures were executed inside a transaction and rolled back to avoid polluting production data.
+- 039 is now moved to **Completed Recently** on the canonical board.

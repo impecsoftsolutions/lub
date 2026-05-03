@@ -5,6 +5,7 @@ import {
   Clock3,
   Globe,
   GlobeLock,
+  Link2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -96,6 +97,7 @@ const AdminEvents: React.FC = () => {
   const canPublish = useHasPermission('events.publish');
   const canArchive = useHasPermission('events.archive');
   const canDelete = useHasPermission('events.delete');
+  const canCreateActivity = useHasPermission('activities.create');
 
   const [items, setItems] = useState<AdminEventListItem[]>([]);
   const [metrics, setMetrics] = useState<EventSummaryMetrics | null>(null);
@@ -193,6 +195,29 @@ const AdminEvents: React.FC = () => {
       setActionLoading(null);
     }
   }, [loadEvents, showToast]);
+
+  const handleBridgeToActivity = useCallback(async (id: string) => {
+    setActionLoading(`${id}:bridge`);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      const result = await eventsService.bridgeToActivity(token, id);
+      if (!result.success || !result.activity_id) {
+        showToast('error', result.error ?? 'Failed to create activity from event.');
+        return;
+      }
+      showToast(
+        'success',
+        result.reused ? 'Opening existing activity draft.' : 'Activity draft created from event.',
+      );
+      navigate(`/admin/content/activities/${result.activity_id}/edit`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [navigate, showToast]);
 
   const handleDelete = useCallback(async (id: string, title: string) => {
     if (!window.confirm(`Permanently delete "${title}"? This cannot be undone.`)) {
@@ -399,7 +424,7 @@ const AdminEvents: React.FC = () => {
                             <p className="inline-flex items-center gap-1.5">
                               <Clock3 className="h-3.5 w-3.5" />
                               {formatDateTime(item.start_at)}
-                              {item.end_at ? ` ? ${formatDateTime(item.end_at)}` : ''}
+                              {item.end_at ? ` – ${formatDateTime(item.end_at)}` : ''}
                             </p>
                             {item.location && (
                               <p className="inline-flex items-center gap-1.5">
@@ -480,6 +505,16 @@ const AdminEvents: React.FC = () => {
                                   <DropdownMenuItem onClick={() => void handleArchive(item.id)} className="flex items-center gap-2">
                                     <Archive className="h-4 w-4" />
                                     Archive
+                                  </DropdownMenuItem>
+                                )}
+
+                                {canCreateActivity && (
+                                  <DropdownMenuItem
+                                    onClick={() => void handleBridgeToActivity(item.id)}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Link2 className="h-4 w-4" />
+                                    Create Activity from Event
                                   </DropdownMenuItem>
                                 )}
 

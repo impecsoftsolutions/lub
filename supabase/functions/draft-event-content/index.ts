@@ -177,7 +177,10 @@ interface DraftEventOutput {
   invitation_text: string;
   agenda_items: Array<{ title: string; time?: string; note?: string }>;
   show_agenda_publicly: boolean;
+  whatsapp_invitation_message: string;
 }
+
+const MAX_WHATSAPP_MESSAGE_CHARS = 1200;
 
 interface ExtractionFields {
   event_type?: string;
@@ -308,7 +311,8 @@ function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
     '  "location": string|null,',
     '  "invitation_text": string,',
     '  "agenda_items": [{ "title": string, "time"?: string, "note"?: string }],',
-    '  "show_agenda_publicly": boolean',
+    '  "show_agenda_publicly": boolean,',
+    '  "whatsapp_invitation_message": string',
     '}',
     'title: short, descriptive, <= 90 characters, no trailing punctuation.',
     'slug: lowercase letters, digits, and hyphens only, <= 60 characters; client/server may re-validate.',
@@ -319,6 +323,7 @@ function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
     'event_type: pick the closest of the listed values. If unsure, use "general".',
     'visibility: default to "public" unless the brief indicates members-only.',
     'show_agenda_publicly: default true when an agenda is present; otherwise false.',
+    'whatsapp_invitation_message: a concise, ready-to-share WhatsApp invitation message for members. Plain text only (no Markdown), <= 1200 characters. Use short paragraphs and line breaks for readability. Open with a warm greeting, name the event, summarize what attendees will gain in 1-2 lines, then list date/time and venue (or online link) when known. End with a simple call-to-action to RSVP or ask for details. Do not invent dates, venues, or speaker names that are not present in the inputs. Avoid all-caps and avoid heavy emoji use; a single welcoming emoji is acceptable but not required.',
   );
   return base.join(' ');
 }
@@ -405,6 +410,10 @@ function parseDraftJson(content: string): DraftEventOutput {
     typeof obj.show_agenda_publicly === 'boolean'
       ? obj.show_agenda_publicly
       : false;
+  const whatsappRaw = toStringValue(obj.whatsapp_invitation_message);
+  const whatsappMessage = whatsappRaw.length > MAX_WHATSAPP_MESSAGE_CHARS
+    ? whatsappRaw.slice(0, MAX_WHATSAPP_MESSAGE_CHARS)
+    : whatsappRaw;
 
   if (!title) {
     throw new Error('AI response missing required title.');
@@ -430,6 +439,7 @@ function parseDraftJson(content: string): DraftEventOutput {
     invitation_text: invitationText,
     agenda_items: agenda,
     show_agenda_publicly: agenda.length > 0 ? showAgendaPublicly : false,
+    whatsapp_invitation_message: whatsappMessage,
   };
 }
 
