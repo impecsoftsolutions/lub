@@ -6811,6 +6811,7 @@ export interface PublicEvent {
 export interface PublicEventDetail extends PublicEvent {
   invitation_text: string | null;
   agenda_items: EventAgendaItem[];
+  show_agenda_publicly?: boolean;
 }
 
 export interface AdminEventListItem {
@@ -6846,11 +6847,74 @@ export interface AdminEventDetail {
   location: string | null;
   invitation_text: string | null;
   agenda_items: EventAgendaItem[];
+  show_agenda_publicly: boolean;
+  slug_locked: boolean;
+  ai_metadata: Record<string, unknown> | null;
   created_by: string | null;
   published_by: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// COD-EVENTS-CMS-AI-AUTOFILL-038
+export interface EventAIDraftSourceFile {
+  name: string;
+  mime: string;
+  base64: string;
+}
+
+export interface EventAIDraftHints {
+  title?: string;
+  event_type?: EventType | string;
+  visibility?: EventVisibility;
+  start_at?: string;
+  end_at?: string;
+  location?: string;
+}
+
+export interface EventAIDraftResult {
+  success: boolean;
+  data?: {
+    title: string;
+    slug: string;
+    excerpt: string;
+    description: string;
+    event_type: EventType;
+    visibility: EventVisibility;
+    start_at: string | null;
+    end_at: string | null;
+    location: string | null;
+    invitation_text: string;
+    agenda_items: EventAgendaItem[];
+    show_agenda_publicly: boolean;
+  };
+  ai?: {
+    model: string;
+    generated_at: string;
+    source_doc_count: number;
+    brief_chars: number;
+  };
+  error?: string;
+  errorCode?:
+    | 'ai_disabled'
+    | 'provider_unsupported'
+    | 'no_api_key'
+    | 'session_invalid'
+    | 'permission_denied'
+    | 'brief_required'
+    | 'files_too_large'
+    | 'files_too_many'
+    | 'unsupported_format'
+    | 'generation_failed';
+}
+
+export interface EventSlugAvailability {
+  success: boolean;
+  available?: boolean;
+  normalizedSlug?: string;
+  error?: string;
+  errorCode?: string;
 }
 
 export interface EventSummaryMetrics {
@@ -6958,13 +7022,28 @@ export const eventsService = {
   async create(
     sessionToken: string,
     payload: Record<string, unknown>
-  ): Promise<{ success: boolean; event_id?: string; slug?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    event_id?: string;
+    slug?: string;
+    error?: string;
+    error_code?: string;
+    conflict_slug?: string;
+  }> {
     const { data, error } = await supabase.rpc('create_event_with_session', {
       p_session_token: sessionToken,
       p_payload: payload,
     });
     if (error) return { success: false, error: error.message };
-    const result = data as { success: boolean; event_id?: string; id?: string; slug?: string; error?: string };
+    const result = data as {
+      success: boolean;
+      event_id?: string;
+      id?: string;
+      slug?: string;
+      error?: string;
+      error_code?: string;
+      conflict_slug?: string;
+    };
     return result?.success
       ? { success: true, event_id: result.event_id ?? result.id, slug: result.slug }
       : (result ?? { success: false, error: 'Unknown error' });
@@ -6974,14 +7053,26 @@ export const eventsService = {
     sessionToken: string,
     eventId: string,
     payload: Record<string, unknown>
-  ): Promise<{ success: boolean; slug?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    slug?: string;
+    error?: string;
+    error_code?: string;
+    conflict_slug?: string;
+  }> {
     const { data, error } = await supabase.rpc('update_event_with_session', {
       p_session_token: sessionToken,
       p_event_id: eventId,
       p_payload: payload,
     });
     if (error) return { success: false, error: error.message };
-    const result = data as { success: boolean; slug?: string; error?: string };
+    const result = data as {
+      success: boolean;
+      slug?: string;
+      error?: string;
+      error_code?: string;
+      conflict_slug?: string;
+    };
     return result ?? { success: false, error: 'Unknown error' };
   },
 
@@ -7031,6 +7122,94 @@ export const eventsService = {
     });
     if (error) return { success: false, error: error.message };
     return (data as { success: boolean; error?: string }) ?? { success: false, error: 'Unknown error' };
+  },
+
+  // COD-EVENTS-CMS-AI-AUTOFILL-038
+  async checkSlugAvailable(
+    sessionToken: string,
+    slug: string,
+    eventId?: string | null,
+  ): Promise<EventSlugAvailability> {
+    const { data, error } = await supabase.rpc('check_event_slug_available_with_session', {
+      p_session_token: sessionToken,
+      p_slug: slug,
+      p_event_id: eventId ?? null,
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    const result = data as {
+      success?: boolean;
+      available?: boolean;
+      normalized_slug?: string;
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error,
+        errorCode: result?.error_code,
+        normalizedSlug: result?.normalized_slug,
+      };
+    }
+    return {
+      success: true,
+      available: Boolean(result.available),
+      normalizedSlug: result.normalized_slug,
+    };
+  },
+
+  async draftFromBrief(
+    sessionToken: string,
+    args: {
+      brief: string;
+      mode?: 'draft' | 'extract_fields';
+      hints?: EventAIDraftHints;
+      sourceFiles?: EventAIDraftSourceFile[];
+    },
+  ): Promise<EventAIDraftResult> {
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-event-content', {
+        body: {
+          session_token: sessionToken,
+          mode: args.mode ?? 'draft',
+          brief: args.brief,
+          inputs: args.hints ?? {},
+          source_files: args.sourceFiles ?? [],
+        },
+      });
+      if (error) {
+        console.error('[eventsService.draftFromBrief] invoke error:', error);
+        return { success: false, error: error.message, errorCode: 'generation_failed' };
+      }
+      const result = data as {
+        success?: boolean;
+        data?: EventAIDraftResult['data'];
+        ai?: EventAIDraftResult['ai'];
+        error?: string;
+        error_code?: EventAIDraftResult['errorCode'];
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error ?? 'AI generation failed.',
+          errorCode: result?.error_code ?? 'generation_failed',
+        };
+      }
+      return {
+        success: true,
+        data: result.data,
+        ai: result.ai,
+      };
+    } catch (err) {
+      console.error('[eventsService.draftFromBrief] exception:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        errorCode: 'generation_failed',
+      };
+    }
   },
 
   computeMetrics(items: AdminEventListItem[]): EventSummaryMetrics {

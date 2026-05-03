@@ -1,7 +1,7 @@
 ﻿# LUB Web Portal - Current State
 
 **Last updated:** 2026-05-02
-**Updated by:** Codex (`COD-EVENTS-CMS-032` full implementation batch)
+**Updated by:** Claude (`COD-EVENTS-CMS-AI-AUTOFILL-038` implementation)
 
 ---
 
@@ -28,10 +28,10 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 
 ## Active Stream
 
-**Active stream:** `COD-EVENTS-CMS-032` (implemented in repo)
-**Current owner:** Codex
-**Task board:** `docs/agent_coordination/TASK_BOARD.md` â€” single source of truth.
-**Current handoff state:** Full Events CMS slice is now landed in repo. Added migration `20260503120000_events_cms_full.sql` with dedicated `events` table, `events.*` permissions, slug helpers, public read RPCs (`get_published_events`, `get_event_by_slug`), and secure `_with_session` admin CRUD/publish/archive/delete RPCs. Frontend now includes `eventsService`, real admin Events list/form routes, and public `/events` now reads both Events + Activities. `/events/:slug` resolves Event first, then Activity fallback.
+**Active stream:** `COD-EVENTS-CMS-AI-AUTOFILL-038` (implemented in repo)
+**Current owner:** Codex (apply migration + deploy edge function + seed `event_drafting` AI runtime + live RPC/browser probes)
+**Task board:** `docs/agent_coordination/TASK_BOARD.md` — single source of truth.
+**Current handoff state:** 038 single-batch implemented in repo on top of 032. New migration adds `show_agenda_publicly` / `slug_locked` / `ai_metadata` to `events`, plus a slug-availability RPC; CREATE OR REPLACE rewrites of all event RPCs honor `slug_locked` (rejects collisions instead of auto-suffixing), gate public agenda by `show_agenda_publicly`, and fix the previously-flagged pagination bug in `get_published_events` and `get_all_events_with_session`. New Edge Function `draft-event-content` (cloned from `draft-activity-content`) reads a new `ai_runtime_settings` key `event_drafting`. `eventsService` gained `draftFromBrief` + `checkSlugAvailable`. AdminEventForm rewritten with prominent Event Brief panel + attach files + Generate, slug read-only-with-edit + debounced availability check + Reset-to-auto, Show-agenda-publicly toggle, and a published-event Generate-overwrite confirm dialog. ActivityDetail event branch needs no client change because the public RPC now returns `agenda_items: []` when the toggle is off. Local validation: `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped).
 
 Most recently completed streams:
 - **COD-EVENTS-CMS-032**: Full Events CMS implementation batch complete in repo. Added migration supabase/migrations/20260503120000_events_cms_full.sql (events table, permissions, secure RPCs), wired eventsService in src/lib/supabase.ts, replaced admin placeholder with real AdminEvents and AdminEventForm flows, updated admin routing/sidebar, unified public /events to read both domains, and updated /events/:slug to resolve Event then Activity fallback. Validation on 2026-05-02: lint PASS (0 errors / 3 warnings), build PASS, readonly Phase 1 smoke PASS (3 passed / 12 skipped).
