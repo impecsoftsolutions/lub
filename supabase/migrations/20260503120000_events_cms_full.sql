@@ -1,4 +1,4 @@
-﻿/*
+/*
   # Events CMS Foundation (COD-EVENTS-CMS-032)
 
   Purpose:

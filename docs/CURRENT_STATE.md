@@ -1,7 +1,7 @@
-﻿# LUB Web Portal - Current State
+# LUB Web Portal - Current State
 
-**Last updated:** 2026-05-02
-**Updated by:** Claude (`COD-EVENTS-CMS-AI-AUTOFILL-038` implementation)
+**Last updated:** 2026-05-03
+**Updated by:** Codex (`COD-EVENTS-CMS-AI-AUTOFILL-038` runtime closeout + limits update)
 
 ---
 
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-05-02, COD-EVENTS-CMS-032) |
-| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-02, COD-EVENTS-CMS-032) |
+| Build (`npm run build`) | PASS (2026-05-03, COD-EVENTS-CMS-AI-AUTOFILL-038) |
+| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-03, COD-EVENTS-CMS-AI-AUTOFILL-038) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13 baseline) |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-02, COD-EVENTS-CMS-032) |
+| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-03, COD-EVENTS-CMS-AI-AUTOFILL-038) |
 
 Phase 1 destructive baseline remains the non-negotiable floor.
 
@@ -29,9 +29,9 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 ## Active Stream
 
 **Active stream:** `COD-EVENTS-CMS-AI-AUTOFILL-038` (implemented in repo)
-**Current owner:** Codex (apply migration + deploy edge function + seed `event_drafting` AI runtime + live RPC/browser probes)
-**Task board:** `docs/agent_coordination/TASK_BOARD.md` — single source of truth.
-**Current handoff state:** 038 single-batch implemented in repo on top of 032. New migration adds `show_agenda_publicly` / `slug_locked` / `ai_metadata` to `events`, plus a slug-availability RPC; CREATE OR REPLACE rewrites of all event RPCs honor `slug_locked` (rejects collisions instead of auto-suffixing), gate public agenda by `show_agenda_publicly`, and fix the previously-flagged pagination bug in `get_published_events` and `get_all_events_with_session`. New Edge Function `draft-event-content` (cloned from `draft-activity-content`) reads a new `ai_runtime_settings` key `event_drafting`. `eventsService` gained `draftFromBrief` + `checkSlugAvailable`. AdminEventForm rewritten with prominent Event Brief panel + attach files + Generate, slug read-only-with-edit + debounced availability check + Reset-to-auto, Show-agenda-publicly toggle, and a published-event Generate-overwrite confirm dialog. ActivityDetail event branch needs no client change because the public RPC now returns `agenda_items: []` when the toggle is off. Local validation: `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped).
+**Current owner:** Codex
+**Task board:** `docs/agent_coordination/TASK_BOARD.md` � single source of truth.
+**Current handoff state:** 038 is complete end-to-end. Runtime closeout done by Codex: repaired remote migration history drift entries, applied migrations `20260503120000_events_cms_full.sql`, `20260504000000_events_ai_autofill_and_slug_lock.sql`, and `20260504010000_seed_event_drafting_ai_runtime.sql`; deployed `draft-event-content`; validated callable slug RPC and callable edge function with invalid-session probes; and implemented follow-up limits update (5 files, 30 MB each, 150 MB total). Local lint/build/Phase-1 readonly smoke are PASS.
 
 Most recently completed streams:
 - **COD-EVENTS-CMS-032**: Full Events CMS implementation batch complete in repo. Added migration supabase/migrations/20260503120000_events_cms_full.sql (events table, permissions, secure RPCs), wired eventsService in src/lib/supabase.ts, replaced admin placeholder with real AdminEvents and AdminEventForm flows, updated admin routing/sidebar, unified public /events to read both domains, and updated /events/:slug to resolve Event then Activity fallback. Validation on 2026-05-02: lint PASS (0 errors / 3 warnings), build PASS, readonly Phase 1 smoke PASS (3 passed / 12 skipped).
@@ -54,9 +54,9 @@ Most recently completed streams:
 
 ## Last Verified
 
-- **When:** 2026-05-02
-- **What:** `COD-EVENTS-CMS-032` implementation validation
-- **Result:** PASS for lint/build/readonly smoke after Events CMS backend + admin/public integration.
+- **When:** 2026-05-03
+- **What:** `COD-EVENTS-CMS-AI-AUTOFILL-038` runtime closeout + limits update validation
+- **Result:** PASS for lint/build/readonly smoke, migration apply, function deploy, and runtime probe checks.
 - **Commands:**
   ```
   npm run lint -> PASS (0 errors / 3 expected warnings)
@@ -108,6 +108,8 @@ Most recently completed streams:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+
+
 
 
 
