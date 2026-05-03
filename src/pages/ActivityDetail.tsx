@@ -131,12 +131,44 @@ interface EventViewProps {
   onRefresh: () => Promise<void>;
 }
 
+function eventDayList(start: string | null | undefined, end: string | null | undefined): string[] {
+  if (!start) return [];
+  const s = new Date(start);
+  const e = end ? new Date(end) : s;
+  if (Number.isNaN(s.getTime())) return [];
+  const last = Number.isNaN(e.getTime()) ? s : e;
+  const days: string[] = [];
+  const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+  const end0 = new Date(last.getFullYear(), last.getMonth(), last.getDate());
+  while (cur <= end0) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    days.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+
+function formatDayLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const agendaItems = Array.isArray(eventDetail.agenda_items) ? eventDetail.agenda_items : [];
   const venueMapUrl = (eventDetail.venue_map_url ?? '').trim();
   const whatsappMessage = (eventDetail.whatsapp_invitation_message ?? '').trim();
+  const banner = (eventDetail.banner_image_url ?? '').trim();
+  const assets = Array.isArray(eventDetail.assets) ? eventDetail.assets : [];
+  const flyerImages = assets.filter((a) => a.kind === 'flyer' || a.kind === 'gallery');
+  const documents = assets.filter((a) => a.kind === 'document');
   const rsvp = eventDetail.rsvp ?? null;
   const rsvpOpen = Boolean(rsvp?.enabled && rsvp?.open);
+
+  const eventDays = eventDayList(eventDetail.start_at ?? null, eventDetail.end_at ?? null);
+  const isMultiday = eventDays.length > 1;
 
   // RSVP form state
   const [rsvpName, setRsvpName] = useState('');
@@ -146,10 +178,21 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const [rsvpGender, setRsvpGender] = useState<EventRsvpGender | ''>('');
   const [rsvpMeal, setRsvpMeal] = useState<EventRsvpMealPreference | ''>('');
   const [rsvpProfession, setRsvpProfession] = useState<EventRsvpProfession | ''>('');
+  const [rsvpVisitDate, setRsvpVisitDate] = useState<string>(isMultiday ? '' : eventDays[0] ?? '');
   const [rsvpNotes, setRsvpNotes] = useState('');
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
+
+  // Day-wise capacity helpers
+  const perDayUsed = rsvp?.per_day_used ?? {};
+  const perDayCap = rsvp?.per_day_capacity ?? null;
+  const isPerDayMode = rsvp?.capacity_mode === 'per_day';
+  const remainingForDay = (day: string): number | null => {
+    if (!isPerDayMode || perDayCap == null) return null;
+    const used = perDayUsed[day] ?? 0;
+    return Math.max(perDayCap - used, 0);
+  };
 
   const [whatsappCopied, setWhatsappCopied] = useState(false);
 
@@ -192,6 +235,10 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
       setRsvpError('Please select your profession.');
       return;
     }
+    if (isMultiday && !rsvpVisitDate) {
+      setRsvpError('Please choose your day of visit.');
+      return;
+    }
     setRsvpSubmitting(true);
     try {
       const token = sessionManager.getSessionToken();
@@ -205,15 +252,19 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
         mealPreference: rsvp?.collect_meal ? (rsvpMeal || null) : null,
         profession: rsvp?.collect_profession ? (rsvpProfession || null) : null,
         notes: rsvpNotes.trim() || null,
+        visitDate: rsvpVisitDate || null,
         sessionToken: token,
       });
       if (!result.success) {
         const messages: Record<string, string> = {
-          login_required: 'Please sign in as a member to RSVP for this event.',
+          login_required: 'Please sign in as a member to register for this event.',
           permission_denied: 'This event is open to members only.',
-          rsvp_closed: 'RSVPs are closed for this event.',
-          rsvp_deadline_passed: 'The RSVP deadline has passed.',
+          rsvp_closed: 'Registrations are closed for this event.',
+          rsvp_deadline_passed: 'The registration deadline has passed.',
           capacity_full: 'This event is fully booked.',
+          capacity_full_for_date: 'No seats remaining for the selected day.',
+          visit_date_required: 'Please choose your day of visit.',
+          invalid_visit_date: 'Selected day is outside the event window.',
           invalid_full_name: 'Please enter your full name.',
           invalid_email: 'Please enter a valid email address.',
           invalid_phone: 'Please enter a valid phone number.',
@@ -226,7 +277,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           profession_required: 'Please select your profession.',
           invalid_profession: 'Please select a valid profession.',
         };
-        setRsvpError(messages[result.error_code ?? ''] ?? result.error ?? 'Could not submit RSVP.');
+        setRsvpError(messages[result.error_code ?? ''] ?? result.error ?? 'Could not submit your registration.');
         return;
       }
       setRsvpSuccess(true);
@@ -238,6 +289,15 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
 
   return (
     <div className="bg-background text-foreground">
+      {banner && (
+        <div className="w-full bg-muted">
+          <img
+            src={banner}
+            alt={`${eventDetail.title} banner`}
+            className="w-full max-h-[440px] object-cover"
+          />
+        </div>
+      )}
       <div className="border-b border-border bg-muted/40">
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
           <Link
@@ -381,12 +441,66 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           </section>
         )}
 
-        {/* RSVP block */}
+        {/* Additional images */}
+        {flyerImages.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Images</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {flyerImages.map((asset) => (
+                <a
+                  key={asset.id}
+                  href={asset.public_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative block aspect-[4/3] overflow-hidden rounded-lg bg-muted"
+                >
+                  <img
+                    src={asset.public_url}
+                    alt={asset.label ?? ''}
+                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                    loading="lazy"
+                  />
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Documents */}
+        {documents.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Materials</h2>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {documents.map((asset) => (
+                <li key={asset.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <a
+                      href={asset.public_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-foreground hover:text-primary truncate inline-flex items-center gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4 shrink-0" />
+                      {asset.label || asset.storage_path.split('/').pop()}
+                    </a>
+                    {asset.byte_size && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {Math.ceil(asset.byte_size / 1024)} KB
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Registration block */}
         {rsvp?.enabled && (
           <section className="space-y-3">
             <h2 className="text-xl font-semibold tracking-tight inline-flex items-center gap-2">
               <Users className="h-5 w-5" />
-              RSVP
+              Register for Event
             </h2>
             <div className="rounded-lg border border-border bg-card p-5 space-y-4">
               {rsvpSuccess ? (
@@ -394,7 +508,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                   <Check className="h-5 w-5 text-green-700 dark:text-green-400 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-green-800 dark:text-green-300">
-                      Thanks for your RSVP — we have you on the list.
+                      Thanks for registering — we have you on the list.
                     </p>
                     <p className="mt-1 text-xs text-green-700 dark:text-green-400">
                       We&rsquo;ll send event details to {rsvpEmail.trim()}.
@@ -403,7 +517,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                 </div>
               ) : !rsvpOpen ? (
                 <p className="text-sm text-muted-foreground">
-                  RSVPs are currently closed for this event.
+                  Registrations are currently closed for this event.
                   {rsvp.deadline_at && (
                     <> Deadline was {new Date(rsvp.deadline_at).toLocaleString('en-IN')}.</>
                   )}
@@ -411,11 +525,24 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {rsvp.capacity != null && (
+                    {!isPerDayMode && rsvp.capacity != null && (
                       <span>
                         Capacity: <strong className="text-foreground">{rsvp.capacity}</strong>
                         {' · '}
                         Remaining: <strong className="text-foreground">{rsvp.remaining ?? rsvp.capacity - rsvp.used_count}</strong>
+                      </span>
+                    )}
+                    {isPerDayMode && perDayCap != null && (
+                      <span>
+                        Per-day capacity: <strong className="text-foreground">{perDayCap}</strong>
+                        {rsvpVisitDate && (
+                          <>
+                            {' · '}
+                            Remaining for {formatDayLabel(rsvpVisitDate)}:
+                            {' '}
+                            <strong className="text-foreground">{remainingForDay(rsvpVisitDate) ?? '—'}</strong>
+                          </>
+                        )}
                       </span>
                     )}
                     {rsvp.deadline_at && (
@@ -432,6 +559,33 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
+                    {isMultiday && (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground">Day of visit *</label>
+                        <select
+                          value={rsvpVisitDate}
+                          onChange={(e) => setRsvpVisitDate(e.target.value)}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        >
+                          <option value="">Select a day…</option>
+                          {eventDays.map((day) => {
+                            const remaining = remainingForDay(day);
+                            const full = isPerDayMode && remaining != null && remaining <= 0;
+                            return (
+                              <option key={day} value={day} disabled={full}>
+                                {formatDayLabel(day)}
+                                {isPerDayMode && remaining != null
+                                  ? full
+                                    ? ' — Full'
+                                    : ` — ${remaining} seats left`
+                                  : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-foreground">Full name *</label>
                       <input
@@ -552,7 +706,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                       ) : (
                         <Check className="h-4 w-4" />
                       )}
-                      Submit RSVP
+                      Submit Registration
                     </button>
                   </div>
                 </>

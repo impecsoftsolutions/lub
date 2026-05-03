@@ -11,6 +11,7 @@ import AdminActivityForm from './pages/AdminActivityForm';
 import AdminActivitySettings from './pages/AdminActivitySettings';
 import AdminEvents from './pages/AdminEvents';
 import AdminEventForm from './pages/AdminEventForm';
+import AdminEventRegistrations from './pages/AdminEventRegistrations';
 import Leadership from './pages/Leadership';
 import Join from './pages/Join';
 import MembershipBenefits from './pages/MembershipBenefits';
@@ -206,6 +207,7 @@ function App() {
             <Route path="/admin/content/events" element={<AdminEvents />} />
             <Route path="/admin/content/events/new" element={<AdminEventForm />} />
             <Route path="/admin/content/events/:id/edit" element={<AdminEventForm />} />
+            <Route path="/admin/content/events/:id/registrations" element={<AdminEventRegistrations />} />
             <Route path="/admin/content/activities" element={<AdminActivities />} />
             <Route path="/admin/content/activities/new" element={<AdminActivityForm />} />
             <Route path="/admin/content/activities/:id/edit" element={<AdminActivityForm />} />

@@ -40,6 +40,9 @@ import {
   type EventRsvpGender,
   type EventRsvpMealPreference,
   type EventRsvpProfession,
+  type EventAsset,
+  type EventAssetKind,
+  type EventCapacityMode,
   type EventRsvpRow,
   type EventRsvpStatus,
   type EventRsvpSummary,
@@ -189,6 +192,13 @@ const AdminEventForm: React.FC = () => {
   // RSVP config
   const [rsvpEnabled, setRsvpEnabled] = useState(false);
   const [rsvpCapacity, setRsvpCapacity] = useState<string>('');
+  const [capacityMode, setCapacityMode] = useState<EventCapacityMode>('global');
+  const [perDayCapacity, setPerDayCapacity] = useState<string>('');
+  // Media (banner + flyer/gallery + documents)
+  const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
+  const [assets, setAssets] = useState<EventAsset[]>([]);
+  const [uploadingKind, setUploadingKind] = useState<EventAssetKind | null>(null);
+  const [docLabelDraft, setDocLabelDraft] = useState('');
   const [rsvpDeadlineAt, setRsvpDeadlineAt] = useState('');
   const [rsvpCollectPhone, setRsvpCollectPhone] = useState(true);
   const [rsvpCollectCompany, setRsvpCollectCompany] = useState(true);
@@ -288,6 +298,10 @@ const AdminEventForm: React.FC = () => {
         };
         setRsvpEnabled(Boolean(rsvpCfg.enabled));
         setRsvpCapacity(rsvpCfg.capacity != null ? String(rsvpCfg.capacity) : '');
+        setCapacityMode((rsvpCfg.capacity_mode as EventCapacityMode) ?? 'global');
+        setPerDayCapacity(rsvpCfg.per_day_capacity != null ? String(rsvpCfg.per_day_capacity) : '');
+        setBannerImageUrl(data.banner_image_url ?? null);
+        setAssets(Array.isArray(data.assets) ? data.assets : []);
         setRsvpDeadlineAt(toDateTimeInput(rsvpCfg.deadline_at ?? null));
         setRsvpCollectPhone(rsvpCfg.collect_phone !== false);
         setRsvpCollectCompany(rsvpCfg.collect_company !== false);
@@ -569,6 +583,8 @@ const AdminEventForm: React.FC = () => {
   const buildPayload = (): Record<string, unknown> => {
     const capacityRaw = rsvpCapacity.trim();
     const capacityNum = capacityRaw ? Number(capacityRaw) : null;
+    const perDayRaw = perDayCapacity.trim();
+    const perDayNum = perDayRaw ? Number(perDayRaw) : null;
     return {
       title: title.trim(),
       slug: slug.trim(),
@@ -597,6 +613,9 @@ const AdminEventForm: React.FC = () => {
       rsvp_collect_meal: rsvpCollectMeal,
       rsvp_collect_profession: rsvpCollectProfession,
       rsvp_require_login: rsvpRequireLogin,
+      capacity_mode: capacityMode,
+      per_day_capacity:
+        perDayNum != null && Number.isFinite(perDayNum) && perDayNum > 0 ? perDayNum : null,
     };
   };
 
@@ -874,6 +893,76 @@ const AdminEventForm: React.FC = () => {
     setShowWhatsappOverwriteConfirm(false);
     void runGenerateWhatsapp();
   };
+
+  // ── Event assets (banner/flyer/gallery/document) ─────────────────────────
+  const refreshAssetsAfterUpload = useCallback(async () => {
+    if (!isEdit || !id) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    const data = await eventsService.getById(token, id);
+    if (data) {
+      setAssets(Array.isArray(data.assets) ? data.assets : []);
+      setBannerImageUrl(data.banner_image_url ?? null);
+    }
+  }, [id, isEdit]);
+
+  const handleAssetUpload = useCallback(
+    async (kind: EventAssetKind, file: File, label?: string) => {
+      if (!isEdit || !id) {
+        showToast('error', 'Save the event before uploading media.');
+        return;
+      }
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      setUploadingKind(kind);
+      try {
+        const result = await eventsService.uploadAsset({
+          sessionToken: token,
+          eventId: id,
+          kind,
+          file,
+          label: label ?? null,
+        });
+        if (!result.success) {
+          showToast('error', result.error ?? 'Upload failed.');
+          return;
+        }
+        showToast('success', kind === 'banner' ? 'Banner updated.' : 'Upload complete.');
+        await refreshAssetsAfterUpload();
+      } finally {
+        setUploadingKind(null);
+      }
+    },
+    [id, isEdit, refreshAssetsAfterUpload, showToast],
+  );
+
+  const handleAssetDelete = useCallback(
+    async (assetId: string) => {
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      if (!window.confirm('Remove this item? This cannot be undone.')) return;
+      const result = await eventsService.deleteAsset(token, assetId);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to remove item.');
+        return;
+      }
+      showToast('success', 'Removed.');
+      await refreshAssetsAfterUpload();
+    },
+    [refreshAssetsAfterUpload, showToast],
+  );
+
+  const flyerAssets = useMemo(
+    () => assets.filter((a) => a.kind === 'flyer' || a.kind === 'gallery'),
+    [assets],
+  );
+  const documentAssets = useMemo(() => assets.filter((a) => a.kind === 'document'), [assets]);
 
   // ── Publish-time RSVP share package (040A-HOTFIX) ────────────────────────
   const isPublished = original?.status === 'published';
@@ -1350,6 +1439,197 @@ const AdminEventForm: React.FC = () => {
               </p>
             </div>
 
+            {/* Banner + media + documents (edit mode only) */}
+            {isEdit && (
+              <div className="md:col-span-2 rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-foreground">Media &amp; documents</h3>
+
+                {/* Banner */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-foreground">Banner image</p>
+                  {bannerImageUrl ? (
+                    <div className="flex flex-wrap items-start gap-3">
+                      <img
+                        src={bannerImageUrl}
+                        alt="Banner preview"
+                        className="h-32 max-w-[420px] rounded-md border border-border object-cover"
+                      />
+                      <div className="flex flex-col gap-2">
+                        <label className="inline-flex items-center justify-center gap-1.5 cursor-pointer rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-muted/50">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={uploadingKind === 'banner'}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = '';
+                              if (f) void handleAssetUpload('banner', f);
+                            }}
+                          />
+                          {uploadingKind === 'banner' ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          Replace banner
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const banner = assets.find((a) => a.kind === 'banner');
+                            if (banner) void handleAssetDelete(banner.id);
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1.5" />
+                          Remove banner
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="inline-flex items-center gap-2 cursor-pointer rounded-md border border-dashed border-border bg-background px-4 py-3 text-sm hover:bg-muted/40">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={uploadingKind === 'banner'}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';
+                          if (f) void handleAssetUpload('banner', f);
+                        }}
+                      />
+                      {uploadingKind === 'banner' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                      Upload banner image (JPEG/PNG/WebP, ≤ 8 MB)
+                    </label>
+                  )}
+                </div>
+
+                {/* Flyer / gallery images */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-foreground">Additional images (flyers / gallery)</p>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-muted/50">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={uploadingKind === 'flyer'}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';
+                          if (f) void handleAssetUpload('flyer', f);
+                        }}
+                      />
+                      {uploadingKind === 'flyer' ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5" />
+                      )}
+                      Add image
+                    </label>
+                  </div>
+                  {flyerAssets.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">No additional images yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {flyerAssets.map((asset) => (
+                        <div key={asset.id} className="relative group rounded-md overflow-hidden border border-border bg-background">
+                          <img src={asset.public_url} alt={asset.label ?? ''} className="h-28 w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => void handleAssetDelete(asset.id)}
+                            className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Remove image"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Documents */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-foreground">Downloadable documents</p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="flex-1 min-w-[200px] space-y-1">
+                      <label className="text-[11px] text-muted-foreground">Label (optional)</label>
+                      <Input
+                        value={docLabelDraft}
+                        onChange={(e) => setDocLabelDraft(e.target.value)}
+                        placeholder="e.g. Agenda PDF"
+                      />
+                    </div>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-md border border-border bg-background px-3 py-2 text-xs hover:bg-muted/50">
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png"
+                        className="hidden"
+                        disabled={uploadingKind === 'document'}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';
+                          if (f) {
+                            void handleAssetUpload('document', f, docLabelDraft || f.name);
+                            setDocLabelDraft('');
+                          }
+                        }}
+                      />
+                      {uploadingKind === 'document' ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Paperclip className="h-3.5 w-3.5" />
+                      )}
+                      Upload document
+                    </label>
+                  </div>
+                  {documentAssets.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">No documents yet. PDF/DOCX/XLSX/PPTX/JPG/PNG, ≤ 25 MB each.</p>
+                  ) : (
+                    <ul className="divide-y divide-border rounded-md border border-border bg-background">
+                      {documentAssets.map((asset) => (
+                        <li key={asset.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                          <a
+                            href={asset.public_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-foreground hover:text-primary truncate"
+                          >
+                            {asset.label || asset.storage_path.split('/').pop()}
+                          </a>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">
+                              {asset.byte_size ? `${Math.ceil(asset.byte_size / 1024)} KB` : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleAssetDelete(asset.id)}
+                              className="text-muted-foreground hover:text-destructive"
+                              aria-label="Remove document"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Save the event first to unlock media uploads. Banners are public; documents are publicly downloadable via their URL.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-foreground">Excerpt</label>
               <Textarea
@@ -1530,17 +1810,59 @@ const AdminEventForm: React.FC = () => {
 
               {rsvpEnabled && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-foreground">Capacity (optional)</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={rsvpCapacity}
-                      onChange={(event) => setRsvpCapacity(event.target.value)}
-                      placeholder="Leave blank for unlimited"
-                    />
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-medium text-foreground">Capacity model</label>
+                    <div className="flex flex-wrap gap-3">
+                      <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                        <input
+                          type="radio"
+                          name="capacity-mode"
+                          value="global"
+                          checked={capacityMode === 'global'}
+                          onChange={() => setCapacityMode('global')}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        Global capacity (single number for the whole event)
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                        <input
+                          type="radio"
+                          name="capacity-mode"
+                          value="per_day"
+                          checked={capacityMode === 'per_day'}
+                          onChange={() => setCapacityMode('per_day')}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        Per-day capacity (enforced per selected visit date)
+                      </label>
+                    </div>
                   </div>
+                  {capacityMode === 'global' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-foreground">Capacity (optional)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={rsvpCapacity}
+                        onChange={(event) => setRsvpCapacity(event.target.value)}
+                        placeholder="Leave blank for unlimited"
+                      />
+                    </div>
+                  )}
+                  {capacityMode === 'per_day' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-foreground">Per-day capacity</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={perDayCapacity}
+                        onChange={(event) => setPerDayCapacity(event.target.value)}
+                        placeholder="Required when per-day is selected"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-foreground">RSVP deadline (optional)</label>
                     <Input

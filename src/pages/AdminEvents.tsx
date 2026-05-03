@@ -15,6 +15,7 @@ import {
   Trash2,
   Archive,
   Eye,
+  Users,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
@@ -98,6 +99,8 @@ const AdminEvents: React.FC = () => {
   const canArchive = useHasPermission('events.archive');
   const canDelete = useHasPermission('events.delete');
   const canCreateActivity = useHasPermission('activities.create');
+  const canViewRsvp = useHasPermission('events.rsvp.view');
+  const canManageRsvp = useHasPermission('events.rsvp.manage');
 
   const [items, setItems] = useState<AdminEventListItem[]>([]);
   const [metrics, setMetrics] = useState<EventSummaryMetrics | null>(null);
@@ -483,6 +486,15 @@ const AdminEvents: React.FC = () => {
                                     <Link to={`/admin/content/events/${item.id}/edit`} className="flex items-center gap-2">
                                       <Pencil className="h-4 w-4" />
                                       Edit
+                                    </Link>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {(canViewRsvp || canManageRsvp) && (
+                                  <DropdownMenuItem asChild>
+                                    <Link to={`/admin/content/events/${item.id}/registrations`} className="flex items-center gap-2">
+                                      <Users className="h-4 w-4" />
+                                      View Registrations
                                     </Link>
                                   </DropdownMenuItem>
                                 )}

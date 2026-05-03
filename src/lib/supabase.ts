@@ -6840,13 +6840,32 @@ export const EVENT_RSVP_MEAL_OPTIONS: Array<{ value: EventRsvpMealPreference; la
   { value: 'non_veg', label: 'Non-Veg' },
 ];
 
+export type EventCapacityMode = 'global' | 'per_day';
+
+export type EventAssetKind = 'banner' | 'flyer' | 'gallery' | 'document';
+
+export interface EventAsset {
+  id: string;
+  kind: EventAssetKind;
+  storage_path: string;
+  public_url: string;
+  label: string | null;
+  byte_size: number | null;
+  mime_type: string | null;
+  display_order: number;
+  created_at: string;
+}
+
 export interface EventRsvpPublicConfig {
   enabled: boolean;
   open: boolean;
   deadline_at: string | null;
   capacity: number | null;
+  capacity_mode?: EventCapacityMode;
+  per_day_capacity?: number | null;
   used_count: number;
   remaining: number | null;
+  per_day_used?: Record<string, number>;
   collect_phone: boolean;
   collect_company: boolean;
   collect_gender?: boolean;
@@ -6861,6 +6880,8 @@ export interface PublicEventDetail extends PublicEvent {
   show_agenda_publicly?: boolean;
   venue_map_url?: string | null;
   whatsapp_invitation_message?: string | null;
+  banner_image_url?: string | null;
+  assets?: EventAsset[];
   rsvp?: EventRsvpPublicConfig | null;
 }
 
@@ -6885,6 +6906,8 @@ export interface AdminEventListItem {
 export interface EventRsvpAdminConfig {
   enabled: boolean;
   capacity: number | null;
+  capacity_mode?: EventCapacityMode;
+  per_day_capacity?: number | null;
   deadline_at: string | null;
   collect_phone: boolean;
   collect_company: boolean;
@@ -6920,6 +6943,9 @@ export interface AdminEventDetail {
   ai_metadata: Record<string, unknown> | null;
   venue_map_url: string | null;
   whatsapp_invitation_message: string | null;
+  banner_image_url?: string | null;
+  banner_object_key?: string | null;
+  assets?: EventAsset[];
   rsvp: EventRsvpAdminConfig;
   bridge: EventBridgeInfo;
   created_by: string | null;
@@ -6943,6 +6969,7 @@ export interface EventRsvpRow {
   gender?: EventRsvpGender | null;
   meal_preference?: EventRsvpMealPreference | null;
   profession?: EventRsvpProfession | null;
+  visit_date?: string | null;
   notes: string | null;
   status: EventRsvpStatus;
   created_at: string;
@@ -7337,6 +7364,7 @@ export const eventsService = {
     gender?: EventRsvpGender | null;
     mealPreference?: EventRsvpMealPreference | null;
     profession?: EventRsvpProfession | null;
+    visitDate?: string | null;
   }): Promise<{
     success: boolean;
     rsvp_id?: string;
@@ -7355,6 +7383,7 @@ export const eventsService = {
       p_gender: args.gender ?? null,
       p_meal_preference: args.mealPreference ?? null,
       p_profession: args.profession ?? null,
+      p_visit_date: args.visitDate ?? null,
     });
     if (error) return { success: false, error: error.message };
     return (
@@ -7535,6 +7564,82 @@ export const eventsService = {
         error?: string;
         error_code?: string;
       }) ?? { success: false, error: 'Unknown error' }
+    );
+  },
+
+  // COD-EVENTS-REGISTRATION-MEDIA-041 — event asset upload + delete
+  async uploadAsset(args: {
+    sessionToken: string;
+    eventId: string;
+    kind: EventAssetKind;
+    file: File;
+    label?: string | null;
+  }): Promise<{
+    success: boolean;
+    asset_id?: string;
+    public_url?: string;
+    storage_path?: string;
+    error?: string;
+    error_code?: string;
+  }> {
+    try {
+      const fd = new FormData();
+      fd.append('session_token', args.sessionToken);
+      fd.append('event_id', args.eventId);
+      fd.append('kind', args.kind);
+      if (args.label) fd.append('label', args.label);
+      fd.append('file', args.file);
+
+      const { data, error } = await supabase.functions.invoke('event-media-upload', { body: fd });
+      if (error) {
+        console.error('[eventsService.uploadAsset] invoke error:', error);
+        return { success: false, error: error.message, error_code: 'invoke_error' };
+      }
+      const result = data as {
+        success?: boolean;
+        asset_id?: string;
+        public_url?: string;
+        storage_path?: string;
+        error?: string;
+        error_code?: string;
+      } | null;
+      if (!result?.success || !result.asset_id) {
+        return {
+          success: false,
+          error: result?.error ?? 'Asset upload failed.',
+          error_code: result?.error_code ?? 'upload_failed',
+        };
+      }
+      return {
+        success: true,
+        asset_id: result.asset_id,
+        public_url: result.public_url,
+        storage_path: result.storage_path,
+      };
+    } catch (err) {
+      console.error('[eventsService.uploadAsset] exception:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        error_code: 'exception',
+      };
+    }
+  },
+
+  async deleteAsset(
+    sessionToken: string,
+    assetId: string,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('delete_event_asset_with_session', {
+      p_session_token: sessionToken,
+      p_asset_id: assetId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (
+      (data as { success: boolean; error?: string; error_code?: string }) ?? {
+        success: false,
+        error: 'Unknown error',
+      }
     );
   },
 
