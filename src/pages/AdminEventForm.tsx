@@ -30,9 +30,15 @@ import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
   eventsService,
+  EVENT_RSVP_GENDER_OPTIONS,
+  EVENT_RSVP_MEAL_OPTIONS,
+  EVENT_RSVP_PROFESSION_OPTIONS,
   type AdminEventDetail,
   type EventAIDraftSourceFile,
   type EventAgendaItem,
+  type EventRsvpGender,
+  type EventRsvpMealPreference,
+  type EventRsvpProfession,
   type EventRsvpRow,
   type EventRsvpStatus,
   type EventRsvpSummary,
@@ -94,6 +100,15 @@ function toDateTimeInputFromIsoLoose(value: string | null | undefined): string {
   if (!trimmed) return '';
   // Accept ISO 8601 with or without TZ.
   return toDateTimeInput(trimmed);
+}
+
+function labelFromOptions<T extends string>(
+  value: T | null | undefined,
+  options: ReadonlyArray<{ value: T; label: string }>,
+): string {
+  if (!value) return '—';
+  const match = options.find((o) => o.value === value);
+  return match ? match.label : value;
 }
 
 function normalizeAgendaItems(items: EventAgendaItem[]): EventAgendaItem[] {
@@ -176,6 +191,9 @@ const AdminEventForm: React.FC = () => {
   const [rsvpDeadlineAt, setRsvpDeadlineAt] = useState('');
   const [rsvpCollectPhone, setRsvpCollectPhone] = useState(true);
   const [rsvpCollectCompany, setRsvpCollectCompany] = useState(true);
+  const [rsvpCollectGender, setRsvpCollectGender] = useState(false);
+  const [rsvpCollectMeal, setRsvpCollectMeal] = useState(false);
+  const [rsvpCollectProfession, setRsvpCollectProfession] = useState(false);
   const [rsvpRequireLogin, setRsvpRequireLogin] = useState(true);
 
   // RSVP roster
@@ -193,6 +211,10 @@ const AdminEventForm: React.FC = () => {
   // Bridge (event -> activity)
   const [bridgeActivityId, setBridgeActivityId] = useState<string | null>(null);
   const [isBridging, setIsBridging] = useState(false);
+
+  // WhatsApp manual generation (040A)
+  const [isGeneratingWhatsapp, setIsGeneratingWhatsapp] = useState(false);
+  const [showWhatsappOverwriteConfirm, setShowWhatsappOverwriteConfirm] = useState(false);
 
   const [original, setOriginal] = useState<AdminEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
@@ -268,6 +290,9 @@ const AdminEventForm: React.FC = () => {
         setRsvpDeadlineAt(toDateTimeInput(rsvpCfg.deadline_at ?? null));
         setRsvpCollectPhone(rsvpCfg.collect_phone !== false);
         setRsvpCollectCompany(rsvpCfg.collect_company !== false);
+        setRsvpCollectGender(Boolean(rsvpCfg.collect_gender));
+        setRsvpCollectMeal(Boolean(rsvpCfg.collect_meal));
+        setRsvpCollectProfession(Boolean(rsvpCfg.collect_profession));
         setRsvpRequireLogin(rsvpCfg.require_login !== false);
         setBridgeActivityId(data.bridge?.activity_id ?? null);
 
@@ -442,9 +467,9 @@ const AdminEventForm: React.FC = () => {
       );
       setShowAgendaPublicly(Boolean(draft.show_agenda_publicly));
     }
-    if (typeof draft.whatsapp_invitation_message === 'string') {
-      setWhatsappMessage(draft.whatsapp_invitation_message);
-    }
+    // 040A: WhatsApp invitation text is no longer auto-applied from the
+    // generic "Generate from Brief" — it is generated only via the dedicated
+    // "Generate WhatsApp Message with AI" button below the WhatsApp field.
   }, []);
 
   const runGenerate = useCallback(async () => {
@@ -567,6 +592,9 @@ const AdminEventForm: React.FC = () => {
       rsvp_deadline_at: rsvpDeadlineAt ? new Date(rsvpDeadlineAt).toISOString() : null,
       rsvp_collect_phone: rsvpCollectPhone,
       rsvp_collect_company: rsvpCollectCompany,
+      rsvp_collect_gender: rsvpCollectGender,
+      rsvp_collect_meal: rsvpCollectMeal,
+      rsvp_collect_profession: rsvpCollectProfession,
       rsvp_require_login: rsvpRequireLogin,
     };
   };
@@ -780,6 +808,70 @@ const AdminEventForm: React.FC = () => {
     } catch {
       showToast('error', 'Could not copy. Select and copy manually.');
     }
+  };
+
+  // 040A: dedicated WhatsApp AI generation, button-only.
+  const runGenerateWhatsapp = useCallback(async () => {
+    const sessionToken = sessionManager.getSessionToken();
+    if (!sessionToken) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    const hints: Record<string, string> = {};
+    if (title.trim()) hints.title = title.trim();
+    if (eventType) hints.event_type = eventType;
+    if (visibility) hints.visibility = visibility;
+    if (startAt) hints.start_at = new Date(startAt).toISOString();
+    if (endAt) hints.end_at = new Date(endAt).toISOString();
+    if (location.trim()) hints.location = location.trim();
+    if (venueMapUrl.trim()) hints.location = `${hints.location ?? ''}${hints.location ? ' — ' : ''}Map: ${venueMapUrl.trim()}`;
+    if (invitationText.trim()) hints.invitation_text = invitationText.trim();
+
+    const sourceFiles: EventAIDraftSourceFile[] = sources
+      .filter((s) => s.base64)
+      .map((s) => ({ name: s.file.name, mime: s.file.type, base64: s.base64! }));
+
+    setIsGeneratingWhatsapp(true);
+    try {
+      const result = await eventsService.draftWhatsappMessage(sessionToken, {
+        brief: brief.trim(),
+        hints,
+        sourceFiles,
+      });
+      if (!result.success || !result.message) {
+        showToast('error', result.error ?? 'AI WhatsApp generation failed.');
+        return;
+      }
+      setWhatsappMessage(result.message);
+      showToast('success', 'WhatsApp message generated. Edit before saving if needed.');
+    } finally {
+      setIsGeneratingWhatsapp(false);
+    }
+  }, [
+    brief,
+    endAt,
+    eventType,
+    invitationText,
+    location,
+    showToast,
+    sources,
+    startAt,
+    title,
+    venueMapUrl,
+    visibility,
+  ]);
+
+  const handleGenerateWhatsappClick = () => {
+    if (whatsappMessage.trim().length > 0) {
+      setShowWhatsappOverwriteConfirm(true);
+      return;
+    }
+    void runGenerateWhatsapp();
+  };
+
+  const confirmOverwriteWhatsappAndGenerate = () => {
+    setShowWhatsappOverwriteConfirm(false);
+    void runGenerateWhatsapp();
   };
 
   const handleDelete = async () => {
@@ -1238,12 +1330,29 @@ const AdminEventForm: React.FC = () => {
                 onChange={(event) =>
                   setWhatsappMessage(event.target.value.slice(0, 1200))
                 }
-                placeholder={'A short, ready-to-share WhatsApp invitation message.\nGenerated by AI from the brief, fully editable.'}
+                placeholder={'A short, ready-to-share WhatsApp invitation message.\nClick "Generate WhatsApp Message with AI" below to draft from the brief — fully editable.'}
                 className="font-mono text-[13px] leading-snug whitespace-pre-wrap"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Plain-text, &lt;= 1200 chars. Members see a "Share on WhatsApp" copy action on the event page.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Plain-text, &lt;= 1200 chars. Generated only when you click the button — never auto-filled.
+                </p>
+                {canEdit && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleGenerateWhatsappClick}
+                    disabled={isGeneratingWhatsapp}
+                  >
+                    {isGeneratingWhatsapp ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Generate WhatsApp Message with AI
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-3 md:col-span-2">
@@ -1384,6 +1493,33 @@ const AdminEventForm: React.FC = () => {
                     <label className="inline-flex items-center gap-2 text-xs text-foreground">
                       <input
                         type="checkbox"
+                        checked={rsvpCollectGender}
+                        onChange={(event) => setRsvpCollectGender(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Collect gender
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rsvpCollectMeal}
+                        onChange={(event) => setRsvpCollectMeal(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Collect meal preference
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rsvpCollectProfession}
+                        onChange={(event) => setRsvpCollectProfession(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Collect profession
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
                         checked={rsvpRequireLogin}
                         onChange={(event) => setRsvpRequireLogin(event.target.checked)}
                         className="h-3.5 w-3.5 rounded border-input accent-primary"
@@ -1391,6 +1527,10 @@ const AdminEventForm: React.FC = () => {
                       Require sign-in
                     </label>
                   </div>
+
+                  <p className="md:col-span-2 text-[11px] text-muted-foreground">
+                    Enabled fields become required for the user. Existing RSVPs from before these were enabled remain valid.
+                  </p>
                   {visibility === 'member_only' && !rsvpRequireLogin && (
                     <p className="md:col-span-2 text-[11px] text-amber-700 dark:text-amber-400">
                       Note: members-only events always require a signed-in member regardless of this toggle.
@@ -1456,6 +1596,9 @@ const AdminEventForm: React.FC = () => {
                           <th className="px-2 py-1">Email</th>
                           <th className="px-2 py-1">Phone</th>
                           <th className="px-2 py-1">Company</th>
+                          <th className="px-2 py-1">Gender</th>
+                          <th className="px-2 py-1">Meal</th>
+                          <th className="px-2 py-1">Profession</th>
                           <th className="px-2 py-1">Status</th>
                           {canManageRsvp && <th className="px-2 py-1 text-right">Actions</th>}
                         </tr>
@@ -1469,6 +1612,15 @@ const AdminEventForm: React.FC = () => {
                             </td>
                             <td className="px-2 py-1.5 text-muted-foreground">{row.phone ?? '—'}</td>
                             <td className="px-2 py-1.5 text-muted-foreground">{row.company ?? '—'}</td>
+                            <td className="px-2 py-1.5 text-muted-foreground">
+                              {labelFromOptions<EventRsvpGender>(row.gender ?? null, EVENT_RSVP_GENDER_OPTIONS)}
+                            </td>
+                            <td className="px-2 py-1.5 text-muted-foreground">
+                              {labelFromOptions<EventRsvpMealPreference>(row.meal_preference ?? null, EVENT_RSVP_MEAL_OPTIONS)}
+                            </td>
+                            <td className="px-2 py-1.5 text-muted-foreground">
+                              {labelFromOptions<EventRsvpProfession>(row.profession ?? null, EVENT_RSVP_PROFESSION_OPTIONS)}
+                            </td>
                             <td className="px-2 py-1.5">
                               <span
                                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -1562,6 +1714,36 @@ const AdminEventForm: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* WhatsApp overwrite confirm */}
+        {showWhatsappOverwriteConfirm && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            onClick={() => setShowWhatsappOverwriteConfirm(false)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-foreground">Replace existing WhatsApp message?</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                The current WhatsApp invitation message will be replaced with a fresh AI-generated draft based on the
+                Event Brief and form fields. You can still edit any part of it after generation.
+              </p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowWhatsappOverwriteConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={confirmOverwriteWhatsappAndGenerate}>
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  Replace &amp; generate
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Overwrite confirm dialog for published events */}
         {showOverwriteConfirm && (

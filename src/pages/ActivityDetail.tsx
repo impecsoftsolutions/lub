@@ -21,6 +21,12 @@ import {
 import {
   activitiesService,
   eventsService,
+  EVENT_RSVP_GENDER_OPTIONS,
+  EVENT_RSVP_MEAL_OPTIONS,
+  EVENT_RSVP_PROFESSION_OPTIONS,
+  type EventRsvpGender,
+  type EventRsvpMealPreference,
+  type EventRsvpProfession,
   type PublicActivityDetail,
   type PublicEventDetail,
 } from '../lib/supabase';
@@ -137,6 +143,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const [rsvpEmail, setRsvpEmail] = useState('');
   const [rsvpPhone, setRsvpPhone] = useState('');
   const [rsvpCompany, setRsvpCompany] = useState('');
+  const [rsvpGender, setRsvpGender] = useState<EventRsvpGender | ''>('');
+  const [rsvpMeal, setRsvpMeal] = useState<EventRsvpMealPreference | ''>('');
+  const [rsvpProfession, setRsvpProfession] = useState<EventRsvpProfession | ''>('');
   const [rsvpNotes, setRsvpNotes] = useState('');
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
@@ -171,6 +180,18 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
       setRsvpError('Please enter a valid email address.');
       return;
     }
+    if (rsvp?.collect_gender && !rsvpGender) {
+      setRsvpError('Please select your gender.');
+      return;
+    }
+    if (rsvp?.collect_meal && !rsvpMeal) {
+      setRsvpError('Please select your meal preference.');
+      return;
+    }
+    if (rsvp?.collect_profession && !rsvpProfession) {
+      setRsvpError('Please select your profession.');
+      return;
+    }
     setRsvpSubmitting(true);
     try {
       const token = sessionManager.getSessionToken();
@@ -180,6 +201,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
         email: rsvpEmail.trim(),
         phone: rsvp?.collect_phone ? rsvpPhone.trim() || null : null,
         company: rsvp?.collect_company ? rsvpCompany.trim() || null : null,
+        gender: rsvp?.collect_gender ? (rsvpGender || null) : null,
+        mealPreference: rsvp?.collect_meal ? (rsvpMeal || null) : null,
+        profession: rsvp?.collect_profession ? (rsvpProfession || null) : null,
         notes: rsvpNotes.trim() || null,
         sessionToken: token,
       });
@@ -195,6 +219,12 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           invalid_phone: 'Please enter a valid phone number.',
           invalid_company: 'Please enter a valid company name.',
           invalid_notes: 'Notes are too long (max 1000 characters).',
+          gender_required: 'Please select your gender.',
+          invalid_gender: 'Please select a valid gender.',
+          meal_required: 'Please select your meal preference.',
+          invalid_meal_preference: 'Please select a valid meal preference.',
+          profession_required: 'Please select your profession.',
+          invalid_profession: 'Please select a valid profession.',
         };
         setRsvpError(messages[result.error_code ?? ''] ?? result.error ?? 'Could not submit RSVP.');
         return;
@@ -444,6 +474,54 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                           disabled={rsvpSubmitting}
                         />
+                      </div>
+                    )}
+                    {rsvp.collect_gender && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">Gender *</label>
+                        <select
+                          value={rsvpGender}
+                          onChange={(e) => setRsvpGender(e.target.value as EventRsvpGender | '')}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        >
+                          <option value="">Select…</option>
+                          {EVENT_RSVP_GENDER_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {rsvp.collect_meal && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">Meal preference *</label>
+                        <select
+                          value={rsvpMeal}
+                          onChange={(e) => setRsvpMeal(e.target.value as EventRsvpMealPreference | '')}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        >
+                          <option value="">Select…</option>
+                          {EVENT_RSVP_MEAL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {rsvp.collect_profession && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">Profession *</label>
+                        <select
+                          value={rsvpProfession}
+                          onChange={(e) => setRsvpProfession(e.target.value as EventRsvpProfession | '')}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        >
+                          <option value="">Select…</option>
+                          {EVENT_RSVP_PROFESSION_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
                       </div>
                     )}
                     <div className="space-y-1.5 sm:col-span-2">

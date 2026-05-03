@@ -6808,6 +6808,38 @@ export interface PublicEvent {
   published_at: string | null;
 }
 
+export type EventRsvpGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
+export type EventRsvpMealPreference = 'veg' | 'non_veg';
+export type EventRsvpProfession =
+  | 'company_owner'
+  | 'director'
+  | 'official'
+  | 'other'
+  | 'partner'
+  | 'student';
+
+// Alphabetical display order matches the DB enum order.
+export const EVENT_RSVP_PROFESSION_OPTIONS: Array<{ value: EventRsvpProfession; label: string }> = [
+  { value: 'company_owner', label: 'Company Owner' },
+  { value: 'director',      label: 'Director' },
+  { value: 'official',      label: 'Official' },
+  { value: 'other',         label: 'Other' },
+  { value: 'partner',       label: 'Partner' },
+  { value: 'student',       label: 'Student' },
+];
+
+export const EVENT_RSVP_GENDER_OPTIONS: Array<{ value: EventRsvpGender; label: string }> = [
+  { value: 'male',              label: 'Male' },
+  { value: 'female',            label: 'Female' },
+  { value: 'other',             label: 'Other' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+];
+
+export const EVENT_RSVP_MEAL_OPTIONS: Array<{ value: EventRsvpMealPreference; label: string }> = [
+  { value: 'veg',     label: 'Veg' },
+  { value: 'non_veg', label: 'Non-Veg' },
+];
+
 export interface EventRsvpPublicConfig {
   enabled: boolean;
   open: boolean;
@@ -6817,6 +6849,9 @@ export interface EventRsvpPublicConfig {
   remaining: number | null;
   collect_phone: boolean;
   collect_company: boolean;
+  collect_gender?: boolean;
+  collect_meal?: boolean;
+  collect_profession?: boolean;
   require_login: boolean;
 }
 
@@ -6853,6 +6888,9 @@ export interface EventRsvpAdminConfig {
   deadline_at: string | null;
   collect_phone: boolean;
   collect_company: boolean;
+  collect_gender?: boolean;
+  collect_meal?: boolean;
+  collect_profession?: boolean;
   require_login: boolean;
   used_count?: number;
 }
@@ -6897,11 +6935,14 @@ export type EventRsvpStatus = 'confirmed' | 'cancelled' | 'pending' | 'waitliste
 export interface EventRsvpRow {
   id: string;
   event_id: string;
-  user_id: string | null;
+  user_id?: string | null;
   full_name: string;
   email: string;
   phone: string | null;
   company: string | null;
+  gender?: EventRsvpGender | null;
+  meal_preference?: EventRsvpMealPreference | null;
+  profession?: EventRsvpProfession | null;
   notes: string | null;
   status: EventRsvpStatus;
   created_at: string;
@@ -7284,6 +7325,7 @@ export const eventsService = {
   },
 
   // COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039
+  // Extended in COD-EVENTS-NEXT-040A with gender / meal_preference / profession.
   async submitRsvp(args: {
     eventSlug: string;
     fullName: string;
@@ -7292,6 +7334,9 @@ export const eventsService = {
     company?: string | null;
     notes?: string | null;
     sessionToken?: string | null;
+    gender?: EventRsvpGender | null;
+    mealPreference?: EventRsvpMealPreference | null;
+    profession?: EventRsvpProfession | null;
   }): Promise<{
     success: boolean;
     rsvp_id?: string;
@@ -7307,6 +7352,9 @@ export const eventsService = {
       p_company: args.company ?? null,
       p_notes: args.notes ?? null,
       p_session_token: args.sessionToken ?? null,
+      p_gender: args.gender ?? null,
+      p_meal_preference: args.mealPreference ?? null,
+      p_profession: args.profession ?? null,
     });
     if (error) return { success: false, error: error.message };
     return (
@@ -7318,6 +7366,64 @@ export const eventsService = {
         error_code?: string;
       }) ?? { success: false, error: 'Unknown error' }
     );
+  },
+
+  // COD-EVENTS-NEXT-040A — explicit, button-only WhatsApp generation.
+  async draftWhatsappMessage(
+    sessionToken: string,
+    args: {
+      brief: string;
+      hints?: EventAIDraftHints;
+      sourceFiles?: EventAIDraftSourceFile[];
+    },
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    ai?: { model: string; generated_at: string; source_doc_count: number; brief_chars: number };
+    error?: string;
+    errorCode?: EventAIDraftResult['errorCode'];
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-event-content', {
+        body: {
+          session_token: sessionToken,
+          mode: 'draft_whatsapp',
+          brief: args.brief,
+          inputs: args.hints ?? {},
+          source_files: args.sourceFiles ?? [],
+        },
+      });
+      if (error) {
+        console.error('[eventsService.draftWhatsappMessage] invoke error:', error);
+        return { success: false, error: error.message, errorCode: 'generation_failed' };
+      }
+      const result = data as {
+        success?: boolean;
+        data?: { whatsapp_invitation_message?: string };
+        ai?: { model: string; generated_at: string; source_doc_count: number; brief_chars: number };
+        error?: string;
+        error_code?: EventAIDraftResult['errorCode'];
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error ?? 'AI WhatsApp generation failed.',
+          errorCode: result?.error_code ?? 'generation_failed',
+        };
+      }
+      return {
+        success: true,
+        message: result.data?.whatsapp_invitation_message ?? '',
+        ai: result.ai,
+      };
+    } catch (err) {
+      console.error('[eventsService.draftWhatsappMessage] exception:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        errorCode: 'generation_failed',
+      };
+    }
   },
 
   async getRsvps(

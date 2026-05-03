@@ -97,7 +97,7 @@ interface SourceFile {
 
 interface DraftRequestBody {
   session_token?: string;
-  mode?: 'draft' | 'extract_fields';
+  mode?: 'draft' | 'extract_fields' | 'draft_whatsapp';
   brief?: string;
   inputs?: DraftInputs;
   source_files?: SourceFile[];
@@ -640,6 +640,132 @@ async function callOpenAIResponsesAPIExtract(
   return parseExtractionJson(textContent);
 }
 
+// ── WhatsApp-only generation ────────────────────────────────────────────────
+
+function buildWhatsappSystemPrompt(): string {
+  return [
+    'You write a single concise WhatsApp invitation message for a member-association event.',
+    'Plain text only. No Markdown. No HTML. No code fences. <= 1200 characters total.',
+    'Open with a short warm greeting, name the event, summarize the value in 1-2 lines, then list date/time and venue (or online link) when known.',
+    'End with a simple call-to-action to RSVP or ask for details.',
+    'Use short paragraphs and line breaks for readability.',
+    'Avoid all-caps. A single welcoming emoji is acceptable; do not require emojis.',
+    'Do not invent dates, times, venues, speaker names, or sponsor names that are not present in the inputs.',
+    'Return strict JSON only with this exact shape: { "whatsapp_invitation_message": string }',
+  ].join(' ');
+}
+
+function buildWhatsappUserMessage(brief: string, inputs: DraftInputs): string {
+  const factBlock: Record<string, string> = {};
+  for (const [k, v] of Object.entries(inputs)) {
+    const s = toStringValue(v);
+    if (s) factBlock[k] = s;
+  }
+  return JSON.stringify(
+    {
+      task: 'draft_event_whatsapp_invitation',
+      brief,
+      hints: factBlock,
+    },
+    null,
+    2,
+  );
+}
+
+function parseWhatsappJson(content: string): { whatsapp_invitation_message: string } {
+  const obj = parseJsonContent(content);
+  const raw = toStringValue(obj.whatsapp_invitation_message);
+  const trimmed = raw.length > MAX_WHATSAPP_MESSAGE_CHARS ? raw.slice(0, MAX_WHATSAPP_MESSAGE_CHARS) : raw;
+  if (!trimmed) {
+    throw new Error('AI returned empty WhatsApp message.');
+  }
+  return { whatsapp_invitation_message: trimmed };
+}
+
+async function callOpenAIChatCompletionsWhatsapp(
+  apiKey: string,
+  model: string,
+  reasoningEffort: string | null,
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<{ whatsapp_invitation_message: string }> {
+  const requestBody: Record<string, unknown> = {
+    model,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  };
+  if (reasoningEffort && model.toLowerCase().startsWith('gpt-5')) {
+    requestBody.reasoning_effort = reasoningEffort;
+  }
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+  const body = (await response.json()) as OpenAICompletionResponse;
+  if (!response.ok) {
+    throw new Error(body?.error?.message || `OpenAI request failed with ${response.status}`);
+  }
+  const content = body?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== 'string') {
+    throw new Error('AI returned empty content.');
+  }
+  return parseWhatsappJson(content);
+}
+
+async function callOpenAIResponsesAPIWhatsapp(
+  apiKey: string,
+  model: string,
+  reasoningEffort: string | null,
+  systemPrompt: string,
+  userPrompt: string,
+  sourceFiles: SourceFile[],
+): Promise<{ whatsapp_invitation_message: string }> {
+  const requestBody: Record<string, unknown> = {
+    model,
+    input: buildResponsesContent(systemPrompt, userPrompt, sourceFiles),
+  };
+  if (reasoningEffort && model.toLowerCase().startsWith('gpt-5')) {
+    requestBody.reasoning = { effort: reasoningEffort };
+  }
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+  const body = (await response.json()) as OpenAIResponsesAPIResponse;
+  if (!response.ok) {
+    throw new Error(body?.error?.message || `OpenAI Responses request failed with ${response.status}`);
+  }
+  let textContent = toStringValue(body?.output_text);
+  if (!textContent && Array.isArray(body?.output)) {
+    const collected: string[] = [];
+    for (const item of body.output) {
+      if (Array.isArray(item?.content)) {
+        for (const c of item.content) {
+          if (c && typeof c === 'object' && typeof c.text === 'string') {
+            collected.push(c.text);
+          }
+        }
+      }
+    }
+    textContent = collected.join('\n').trim();
+  }
+  if (!textContent) {
+    throw new Error('AI Responses API returned empty content.');
+  }
+  return parseWhatsappJson(textContent);
+}
+
 // ── Source file validation ──────────────────────────────────────────────────
 
 function validateSourceFiles(
@@ -713,10 +839,13 @@ Deno.serve(async (req: Request) => {
   const inputs: DraftInputs = payload?.inputs && typeof payload.inputs === 'object' ? payload.inputs : {};
   const briefRaw = toStringValue(payload?.brief).slice(0, MAX_BRIEF_CHARS);
 
-  if (rawMode !== 'draft' && rawMode !== 'extract_fields') {
-    return failClosed(`Invalid mode "${rawMode}". Expected "draft" or "extract_fields".`, 'generation_failed');
+  if (rawMode !== 'draft' && rawMode !== 'extract_fields' && rawMode !== 'draft_whatsapp') {
+    return failClosed(
+      `Invalid mode "${rawMode}". Expected "draft", "extract_fields", or "draft_whatsapp".`,
+      'generation_failed',
+    );
   }
-  const mode = rawMode as 'draft' | 'extract_fields';
+  const mode = rawMode as 'draft' | 'extract_fields' | 'draft_whatsapp';
 
   if (!sessionToken) {
     return failClosed('Session token is required.', 'session_invalid');
@@ -805,6 +934,37 @@ Deno.serve(async (req: Request) => {
       const message = err instanceof Error ? err.message : 'Extraction failed.';
       console.error('[draft-event-content] extraction error:', message);
       return failClosed(`AI field extraction failed: ${message}`, 'generation_failed');
+    }
+  }
+
+  // ── draft_whatsapp mode ──────────────────────────────────────────────────
+  if (mode === 'draft_whatsapp') {
+    if (!briefRaw && sourceFiles.length === 0 && Object.values(inputs ?? {}).every((v) => !toStringValue(v))) {
+      return failClosed(
+        'Provide a brief or current form context to generate a WhatsApp message.',
+        'brief_required',
+      );
+    }
+    try {
+      const systemPrompt = buildWhatsappSystemPrompt();
+      const userPrompt = buildWhatsappUserMessage(briefRaw, inputs);
+      const result = sourceFiles.length > 0
+        ? await callOpenAIResponsesAPIWhatsapp(apiKey, model, reasoningEffort, systemPrompt, userPrompt, sourceFiles)
+        : await callOpenAIChatCompletionsWhatsapp(apiKey, model, reasoningEffort, systemPrompt, userPrompt);
+      return jsonResponse({
+        success: true,
+        data: { whatsapp_invitation_message: result.whatsapp_invitation_message },
+        ai: {
+          model,
+          generated_at: new Date().toISOString(),
+          source_doc_count: sourceFiles.length,
+          brief_chars: briefRaw.length,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'WhatsApp generation failed.';
+      console.error('[draft-event-content] whatsapp generation error:', message);
+      return failClosed(`AI WhatsApp generation failed: ${message}`, 'generation_failed');
     }
   }
 
