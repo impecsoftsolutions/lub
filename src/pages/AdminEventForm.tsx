@@ -20,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Share2,
   Sparkles,
   Trash2,
   Unlock,
@@ -874,6 +875,83 @@ const AdminEventForm: React.FC = () => {
     void runGenerateWhatsapp();
   };
 
+  // ── Publish-time RSVP share package (040A-HOTFIX) ────────────────────────
+  const isPublished = original?.status === 'published';
+  const publicEventUrl = useMemo(() => {
+    if (!isPublished) return '';
+    const slugForUrl = (slug || original?.slug || '').trim();
+    if (!slugForUrl) return '';
+    if (typeof window === 'undefined') return `/events/${slugForUrl}`;
+    return `${window.location.origin}/events/${slugForUrl}`;
+  }, [isPublished, slug, original?.slug]);
+
+  const buildDefaultShareMessage = useCallback((): string => {
+    const lines: string[] = [];
+    const t = title.trim();
+    if (t) lines.push(`You're invited: ${t}`);
+    const dateBits: string[] = [];
+    if (startAt) {
+      try {
+        dateBits.push(new Date(startAt).toLocaleString('en-IN', {
+          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        }));
+      } catch { /* ignore */ }
+    }
+    if (endAt) {
+      try {
+        dateBits.push(`to ${new Date(endAt).toLocaleString('en-IN', {
+          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        })}`);
+      } catch { /* ignore */ }
+    }
+    if (dateBits.length > 0) lines.push(dateBits.join(' '));
+    if (location.trim()) lines.push(`Venue: ${location.trim()}`);
+    if (publicEventUrl) {
+      lines.push('');
+      lines.push(`RSVP / details: ${publicEventUrl}`);
+    }
+    return lines.join('\n').trim();
+  }, [title, startAt, endAt, location, publicEventUrl]);
+
+  // The message we actually share. If the saved WhatsApp message exists,
+  // append the URL (only if not already present); otherwise build a default.
+  const shareMessage = useMemo(() => {
+    if (!isPublished) return '';
+    const saved = whatsappMessage.trim();
+    if (saved) {
+      if (publicEventUrl && !saved.includes(publicEventUrl)) {
+        return `${saved}\n\nRSVP / details: ${publicEventUrl}`;
+      }
+      return saved;
+    }
+    return buildDefaultShareMessage();
+  }, [isPublished, whatsappMessage, publicEventUrl, buildDefaultShareMessage]);
+
+  const copyTextSafely = useCallback(async (text: string, successMsg: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('success', successMsg);
+    } catch {
+      showToast('error', 'Could not copy. Select and copy manually.');
+    }
+  }, [showToast]);
+
+  const openWhatsappShare = useCallback(() => {
+    if (!shareMessage) return;
+    const encoded = encodeURIComponent(shareMessage);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
+  }, [shareMessage]);
+
+  const generateShareMessageWithAI = useCallback(() => {
+    if (!isPublished) return;
+    if (whatsappMessage.trim().length > 0) {
+      setShowWhatsappOverwriteConfirm(true);
+      return;
+    }
+    void runGenerateWhatsapp();
+  }, [isPublished, whatsappMessage, runGenerateWhatsapp]);
+
   const handleDelete = async () => {
     if (!id || !window.confirm('Permanently delete this event? This cannot be undone.')) return;
     setIsSaving(true);
@@ -1690,6 +1768,97 @@ const AdminEventForm: React.FC = () => {
                   )}
                   {bridgeActivityId ? 'Open linked Activity' : 'Create Activity from Event'}
                 </Button>
+              </div>
+            )}
+
+            {/* Share RSVP package (published events only) */}
+            {isPublished && (
+              <div className="md:col-span-2 rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+                    <Share2 className="h-4 w-4" />
+                    Share RSVP
+                  </h3>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={generateShareMessageWithAI}
+                    disabled={isGeneratingWhatsapp}
+                  >
+                    {isGeneratingWhatsapp ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Generate RSVP Share Message with AI
+                  </Button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Public RSVP URL</label>
+                  <div className="flex gap-2">
+                    <Input value={publicEventUrl} readOnly className="font-mono text-xs" />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void copyTextSafely(publicEventUrl, 'URL copied to clipboard.')}
+                      disabled={!publicEventUrl}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy URL
+                    </Button>
+                    {publicEventUrl && (
+                      <a
+                        href={publicEventUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Share message preview</label>
+                  <Textarea
+                    rows={6}
+                    value={shareMessage}
+                    readOnly
+                    className="font-mono text-[13px] leading-snug whitespace-pre-wrap"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] text-muted-foreground">
+                      Built from your saved WhatsApp message (with the URL appended) or, if empty, a compact auto-built invite.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void copyTextSafely(shareMessage, 'Share message copied to clipboard.')}
+                        disabled={!shareMessage}
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1.5" />
+                        Copy Share Message
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={openWhatsappShare}
+                        disabled={!shareMessage}
+                        className="bg-[#25D366] hover:bg-[#1da851] text-white"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Open WhatsApp Share
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

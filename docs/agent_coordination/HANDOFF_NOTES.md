@@ -7,24 +7,27 @@ Do not edit task rows in worktree-local board copies.
 
 ## Current Owner — Codex
 
-## Current Slice — COD-EVENTS-NEXT-040A (Closed)
+## Current Slice — COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX (Closed)
 
 ## Runtime Closeout Completed
 
-1. Applied migration:
-   - `supabase/migrations/20260506000000_events_rsvp_fields_v2.sql`
-2. Redeployed edge function:
+1. Redeployed edge function:
    - `draft-event-content` on project `qskziirjtzomrtckpzas`
-3. Runtime probes passed:
-   - `submit_event_rsvp` with missing gender under collect flag => `gender_required`
-   - `submit_event_rsvp` with invalid meal => `invalid_meal_preference`
-   - valid RSVP stores `gender`, `meal_preference`, `profession`
-   - `get_event_by_slug` includes `collect_gender`, `collect_meal`, `collect_profession`
-   - `get_event_rsvps_with_session` returns new RSVP fields
-   - `draft_whatsapp` mode returns only `whatsapp_invitation_message` on valid invoke
-   - invalid token returns structured `session_invalid`
+2. Runtime probes passed:
+   - Failing brief probe (`Dates: 16 and 17 April 2026`) returned:
+     - `start_at`: `2026-04-16T10:00:00+05:30`
+     - `end_at`: `2026-04-17T17:00:00+05:30`
+     - `ai.date_outcome`: `ai_date_detected`
+   - No-date brief probe returned:
+     - `start_at`: null
+     - `end_at`: null
+     - `ai.date_outcome`: `no_date_detected`
+   - `mode='draft_whatsapp'` with valid session returned only:
+     - `data.whatsapp_invitation_message`
+   - Invalid token returned:
+     - `error_code='session_invalid'`
 
-## Validation Baseline
+## Validation Baseline (from implementation batch)
 
 - `npm run lint` => PASS (0 errors / 3 expected warnings)
 - `npm run build` => PASS

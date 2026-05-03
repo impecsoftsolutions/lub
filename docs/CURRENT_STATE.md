@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-03
-**Updated by:** Codex (`COD-EVENTS-NEXT-040A` runtime closeout)
+**Updated by:** Codex (`COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX` runtime closeout)
 
 ---
 
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-05-03, COD-EVENTS-NEXT-040A) |
-| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-03, COD-EVENTS-NEXT-040A) |
+| Build (`npm run build`) | PASS (2026-05-03, COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX) |
+| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-03, COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX) |
 | Phase 1 destructive smoke | **15 passed** (verified 2026-03-13 baseline) |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-03, COD-EVENTS-NEXT-040A) |
+| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-03, COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX) |
 
 Phase 1 destructive baseline remains the non-negotiable floor.
 
@@ -28,10 +28,10 @@ Phase 1 destructive baseline remains the non-negotiable floor.
 
 ## Active Stream
 
-**Active stream:** None (040A closed)
+**Active stream:** None (040A-HOTFIX closed)
 **Current owner:** Codex
 **Task board:** `docs/agent_coordination/TASK_BOARD.md` — single source of truth.
-**Current handoff state:** 040A closed. Migration applied, edge function redeployed, runtime probes passed, and task board moved to Completed Recently.
+**Current handoff state:** Hotfix is fully closed. Codex redeployed `draft-event-content` and ran live probes: the failing Vendor Development brief now returns non-null `start_at/end_at` (`2026-04-16T10:00:00+05:30`, `2026-04-17T17:00:00+05:30`) with `ai_date_detected`; a no-date brief returns null dates with `no_date_detected`; `draft_whatsapp` returns message-only payload; invalid token returns `session_invalid`.
 
 Most recently completed streams:
 - **COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039**: Closed. Codex applied migration `supabase/migrations/20260505000000_events_rsvp_bridge_maps_whatsapp.sql`, redeployed edge function `draft-event-content`, and executed runtime SQL probes (RSVP capacity, member-only/session, deadline, idempotent bridge, slug payload includes new fields, editor permission denied). Edge invoke check returns `session_invalid` for invalid tokens.
@@ -57,8 +57,8 @@ Most recently completed streams:
 ## Last Verified
 
 - **When:** 2026-05-03
-- **What:** `COD-EVENTS-NEXT-040A` runtime closeout
-- **Result:** PASS for lint, build, and Phase 1 readonly smoke. Migration applied remotely, edge function redeployed, and runtime probes passed (`gender_required`, `invalid_meal_preference`, valid row persistence, collect flags surfaced, RSVP list new fields, `draft_whatsapp` success + `session_invalid` negative).
+- **What:** `COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX` runtime closeout
+- **Result:** PASS for lint, build, and Phase 1 readonly smoke. Edge function redeployed and runtime probes passed (failing brief date autofill restored, no-date brief remains null-date, `draft_whatsapp` success, invalid token `session_invalid`).
 - **Commands:**
   ```
   npm run lint -> PASS (0 errors / 3 expected warnings)

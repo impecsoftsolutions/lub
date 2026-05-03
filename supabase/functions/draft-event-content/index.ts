@@ -324,6 +324,15 @@ function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
     'visibility: default to "public" unless the brief indicates members-only.',
     'show_agenda_publicly: default true when an agenda is present; otherwise false.',
     'whatsapp_invitation_message: a concise, ready-to-share WhatsApp invitation message for members. Plain text only (no Markdown), <= 1200 characters. Use short paragraphs and line breaks for readability. Open with a warm greeting, name the event, summarize what attendees will gain in 1-2 lines, then list date/time and venue (or online link) when known. End with a simple call-to-action to RSVP or ask for details. Do not invent dates, venues, or speaker names that are not present in the inputs. Avoid all-caps and avoid heavy emoji use; a single welcoming emoji is acceptable but not required.',
+    // 040A-HOTFIX: explicit date guidance.
+    'Date parsing rules — apply these with priority:',
+    '  - "16 and 17 April 2026" / "16, 17 April 2026" / "16 & 17 April 2026" → start_at is the FIRST day, end_at is the SECOND day (same month, same year).',
+    '  - "16-17 April 2026" / "16–17 April 2026" / "16/17 April 2026" → start_at = first day, end_at = second day.',
+    '  - "April 16-17, 2026" / "April 16–17, 2026" → same; start = April 16 2026, end = April 17 2026.',
+    '  - "16 April to 18 April 2026" → start = first listed day, end = last listed day.',
+    '  - Single-day with no time → start_at = that day, end_at = same day.',
+    '  - When time-of-day is NOT specified anywhere in the brief, default start time to local 10:00 and end time to local 17:00. Emit ISO 8601 timestamps with the offset of the location when known, otherwise without an offset (the server will localize).',
+    '  - Never fabricate a date that is not present in the inputs. If no date is present at all, set both start_at and end_at to null.',
   );
   return base.join(' ');
 }
@@ -356,6 +365,140 @@ function buildExtractionSystemPrompt(): string {
     'Do not invent values that are not in the documents.',
     'Return strict JSON only — no explanation, no markdown.',
   ].join(' ');
+}
+
+// ── Deterministic date fallback (English month names) ──────────────────────
+// 040A-HOTFIX: parse common day-range patterns directly from the brief when
+// the AI leaves start_at/end_at empty. Never fabricates dates from nothing.
+
+const MONTHS_EN: Record<string, number> = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+const DEFAULT_START_HOUR = 10; // 10:00 local
+const DEFAULT_END_HOUR = 17;   // 17:00 local
+
+function isoLocalNoTz(year: number, monthIndex0: number, day: number, hour: number, minute: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(monthIndex0 + 1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00`;
+}
+
+interface DateRangeParse {
+  start: string;
+  end: string;
+  source: 'two_day_range' | 'single_day';
+}
+
+function fallbackParseDateRange(brief: string): DateRangeParse | null {
+  if (!brief || typeof brief !== 'string') return null;
+  const text = brief.replace(/\s+/g, ' ').trim();
+  const monthAlt = Object.keys(MONTHS_EN).join('|');
+
+  // Pattern A: "16 and 17 April 2026", "16, 17 April 2026", "16 & 17 April 2026"
+  // Optional trailing year via space + 4 digits.
+  const reA = new RegExp(
+    `\\b(\\d{1,2})\\s*(?:,|and|&)\\s*(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`,
+    'i',
+  );
+  // Pattern B: "16-17 April 2026", "16–17 April 2026", "16/17 April 2026"
+  const reB = new RegExp(
+    `\\b(\\d{1,2})\\s*[\\-–/]\\s*(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`,
+    'i',
+  );
+  // Pattern C: "April 16-17, 2026" / "April 16 and 17, 2026"
+  const reC = new RegExp(
+    `\\b(${monthAlt})\\.?\\s+(\\d{1,2})\\s*(?:[\\-–/,]|and|&)\\s*(\\d{1,2})\\s*,?\\s*(\\d{4})\\b`,
+    'i',
+  );
+  // Pattern D: "16 April 2026 to 18 April 2026" / "16 April to 18 April 2026"
+  const reD = new RegExp(
+    `\\b(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(?:(\\d{4})\\s+)?(?:to|until|through|–|-)\\s+(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`,
+    'i',
+  );
+  // Pattern E (single day): "16 April 2026" or "April 16, 2026"
+  const reE1 = new RegExp(`\\b(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`, 'i');
+  const reE2 = new RegExp(`\\b(${monthAlt})\\.?\\s+(\\d{1,2})\\s*,?\\s*(\\d{4})\\b`, 'i');
+
+  let m: RegExpMatchArray | null;
+
+  if ((m = text.match(reA))) {
+    const day1 = Number(m[1]);
+    const day2 = Number(m[2]);
+    const monthIdx = MONTHS_EN[m[3].toLowerCase()] - 1;
+    const year = Number(m[4]);
+    return {
+      start: isoLocalNoTz(year, monthIdx, day1, DEFAULT_START_HOUR, 0),
+      end: isoLocalNoTz(year, monthIdx, day2, DEFAULT_END_HOUR, 0),
+      source: 'two_day_range',
+    };
+  }
+  if ((m = text.match(reB))) {
+    const day1 = Number(m[1]);
+    const day2 = Number(m[2]);
+    const monthIdx = MONTHS_EN[m[3].toLowerCase()] - 1;
+    const year = Number(m[4]);
+    return {
+      start: isoLocalNoTz(year, monthIdx, day1, DEFAULT_START_HOUR, 0),
+      end: isoLocalNoTz(year, monthIdx, day2, DEFAULT_END_HOUR, 0),
+      source: 'two_day_range',
+    };
+  }
+  if ((m = text.match(reC))) {
+    const monthIdx = MONTHS_EN[m[1].toLowerCase()] - 1;
+    const day1 = Number(m[2]);
+    const day2 = Number(m[3]);
+    const year = Number(m[4]);
+    return {
+      start: isoLocalNoTz(year, monthIdx, day1, DEFAULT_START_HOUR, 0),
+      end: isoLocalNoTz(year, monthIdx, day2, DEFAULT_END_HOUR, 0),
+      source: 'two_day_range',
+    };
+  }
+  if ((m = text.match(reD))) {
+    const day1 = Number(m[1]);
+    const month1Idx = MONTHS_EN[m[2].toLowerCase()] - 1;
+    const day2 = Number(m[4]);
+    const month2Idx = MONTHS_EN[m[5].toLowerCase()] - 1;
+    const yearEnd = Number(m[6]);
+    const yearStart = m[3] ? Number(m[3]) : yearEnd;
+    return {
+      start: isoLocalNoTz(yearStart, month1Idx, day1, DEFAULT_START_HOUR, 0),
+      end: isoLocalNoTz(yearEnd, month2Idx, day2, DEFAULT_END_HOUR, 0),
+      source: 'two_day_range',
+    };
+  }
+  if ((m = text.match(reE1))) {
+    const day = Number(m[1]);
+    const monthIdx = MONTHS_EN[m[2].toLowerCase()] - 1;
+    const year = Number(m[3]);
+    return {
+      start: isoLocalNoTz(year, monthIdx, day, DEFAULT_START_HOUR, 0),
+      end: isoLocalNoTz(year, monthIdx, day, DEFAULT_END_HOUR, 0),
+      source: 'single_day',
+    };
+  }
+  if ((m = text.match(reE2))) {
+    const monthIdx = MONTHS_EN[m[1].toLowerCase()] - 1;
+    const day = Number(m[2]);
+    const year = Number(m[3]);
+    return {
+      start: isoLocalNoTz(year, monthIdx, day, DEFAULT_START_HOUR, 0),
+      end: isoLocalNoTz(year, monthIdx, day, DEFAULT_END_HOUR, 0),
+      source: 'single_day',
+    };
+  }
+  return null;
 }
 
 // ── Parse helpers ───────────────────────────────────────────────────────────
@@ -977,6 +1120,21 @@ Deno.serve(async (req: Request) => {
       ? await callOpenAIResponsesAPI(apiKey, model, reasoningEffort, systemPrompt, userPrompt, sourceFiles)
       : await callOpenAIChatCompletions(apiKey, model, reasoningEffort, systemPrompt, userPrompt);
 
+    // 040A-HOTFIX: deterministic date fallback for clearly stated date ranges.
+    // Only fills in dates when the AI left them empty AND the brief has a parseable pattern.
+    let dateBreadcrumb: 'ai_date_detected' | 'fallback_date_detected' | 'no_date_detected' = 'no_date_detected';
+    if (draft.start_at) {
+      dateBreadcrumb = 'ai_date_detected';
+    } else if (briefRaw) {
+      const fallback = fallbackParseDateRange(briefRaw);
+      if (fallback) {
+        draft.start_at = fallback.start;
+        draft.end_at = draft.end_at || fallback.end;
+        dateBreadcrumb = 'fallback_date_detected';
+      }
+    }
+    console.log(`[draft-event-content] date_outcome=${dateBreadcrumb} brief_chars=${briefRaw.length} src_docs=${sourceFiles.length}`);
+
     return jsonResponse({
       success: true,
       data: draft,
@@ -985,6 +1143,7 @@ Deno.serve(async (req: Request) => {
         generated_at: new Date().toISOString(),
         source_doc_count: sourceFiles.length,
         brief_chars: briefRaw.length,
+        date_outcome: dateBreadcrumb,
       },
     });
   } catch (err) {
