@@ -6,6 +6,7 @@ import {
   Camera,
   Check,
   Clock3,
+  FileText,
   Download,
   ExternalLink,
   Loader2,
@@ -175,6 +176,27 @@ function formatDayLabel(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function isDocumentImageAsset(mimeType: string | null | undefined): boolean {
+  return (mimeType ?? '').toLowerCase().startsWith('image/');
+}
+
+function isDocumentPdfAsset(mimeType: string | null | undefined): boolean {
+  return (mimeType ?? '').toLowerCase() === 'application/pdf';
+}
+
+function documentDisplayName(asset: { label: string | null; storage_path: string }): string {
+  return asset.label || asset.storage_path.split('/').pop() || 'Material';
+}
+
+function documentPreviewLabel(asset: { mime_type: string | null; label: string | null; storage_path: string }): string {
+  if (isDocumentPdfAsset(asset.mime_type)) return 'PDF';
+  const ext = documentDisplayName(asset).split('.').pop();
+  if (ext && ext.length <= 6) return ext.toUpperCase();
+  const mime = (asset.mime_type ?? '').toLowerCase();
+  if (mime.includes('/')) return mime.split('/')[1].toUpperCase();
+  return 'FILE';
 }
 
 const RSVP_ALL_DAYS_VALUE = '__all_days__';
@@ -463,13 +485,21 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           invalid_designation: 'Designation is too long (max 120 characters).',
           aadhaar_required: 'Please enter your Aadhaar Card number.',
           invalid_aadhaar: 'Please enter a valid 12 digit Aadhaar number.',
+          duplicate_email: 'A registration already exists with the same email address.',
+          duplicate_mobile: 'A registration already exists with the same mobile number.',
+          duplicate_aadhaar: 'A registration already exists with the same Aadhaar Card number.',
         };
         setRsvpError(messages[result.error_code ?? ''] ?? result.error ?? 'Could not submit your registration.');
         return;
       }
-      setRsvpBadgeCode(result.badge_code ?? null);
+      const issuedCode = (result.badge_code ?? '').trim().toUpperCase();
+      setRsvpBadgeCode(issuedCode || null);
       setRsvpSuccess(true);
       void onRefresh();
+      if (issuedCode) {
+        const target = `/events/badge/${encodeURIComponent(issuedCode)}`;
+        window.open(target, '_blank');
+      }
     } finally {
       setRsvpSubmitting(false);
     }
@@ -661,21 +691,46 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
             <ul className="divide-y divide-border rounded-lg border border-border bg-card">
               {documents.map((asset) => (
                 <li key={asset.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-3">
                     <a
-                      href={asset.public_url}
+                      href={`/events/${encodeURIComponent(eventDetail.slug)}/material/${encodeURIComponent(asset.id)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-medium text-foreground hover:text-primary truncate inline-flex items-center gap-2"
+                      className="group block h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted/20"
+                      title={`Open ${documentDisplayName(asset)}`}
                     >
-                      <ExternalLink className="h-4 w-4 shrink-0" />
-                      {asset.label || asset.storage_path.split('/').pop()}
+                      {isDocumentImageAsset(asset.mime_type) ? (
+                        <img
+                          src={asset.public_url}
+                          alt={`${documentDisplayName(asset)} preview`}
+                          className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30 text-muted-foreground">
+                          <FileText className="h-5 w-5" />
+                          <span className="mt-0.5 text-[9px] font-semibold leading-none text-foreground">
+                            {documentPreviewLabel(asset)}
+                          </span>
+                        </div>
+                      )}
                     </a>
-                    {asset.byte_size && (
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {Math.ceil(asset.byte_size / 1024)} KB
-                      </p>
-                    )}
+                    <div className="min-w-0">
+                      <a
+                        href={`/events/${encodeURIComponent(eventDetail.slug)}/material/${encodeURIComponent(asset.id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-foreground hover:text-primary truncate inline-flex items-center gap-2"
+                      >
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                        {documentDisplayName(asset)}
+                      </a>
+                      {asset.byte_size && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {Math.ceil(asset.byte_size / 1024)} KB
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -789,7 +844,12 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                         >
                           <option value="">Select a day…</option>
                           <option value={RSVP_ALL_DAYS_VALUE} disabled={!allDaysSelectable}>
-                            {allDaysSelectable ? 'All days' : 'All days — Full on one or more dates'}
+                            {allDaysSelectable
+                              ? `${eventDays.length} day${eventDays.length === 1 ? '' : 's'}`
+                              : `${eventDays.length} day${eventDays.length === 1 ? '' : 's'} — Full on one or more dates`}
+                          </option>
+                          <option value="" disabled>
+                            OR
                           </option>
                           {eventDays.map((day) => {
                             const remaining = remainingForDay(day);
@@ -1106,58 +1166,84 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public badge lookup — visitor enters mobile, gets their badge PDF.
+// Public badge lookup — visitor enters mobile/email and gets their badge.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BadgeMobileLookup: React.FC<{ eventSlug: string; defaultMobile?: string }> = ({
   eventSlug,
   defaultMobile,
 }) => {
-  const [mobile, setMobile] = useState('');
+  const [contact, setContact] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
   // COD-EVENTS-REGISTRATION-COMPLETE-059
   // Prefill mobile from approved-member profile only when the field is empty.
   useEffect(() => {
     if (!defaultMobile) return;
-    setMobile((cur) => (cur.trim().length === 0 ? defaultMobile : cur));
+    setContact((cur) => (cur.trim().length === 0 ? defaultMobile : cur));
   }, [defaultMobile]);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const parseBadgeCodeFromDisposition = (headerValue: string | null): string | null => {
+    if (!headerValue) return null;
+    const m = /badge-([A-Za-z0-9]+)\.pdf/i.exec(headerValue);
+    return m ? m[1].toUpperCase() : null;
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const trimmed = mobile.trim();
+    const trimmed = contact.trim();
     if (!trimmed) {
-      setError('Please enter the mobile number you registered with.');
+      setError('Please enter the mobile number or email you registered with.');
       return;
     }
-    setBusy(true);
+
+    const looksLikeEmail = trimmed.includes('@');
+    const lookupUrl = looksLikeEmail
+      ? eventsService.badgeDownloadUrlByEmail(eventSlug, trimmed.toLowerCase())
+      : eventsService.badgeDownloadUrlByMobile(eventSlug, trimmed);
+
+    setIsChecking(true);
     try {
-      const url = eventsService.badgeDownloadUrlByMobile(eventSlug, trimmed);
-      const resp = await fetch(url, { method: 'GET' });
-      if (resp.status === 410) {
+      const response = await fetch(lookupUrl, { headers: { Accept: 'application/pdf' } });
+      if (response.status === 404) {
+        setError('No registration found with this mobile number or email.');
+        return;
+      }
+      if (response.status === 410) {
         setError('Badge downloads are closed for this event.');
         return;
       }
-      if (resp.status === 404) {
-        setError('No badge found for that mobile number. Make sure you registered with this number.');
+      if (!response.ok) {
+        setError('Could not fetch your badge right now. Please try again.');
         return;
       }
-      if (!resp.ok) {
-        setError('Could not retrieve badge. Please try again later.');
+
+      const codeFromHeader = parseBadgeCodeFromDisposition(response.headers.get('content-disposition'));
+      const target = codeFromHeader
+        ? `/events/badge/${encodeURIComponent(codeFromHeader)}`
+        : `/events/badge?${
+          new URLSearchParams(
+            looksLikeEmail
+              ? { event_slug: eventSlug, email: trimmed.toLowerCase() }
+              : { event_slug: eventSlug, mobile: trimmed },
+          ).toString()
+        }`;
+
+      const win = window.open(target, '_blank');
+      if (!win) {
+        setError('Popup blocked. Please allow popups for this site and try again.');
         return;
       }
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `badge-${eventSlug}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+      try {
+        win.focus();
+      } catch {
+        // no-op
+      }
+    } catch {
+      setError('Could not fetch your badge right now. Please try again.');
     } finally {
-      setBusy(false);
+      setIsChecking(false);
     }
   };
 
@@ -1169,27 +1255,26 @@ const BadgeMobileLookup: React.FC<{ eventSlug: string; defaultMobile?: string }>
       </h2>
       <form onSubmit={(e) => void onSubmit(e)} className="rounded-lg border border-border bg-card p-5 space-y-3">
         <p className="text-xs text-muted-foreground">
-          Enter the mobile number you used to register and we'll generate your badge as a PDF (4 in × 6 in). Available until the event ends.
+          Enter the mobile number or email you used to register. We&apos;ll open your badge page in a new tab only when a matching registration is found.
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[200px] space-y-1.5">
-            <label className="text-xs font-medium text-foreground">Mobile</label>
+            <label className="text-xs font-medium text-foreground">Mobile or Email</label>
             <input
-              type="tel"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              placeholder="e.g. 9876543210"
+              type="text"
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              placeholder="e.g. 9876543210 or member@example.com"
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              disabled={busy}
             />
           </div>
           <button
             type="submit"
-            disabled={busy}
+            disabled={isChecking}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Get my badge
+            {isChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {isChecking ? 'Checking...' : 'Get my badge'}
           </button>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}

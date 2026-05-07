@@ -338,7 +338,7 @@ function buildExtractionSystemPrompt(): string {
     'purpose (what the event was meant to achieve), highlights (key moments, sessions, or speakers),',
     'outcome (what was achieved or concluded), additional_notes (any other notable facts).',
     'For two-day or multi-day activities, set activity_date to the first day of the activity and include all clear activity dates in activity_date_options.',
-    'Do not use document issue dates, print dates, RSVP deadlines, registration deadlines, or payment dates as activity_date unless the document clearly says they are the event/activity date.',
+    'Do not use document issue dates, print dates, registration deadlines, or payment dates as activity_date unless the document clearly says they are the event/activity date.',
     'Prefer dates near event title, agenda, schedule, venue, invitation line, or phrases such as "held on", "conducted on", "date", "program", or "venue".',
     'If multiple locations are present, set location to the most likely event venue/location and include the candidates in location_options.',
     'Return a JSON object with exactly those field names as keys. Omit any key you cannot clearly determine from the documents.',

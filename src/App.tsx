@@ -7,6 +7,8 @@ import Events from './pages/Events';
 import News from './pages/News';
 import ActivityDetail from './pages/ActivityDetail';
 import EventBadgeDownload from './pages/EventBadgeDownload';
+import EventMaterialPreview from './pages/EventMaterialPreview';
+import EventShortRedirect from './pages/EventShortRedirect';
 import AdminActivities from './pages/AdminActivities';
 import AdminActivityForm from './pages/AdminActivityForm';
 import AdminActivitySettings from './pages/AdminActivitySettings';
@@ -128,7 +130,10 @@ function App() {
             <Route path="/members" element={<Directory />} />
             <Route path="/member/:id/:companySlug/:nameSlug" element={<MemberProfile />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/r/:code" element={<EventShortRedirect />} />
+            <Route path="/events/badge" element={<EventBadgeDownload />} />
             <Route path="/events/badge/:code" element={<EventBadgeDownload />} />
+            <Route path="/events/:slug/material/:assetId" element={<EventMaterialPreview />} />
             <Route path="/events/:slug" element={<ActivityDetail />} />
             <Route path="/news" element={<News />} />
             <Route path="/activities" element={<Navigate to="/events" replace />} />

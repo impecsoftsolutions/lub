@@ -5,10 +5,10 @@
 // Two access paths (both anon-callable):
 //   1) ?code=<badge_code>          — direct one-shot link (used in email links
 //                                    and admin downloads).
-//   2) ?event_slug=<slug>&mobile=<phone>
+//   2) ?event_slug=<slug>&mobile=<phone> OR ?event_slug=<slug>&email=<email>
 //                                  — visitor self-serve lookup; returns the
 //                                    badge for any confirmed RSVP whose phone
-//                                    matches (loose normalization).
+//                                    or email matches.
 //
 // In both paths the event must not be "ended": now() must be earlier than
 // COALESCE(event.end_at, event.start_at) + 12h grace. After that the
@@ -171,6 +171,10 @@ function normalizePhone(raw: string): string {
   return raw.replace(/[^0-9]/g, '');
 }
 
+function normalizeEmail(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
 async function findBadgeByCode(
   supabaseUrl: string,
   serviceRoleKey: string,
@@ -190,11 +194,12 @@ async function findBadgeByCode(
   return { badge, event: events[0] };
 }
 
-async function findBadgeByMobile(
+async function findBadgeByContact(
   supabaseUrl: string,
   serviceRoleKey: string,
   eventSlug: string,
   mobile: string,
+  email: string,
 ): Promise<{ badge: BadgeRow; event: EventRow } | null> {
   const events = await rest<EventRow[]>(
     supabaseUrl, serviceRoleKey,
@@ -203,8 +208,9 @@ async function findBadgeByMobile(
   if (!events || events.length === 0) return null;
   const event = events[0];
 
-  const normalized = normalizePhone(mobile);
-  if (!normalized) return null;
+  const normalizedMobile = normalizePhone(mobile);
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedMobile && !normalizedEmail) return null;
 
   // Pull all badges for this event then match phone in JS (snapshot.phone
   // is free-text). For typical event sizes this is fine.
@@ -214,8 +220,12 @@ async function findBadgeByMobile(
   );
   if (!badges) return null;
   const match = badges.find((b) => {
-    const phone = String((b.snapshot as Record<string, unknown>).phone ?? '');
-    return normalizePhone(phone) === normalized;
+    const snapshot = b.snapshot as Record<string, unknown>;
+    const phone = String(snapshot.phone ?? '');
+    const snapEmail = String(snapshot.email ?? '');
+    const byMobile = normalizedMobile && normalizePhone(phone) === normalizedMobile;
+    const byEmail = normalizedEmail && normalizeEmail(snapEmail) === normalizedEmail;
+    return byMobile || byEmail;
   });
   if (!match) return null;
   return { badge: match, event };
@@ -790,15 +800,17 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   let code = url.searchParams.get('code')?.trim() ?? '';
   let mobile = url.searchParams.get('mobile')?.trim() ?? '';
+  let email = url.searchParams.get('email')?.trim() ?? '';
   let eventSlug = url.searchParams.get('event_slug')?.trim() ?? '';
   const templateOverride = url.searchParams.get('template')?.trim() ?? '';
   const isPreview = url.searchParams.get('preview') === '1';
 
   if (req.method === 'POST') {
     try {
-      const body = (await req.json()) as { code?: string; mobile?: string; event_slug?: string };
+      const body = (await req.json()) as { code?: string; mobile?: string; email?: string; event_slug?: string };
       code = (body.code ?? code).trim();
       mobile = (body.mobile ?? mobile).trim();
+      email = (body.email ?? email).trim();
       eventSlug = (body.event_slug ?? eventSlug).trim();
     } catch {
       // ignore malformed body — still try query params
@@ -847,10 +859,10 @@ Deno.serve(async (req: Request) => {
   let resolved: { badge: BadgeRow; event: EventRow } | null = null;
   if (code) {
     resolved = await findBadgeByCode(supabaseUrl, serviceRoleKey, code.toUpperCase());
-  } else if (mobile && eventSlug) {
-    resolved = await findBadgeByMobile(supabaseUrl, serviceRoleKey, eventSlug, mobile);
+  } else if (eventSlug && (mobile || email)) {
+    resolved = await findBadgeByContact(supabaseUrl, serviceRoleKey, eventSlug, mobile, email);
   } else {
-    return jsonError(400, 'missing_params', 'Provide ?code= or ?event_slug= and ?mobile=.');
+    return jsonError(400, 'missing_params', 'Provide ?code= or ?event_slug= with ?mobile= or ?email=.');
   }
 
   if (!resolved) {

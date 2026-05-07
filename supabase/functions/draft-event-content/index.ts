@@ -340,7 +340,7 @@ function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
     'event_type: pick the closest of the listed values. If unsure, use "general".',
     'visibility: default to "public" unless the brief indicates members-only.',
     'show_agenda_publicly: default true when an agenda is present; otherwise false.',
-    'whatsapp_invitation_message: a concise, ready-to-share WhatsApp invitation message for members. Plain text only (no Markdown), <= 1200 characters. Use short paragraphs and line breaks for readability. Open with a warm greeting, name the event, summarize what attendees will gain in 1-2 lines, then list date/time and venue (or online link) when known. End with a simple call-to-action to RSVP or ask for details. Do not invent dates, venues, or speaker names that are not present in the inputs. Avoid all-caps and avoid heavy emoji use; a single welcoming emoji is acceptable but not required.',
+    'whatsapp_invitation_message: a concise, ready-to-share WhatsApp invitation message for members. Plain text only (no Markdown), <= 1200 characters. Use short paragraphs and line breaks for readability. Open with a warm greeting, name the event, summarize what attendees will gain in 1-2 lines, then list date/time and venue (or online link) when known. End with a simple call-to-action to register or ask for details. Do not invent dates, venues, or speaker names that are not present in the inputs. Avoid all-caps and avoid heavy emoji use; a single welcoming emoji is acceptable but not required.',
     // 040A-HOTFIX: explicit date guidance.
     'Date parsing rules — apply these with priority:',
     '  - "16 and 17 April 2026" / "16, 17 April 2026" / "16 & 17 April 2026" → start_at is the FIRST day, end_at is the SECOND day (same month, same year).',
@@ -807,7 +807,7 @@ function buildWhatsappSystemPrompt(): string {
     'You write a single concise WhatsApp invitation message for a member-association event.',
     'Plain text only. No Markdown. No HTML. No code fences. <= 1200 characters total.',
     'Open with a short warm greeting, name the event, summarize the value in 1-2 lines, then list date/time and venue (or online link) when known.',
-    'End with a simple call-to-action to RSVP or ask for details.',
+    'End with a simple call-to-action to register or ask for details.',
     'Use short paragraphs and line breaks for readability.',
     'Avoid all-caps. A single welcoming emoji is acceptable; do not require emojis.',
     'Do not invent dates, times, venues, speaker names, or sponsor names that are not present in the inputs.',
@@ -1169,4 +1169,3 @@ Deno.serve(async (req: Request) => {
     return failClosed(`AI drafting failed: ${message}`, 'generation_failed');
   }
 });
-

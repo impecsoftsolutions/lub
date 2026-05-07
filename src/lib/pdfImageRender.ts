@@ -63,3 +63,34 @@ export async function renderPdfFirstPageAsImages(file: File): Promise<File[]> {
   }
   return rendered;
 }
+
+export async function renderPdfFirstPageAsJpegBlob(
+  pdfBytes: ArrayBuffer,
+  opts?: { scale?: number; quality?: number },
+): Promise<Blob> {
+  const doc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  const page = await doc.getPage(1);
+  const viewport = page.getViewport({ scale: opts?.scale ?? PDF_RENDER_SCALE });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not render PDF page.');
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('Could not export PDF preview image.'));
+          return;
+        }
+        resolve(blob);
+      },
+      'image/jpeg',
+      opts?.quality ?? JPEG_QUALITY,
+    );
+  });
+}

@@ -6798,6 +6798,7 @@ export interface PublicEvent {
   slug: string;
   title: string;
   excerpt: string | null;
+  show_excerpt_publicly?: boolean;
   description: string | null;
   event_type: EventType;
   visibility: EventVisibility;
@@ -6906,6 +6907,7 @@ export interface EventRsvpPublicConfig {
 
 export interface PublicEventDetail extends PublicEvent {
   invitation_text: string | null;
+  show_invitation_text_publicly?: boolean;
   agenda_items: EventAgendaItem[];
   show_agenda_publicly?: boolean;
   venue_map_url?: string | null;
@@ -6970,6 +6972,7 @@ export interface EventBridgeInfo {
 export interface AdminEventDetail {
   id: string;
   slug: string;
+  short_url_code?: string | null;
   title: string;
   excerpt: string | null;
   description: string | null;
@@ -7207,6 +7210,15 @@ export interface EventSummaryMetrics {
   last_published_at: string | null;
 }
 
+export interface EventShortUrlResolution {
+  success: boolean;
+  slug?: string;
+  short_code?: string;
+  target_path?: string;
+  error?: string;
+  errorCode?: string;
+}
+
 interface EventsRpcEnvelope<T> {
   success?: boolean;
   data?: T;
@@ -7256,6 +7268,88 @@ export const eventsService = {
       throw new Error(result?.error || 'Failed to load event');
     }
     return result.data ?? null;
+  },
+
+  async resolveShortUrl(shortCode: string): Promise<EventShortUrlResolution> {
+    const code = shortCode.trim().toLowerCase();
+    if (!code) {
+      return { success: false, error: 'Short code is required.', errorCode: 'invalid_code' };
+    }
+    const { data, error } = await supabase.rpc('resolve_event_short_url', {
+      p_short_code: code,
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    const result = data as {
+      success?: boolean;
+      data?: { slug?: string; short_code?: string; target_path?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Short URL not found.',
+        errorCode: result?.error_code ?? 'not_found',
+      };
+    }
+    return {
+      success: true,
+      slug: result.data?.slug,
+      short_code: result.data?.short_code,
+      target_path: result.data?.target_path,
+    };
+  },
+
+  async ensureShortShareUrl(
+    sessionToken: string,
+    eventId: string,
+  ): Promise<{ success: boolean; short_code?: string; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('ensure_event_short_url_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { short_code?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to get short URL.',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, short_code: result.data?.short_code };
+  },
+
+  async refreshShortShareUrl(
+    sessionToken: string,
+    eventId: string,
+  ): Promise<{ success: boolean; short_code?: string; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('refresh_event_short_url_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { short_code?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to refresh short URL.',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, short_code: result.data?.short_code };
   },
 
   async getAll(
@@ -7675,7 +7769,7 @@ export const eventsService = {
         success: false,
         rows: [],
         summary: { total: 0, confirmed: 0, cancelled: 0, pending: 0, waitlisted: 0 },
-        error: result?.error ?? 'Failed to load RSVPs',
+        error: result?.error ?? 'Failed to load registrations',
       };
     }
     return {
@@ -7928,6 +8022,12 @@ export const eventsService = {
   badgeDownloadUrlByMobile(eventSlug: string, mobile: string): string {
     const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
     const params = new URLSearchParams({ event_slug: eventSlug, mobile });
+    return `${base.replace(/\/+$/, '')}/functions/v1/event-badge-download?${params.toString()}`;
+  },
+
+  badgeDownloadUrlByEmail(eventSlug: string, email: string): string {
+    const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
+    const params = new URLSearchParams({ event_slug: eventSlug, email });
     return `${base.replace(/\/+$/, '')}/functions/v1/event-badge-download?${params.toString()}`;
   },
 

@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-07  
-**Updated by:** Claude (074 follow-up: check-in stale-cache fix + button label)
+**Updated by:** Codex (`COD-EVENTS-REGISTRATION-SUBMIT-NO-POPUP-080`)
 
 ---
 
@@ -20,7 +20,7 @@
 | Lint (`npm run lint`) | PASS - 0 errors, 3 expected shadcn warnings |
 | Build (`npm run build`) | PASS |
 | Phase 1 destructive smoke | **15 passed** baseline |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped |
+| Phase 1 readonly smoke | Last known PASS baseline: 3 passed / 12 skipped |
 
 ---
 
@@ -33,45 +33,60 @@
 ## Last Verified
 
 - **When:** 2026-05-07
-- **What:** `COD-EVENTS-CHECKIN-UI-FOLLOWUP-074` — UI follow-up: check-in columns in registrations + undo check-in action.
-- **Deploy/apply commands run:** None (UI-only slice; no migrations or edge function changes).
-- **Result:** Lint PASS (0 errors / 3 expected shadcn warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **What:** `COD-EVENTS-REGISTRATION-SUBMIT-NO-POPUP-080` - fixed public event registration submit flow so duplicate/error cases show inline error directly without opening/closing a blank badge tab.
+- **Deploy/apply commands run:** None (UI-only behavior fix).
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase1 readonly smoke PASS (3 passed / 12 skipped).
 
-Runtime outcomes:
-- `AdminEventRegistrations`: registrations table and XLSX export now show Checked In (green badge / `—`), Checked In At (formatted timestamp), and Check-in Source (`Admin`, `QR Scan`, `Manual`).
-- `AdminEventCheckin`: detail card now seeds checked-in state from `row.checked_in_at` on load; when checked in, shows "Attendance recorded" + amber "Undo check-in" button; Undo calls `eventsService.uncheckInBadge` and clears state on success.
+Runtime notes:
+- `src/pages/ActivityDetail.tsx` no longer pre-opens `about:blank` before `submit_event_rsvp`.
+- On failed submit (duplicate email/mobile/aadhaar or any validation/server error), only inline red error is shown; no tab flicker.
+- On successful submit with `badge_code`, badge page still opens in a new tab as intended.
 
 ---
 
 ## Recently Closed Events Follow-ups
 
-### 074 Check-in UI — Registrations Columns + Undo Action
+### 078 Excerpt + Invitation Visibility
+
+- Closed on 2026-05-07.
+- Added migration: `supabase/migrations/20260507024000_events_excerpt_invitation_public_visibility_078.sql` and applied to linked DB.
+- Updated admin UI: `src/pages/AdminEventForm.tsx` with `Show on website` checkboxes for Excerpt and Invitation Text.
+- Public event reads now honor toggles in `events.ai_metadata` via:
+  - `get_published_events`
+  - `get_event_by_slug`
+
+### 077 Short Share URL
+
+
+- Closed on 2026-05-07.
+- Added migration: `supabase/migrations/20260507023000_events_short_share_url_077.sql` and applied to linked DB.
+- Added public short redirect route and resolver: `/r/:code`.
+- Added admin controls in Share RSVP panel to view/copy/open/refresh short URL.
+
+### 076 Badge Window + Duplicate Guard
+
+- Runtime apply closed on 2026-05-07 (`supabase db push --linked`).
+- `src/pages/ActivityDetail.tsx`: opens badge page in new window for submit + Get-my-badge and maps duplicate error codes.
+- `src/pages/EventBadgeDownload.tsx`: removed `Open Image` and `Open PDF` buttons.
+
+### 075 Post-registration badge page + JPG download
 
 - Closed on 2026-05-07.
 - UI-only slice; no migrations or edge function changes.
-- `AdminEventRegistrations.tsx`: added `CheckCircle2` import, `formatCheckinTime`/`formatCheckinSource` helpers, 3 table columns (Checked In / Checked In At / Source), 3 XLSX export columns, `check_in_source` added to search haystack.
-- `AdminEventCheckin.tsx`: added `isUndoing` state, `handleUndo` using `eventsService.uncheckInBadge`, `selectRow` now seeds `checkedIn` from `row.checked_in_at`, detail card shows amber Undo button when checked in.
-- **074 follow-up (same session):** Fixed in-session stale-cache bug — after `checkInBadge` / `uncheckInBadge` success, the matching row in `allRsvps` is now patched in memory so re-selecting the same person without a page reload reflects the correct check-in state. Renamed "Search another" button to "Close".
+- `src/pages/ActivityDetail.tsx`: submit success and Get-my-badge now route to website badge page.
+- `src/pages/EventBadgeDownload.tsx`: code/mobile lookup support + JPG preview/download.
+- `src/lib/pdfImageRender.ts`: added `renderPdfFirstPageAsJpegBlob(...)` helper.
+- `src/App.tsx`: added explicit `/events/badge` route.
+
+### 074 Check-in UI - Registrations Columns + Undo Action
+
+- Closed on 2026-05-07.
+- UI-only slice; no migrations or edge function changes.
 
 ### 073 Check-in Persistence Backend
 
 - Closed on 2026-05-07.
-- Added migration `20260507020000_events_checkin_persist_073.sql`.
-- Includes: check-in source patch (`admin`), roster payload field exposure, and reverse check-in RPC.
-- `supabase db push --linked` applied successfully.
-
-### 072 Badge Check-in Camera Scanner
-
-- Closed on 2026-05-07.
-- Added camera scanner UI and loop on `/admin/content/events/:id/checkin`.
-- No schema changes, no edge function changes.
-- Safe fallback remains available: manual entry/paste.
-
-### 071 Badge Layout / Profession Options / Badge Download / Aadhaar Reports
-
-- Closed end-to-end on 2026-05-07.
-- Migrations `070`, `071`, and `071x` applied.
-- Badge renderer deployed and verified.
+- Migration `20260507020000_events_checkin_persist_073.sql` applied.
 
 ---
 

@@ -132,6 +132,16 @@ function isPdfAsset(asset: EventAsset): boolean {
   return (asset.mime_type ?? '').toLowerCase() === 'application/pdf';
 }
 
+function documentPreviewLabel(asset: EventAsset): string {
+  if (isPdfAsset(asset)) return 'PDF';
+  const name = assetFileName(asset);
+  const ext = name.includes('.') ? name.split('.').pop() : null;
+  if (ext) return ext.toUpperCase();
+  const mime = (asset.mime_type ?? '').toLowerCase();
+  if (mime.includes('/')) return mime.split('/')[1].toUpperCase();
+  return 'FILE';
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -231,6 +241,7 @@ const AdminEventForm: React.FC = () => {
   const [slugEditing, setSlugEditing] = useState(false);
   const [slugStatus, setSlugStatus] = useState<SlugStatus>({ kind: 'idle' });
   const [excerpt, setExcerpt] = useState('');
+  const [showExcerptPublicly, setShowExcerptPublicly] = useState(true);
   const [description, setDescription] = useState('');
   const [eventType, setEventType] = useState<EventType>('general');
   const [visibility, setVisibility] = useState<EventVisibility>('public');
@@ -239,6 +250,7 @@ const AdminEventForm: React.FC = () => {
   const [endAt, setEndAt] = useState('');
   const [location, setLocation] = useState('');
   const [invitationText, setInvitationText] = useState('');
+  const [showInvitationTextPublicly, setShowInvitationTextPublicly] = useState(true);
   const [agendaItems, setAgendaItems] = useState<EventAgendaItem[]>([{ title: '', time: '', note: '' }]);
   const [showAgendaPublicly, setShowAgendaPublicly] = useState(false);
   const [aiMetadata, setAiMetadata] = useState<Record<string, unknown> | null>(null);
@@ -306,6 +318,10 @@ const AdminEventForm: React.FC = () => {
   // WhatsApp manual generation (040A)
   const [isGeneratingWhatsapp, setIsGeneratingWhatsapp] = useState(false);
   const [showWhatsappOverwriteConfirm, setShowWhatsappOverwriteConfirm] = useState(false);
+  // Short RSVP redirect URL (077)
+  const [shortShareCode, setShortShareCode] = useState('');
+  const [shortShareLoading, setShortShareLoading] = useState(false);
+  const [shortShareRefreshing, setShortShareRefreshing] = useState(false);
 
   const [original, setOriginal] = useState<AdminEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
@@ -368,6 +384,12 @@ const AdminEventForm: React.FC = () => {
         const meta = (data.ai_metadata && typeof data.ai_metadata === 'object')
           ? (data.ai_metadata as Record<string, unknown>)
           : {};
+        setShowExcerptPublicly(
+          meta.show_excerpt_publicly === undefined ? true : Boolean(meta.show_excerpt_publicly),
+        );
+        setShowInvitationTextPublicly(
+          meta.show_invitation_text_publicly === undefined ? true : Boolean(meta.show_invitation_text_publicly),
+        );
         setVenueMapUrl(data.venue_map_url ?? '');
         setWhatsappMessage(data.whatsapp_invitation_message ?? '');
 
@@ -706,6 +728,8 @@ const AdminEventForm: React.FC = () => {
       rsvp_require_note: rsvpCollectNote ? rsvpRequireNote : false,
       rsvp_require_designation: rsvpCollectDesignation ? rsvpRequireDesignation : false,
       rsvp_profession_options: professionOptions,
+      show_excerpt_publicly: showExcerptPublicly,
+      show_invitation_text_publicly: showInvitationTextPublicly,
       badge_include_surname: badgeIncludeSurname,
       badge_name_max_chars: badgeNameMaxChars,
       badge_name_font_size: badgeNameFontSize,
@@ -715,6 +739,7 @@ const AdminEventForm: React.FC = () => {
       slug: slug.trim(),
       slug_locked: slugLocked,
       excerpt: excerpt.trim() || null,
+      show_excerpt_publicly: showExcerptPublicly,
       description: description.trim() || null,
       event_type: eventType,
       visibility,
@@ -723,6 +748,7 @@ const AdminEventForm: React.FC = () => {
       end_at: endAt ? new Date(endAt).toISOString() : null,
       location: location.trim() || null,
       invitation_text: invitationText.trim() || null,
+      show_invitation_text_publicly: showInvitationTextPublicly,
       agenda_items: normalizeAgendaItems(agendaItems),
       show_agenda_publicly: showAgendaPublicly,
       ai_metadata: nextAiMetadata,
@@ -787,7 +813,7 @@ const AdminEventForm: React.FC = () => {
     if (rsvpEnabled && rsvpCapacity.trim()) {
       const capNum = Number(rsvpCapacity.trim());
       if (!Number.isFinite(capNum) || capNum <= 0) {
-        showToast('error', 'RSVP capacity must be a positive whole number.');
+        showToast('error', 'Registration capacity must be a positive whole number.');
         return null;
       }
     }
@@ -895,7 +921,7 @@ const AdminEventForm: React.FC = () => {
         rsvpStatusFilter === 'all' ? null : (rsvpStatusFilter as EventRsvpStatus);
       const result = await eventsService.getRsvps(token, id, status);
       if (!result.success) {
-        showToast('error', result.error ?? 'Failed to load RSVPs');
+        showToast('error', result.error ?? 'Failed to load registrations.');
         return;
       }
       setRsvpRows(result.rows);
@@ -918,7 +944,7 @@ const AdminEventForm: React.FC = () => {
     }
     const result = await eventsService.updateRsvpStatus(token, rsvpId, status);
     if (!result.success) {
-      showToast('error', result.error ?? 'Failed to update RSVP status.');
+      showToast('error', result.error ?? 'Failed to update registration status.');
       return;
     }
     showToast('success', 'Registration updated.');
@@ -1192,6 +1218,35 @@ const AdminEventForm: React.FC = () => {
 
   // ── Publish-time RSVP share package (040A-HOTFIX) ────────────────────────
   const isPublished = original?.status === 'published';
+
+  useEffect(() => {
+    let active = true;
+    if (!isPublished || !id) {
+      setShortShareCode('');
+      return;
+    }
+    const run = async () => {
+      setShortShareLoading(true);
+      try {
+        const token = sessionManager.getSessionToken();
+        if (!token) return;
+        const result = await eventsService.ensureShortShareUrl(token, id);
+        if (!active) return;
+        if (!result.success) {
+          showToast('error', result.error ?? 'Could not load short URL.');
+          return;
+        }
+        setShortShareCode((result.short_code ?? '').trim().toLowerCase());
+      } finally {
+        if (active) setShortShareLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [isPublished, id, showToast]);
+
   const publicEventUrl = useMemo(() => {
     if (!isPublished) return '';
     const slugForUrl = (slug || original?.slug || '').trim();
@@ -1199,6 +1254,24 @@ const AdminEventForm: React.FC = () => {
     if (typeof window === 'undefined') return `/events/${slugForUrl}`;
     return `${window.location.origin}/events/${slugForUrl}`;
   }, [isPublished, slug, original?.slug]);
+
+  const shortEventUrl = useMemo(() => {
+    if (!isPublished || !shortShareCode) return '';
+    if (typeof window === 'undefined') return `/r/${shortShareCode}`;
+    return `${window.location.origin}/r/${shortShareCode}`;
+  }, [isPublished, shortShareCode]);
+
+  const preferredShareUrl = shortEventUrl;
+
+  const normalizeRegistrationWording = useCallback((text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/\bRSVPs\b/g, 'Registrations')
+      .replace(/\brsvps\b/g, 'registrations')
+      .replace(/\bRSVP\b/g, 'Registration')
+      .replace(/\bRsvp\b/g, 'Registration')
+      .replace(/\brsvp\b/g, 'registration');
+  }, []);
 
   const buildDefaultShareMessage = useCallback((): string => {
     const lines: string[] = [];
@@ -1221,26 +1294,66 @@ const AdminEventForm: React.FC = () => {
     }
     if (dateBits.length > 0) lines.push(dateBits.join(' '));
     if (location.trim()) lines.push(`Venue: ${location.trim()}`);
-    if (publicEventUrl) {
+    if (preferredShareUrl) {
       lines.push('');
-      lines.push(`RSVP / details: ${publicEventUrl}`);
+      lines.push(`Registration / details: ${preferredShareUrl}`);
     }
     return lines.join('\n').trim();
-  }, [title, startAt, endAt, location, publicEventUrl]);
+  }, [title, startAt, endAt, location, preferredShareUrl]);
 
-  // The message we actually share. If the saved WhatsApp message exists,
-  // append the URL (only if not already present); otherwise build a default.
+  // The message we actually share. If a saved WhatsApp message exists,
+  // normalize old RSVP wording and force short-URL usage in preview/share.
   const shareMessage = useMemo(() => {
     if (!isPublished) return '';
     const saved = whatsappMessage.trim();
     if (saved) {
-      if (publicEventUrl && !saved.includes(publicEventUrl)) {
-        return `${saved}\n\nRSVP / details: ${publicEventUrl}`;
+      let nextMessage = normalizeRegistrationWording(saved);
+      if (publicEventUrl) {
+        nextMessage = nextMessage.split(publicEventUrl).join(preferredShareUrl || '');
       }
-      return saved;
+      nextMessage = nextMessage
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      if (preferredShareUrl && !nextMessage.includes(preferredShareUrl)) {
+        return `${nextMessage}\n\nRegistration / details: ${preferredShareUrl}`;
+      }
+      return nextMessage;
     }
     return buildDefaultShareMessage();
-  }, [isPublished, whatsappMessage, publicEventUrl, buildDefaultShareMessage]);
+  }, [
+    isPublished,
+    whatsappMessage,
+    publicEventUrl,
+    preferredShareUrl,
+    normalizeRegistrationWording,
+    buildDefaultShareMessage,
+  ]);
+
+  const refreshShortShareUrl = useCallback(async () => {
+    if (!id) return;
+    if (!window.confirm('Regenerate short URL now? Old short links will stop working immediately.')) {
+      return;
+    }
+    setShortShareRefreshing(true);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      const result = await eventsService.refreshShortShareUrl(token, id);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Could not refresh short URL.');
+        return;
+      }
+      const nextCode = (result.short_code ?? '').trim().toLowerCase();
+      if (nextCode) setShortShareCode(nextCode);
+      showToast('success', 'Short registration URL refreshed.');
+    } finally {
+      setShortShareRefreshing(false);
+    }
+  }, [id, showToast]);
 
   const copyTextSafely = useCallback(async (text: string, successMsg: string) => {
     if (!text) return;
@@ -1823,18 +1936,45 @@ const AdminEventForm: React.FC = () => {
                     <ul className="divide-y divide-border rounded-md border border-border bg-background">
                       {documentAssets.map((asset) => (
                         <li key={asset.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                          <a
-                            href={asset.public_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-foreground hover:text-primary truncate"
-                          >
-                            {asset.label || asset.storage_path.split('/').pop()}
-                          </a>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <a
+                              href={asset.public_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group block h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-muted/20"
+                              title={`Open ${assetFileName(asset)}`}
+                            >
+                              {isImageAsset(asset) ? (
+                                <img
+                                  src={asset.public_url}
+                                  alt={`${assetFileName(asset)} thumbnail`}
+                                  className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30 text-muted-foreground">
+                                  <FileText className="h-4 w-4" />
+                                  <span className="mt-0.5 text-[9px] font-semibold leading-none text-foreground">
+                                    {documentPreviewLabel(asset)}
+                                  </span>
+                                </div>
+                              )}
+                            </a>
+                            <div className="min-w-0">
+                              <a
+                                href={asset.public_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block truncate text-foreground hover:text-primary"
+                              >
+                                {assetFileName(asset)}
+                              </a>
+                              <p className="text-[11px] text-muted-foreground">
+                                {[asset.mime_type, formatAssetSize(asset.byte_size)].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-muted-foreground">
-                              {asset.byte_size ? `${Math.ceil(asset.byte_size / 1024)} KB` : ''}
-                            </span>
                             <button
                               type="button"
                               onClick={() => void handleAssetDelete(asset.id)}
@@ -1857,7 +1997,18 @@ const AdminEventForm: React.FC = () => {
             )}
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Excerpt</label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium text-foreground">Excerpt</label>
+                <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border"
+                    checked={showExcerptPublicly}
+                    onChange={(event) => setShowExcerptPublicly(event.target.checked)}
+                  />
+                  Show on website
+                </label>
+              </div>
               <Textarea
                 rows={2}
                 value={excerpt}
@@ -1880,7 +2031,18 @@ const AdminEventForm: React.FC = () => {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Invitation Text</label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium text-foreground">Invitation Text</label>
+                <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border"
+                    checked={showInvitationTextPublicly}
+                    onChange={(event) => setShowInvitationTextPublicly(event.target.checked)}
+                  />
+                  Show on website
+                </label>
+              </div>
               <Textarea
                 rows={4}
                 value={invitationText}
@@ -2093,7 +2255,7 @@ const AdminEventForm: React.FC = () => {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-foreground">RSVP deadline (optional)</label>
+                    <label className="text-xs font-medium text-foreground">Registration deadline (optional)</label>
                     <Input
                       type="datetime-local"
                       value={rsvpDeadlineAt}
@@ -2779,13 +2941,13 @@ const AdminEventForm: React.FC = () => {
               </div>
             )}
 
-            {/* Share RSVP package (published events only) */}
+            {/* Share Registration package (published events only) */}
             {isPublished && (
               <div className="md:col-span-2 rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
                     <Share2 className="h-4 w-4" />
-                    Share RSVP
+                    Share Registration
                   </h3>
                   <Button
                     type="button"
@@ -2799,12 +2961,12 @@ const AdminEventForm: React.FC = () => {
                     ) : (
                       <Sparkles className="h-3.5 w-3.5 mr-1.5" />
                     )}
-                    Generate RSVP Share Message with AI
+                    Generate Registration Share Message with AI
                   </Button>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Public RSVP URL</label>
+                  <label className="text-xs font-medium text-foreground">Public Registration URL</label>
                   <div className="flex gap-2">
                     <Input value={publicEventUrl} readOnly className="font-mono text-xs" />
                     <Button
@@ -2832,6 +2994,57 @@ const AdminEventForm: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-foreground">Short Registration URL (permanent)</label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={refreshShortShareUrl}
+                      disabled={shortShareLoading || shortShareRefreshing || !id}
+                    >
+                      {shortShareRefreshing ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Refresh Short Registration URL
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={shortShareLoading ? 'Generating short URL...' : shortEventUrl}
+                      readOnly
+                      className="font-mono text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void copyTextSafely(shortEventUrl, 'Short URL copied to clipboard.')}
+                      disabled={!shortEventUrl}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy Short URL
+                    </Button>
+                    {shortEventUrl && (
+                      <a
+                        href={shortEventUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Short URL is stable even if the event slug changes. Refresh creates a new short URL and invalidates the old one.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground">Share message preview</label>
                   <Textarea
                     rows={6}
@@ -2841,7 +3054,7 @@ const AdminEventForm: React.FC = () => {
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[11px] text-muted-foreground">
-                      Built from your saved WhatsApp message (with the URL appended) or, if empty, a compact auto-built invite.
+                      Built from your saved WhatsApp message (with short URL appended when available) or, if empty, a compact auto-built invite.
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
