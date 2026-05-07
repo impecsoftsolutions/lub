@@ -138,7 +138,25 @@ export const permissionService = {
         );
       }
 
-      const permissionsArray: UserPermission[] = permissions || [];
+      // 056Y: normalize RPC row shape. The DB function `get_user_permissions`
+      // returns columns named `permission_code`, `permission_name`,
+      // `permission_description`, `permission_category` (the OUT parameter
+      // names). The TypeScript `UserPermission` type uses `code`, `name`,
+      // `description`, `category`. Without this mapping, every consumer
+      // checking `perm.code === '<some.permission>'` got `undefined === '...'`
+      // → false, which silently broke `useHasPermission` for all non
+      // super_admin users (super_admin worked only via the
+      // `primaryRole === 'super_admin'` short-circuit in PermissionContext).
+      // Both PermissionContext.hasPermission and 056's hasAnyAdminPermission
+      // depend on this mapping being correct.
+      const rawRows = (permissions ?? []) as Array<Record<string, unknown>>;
+      const permissionsArray: UserPermission[] = rawRows.map((row) => ({
+        code:        String(row.permission_code        ?? row.code        ?? ''),
+        name:        String(row.permission_name        ?? row.name        ?? ''),
+        description: String(row.permission_description ?? row.description ?? ''),
+        category:    String(row.permission_category    ?? row.category    ?? ''),
+        granted_at:  String(row.granted_at             ?? ''),
+      })).filter((p) => p.code.length > 0);
       const rolesArray: UserRole[] = roles || [];
 
       // Cache the results

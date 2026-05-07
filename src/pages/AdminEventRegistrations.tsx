@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, RefreshCw, Search, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, Loader2, Mail, QrCode, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
@@ -9,6 +9,8 @@ import {
   EVENT_RSVP_MEAL_OPTIONS,
   EVENT_RSVP_PROFESSION_OPTIONS,
   type AdminEventDetail,
+  type EventBadgeDeliveryStatus,
+  type EventBadgeRow,
   type EventRsvpGender,
   type EventRsvpMealPreference,
   type EventRsvpProfession,
@@ -21,6 +23,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import Toast from '../components/Toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { downloadSingleSheetXlsx } from '../lib/xlsxExport';
 
 function labelFrom<T extends string>(
   v: T | null | undefined,
@@ -30,7 +33,31 @@ function labelFrom<T extends string>(
   return options.find((o) => o.value === v)?.label ?? v;
 }
 
-function formatVisitDate(iso: string | null | undefined): string {
+function professionOptionsForEvent(event: AdminEventDetail | null) {
+  return event?.rsvp?.profession_options?.length ? event.rsvp.profession_options : EVENT_RSVP_PROFESSION_OPTIONS;
+}
+function formatCheckinTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function formatCheckinSource(src: string | null | undefined): string {
+  if (!src) return '—';
+  if (src === 'qr_scan') return 'QR Scan';
+  if (src === 'manual') return 'Manual';
+  if (src === 'admin') return 'Admin';
+  return src;
+}
+
+function formatVisitDate(iso: string | null | undefined, visitAllDays = false): string {
+  if (visitAllDays) return 'All days';
   if (!iso) return '—';
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
@@ -39,10 +66,22 @@ function formatVisitDate(iso: string | null | undefined): string {
 
 function eventDayList(start: string | null, end: string | null): string[] {
   if (!start) return [];
-  const s = new Date(start);
-  const e = end ? new Date(end) : s;
-  if (Number.isNaN(s.getTime())) return [];
-  const last = Number.isNaN(e.getTime()) ? s : e;
+  const startIso = String(start).slice(0, 10);
+  const endIso = String(end ?? start).slice(0, 10);
+  const parseIsoDay = (iso: string): Date | null => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+    const dt = new Date(y, mo, d);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt;
+  };
+  const s = parseIsoDay(startIso);
+  const e = parseIsoDay(endIso);
+  if (!s) return [];
+  const last = e ?? s;
   const days: string[] = [];
   const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
   const end0 = new Date(last.getFullYear(), last.getMonth(), last.getDate());
@@ -73,6 +112,10 @@ const AdminEventRegistrations: React.FC = () => {
   const [visitDateFilter, setVisitDateFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [badges, setBadges] = useState<EventBadgeRow[]>([]);
+  const [sendingDeliveryId, setSendingDeliveryId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EventRsvpRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -88,9 +131,10 @@ const AdminEventRegistrations: React.FC = () => {
         showToast('error', 'Session expired.');
         return;
       }
-      const [eventDetail, rsvpResult] = await Promise.all([
+      const [eventDetail, rsvpResult, badgesResult] = await Promise.all([
         eventsService.getById(token, id),
         eventsService.getRsvps(token, id, statusFilter === 'all' ? null : statusFilter),
+        eventsService.getBadges(token, id),
       ]);
       if (!eventDetail) {
         showToast('error', 'Event not found.');
@@ -103,6 +147,9 @@ const AdminEventRegistrations: React.FC = () => {
         setSummary(rsvpResult.summary);
       } else {
         showToast('error', rsvpResult.error ?? 'Failed to load registrations.');
+      }
+      if (badgesResult.success) {
+        setBadges(badgesResult.rows);
       }
     } finally {
       setIsLoading(false);
@@ -118,6 +165,22 @@ const AdminEventRegistrations: React.FC = () => {
     [event?.start_at, event?.end_at],
   );
 
+  // COD-EVENTS-REGISTRATION-COMPLETE-059
+  const eventCollectsAadhaar = Boolean(event?.rsvp?.collect_aadhaar);
+  const anyRowHasAadhaar = useMemo(
+    () => rows.some((r) => Boolean(r.aadhaar_number && r.aadhaar_number.length > 0)),
+    [rows],
+  );
+  const showAadhaar = eventCollectsAadhaar || anyRowHasAadhaar;
+
+  // badgeByRsvpId must be defined before filteredRows so badge_code is available in search
+  const badgeByRsvpId = useMemo(() => {
+    const m = new Map<string, EventBadgeRow>();
+    for (const b of badges) m.set(b.rsvp_id, b);
+    return m;
+  }, [badges]);
+
+  // COD-EVENTS-REGISTRATION-BADGE-EXPORT-AADHAAR-068 — search now includes badge code
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((row) => {
@@ -125,16 +188,75 @@ const AdminEventRegistrations: React.FC = () => {
         if ((row.visit_date ?? '') !== visitDateFilter) return false;
       }
       if (!q) return true;
+      const badgeCode = badgeByRsvpId.get(row.id)?.badge_code ?? '';
       const hay = [
         row.full_name,
-        row.email,
+        row.email ?? '',
         row.phone ?? '',
         row.company ?? '',
         row.profession ?? '',
+        badgeCode,
+        row.check_in_source ?? '',
       ].join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, search, visitDateFilter]);
+  }, [rows, search, visitDateFilter, badgeByRsvpId]);
+
+  // Event-end gate: download blocked once now > end_at + 12h grace.
+  const downloadDeadline = useMemo(() => {
+    const ref = event?.end_at ?? event?.start_at ?? null;
+    if (!ref) return null;
+    const t = new Date(ref).getTime();
+    return Number.isNaN(t) ? null : t + 12 * 60 * 60 * 1000;
+  }, [event?.end_at, event?.start_at]);
+  const eventEnded = downloadDeadline !== null && Date.now() > downloadDeadline;
+
+  const handleSendOrRetry = async (deliveryId: string, currentStatus: EventBadgeDeliveryStatus) => {
+    if (!canManage) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    setSendingDeliveryId(deliveryId);
+    try {
+      // For failed → flip to pending first so the audit trail is visible.
+      if (currentStatus === 'failed') {
+        await eventsService.retryBadgeDelivery(token, deliveryId);
+      }
+      const result = await eventsService.sendBadgeDelivery(token, deliveryId);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Email send failed.');
+      } else {
+        showToast('success', `Badge emailed to ${result.recipient ?? 'recipient'}.`);
+      }
+      await load();
+    } finally {
+      setSendingDeliveryId(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || !canManage) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const result = await eventsService.deleteRsvp(token, deleteTarget.id);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to delete registration.');
+        return;
+      }
+      showToast('success', `Registration for ${deleteTarget.full_name} deleted.`);
+      setDeleteTarget(null);
+      await load();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleStatusChange = async (rsvpId: string, status: EventRsvpStatus) => {
     if (!canManage) return;
@@ -151,6 +273,120 @@ const AdminEventRegistrations: React.FC = () => {
     showToast('success', 'Registration updated.');
     void load();
   };
+
+  // COD-EVENTS-REGISTRATION-COMPLETE-059 — Excel export of currently filtered rows.
+  const handleExport = useCallback(async () => {
+    if (!event) {
+      showToast('error', 'Event not loaded yet.');
+      return;
+    }
+    if (filteredRows.length === 0) {
+      showToast('error', 'No registrations to export with current filters.');
+      return;
+    }
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const slugBase = (event.slug && event.slug.length > 0 ? event.slug : event.title)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'event';
+    const fileName = `event-registrations-${slugBase}-${yyyy}-${mm}-${dd}.xlsx`;
+
+    // Detect which optional fields are worth exporting:
+    // include if event configured OR any row has data.
+    const cfg = event.rsvp;
+    const has = (key: keyof EventRsvpRow) => filteredRows.some((r) => r[key] != null && String(r[key] ?? '').length > 0);
+    const includeEmail = (cfg?.collect_email !== false) || has('email');
+    const includeMobile = Boolean(cfg?.collect_phone) || has('phone');
+    const includeOrg = Boolean(cfg?.collect_company) || has('company');
+    const includeGender = Boolean(cfg?.collect_gender) || has('gender');
+    const includeMeal = Boolean(cfg?.collect_meal) || has('meal_preference');
+    const includeProfession = Boolean(cfg?.collect_profession) || has('profession');
+    const includeDesignation = Boolean(cfg?.collect_designation) || has('designation');
+    const includeNote = Boolean(cfg?.collect_note) || has('notes');
+    const includeAadhaar = showAadhaar;
+    const eventDaysCount = eventDays.length;
+    const includeVisit = eventDaysCount > 1 || filteredRows.some((r) => r.visit_date || r.visit_all_days);
+
+    type Col = { key: string; header: string };
+    const columns: Col[] = [
+      { key: 'id', header: 'Registration ID' },
+      { key: 'status', header: 'Status' },
+      { key: 'full_name', header: 'Full Name' },
+      { key: 'surname', header: 'Surname' },
+      { key: 'given_name', header: 'Given Name' },
+    ];
+    if (includeEmail) columns.push({ key: 'email', header: 'Email' });
+    if (includeMobile) columns.push({ key: 'phone', header: 'Mobile' });
+    if (includeOrg) columns.push({ key: 'company', header: 'Organisation' });
+    if (includeVisit) {
+      columns.push({ key: 'visit_date', header: 'Visit Day' });
+      columns.push({ key: 'visit_all_days', header: 'All Days' });
+    }
+    if (includeGender) columns.push({ key: 'gender', header: 'Gender' });
+    if (includeMeal) columns.push({ key: 'meal_preference', header: 'Meal Preference' });
+    if (includeProfession) columns.push({ key: 'profession', header: 'Profession' });
+    if (includeDesignation) columns.push({ key: 'designation', header: 'Designation' });
+    if (includeNote) columns.push({ key: 'notes', header: 'Note' });
+    if (includeAadhaar) columns.push({ key: 'aadhaar_number', header: 'Aadhaar Card' });
+    columns.push({ key: 'badge_code', header: 'Badge No.' });
+    columns.push({ key: 'checked_in', header: 'Checked In' });
+    columns.push({ key: 'checked_in_at', header: 'Checked In At' });
+    columns.push({ key: 'check_in_source', header: 'Check-in Source' });
+    columns.push({ key: 'created_at', header: 'Created At' });
+    columns.push({ key: 'updated_at', header: 'Updated At' });
+
+    const rowsOut: Array<Record<string, string>> = filteredRows.map((r) => {
+      const out: Record<string, string> = {
+        id: r.id,
+        status: r.status,
+        full_name: r.full_name ?? '',
+        surname: r.surname ?? '',
+        given_name: r.given_name ?? '',
+      };
+      if (includeEmail) out.email = r.email ?? '';
+      if (includeMobile) out.phone = r.phone ?? '';
+      if (includeOrg) out.company = r.company ?? '';
+      if (includeVisit) {
+        out.visit_date = r.visit_all_days ? '' : (r.visit_date ?? '');
+        out.visit_all_days = r.visit_all_days ? 'Yes' : 'No';
+      }
+      if (includeGender) {
+        out.gender = labelFrom<EventRsvpGender>(r.gender ?? null, EVENT_RSVP_GENDER_OPTIONS).replace(/^—$/, '');
+      }
+      if (includeMeal) {
+        out.meal_preference = labelFrom<EventRsvpMealPreference>(r.meal_preference ?? null, EVENT_RSVP_MEAL_OPTIONS).replace(/^—$/, '');
+      }
+      if (includeProfession) {
+        out.profession = labelFrom<EventRsvpProfession>(r.profession ?? null, professionOptionsForEvent(event)).replace(/^—$/, '');
+      }
+      if (includeDesignation) out.designation = r.designation ?? '';
+      if (includeNote) out.notes = r.notes ?? '';
+      if (includeAadhaar) out.aadhaar_number = r.aadhaar_number ?? '';
+      out.badge_code = badgeByRsvpId.get(r.id)?.badge_code ?? '';
+      out.checked_in = r.checked_in_at ? 'Yes' : 'No';
+      out.checked_in_at = r.checked_in_at ? formatCheckinTime(r.checked_in_at) : '';
+      out.check_in_source = formatCheckinSource(r.check_in_source).replace(/^—$/, '');
+      out.created_at = r.created_at ?? '';
+      out.updated_at = r.updated_at ?? '';
+      return out;
+    });
+
+    try {
+      await downloadSingleSheetXlsx({
+        fileName,
+        sheetName: 'Registrations',
+        columns,
+        rows: rowsOut,
+      });
+      showToast('success', `Exported ${rowsOut.length} registration${rowsOut.length === 1 ? '' : 's'}.`);
+    } catch {
+      showToast('error', 'Failed to generate Excel file.');
+    }
+  }, [event, filteredRows, eventDays.length, showAadhaar, showToast, badgeByRsvpId]);
 
   if (!canView && !canManage) {
     return (
@@ -180,6 +416,27 @@ const AdminEventRegistrations: React.FC = () => {
           subtitle="Search, filter, and manage event registrations without entering edit mode."
           actions={
             <div className="flex items-center gap-2">
+              {id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/admin/content/events/${id}/checkin`)}
+                  title="Open badge check-in / attendance scanner"
+                >
+                  <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                  Check-in
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleExport()}
+                disabled={isLoading || filteredRows.length === 0}
+                title="Export currently filtered registrations to Excel"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export ({filteredRows.length})
+              </Button>
               <Button variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
                 {isLoading ? (
                   <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -215,7 +472,7 @@ const AdminEventRegistrations: React.FC = () => {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, email, phone, company"
+              placeholder="Search name, email, mobile, org, badge no."
               className="pl-9"
             />
           </div>
@@ -261,13 +518,21 @@ const AdminEventRegistrations: React.FC = () => {
                 <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Name</th>
                   <th className="px-3 py-2 font-medium">Email</th>
-                  <th className="px-3 py-2 font-medium">Phone</th>
-                  <th className="px-3 py-2 font-medium">Company</th>
+                  <th className="px-3 py-2 font-medium">Mobile</th>
+                  <th className="px-3 py-2 font-medium">Organisation</th>
                   <th className="px-3 py-2 font-medium">Day of Visit</th>
                   <th className="px-3 py-2 font-medium">Gender</th>
                   <th className="px-3 py-2 font-medium">Meal</th>
                   <th className="px-3 py-2 font-medium">Profession</th>
+                  <th className="px-3 py-2 font-medium">Designation</th>
+                  {showAadhaar && <th className="px-3 py-2 font-medium">Aadhaar Card</th>}
                   <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Checked In</th>
+                  <th className="px-3 py-2 font-medium">Checked In At</th>
+                  <th className="px-3 py-2 font-medium">Source</th>
+                  <th className="px-3 py-2 font-medium">Badge No.</th>
+                  <th className="px-3 py-2 font-medium">Badge</th>
+                  <th className="px-3 py-2 font-medium">Email delivery</th>
                   {canManage && <th className="px-3 py-2 font-medium text-right">Action</th>}
                 </tr>
               </thead>
@@ -275,10 +540,12 @@ const AdminEventRegistrations: React.FC = () => {
                 {filteredRows.map((row) => (
                   <tr key={row.id} className="border-b border-border/70 last:border-0 align-top">
                     <td className="px-3 py-2 text-foreground">{row.full_name}</td>
-                    <td className="px-3 py-2 text-muted-foreground break-all">{row.email}</td>
+                    <td className="px-3 py-2 text-muted-foreground break-all">{row.email ?? '—'}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.phone ?? '—'}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.company ?? '—'}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{formatVisitDate(row.visit_date ?? null)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatVisitDate(row.visit_date ?? null, Boolean(row.visit_all_days))}
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {labelFrom<EventRsvpGender>(row.gender ?? null, EVENT_RSVP_GENDER_OPTIONS)}
                     </td>
@@ -286,8 +553,14 @@ const AdminEventRegistrations: React.FC = () => {
                       {labelFrom<EventRsvpMealPreference>(row.meal_preference ?? null, EVENT_RSVP_MEAL_OPTIONS)}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {labelFrom<EventRsvpProfession>(row.profession ?? null, EVENT_RSVP_PROFESSION_OPTIONS)}
+                      {labelFrom<EventRsvpProfession>(row.profession ?? null, professionOptionsForEvent(event))}
                     </td>
+                    <td className="px-3 py-2 text-muted-foreground">{row.designation ?? '—'}</td>
+                    {showAadhaar && (
+                      <td className="px-3 py-2 text-muted-foreground font-mono text-xs">
+                        {row.aadhaar_number ?? '-'}
+                      </td>
+                    )}
                     <td className="px-3 py-2">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -303,18 +576,123 @@ const AdminEventRegistrations: React.FC = () => {
                         {row.status}
                       </span>
                     </td>
+                    <td className="px-3 py-2">
+                      {row.checked_in_at ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                      {row.checked_in_at ? formatCheckinTime(row.checked_in_at) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {formatCheckinSource(row.check_in_source)}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                      {badgeByRsvpId.get(row.id)?.badge_code ?? '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      {(() => {
+                        const badge = badgeByRsvpId.get(row.id);
+                        if (!badge) return <span className="text-xs text-muted-foreground">—</span>;
+                        if (eventEnded) {
+                          return (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              {badge.badge_code} · expired
+                            </span>
+                          );
+                        }
+                        return (
+                          <a
+                            href={eventsService.badgeDownloadUrlByCode(badge.badge_code)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:bg-muted/50"
+                          >
+                            <Download className="h-3 w-3" />
+                            {badge.badge_code}
+                          </a>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-3 py-2">
+                      {(() => {
+                        const badge = badgeByRsvpId.get(row.id);
+                        const delivery = badge?.latest_delivery;
+                        if (!delivery) return <span className="text-xs text-muted-foreground">—</span>;
+                        const cls = delivery.status === 'sent'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          : delivery.status === 'failed'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-muted text-muted-foreground';
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${cls} w-fit`}>
+                              <Mail className="h-3 w-3" />
+                              {delivery.status}
+                              {delivery.attempts > 0 ? ` (×${delivery.attempts})` : ''}
+                            </span>
+                            {delivery.last_error && delivery.status === 'failed' && (
+                              <span className="text-[10px] text-destructive truncate max-w-[180px]" title={delivery.last_error}>
+                                {delivery.last_error}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     {canManage && (
                       <td className="px-3 py-2 text-right">
-                        <select
-                          value={row.status}
-                          onChange={(e) => void handleStatusChange(row.id, e.target.value as EventRsvpStatus)}
-                          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                          <option value="confirmed">Confirmed</option>
-                          <option value="pending">Pending</option>
-                          <option value="waitlisted">Waitlisted</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                        <div className="flex items-center justify-end gap-2">
+                          {(() => {
+                            const badge = badgeByRsvpId.get(row.id);
+                            const delivery = badge?.latest_delivery;
+                            if (!delivery) return null;
+                            const isPending = delivery.status === 'pending' || delivery.status === 'failed';
+                            if (!isPending) return null;
+                            const sending = sendingDeliveryId === delivery.id;
+                            return (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleSendOrRetry(delivery.id, delivery.status)}
+                                disabled={sending || eventEnded}
+                              >
+                                {sending ? (
+                                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                ) : (
+                                  <Send className="h-3.5 w-3.5 mr-1.5" />
+                                )}
+                                {delivery.status === 'failed' ? 'Retry' : 'Send'}
+                              </Button>
+                            );
+                          })()}
+                          <select
+                            value={row.status}
+                            onChange={(e) => void handleStatusChange(row.id, e.target.value as EventRsvpStatus)}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          >
+                            <option value="confirmed">Confirmed</option>
+                            <option value="pending">Pending</option>
+                            <option value="waitlisted">Waitlisted</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDeleteTarget(row)}
+                            aria-label={`Delete registration for ${row.full_name}`}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -323,9 +701,62 @@ const AdminEventRegistrations: React.FC = () => {
             </table>
           )}
         </div>
+
+        {/* Delete confirm modal (050) */}
+        {deleteTarget && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            onClick={() => !isDeleting && setDeleteTarget(null)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-base font-semibold text-foreground inline-flex items-center gap-2">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                  Delete this registration?
+                </h3>
+                <button
+                  type="button"
+                  className="rounded-md p-1 text-muted-foreground hover:bg-muted/50"
+                  onClick={() => !isDeleting && setDeleteTarget(null)}
+                  aria-label="Close"
+                  disabled={isDeleting}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-3 text-sm text-foreground">
+                <strong>{deleteTarget.full_name}</strong>
+                {event ? <> for <strong>{event.title}</strong></> : null}.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                This will permanently remove the registration and (via FK cascade) the associated badge and any email
+                delivery records. This cannot be undone.
+              </p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="destructive" size="sm" onClick={() => void confirmDelete()} disabled={isDeleting}>
+                  {isDeleting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Delete registration
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PermissionGate>
   );
 };
 
 export default AdminEventRegistrations;
+
+
+
+
+

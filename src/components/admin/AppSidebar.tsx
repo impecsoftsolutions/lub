@@ -46,6 +46,8 @@ interface NavChild {
   label: string;
   path: string;
   badge?: string;
+  /** If set, child link is only shown when the user has this permission code. */
+  requiredPermission?: string;
 }
 
 interface NavSection {
@@ -73,6 +75,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const canViewAdmin        = useHasPermission('users.edit');
   const canViewContent      = useHasPermission('activities.view');
   const canViewEvents       = useHasPermission('events.view');
+  const canViewRsvp         = useHasPermission('events.rsvp.view');
+  const canManageRsvp       = useHasPermission('events.rsvp.manage');
 
   // Close mobile sidebar on navigation
   useEffect(() => {
@@ -90,8 +94,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: Image,
       requiredPermission: "events_or_activities.view",
       children: [
-        { label: "Events", path: "/admin/content/events" },
-        { label: "Activities", path: "/admin/content/activities" }
+        { label: "Events", path: "/admin/content/events", requiredPermission: "events.section.view" },
+        { label: "Activities", path: "/admin/content/activities", requiredPermission: "activities.view" }
       ]
     },
     {
@@ -173,14 +177,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     'users.edit': canViewAdmin,
     'activities.view': canViewContent,
     'events.view': canViewEvents,
-    'events_or_activities.view': canViewContent || canViewEvents,
-  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent, canViewEvents]);
+    // Events child link is visible whenever the user has any events-shell privilege
+    // (event.view OR rsvp.view OR rsvp.manage). Permissioned non-admins with only
+    // RSVP perms still need the Events link to reach /admin/content/events.
+    'events.section.view': canViewEvents || canViewRsvp || canManageRsvp,
+    // Section-level: show the Events & Activities group when any child is allowed.
+    'events_or_activities.view': canViewContent || canViewEvents || canViewRsvp || canManageRsvp,
+  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent, canViewEvents, canViewRsvp, canManageRsvp]);
 
   const navSections = useMemo(
     () =>
-      allSections.filter((s) =>
-        s.requiredPermission === undefined ? true : permissionMap[s.requiredPermission] === true
-      ),
+      allSections
+        .filter((s) =>
+          s.requiredPermission === undefined ? true : permissionMap[s.requiredPermission] === true
+        )
+        .map((s) => ({
+          ...s,
+          children: s.children.filter((c) =>
+            c.requiredPermission === undefined ? true : permissionMap[c.requiredPermission] === true
+          ),
+        }))
+        .filter((s) => s.children.length > 0),
     [allSections, permissionMap]
   );
 

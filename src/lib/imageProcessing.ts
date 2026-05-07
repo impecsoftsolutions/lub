@@ -235,3 +235,88 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
 
   return { valid: true };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COD-EVENTS-BANNER-PUBLIC-COMPRESS-046
+// Compress an image to a target byte budget WITHOUT changing dimensions.
+// Returns the original file untouched when:
+//   - the input is not an image MIME, or
+//   - the input is already at/under the budget.
+// Otherwise re-encodes via browser-image-compression with
+//   alwaysKeepResolution=true so width/height/aspect ratio are preserved.
+// PNGs are routed through WebP to preserve alpha; other inputs use JPEG.
+// Returns { file, compressed, originalBytes, finalBytes, hitFloor }.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const COMPRESSIBLE_IMAGE_MIMES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]);
+
+export interface CompressResult {
+  file: File;
+  compressed: boolean;
+  originalBytes: number;
+  finalBytes: number;
+  hitFloor: boolean;
+}
+
+export async function compressImageToBudget(
+  source: File,
+  opts?: { maxBytes?: number; minQuality?: number; initialQuality?: number },
+): Promise<CompressResult> {
+  const maxBytes = opts?.maxBytes ?? 1 * 1024 * 1024;
+  const minQuality = opts?.minQuality ?? 0.5;
+  const initialQuality = opts?.initialQuality ?? 0.92;
+  const originalBytes = source.size;
+  const mime = (source.type || '').toLowerCase();
+
+  if (!COMPRESSIBLE_IMAGE_MIMES.has(mime)) {
+    return { file: source, compressed: false, originalBytes, finalBytes: originalBytes, hitFloor: false };
+  }
+  if (source.size <= maxBytes) {
+    return { file: source, compressed: false, originalBytes, finalBytes: originalBytes, hitFloor: false };
+  }
+
+  const isPng = mime === 'image/png';
+  const targetType: 'image/webp' | 'image/jpeg' = isPng ? 'image/webp' : 'image/jpeg';
+  const targetExt = isPng ? '.webp' : '.jpg';
+
+  let bestBlob: Blob | null = null;
+  let quality = initialQuality;
+
+  for (let i = 0; i < 4; i++) {
+    const out = await imageCompression(source, {
+      maxSizeMB: maxBytes / (1024 * 1024),
+      useWebWorker: true,
+      fileType: targetType,
+      initialQuality: quality,
+      alwaysKeepResolution: true,
+      maxWidthOrHeight: 100000,
+    } as Parameters<typeof imageCompression>[1]);
+    if (!bestBlob || out.size < bestBlob.size) bestBlob = out;
+    if (out.size <= maxBytes) break;
+    if (quality <= minQuality) break;
+    quality = Math.max(minQuality, quality - 0.12);
+  }
+
+  if (!bestBlob) {
+    return { file: source, compressed: false, originalBytes, finalBytes: originalBytes, hitFloor: false };
+  }
+
+  const baseName = (source.name || 'upload').replace(/\.[^./\\]+$/, '');
+  const newFile = new File([bestBlob], `${baseName}${targetExt}`, {
+    type: targetType,
+    lastModified: Date.now(),
+  });
+  return {
+    file: newFile,
+    compressed: true,
+    originalBytes,
+    finalBytes: newFile.size,
+    hitFloor: newFile.size > maxBytes,
+  };
+}
+

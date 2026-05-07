@@ -1,1 +1,7 @@
 project_id = "qskziirjtzomrtckpzas"
+
+[functions.event-badge-download]
+verify_jwt = false
+
+[functions.extract-event-aadhaar]
+verify_jwt = false

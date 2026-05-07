@@ -38,6 +38,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+// 046: edge function previously hard-capped images at 8 MB. Client now
+// auto-compresses to ≤ 1 MB while preserving dimensions; raise the per-file
+// upload ceiling so a "compression hit floor" image still gets accepted
+// instead of being rejected outright.
 const DOC_MIMES = new Set([
   'application/pdf',
   'application/msword',
@@ -50,11 +54,12 @@ const DOC_MIMES = new Set([
   'image/jpg',
   'image/png',
 ]);
+const BADGE_REFERENCE_MIMES = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']);
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;     // 8 MB per image
+const MAX_IMAGE_BYTES = 16 * 1024 * 1024;    // 16 MB per image (post-compression headroom)
 const MAX_DOC_BYTES = 25 * 1024 * 1024;      // 25 MB per document
 
-const VALID_KINDS = new Set(['banner', 'flyer', 'gallery', 'document']);
+const VALID_KINDS = new Set(['banner', 'flyer', 'gallery', 'document', 'badge_template', 'badge_sample']);
 
 function safeFilename(name: string): string {
   const cleaned = name.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -122,12 +127,19 @@ Deno.serve(async (req: Request) => {
   if (!VALID_KINDS.has(kind)) return jsonResponse({ success: false, error: 'Invalid kind.', error_code: 'invalid_kind' });
   if (!(file instanceof File)) return jsonResponse({ success: false, error: 'A file is required.', error_code: 'file_required' });
 
-  const isDoc = kind === 'document';
-  const allowedMimes = isDoc ? DOC_MIMES : IMAGE_MIMES;
+  // 052/063A: badge_template / badge_sample are design references only.
+  // Keep them intentionally narrow: PDF, JPEG, or PNG. Other document
+  // formats remain available only for event documents.
+  const isDoc = kind === 'document' || kind === 'badge_template' || kind === 'badge_sample';
+  const allowedMimes = kind === 'badge_template' || kind === 'badge_sample'
+    ? BADGE_REFERENCE_MIMES
+    : (isDoc ? DOC_MIMES : IMAGE_MIMES);
   if (!allowedMimes.has(file.type)) {
     return jsonResponse({
       success: false,
-      error: isDoc
+      error: kind === 'badge_template' || kind === 'badge_sample'
+        ? 'Unsupported badge reference type. Allowed: PDF, JPEG, PNG.'
+        : isDoc
         ? 'Unsupported document type. Allowed: PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, JPEG, PNG.'
         : 'Unsupported image type. Allowed: JPEG, PNG, WEBP.',
       error_code: 'unsupported_format',
@@ -138,7 +150,7 @@ Deno.serve(async (req: Request) => {
   if (file.size <= 0 || file.size > sizeLimit) {
     return jsonResponse({
       success: false,
-      error: isDoc ? 'Document size must be between 1 byte and 25 MB.' : 'Image size must be between 1 byte and 8 MB.',
+      error: isDoc ? 'Document size must be between 1 byte and 25 MB.' : 'Image size must be between 1 byte and 16 MB.',
       error_code: 'file_too_large',
     });
   }

@@ -8,8 +8,10 @@ import {
   Clock3,
   Copy,
   ExternalLink,
+  FileText,
   Globe,
   GlobeLock,
+  ImageIcon,
   Link2,
   Loader2,
   Lock,
@@ -40,6 +42,8 @@ import {
   type EventRsvpGender,
   type EventRsvpMealPreference,
   type EventRsvpProfession,
+  type BadgeDesignAnalysis,
+  type BadgeDesignAnalysisStatus,
   type EventAsset,
   type EventAssetKind,
   type EventCapacityMode,
@@ -68,6 +72,40 @@ const EVENT_TYPE_OPTIONS: Array<{ value: EventType; label: string }> = [
   { value: 'general', label: 'General' },
 ];
 
+const DEFAULT_PROFESSION_LABELS = EVENT_RSVP_PROFESSION_OPTIONS.map((option) => option.label);
+
+function normalizeProfessionOptionLines(raw: string): string[] {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const value = line.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push(value);
+    if (values.length >= 20) break;
+  }
+  return values.length > 0 ? values : DEFAULT_PROFESSION_LABELS;
+}
+
+function professionOptionsTextFrom(value: unknown): string {
+  if (Array.isArray(value)) {
+    const labels = value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>;
+          return String(record.label ?? record.value ?? '').trim();
+        }
+        return '';
+      })
+      .filter(Boolean);
+    if (labels.length > 0) return labels.join('\n');
+  }
+  return DEFAULT_PROFESSION_LABELS.join('\n');
+}
+
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,79})$/;
 const MAX_BRIEF_CHARS = 4000;
 const MAX_SOURCE_FILES = 5;
@@ -75,6 +113,24 @@ const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 const MAX_PDF_BYTES = 30 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
 const ALLOWED_SOURCE_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
+
+function assetFileName(asset: EventAsset): string {
+  return asset.label || asset.storage_path.split('/').pop() || 'Uploaded file';
+}
+
+function formatAssetSize(bytes: number | null | undefined): string {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.ceil(bytes / 1024)} KB`;
+}
+
+function isImageAsset(asset: EventAsset): boolean {
+  return (asset.mime_type ?? '').toLowerCase().startsWith('image/');
+}
+
+function isPdfAsset(asset: EventAsset): boolean {
+  return (asset.mime_type ?? '').toLowerCase() === 'application/pdf';
+}
 
 function slugify(value: string): string {
   return value
@@ -198,13 +254,37 @@ const AdminEventForm: React.FC = () => {
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
   const [assets, setAssets] = useState<EventAsset[]>([]);
   const [uploadingKind, setUploadingKind] = useState<EventAssetKind | null>(null);
+  // 063A — badge sample analysis state
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisPolling, setAnalysisPolling] = useState(false);
+  const [analysisPollTimedOut, setAnalysisPollTimedOut] = useState(false);
   const [docLabelDraft, setDocLabelDraft] = useState('');
   const [rsvpDeadlineAt, setRsvpDeadlineAt] = useState('');
+  const [rsvpCollectEmail, setRsvpCollectEmail] = useState(true);
+  const [rsvpRequireEmail, setRsvpRequireEmail] = useState(false);
   const [rsvpCollectPhone, setRsvpCollectPhone] = useState(true);
   const [rsvpCollectCompany, setRsvpCollectCompany] = useState(true);
   const [rsvpCollectGender, setRsvpCollectGender] = useState(false);
   const [rsvpCollectMeal, setRsvpCollectMeal] = useState(false);
   const [rsvpCollectProfession, setRsvpCollectProfession] = useState(false);
+  const [rsvpProfessionOptionsText, setRsvpProfessionOptionsText] = useState(DEFAULT_PROFESSION_LABELS.join('\n'));
+  const [rsvpRequirePhone, setRsvpRequirePhone] = useState(false);
+  const [rsvpRequireCompany, setRsvpRequireCompany] = useState(false);
+  const [rsvpRequireGender, setRsvpRequireGender] = useState(false);
+  const [rsvpRequireMeal, setRsvpRequireMeal] = useState(false);
+  const [rsvpRequireProfession, setRsvpRequireProfession] = useState(false);
+  const [rsvpCollectNote, setRsvpCollectNote] = useState(false);
+  const [rsvpRequireNote, setRsvpRequireNote] = useState(false);
+  // 052 — Designation field on RSVP.
+  const [rsvpCollectDesignation, setRsvpCollectDesignation] = useState(false);
+  const [rsvpRequireDesignation, setRsvpRequireDesignation] = useState(false);
+  // COD-EVENTS-REGISTRATION-COMPLETE-059
+  const [rsvpCollectAadhaar, setRsvpCollectAadhaar] = useState(false);
+  const [rsvpRequireAadhaar, setRsvpRequireAadhaar] = useState(false);
+  // 054 — Badge name display options (persisted in events.ai_metadata).
+  const [badgeIncludeSurname, setBadgeIncludeSurname] = useState(true);
+  const [badgeNameMaxChars, setBadgeNameMaxChars] = useState(25);
+  const [badgeNameFontSize, setBadgeNameFontSize] = useState(22);
   const [rsvpRequireLogin, setRsvpRequireLogin] = useState(true);
 
   // RSVP roster
@@ -285,6 +365,9 @@ const AdminEventForm: React.FC = () => {
         setInvitationText(data.invitation_text ?? '');
         setShowAgendaPublicly(Boolean(data.show_agenda_publicly));
         setAiMetadata(data.ai_metadata ?? null);
+        const meta = (data.ai_metadata && typeof data.ai_metadata === 'object')
+          ? (data.ai_metadata as Record<string, unknown>)
+          : {};
         setVenueMapUrl(data.venue_map_url ?? '');
         setWhatsappMessage(data.whatsapp_invitation_message ?? '');
 
@@ -303,11 +386,35 @@ const AdminEventForm: React.FC = () => {
         setBannerImageUrl(data.banner_image_url ?? null);
         setAssets(Array.isArray(data.assets) ? data.assets : []);
         setRsvpDeadlineAt(toDateTimeInput(rsvpCfg.deadline_at ?? null));
+        setRsvpCollectEmail(Boolean(meta.rsvp_collect_email ?? rsvpCfg.collect_email ?? true));
+        setRsvpRequireEmail(Boolean(meta.rsvp_require_email ?? rsvpCfg.require_email ?? false));
         setRsvpCollectPhone(rsvpCfg.collect_phone !== false);
         setRsvpCollectCompany(rsvpCfg.collect_company !== false);
         setRsvpCollectGender(Boolean(rsvpCfg.collect_gender));
         setRsvpCollectMeal(Boolean(rsvpCfg.collect_meal));
         setRsvpCollectProfession(Boolean(rsvpCfg.collect_profession));
+        setRsvpProfessionOptionsText(
+          professionOptionsTextFrom(meta.rsvp_profession_options ?? rsvpCfg.profession_options),
+        );
+        setRsvpRequirePhone(Boolean(meta.rsvp_require_phone ?? rsvpCfg.require_phone ?? rsvpCfg.collect_phone));
+        setRsvpRequireCompany(Boolean(meta.rsvp_require_company ?? rsvpCfg.require_company ?? rsvpCfg.collect_company));
+        setRsvpRequireGender(Boolean(meta.rsvp_require_gender ?? rsvpCfg.require_gender ?? rsvpCfg.collect_gender));
+        setRsvpRequireMeal(Boolean(meta.rsvp_require_meal ?? rsvpCfg.require_meal ?? rsvpCfg.collect_meal));
+        setRsvpRequireProfession(Boolean(meta.rsvp_require_profession ?? rsvpCfg.require_profession ?? rsvpCfg.collect_profession));
+        setRsvpCollectNote(Boolean(meta.rsvp_collect_note ?? rsvpCfg.collect_note));
+        setRsvpRequireNote(Boolean(meta.rsvp_require_note ?? rsvpCfg.require_note));
+        setRsvpCollectDesignation(Boolean(rsvpCfg.collect_designation));
+        setRsvpRequireDesignation(Boolean(meta.rsvp_require_designation ?? rsvpCfg.require_designation));
+        setRsvpCollectAadhaar(Boolean(rsvpCfg.collect_aadhaar));
+        setRsvpRequireAadhaar(Boolean(rsvpCfg.require_aadhaar));
+        {
+          const includeRaw = (meta as Record<string, unknown>)['badge_include_surname'];
+          setBadgeIncludeSurname(includeRaw === undefined ? true : Boolean(includeRaw));
+          const maxRaw = Number((meta as Record<string, unknown>)['badge_name_max_chars']);
+          setBadgeNameMaxChars(Number.isFinite(maxRaw) && maxRaw > 0 ? Math.max(6, Math.min(40, Math.floor(maxRaw))) : 25);
+          const fontRaw = Number((meta as Record<string, unknown>)['badge_name_font_size']);
+          setBadgeNameFontSize(Number.isFinite(fontRaw) && fontRaw > 0 ? Math.max(8, Math.min(32, Math.floor(fontRaw))) : 22);
+        }
         setRsvpRequireLogin(rsvpCfg.require_login !== false);
         setBridgeActivityId(data.bridge?.activity_id ?? null);
 
@@ -585,6 +692,24 @@ const AdminEventForm: React.FC = () => {
     const capacityNum = capacityRaw ? Number(capacityRaw) : null;
     const perDayRaw = perDayCapacity.trim();
     const perDayNum = perDayRaw ? Number(perDayRaw) : null;
+    const professionOptions = normalizeProfessionOptionLines(rsvpProfessionOptionsText);
+    const nextAiMetadata: Record<string, unknown> = {
+      ...(aiMetadata && typeof aiMetadata === 'object' ? aiMetadata : {}),
+      rsvp_require_phone: rsvpCollectPhone ? rsvpRequirePhone : false,
+      rsvp_require_company: rsvpCollectCompany ? rsvpRequireCompany : false,
+      rsvp_require_gender: rsvpCollectGender ? rsvpRequireGender : false,
+      rsvp_require_meal: rsvpCollectMeal ? rsvpRequireMeal : false,
+      rsvp_require_profession: rsvpCollectProfession ? rsvpRequireProfession : false,
+      rsvp_collect_email: rsvpCollectEmail,
+      rsvp_require_email: rsvpCollectEmail ? rsvpRequireEmail : false,
+      rsvp_collect_note: rsvpCollectNote,
+      rsvp_require_note: rsvpCollectNote ? rsvpRequireNote : false,
+      rsvp_require_designation: rsvpCollectDesignation ? rsvpRequireDesignation : false,
+      rsvp_profession_options: professionOptions,
+      badge_include_surname: badgeIncludeSurname,
+      badge_name_max_chars: badgeNameMaxChars,
+      badge_name_font_size: badgeNameFontSize,
+    };
     return {
       title: title.trim(),
       slug: slug.trim(),
@@ -600,7 +725,7 @@ const AdminEventForm: React.FC = () => {
       invitation_text: invitationText.trim() || null,
       agenda_items: normalizeAgendaItems(agendaItems),
       show_agenda_publicly: showAgendaPublicly,
-      ai_metadata: aiMetadata ?? null,
+      ai_metadata: nextAiMetadata,
       venue_map_url: venueMapUrl.trim() || null,
       whatsapp_invitation_message: whatsappMessage.trim() || null,
       rsvp_enabled: rsvpEnabled,
@@ -612,6 +737,18 @@ const AdminEventForm: React.FC = () => {
       rsvp_collect_gender: rsvpCollectGender,
       rsvp_collect_meal: rsvpCollectMeal,
       rsvp_collect_profession: rsvpCollectProfession,
+      rsvp_collect_email: rsvpCollectEmail,
+      rsvp_require_email: rsvpCollectEmail ? rsvpRequireEmail : false,
+      rsvp_require_phone: rsvpCollectPhone ? rsvpRequirePhone : false,
+      rsvp_require_company: rsvpCollectCompany ? rsvpRequireCompany : false,
+      rsvp_require_gender: rsvpCollectGender ? rsvpRequireGender : false,
+      rsvp_require_meal: rsvpCollectMeal ? rsvpRequireMeal : false,
+      rsvp_require_profession: rsvpCollectProfession ? rsvpRequireProfession : false,
+      rsvp_collect_note: rsvpCollectNote,
+      rsvp_require_note: rsvpCollectNote ? rsvpRequireNote : false,
+      rsvp_collect_designation: rsvpCollectDesignation,
+      rsvp_collect_aadhaar: rsvpCollectAadhaar,
+      rsvp_require_aadhaar: rsvpCollectAadhaar ? rsvpRequireAadhaar : false,
       rsvp_require_login: rsvpRequireLogin,
       capacity_mode: capacityMode,
       per_day_capacity:
@@ -784,7 +921,7 @@ const AdminEventForm: React.FC = () => {
       showToast('error', result.error ?? 'Failed to update RSVP status.');
       return;
     }
-    showToast('success', 'RSVP updated.');
+    showToast('success', 'Registration updated.');
     void loadRsvps();
   };
 
@@ -903,8 +1040,75 @@ const AdminEventForm: React.FC = () => {
     if (data) {
       setAssets(Array.isArray(data.assets) ? data.assets : []);
       setBannerImageUrl(data.banner_image_url ?? null);
+      // 063A — refresh ai_metadata too so the sample analysis pill
+      // reflects the server's reset/clear behavior on
+      // upload/replace/remove of badge_sample.
+      setAiMetadata(data.ai_metadata ?? null);
     }
   }, [id, isEdit]);
+
+  // 063A — Poll get_event_by_id_with_session every 4s for up to 60s and
+  // refresh ai_metadata so the sample analysis pill reflects the latest
+  // server status. Stops as soon as status flips out of 'pending'.
+  const pollSampleAnalysis = useCallback(async () => {
+    if (!isEdit || !id) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setAnalysisPolling(true);
+    setAnalysisPollTimedOut(false);
+    const start = Date.now();
+    const MAX_MS = 60_000;
+    const INTERVAL_MS = 4_000;
+    try {
+      while (Date.now() - start < MAX_MS) {
+        await new Promise((r) => window.setTimeout(r, INTERVAL_MS));
+        const data = await eventsService.getById(token, id);
+        if (data) {
+          setAssets(Array.isArray(data.assets) ? data.assets : []);
+          setAiMetadata(data.ai_metadata ?? null);
+          const status = (data.ai_metadata as Record<string, unknown> | null)
+            ?.['badge_design_analysis_status'] as BadgeDesignAnalysisStatus | undefined;
+          if (status && status !== 'pending') {
+            return;
+          }
+        }
+      }
+      setAnalysisPollTimedOut(true);
+    } finally {
+      setAnalysisPolling(false);
+    }
+  }, [id, isEdit]);
+
+  const triggerSampleAnalysis = useCallback(
+    async (assetId: string, opts?: { successToast?: string }) => {
+      if (!isEdit || !id) return;
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      setAnalysisBusy(true);
+      setAnalysisPollTimedOut(false);
+      try {
+        const result = await eventsService.triggerBadgeSampleAnalysis(token, id, assetId);
+        // Always re-read to pick up server-side status writes regardless of
+        // sync vs async analyzer behavior.
+        await refreshAssetsAfterUpload();
+        if (!result.success) {
+          showToast('error', result.error ?? 'Could not analyze the sample.');
+        } else if (opts?.successToast) {
+          showToast('success', opts.successToast);
+        }
+        // If the analyzer reported pending (async path), poll for completion.
+        if (result.status === 'pending') {
+          void pollSampleAnalysis();
+        }
+      } finally {
+        setAnalysisBusy(false);
+      }
+    },
+    [id, isEdit, pollSampleAnalysis, refreshAssetsAfterUpload, showToast],
+  );
 
   const handleAssetUpload = useCallback(
     async (kind: EventAssetKind, file: File, label?: string) => {
@@ -930,13 +1134,28 @@ const AdminEventForm: React.FC = () => {
           showToast('error', result.error ?? 'Upload failed.');
           return;
         }
-        showToast('success', kind === 'banner' ? 'Banner updated.' : 'Upload complete.');
+        const c = result.compression;
+        const baseMsg = kind === 'banner' ? 'Banner updated.' : 'Upload complete.';
+        if (c?.compressed) {
+          const before = Math.max(1, Math.round(c.originalBytes / 1024));
+          const after = Math.max(1, Math.round(c.finalBytes / 1024));
+          const note = c.hitFloor ? ' (still over 1 MB at floor quality)' : '';
+          showToast('success', `${baseMsg} Optimized ${before} KB → ${after} KB${note}.`);
+        } else {
+          showToast('success', baseMsg);
+        }
         await refreshAssetsAfterUpload();
+        // 063A — automatically kick off badge sample analysis as soon as
+        // the sample asset upload succeeds. Server has already reset
+        // status='pending' in record_event_asset_with_session.
+        if (kind === 'badge_sample' && result.asset_id) {
+          void triggerSampleAnalysis(result.asset_id);
+        }
       } finally {
         setUploadingKind(null);
       }
     },
-    [id, isEdit, refreshAssetsAfterUpload, showToast],
+    [id, isEdit, refreshAssetsAfterUpload, showToast, triggerSampleAnalysis],
   );
 
   const handleAssetDelete = useCallback(
@@ -957,6 +1176,13 @@ const AdminEventForm: React.FC = () => {
     },
     [refreshAssetsAfterUpload, showToast],
   );
+
+  // Manual refresh used by the "Still analyzing…" passive state and the
+  // generic Refresh affordance after a poll timeout.
+  const refreshSampleAnalysisOnce = useCallback(async () => {
+    setAnalysisPollTimedOut(false);
+    await refreshAssetsAfterUpload();
+  }, [refreshAssetsAfterUpload]);
 
   const flyerAssets = useMemo(
     () => assets.filter((a) => a.kind === 'flyer' || a.kind === 'gallery'),
@@ -1287,7 +1513,7 @@ const AdminEventForm: React.FC = () => {
 
         {/* Form */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-foreground">Title *</label>
               <Input
@@ -1625,7 +1851,7 @@ const AdminEventForm: React.FC = () => {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  Save the event first to unlock media uploads. Banners are public; documents are publicly downloadable via their URL.
+                  Save the event first to unlock media uploads. Image files (banner, flyers, gallery) are auto-optimized for web (target &lt; 1 MB) while keeping their original dimensions; documents are uploaded as-is.
                 </p>
               </div>
             )}
@@ -1648,6 +1874,9 @@ const AdminEventForm: React.FC = () => {
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Detailed event description"
               />
+              <p className="text-[11px] text-muted-foreground">
+                AI generates a short starter description (up to 100 words). You can expand it manually here.
+              </p>
             </div>
 
             <div className="space-y-2 md:col-span-2">
@@ -1795,7 +2024,7 @@ const AdminEventForm: React.FC = () => {
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  RSVP / Registration
+                  Register for Event
                 </h3>
                 <label className="inline-flex items-center gap-2 text-sm text-foreground">
                   <input
@@ -1804,12 +2033,12 @@ const AdminEventForm: React.FC = () => {
                     onChange={(event) => setRsvpEnabled(event.target.checked)}
                     className="h-4 w-4 rounded border-input accent-primary"
                   />
-                  Enable RSVP
+                  Enable Registration
                 </label>
               </div>
 
               {rsvpEnabled && (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-xs font-medium text-foreground">Capacity model</label>
                     <div className="flex flex-wrap gap-3">
@@ -1871,52 +2100,219 @@ const AdminEventForm: React.FC = () => {
                       onChange={(event) => setRsvpDeadlineAt(event.target.value)}
                     />
                   </div>
-                  <div className="md:col-span-2 grid gap-2 sm:grid-cols-3">
-                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={rsvpCollectPhone}
-                        onChange={(event) => setRsvpCollectPhone(event.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-input accent-primary"
-                      />
-                      Collect phone
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={rsvpCollectCompany}
-                        onChange={(event) => setRsvpCollectCompany(event.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-input accent-primary"
-                      />
-                      Collect company
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={rsvpCollectGender}
-                        onChange={(event) => setRsvpCollectGender(event.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-input accent-primary"
-                      />
-                      Collect gender
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={rsvpCollectMeal}
-                        onChange={(event) => setRsvpCollectMeal(event.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-input accent-primary"
-                      />
-                      Collect meal preference
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={rsvpCollectProfession}
-                        onChange={(event) => setRsvpCollectProfession(event.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-input accent-primary"
-                      />
-                      Collect profession
-                    </label>
+                  <div className="md:col-span-2 rounded-md border border-border bg-background/50 p-3">
+                    <div className="mb-2 grid grid-cols-[1fr_auto_auto] gap-2 px-1 text-[11px] font-medium text-muted-foreground">
+                      <span>Field</span>
+                      <span>Collect</span>
+                      <span>Required</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5">
+                        <span className="text-xs text-foreground">
+                          Email
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectEmail}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectEmail(next);
+                            if (!next) setRsvpRequireEmail(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireEmail}
+                          disabled={!rsvpCollectEmail}
+                          onChange={(event) => setRsvpRequireEmail(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Mobile</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectPhone}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectPhone(next);
+                            if (!next) setRsvpRequirePhone(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequirePhone}
+                          disabled={!rsvpCollectPhone}
+                          onChange={(event) => setRsvpRequirePhone(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Organisation</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectCompany}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectCompany(next);
+                            if (!next) setRsvpRequireCompany(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireCompany}
+                          disabled={!rsvpCollectCompany}
+                          onChange={(event) => setRsvpRequireCompany(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Gender</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectGender}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectGender(next);
+                            if (!next) setRsvpRequireGender(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireGender}
+                          disabled={!rsvpCollectGender}
+                          onChange={(event) => setRsvpRequireGender(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Meal preference</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectMeal}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectMeal(next);
+                            if (!next) setRsvpRequireMeal(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireMeal}
+                          disabled={!rsvpCollectMeal}
+                          onChange={(event) => setRsvpRequireMeal(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Profession</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectProfession}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectProfession(next);
+                            if (!next) setRsvpRequireProfession(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireProfession}
+                          disabled={!rsvpCollectProfession}
+                          onChange={(event) => setRsvpRequireProfession(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      {rsvpCollectProfession && (
+                        <div className="space-y-1.5 rounded-md border border-dashed border-border/70 bg-background px-3 py-2">
+                          <label className="text-xs font-medium text-foreground">
+                            Profession dropdown options
+                          </label>
+                          <Textarea
+                            value={rsvpProfessionOptionsText}
+                            onChange={(event) => setRsvpProfessionOptionsText(event.target.value.slice(0, 1200))}
+                            rows={5}
+                            placeholder="One option per line"
+                            className="min-h-[112px] text-xs"
+                          />
+                          <p className="text-[11px] text-muted-foreground">
+                            One option per line. These options appear on the public registration form for this event.
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Designation</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectDesignation}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectDesignation(next);
+                            if (!next) setRsvpRequireDesignation(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireDesignation}
+                          disabled={!rsvpCollectDesignation}
+                          onChange={(event) => setRsvpRequireDesignation(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Aadhaar Card</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectAadhaar}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectAadhaar(next);
+                            if (!next) setRsvpRequireAadhaar(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireAadhaar}
+                          disabled={!rsvpCollectAadhaar}
+                          onChange={(event) => setRsvpRequireAadhaar(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                        <span className="text-xs text-foreground">Note</span>
+                        <input
+                          type="checkbox"
+                          checked={rsvpCollectNote}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpCollectNote(next);
+                            if (!next) setRsvpRequireNote(false);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center"
+                        />
+                        <input
+                          type="checkbox"
+                          checked={rsvpRequireNote}
+                          disabled={!rsvpCollectNote}
+                          onChange={(event) => setRsvpRequireNote(event.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary justify-self-center disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 px-1 text-[11px] text-muted-foreground">
+                      Toggle Collect to show a field on the public registration form, and Required to make it mandatory.
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
                     <label className="inline-flex items-center gap-2 text-xs text-foreground">
                       <input
                         type="checkbox"
@@ -1929,7 +2325,7 @@ const AdminEventForm: React.FC = () => {
                   </div>
 
                   <p className="md:col-span-2 text-[11px] text-muted-foreground">
-                    Enabled fields become required for the user. Existing RSVPs from before these were enabled remain valid.
+                    Tick "Collect" to show a field. Tick "Required" to make submitting that field mandatory.
                   </p>
                   {visibility === 'member_only' && !rsvpRequireLogin && (
                     <p className="md:col-span-2 text-[11px] text-amber-700 dark:text-amber-400">
@@ -1946,7 +2342,7 @@ const AdminEventForm: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
                     <Users className="h-4 w-4" />
-                    RSVP roster
+                    Registration roster
                   </h3>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-muted-foreground">
@@ -1985,7 +2381,7 @@ const AdminEventForm: React.FC = () => {
 
                 {rsvpRows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    {rsvpLoading ? 'Loading…' : 'No RSVPs yet.'}
+                    {rsvpLoading ? 'Loading…' : 'No registrations yet.'}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -1994,8 +2390,8 @@ const AdminEventForm: React.FC = () => {
                         <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="px-2 py-1">Name</th>
                           <th className="px-2 py-1">Email</th>
-                          <th className="px-2 py-1">Phone</th>
-                          <th className="px-2 py-1">Company</th>
+                          <th className="px-2 py-1">Mobile</th>
+                          <th className="px-2 py-1">Organisation</th>
                           <th className="px-2 py-1">Gender</th>
                           <th className="px-2 py-1">Meal</th>
                           <th className="px-2 py-1">Profession</th>
@@ -2061,6 +2457,296 @@ const AdminEventForm: React.FC = () => {
                     </table>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 054 — Badge name display options (edit mode only).
+                Persists in events.ai_metadata; the badge renderer reads
+                them at request time. Saves on the next event Save. */}
+            {isEdit && (
+              <div className="md:col-span-2 rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Badge name display</h3>
+                <p className="text-xs text-muted-foreground">
+                  Controls how the attendee's name appears on the printed badge. Leaves long names readable when there's
+                  little horizontal space.
+                </p>
+                <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={badgeIncludeSurname}
+                    onChange={(e) => setBadgeIncludeSurname(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-input accent-primary"
+                  />
+                  Include surname (when off, only the given name is shown)
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Max characters (default 25)</label>
+                    <Input
+                      type="number"
+                      min={6}
+                      max={40}
+                      value={badgeNameMaxChars}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return;
+                        setBadgeNameMaxChars(Math.max(6, Math.min(40, Math.floor(n))));
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Font size in points (default 22)</label>
+                    <Input
+                      type="number"
+                      min={8}
+                      max={32}
+                      value={badgeNameFontSize}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return;
+                        setBadgeNameFontSize(Math.max(8, Math.min(32, Math.floor(n))));
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 052 — Badge design references (edit mode only).
+                Two singleton uploads stored as event_assets kinds
+                'badge_template' and 'badge_sample'. These are admin-only
+                references for an upcoming AI-driven badge design pass; the
+                public detail RPC excludes them, so they never leak to
+                visitors. */}
+            {isEdit && (
+              <div className="md:col-span-2 rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Badge design references</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Upload your badge template and a sample/expected badge so AI can match your style. PDF or image,
+                    one of each per event. These files are admin-only and never shown on the public event page.
+                    They are retained until an admin replaces or removes them.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+                  {(['badge_template', 'badge_sample'] as const).map((k) => {
+                    const existing = assets.find((a) => a.kind === k);
+                    const titleLabel = k === 'badge_template' ? 'Badge template' : 'Sample badge';
+                    const inputId = `upload-${k}`;
+                    const uploading = uploadingKind === k;
+                    const isSample = k === 'badge_sample';
+                    return (
+                      <div key={k} className="rounded-md border border-border bg-background p-3 space-y-2">
+                        <p className="text-xs font-medium text-foreground">{titleLabel}</p>
+                        {existing ? (
+                          <div className="space-y-2">
+                            <a
+                              href={existing.public_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group block overflow-hidden rounded-md border border-border bg-muted/20"
+                              title={`Open ${assetFileName(existing)}`}
+                            >
+                              {isImageAsset(existing) ? (
+                                <img
+                                  src={existing.public_url}
+                                  alt={`${titleLabel} thumbnail`}
+                                  className="h-32 w-full object-contain bg-[linear-gradient(45deg,rgba(0,0,0,0.04)_25%,transparent_25%,transparent_75%,rgba(0,0,0,0.04)_75%),linear-gradient(45deg,rgba(0,0,0,0.04)_25%,transparent_25%,transparent_75%,rgba(0,0,0,0.04)_75%)] bg-[length:16px_16px] bg-[position:0_0,8px_8px] transition-transform group-hover:scale-[1.01]"
+                                  loading="lazy"
+                                />
+                              ) : isPdfAsset(existing) ? (
+                                <div className="flex h-32 w-full flex-col items-center justify-center gap-2 bg-muted/30 text-muted-foreground">
+                                  <FileText className="h-8 w-8" />
+                                  <span className="text-[11px] font-medium text-foreground">PDF reference</span>
+                                  <span className="text-[10px]">Open to preview</span>
+                                </div>
+                              ) : (
+                                <div className="flex h-32 w-full flex-col items-center justify-center gap-2 bg-muted/30 text-muted-foreground">
+                                  <ImageIcon className="h-8 w-8" />
+                                  <span className="text-[11px] font-medium text-foreground">Uploaded reference</span>
+                                </div>
+                              )}
+                            </a>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="min-w-0">
+                                <a
+                                  href={existing.public_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block truncate text-primary hover:underline max-w-[220px]"
+                                >
+                                  {assetFileName(existing)}
+                                </a>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {[existing.mime_type, formatAssetSize(existing.byte_size)].filter(Boolean).join(' · ')}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <label
+                                  htmlFor={inputId}
+                                  className={`inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 ${
+                                    canEdit ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'
+                                  }`}
+                                  aria-disabled={!canEdit}
+                                >
+                                  {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                                  Replace
+                                </label>
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleAssetDelete(existing.id)}
+                                    className="text-muted-foreground hover:text-destructive"
+                                    aria-label={`Remove ${titleLabel}`}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <label
+                            htmlFor={inputId}
+                            className={`inline-flex items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs w-full justify-center ${
+                              canEdit ? 'cursor-pointer hover:bg-muted/40' : 'opacity-50 cursor-not-allowed'
+                            }`}
+                            aria-disabled={!canEdit}
+                          >
+                            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                            Upload {titleLabel.toLowerCase()} (PDF or image)
+                          </label>
+                        )}
+                        <input
+                          id={inputId}
+                          type="file"
+                          accept=".pdf,image/jpeg,image/png"
+                          className="hidden"
+                          disabled={uploading || !canEdit}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) void handleAssetUpload(k, f, titleLabel);
+                          }}
+                        />
+                        {/* 063A — sample analysis status pill */}
+                        {isSample && (() => {
+                          const meta = (aiMetadata && typeof aiMetadata === 'object' ? aiMetadata : {}) as Record<string, unknown>;
+                          const status = meta['badge_design_analysis_status'] as BadgeDesignAnalysisStatus | undefined;
+                          const errorMsg = (meta['badge_design_analysis_error'] as string | null | undefined) ?? null;
+                          const analysis = (meta['badge_design_analysis'] as BadgeDesignAnalysis | undefined) ?? undefined;
+                          const summary = (analysis?.raw_summary ?? '').slice(0, 500);
+                          const sampleAssetId = existing?.id;
+                          if (!existing) return null;
+
+                          // Pill state machine
+                          let pill: React.ReactNode = null;
+                          let action: React.ReactNode = null;
+
+                          if (analysisPolling || status === 'pending') {
+                            pill = (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Analyzing sample…
+                              </span>
+                            );
+                            if (analysisPollTimedOut) {
+                              action = canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => void refreshSampleAnalysisOnce()}
+                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] hover:bg-muted/50"
+                                >
+                                  <RefreshCw className="h-3 w-3" />
+                                  Refresh
+                                </button>
+                              );
+                            }
+                          } else if (status === 'complete') {
+                            pill = (
+                              <span
+                                title={summary || 'Design analyzed'}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                              >
+                                <Check className="h-3 w-3" />
+                                Design analyzed
+                              </span>
+                            );
+                            action = canEdit && sampleAssetId && (
+                              <button
+                                type="button"
+                                onClick={() => void triggerSampleAnalysis(sampleAssetId, { successToast: 'Re-analysis started.' })}
+                                disabled={analysisBusy}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] hover:bg-muted/50 disabled:opacity-60"
+                              >
+                                {analysisBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                                Re-analyze
+                              </button>
+                            );
+                          } else if (status === 'failed') {
+                            pill = (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                <X className="h-3 w-3" />
+                                Analysis failed
+                              </span>
+                            );
+                            action = canEdit && sampleAssetId && (
+                              <button
+                                type="button"
+                                onClick={() => void triggerSampleAnalysis(sampleAssetId, { successToast: 'Retrying analysis…' })}
+                                disabled={analysisBusy}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] hover:bg-muted/50 disabled:opacity-60"
+                              >
+                                {analysisBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                                Retry
+                              </button>
+                            );
+                          } else {
+                            // Sample exists but no analysis metadata → legacy.
+                            pill = (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                Not analyzed
+                              </span>
+                            );
+                            action = canEdit && sampleAssetId && (
+                              <button
+                                type="button"
+                                onClick={() => void triggerSampleAnalysis(sampleAssetId, { successToast: 'Analyzing sample…' })}
+                                disabled={analysisBusy}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] hover:bg-muted/50 disabled:opacity-60"
+                              >
+                                {analysisBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                                Analyze now
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {pill}
+                                {action}
+                              </div>
+                              {status === 'failed' && errorMsg && (
+                                <p
+                                  className="text-[11px] text-destructive truncate"
+                                  title={errorMsg}
+                                >
+                                  {errorMsg.slice(0, 120)}
+                                </p>
+                              )}
+                              {status === 'complete' && summary && (
+                                <p className="text-[11px] text-muted-foreground line-clamp-2">
+                                  {summary}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -2272,4 +2958,3 @@ const AdminEventForm: React.FC = () => {
 };
 
 export default AdminEventForm;
-

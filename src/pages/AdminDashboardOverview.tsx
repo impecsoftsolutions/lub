@@ -21,11 +21,15 @@ const AdminDashboardOverview: React.FC = () => {
     <PermissionGate
       permission="dashboard.view"
       fallback={
-        <div className="min-h-screen bg-muted flex items-center justify-center">
-          <div className="text-center">
-            <Lock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
-            <p className="text-muted-foreground">You don't have permission to view the dashboard.</p>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="max-w-md text-center space-y-3">
+            <Lock className="w-12 h-12 text-muted-foreground mx-auto" />
+            <h2 className="text-lg font-semibold text-foreground">Welcome to the Admin Panel</h2>
+            <p className="text-sm text-muted-foreground">
+              You don't have access to the dashboard overview, but you can use the sidebar to open
+              the modules your account is permitted to access. If you don't see a module you expect
+              to see, contact a super-admin to grant it.
+            </p>
           </div>
         </div>
       }

@@ -18,7 +18,6 @@ import {
   Users,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
-import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
   eventsService,
@@ -92,6 +91,7 @@ function scoreEvent(item: AdminEventListItem, query: string): number {
 const AdminEvents: React.FC = () => {
   const navigate = useNavigate();
 
+  const canViewEvents = useHasPermission('events.view');
   const canCreate = useHasPermission('events.create');
   const canEditAny = useHasPermission('events.edit_any');
   const canEditOwn = useHasPermission('events.edit_own');
@@ -271,8 +271,17 @@ const AdminEvents: React.FC = () => {
     return filtered;
   }, [filterTab, items, searchQuery, showMemberOnly]);
 
+  // Allow RSVP-only personas to reach this page so they can drill into
+  // /admin/content/events/:id/registrations. Page-level gate is the union of
+  // events.view + RSVP perms; row-level actions remain individually gated below.
+  const canEnterPage = canViewEvents || canViewRsvp || canManageRsvp;
+
+  if (!canEnterPage) {
+    return null;
+  }
+
   return (
-    <PermissionGate permission="events.view">
+    <>
       <div className="space-y-6">
         {toast && (
           <Toast
@@ -555,7 +564,7 @@ const AdminEvents: React.FC = () => {
           )}
         </div>
       </div>
-    </PermissionGate>
+    </>
   );
 };
 

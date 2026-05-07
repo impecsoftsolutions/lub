@@ -6806,17 +6806,12 @@ export interface PublicEvent {
   location: string | null;
   is_featured: boolean;
   published_at: string | null;
+  banner_image_url?: string | null;
 }
 
 export type EventRsvpGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
 export type EventRsvpMealPreference = 'veg' | 'non_veg';
-export type EventRsvpProfession =
-  | 'company_owner'
-  | 'director'
-  | 'official'
-  | 'other'
-  | 'partner'
-  | 'student';
+export type EventRsvpProfession = string;
 
 // Alphabetical display order matches the DB enum order.
 export const EVENT_RSVP_PROFESSION_OPTIONS: Array<{ value: EventRsvpProfession; label: string }> = [
@@ -6827,6 +6822,8 @@ export const EVENT_RSVP_PROFESSION_OPTIONS: Array<{ value: EventRsvpProfession; 
   { value: 'partner',       label: 'Partner' },
   { value: 'student',       label: 'Student' },
 ];
+
+export type EventRsvpOption = { value: string; label: string };
 
 export const EVENT_RSVP_GENDER_OPTIONS: Array<{ value: EventRsvpGender; label: string }> = [
   { value: 'male',              label: 'Male' },
@@ -6842,7 +6839,7 @@ export const EVENT_RSVP_MEAL_OPTIONS: Array<{ value: EventRsvpMealPreference; la
 
 export type EventCapacityMode = 'global' | 'per_day';
 
-export type EventAssetKind = 'banner' | 'flyer' | 'gallery' | 'document';
+export type EventAssetKind = 'banner' | 'flyer' | 'gallery' | 'document' | 'badge_template' | 'badge_sample';
 
 export interface EventAsset {
   id: string;
@@ -6856,6 +6853,25 @@ export interface EventAsset {
   created_at: string;
 }
 
+export type BadgeDesignAnalysisStatus = 'pending' | 'complete' | 'failed';
+
+export interface BadgeDesignAnalysis {
+  version?: number;
+  analyzed_at?: string;
+  source_asset_id?: string;
+  layout?: Record<string, unknown>;
+  typography?: Record<string, unknown>;
+  colors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    text?: string;
+  };
+  placement?: Record<string, unknown>;
+  tone?: 'formal' | 'minimal' | 'bold' | 'compact' | string;
+  raw_summary?: string;
+}
+
 export interface EventRsvpPublicConfig {
   enabled: boolean;
   open: boolean;
@@ -6866,11 +6882,25 @@ export interface EventRsvpPublicConfig {
   used_count: number;
   remaining: number | null;
   per_day_used?: Record<string, number>;
+  collect_email?: boolean;
   collect_phone: boolean;
   collect_company: boolean;
   collect_gender?: boolean;
   collect_meal?: boolean;
   collect_profession?: boolean;
+  profession_options?: EventRsvpOption[];
+  collect_note?: boolean;
+  collect_designation?: boolean;
+  collect_aadhaar?: boolean;
+  require_email?: boolean;
+  require_phone?: boolean;
+  require_company?: boolean;
+  require_gender?: boolean;
+  require_meal?: boolean;
+  require_profession?: boolean;
+  require_note?: boolean;
+  require_designation?: boolean;
+  require_aadhaar?: boolean;
   require_login: boolean;
 }
 
@@ -6909,11 +6939,25 @@ export interface EventRsvpAdminConfig {
   capacity_mode?: EventCapacityMode;
   per_day_capacity?: number | null;
   deadline_at: string | null;
+  collect_email?: boolean;
   collect_phone: boolean;
   collect_company: boolean;
   collect_gender?: boolean;
   collect_meal?: boolean;
   collect_profession?: boolean;
+  profession_options?: EventRsvpOption[];
+  collect_note?: boolean;
+  collect_designation?: boolean;
+  collect_aadhaar?: boolean;
+  require_email?: boolean;
+  require_phone?: boolean;
+  require_company?: boolean;
+  require_gender?: boolean;
+  require_meal?: boolean;
+  require_profession?: boolean;
+  require_note?: boolean;
+  require_designation?: boolean;
+  require_aadhaar?: boolean;
   require_login: boolean;
   used_count?: number;
 }
@@ -6963,15 +7007,33 @@ export interface EventRsvpRow {
   event_id: string;
   user_id?: string | null;
   full_name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   company: string | null;
   gender?: EventRsvpGender | null;
   meal_preference?: EventRsvpMealPreference | null;
   profession?: EventRsvpProfession | null;
+  designation?: string | null;
+  aadhaar_number?: string | null;
+  surname?: string | null;
+  given_name?: string | null;
   visit_date?: string | null;
+  visit_all_days?: boolean;
   notes: string | null;
   status: EventRsvpStatus;
+  badge_id?: string | null;
+  badge_code?: string | null;
+  badge_status?: 'issued' | 'expired' | 'revoked' | null;
+  badge_expires_at?: string | null;
+  pdf_storage_path?: string | null;
+  pdf_generated_at?: string | null;
+  badge_email_status?: 'pending' | 'sent' | 'failed' | null;
+  badge_email_attempt_count?: number | null;
+  badge_email_last_error?: string | null;
+  badge_email_sent_at?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
+  check_in_source?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -6984,6 +7046,43 @@ export interface EventRsvpSummary {
   waitlisted: number;
 }
 
+export interface EventBadgeLookupRow {
+  badge_id: string;
+  rsvp_id: string;
+  badge_code: string;
+  badge_status: 'issued' | 'expired' | 'revoked';
+  attendee_name: string;
+  attendee_organisation?: string | null;
+  attendee_profession?: string | null;
+  visit_date?: string | null;
+  visit_all_days?: boolean;
+  expires_at: string;
+  pdf_generated_at?: string | null;
+  download_url?: string | null;
+}
+
+export interface EventRegistrationPrefill {
+  approved_member: boolean;
+  surname: string | null;
+  given_name: string | null;
+  full_name: string | null;
+  email: string | null;
+  mobile: string | null;
+  organization: string | null;
+}
+
+// COD-EVENTS-AADHAAR-DOC-AUTOFILL-063B
+// Returned by the extract-event-aadhaar edge function after transient
+// processing. The source file is never persisted; callers autofill from this.
+export interface EventAadhaarExtractionResult {
+  aadhaar_number: string | null; // 12-digit string or null
+  name: string | null;           // full name as printed on card
+  surname_guess: string | null;
+  given_name_guess: string | null;
+  dob: string | null;            // YYYY-MM-DD or null
+  confidence: number;            // 0–1 float
+}
+
 export interface EligibleEventRow {
   id: string;
   slug: string;
@@ -6993,6 +7092,48 @@ export interface EligibleEventRow {
   end_at: string | null;
   location: string | null;
   bridged_activity_id: string | null;
+}
+
+// COD-EVENTS-BADGE-TEMPLATE-PREVIEW-051
+export type BadgeTemplateKey =
+  | 'classic_corporate'
+  | 'minimal_clean'
+  | 'bold_header'
+  | 'compact_info';
+
+export const BADGE_TEMPLATE_OPTIONS: Array<{
+  key: BadgeTemplateKey;
+  label: string;
+  note: string;
+}> = [
+  { key: 'classic_corporate', label: 'Classic Corporate', note: 'Solid header band, structured field rows.' },
+  { key: 'minimal_clean',     label: 'Minimal Clean',     note: 'White background, hairline accents, lots of whitespace.' },
+  { key: 'bold_header',       label: 'Bold Header',       note: 'Tall colored banner with large event title.' },
+  { key: 'compact_info',      label: 'Compact Info',      note: 'Tight rows + larger QR; fits more text.' },
+];
+
+// COD-EVENTS-BADGES-048
+export type EventBadgeDeliveryStatus = 'pending' | 'sent' | 'failed';
+
+export interface EventBadgeDeliverySummary {
+  id: string;
+  channel: 'email';
+  recipient: string;
+  status: EventBadgeDeliveryStatus;
+  attempts: number;
+  last_error: string | null;
+  last_attempt_at: string | null;
+  sent_at: string | null;
+}
+
+export interface EventBadgeRow {
+  id: string;
+  rsvp_id: string;
+  badge_code: string;
+  issued_at: string;
+  last_downloaded_at: string | null;
+  snapshot: Record<string, unknown>;
+  latest_delivery: EventBadgeDeliverySummary | null;
 }
 
 // COD-EVENTS-CMS-AI-AUTOFILL-038
@@ -7356,7 +7497,7 @@ export const eventsService = {
   async submitRsvp(args: {
     eventSlug: string;
     fullName: string;
-    email: string;
+    email?: string | null;
     phone?: string | null;
     company?: string | null;
     notes?: string | null;
@@ -7364,18 +7505,27 @@ export const eventsService = {
     gender?: EventRsvpGender | null;
     mealPreference?: EventRsvpMealPreference | null;
     profession?: EventRsvpProfession | null;
+    designation?: string | null;
+    aadhaar?: string | null;
+    surname?: string | null;
+    givenName?: string | null;
     visitDate?: string | null;
+    visitAllDays?: boolean;
   }): Promise<{
     success: boolean;
     rsvp_id?: string;
     status?: EventRsvpStatus;
+    badge_code?: string | null;
+    badge_ready?: boolean;
+    badge_download_url?: string;
+    badge_error_code?: string;
     error?: string;
     error_code?: string;
   }> {
     const { data, error } = await supabase.rpc('submit_event_rsvp', {
       p_event_slug: args.eventSlug,
       p_full_name: args.fullName,
-      p_email: args.email,
+      p_email: args.email ?? null,
       p_phone: args.phone ?? null,
       p_company: args.company ?? null,
       p_notes: args.notes ?? null,
@@ -7384,20 +7534,56 @@ export const eventsService = {
       p_meal_preference: args.mealPreference ?? null,
       p_profession: args.profession ?? null,
       p_visit_date: args.visitDate ?? null,
+      p_visit_all_days: args.visitAllDays ?? false,
+      p_designation: args.designation ?? null,
+      p_surname: args.surname ?? null,
+      p_given_name: args.givenName ?? null,
+      p_aadhaar: args.aadhaar ?? null,
     });
     if (error) return { success: false, error: error.message };
-    return (
+    const result = (
       (data as {
         success: boolean;
         rsvp_id?: string;
         status?: EventRsvpStatus;
+        badge_code?: string | null;
         error?: string;
         error_code?: string;
       }) ?? { success: false, error: 'Unknown error' }
     );
+    // Badge issuing is handled server-side by DB trigger (COD-EVENTS-BADGES-048).
+    // Keep RSVP submit path fast and independent from any follow-up function invoke.
+    return result;
   },
 
   // COD-EVENTS-NEXT-040A — explicit, button-only WhatsApp generation.
+  async getRegistrationPrefill(
+    sessionToken: string,
+  ): Promise<{ success: boolean; data: EventRegistrationPrefill | null; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('get_event_registration_prefill_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) {
+      return { success: false, data: null, error: error.message };
+    }
+    const result = data as {
+      success?: boolean;
+      data?: EventRegistrationPrefill | null;
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        data: null,
+        error: result?.error ?? 'Failed to load registration prefill',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, data: result.data ?? null };
+  },
+
+  // COD-EVENTS-NEXT-040A - explicit, button-only WhatsApp generation.
   async draftWhatsappMessage(
     sessionToken: string,
     args: {
@@ -7581,14 +7767,41 @@ export const eventsService = {
     storage_path?: string;
     error?: string;
     error_code?: string;
+    compression?: {
+      compressed: boolean;
+      originalBytes: number;
+      finalBytes: number;
+      hitFloor: boolean;
+    };
   }> {
     try {
+      // 046: client-side compression for image kinds only. Documents are
+      // uploaded as-is. Banner/flyer/gallery images target ≤ 1 MB while
+      // preserving original dimensions and aspect ratio.
+      let outgoingFile = args.file;
+      let compressionInfo:
+        | { compressed: boolean; originalBytes: number; finalBytes: number; hitFloor: boolean }
+        | undefined;
+      const shouldCompressForWeb =
+        args.kind === 'banner' || args.kind === 'flyer' || args.kind === 'gallery';
+      if (shouldCompressForWeb) {
+        const { compressImageToBudget } = await import('./imageProcessing');
+        const result = await compressImageToBudget(args.file);
+        outgoingFile = result.file;
+        compressionInfo = {
+          compressed: result.compressed,
+          originalBytes: result.originalBytes,
+          finalBytes: result.finalBytes,
+          hitFloor: result.hitFloor,
+        };
+      }
+
       const fd = new FormData();
       fd.append('session_token', args.sessionToken);
       fd.append('event_id', args.eventId);
       fd.append('kind', args.kind);
       if (args.label) fd.append('label', args.label);
-      fd.append('file', args.file);
+      fd.append('file', outgoingFile);
 
       const { data, error } = await supabase.functions.invoke('event-media-upload', { body: fd });
       if (error) {
@@ -7615,6 +7828,7 @@ export const eventsService = {
         asset_id: result.asset_id,
         public_url: result.public_url,
         storage_path: result.storage_path,
+        compression: compressionInfo,
       };
     } catch (err) {
       console.error('[eventsService.uploadAsset] exception:', err);
@@ -7641,6 +7855,445 @@ export const eventsService = {
         error: 'Unknown error',
       }
     );
+  },
+
+  // COD-EVENTS-BADGE-DESIGN-AND-LIVE-RENDER-063A
+  // Starts/retries AI analysis for an uploaded badge_sample asset. The edge
+  // function writes the status/result into events.ai_metadata:
+  // badge_design_analysis, badge_design_analysis_status,
+  // badge_design_analysis_error, badge_design_analysis_updated_at.
+  async triggerBadgeSampleAnalysis(
+    sessionToken: string,
+    eventId: string,
+    assetId: string,
+  ): Promise<{
+    success: boolean;
+    status?: BadgeDesignAnalysisStatus;
+    updated_at?: string;
+    summary?: string;
+    error?: string;
+    error_code?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-event-badge-sample', {
+        body: {
+          session_token: sessionToken,
+          event_id: eventId,
+          asset_id: assetId,
+        },
+      });
+      if (error) {
+        console.error('[eventsService.triggerBadgeSampleAnalysis] invoke error:', error);
+        return { success: false, status: 'failed', error: error.message, error_code: 'invoke_error' };
+      }
+      const result = data as {
+        success?: boolean;
+        status?: BadgeDesignAnalysisStatus;
+        updated_at?: string;
+        summary?: string;
+        error?: string;
+        error_code?: string;
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          status: result?.status ?? 'failed',
+          error: result?.error ?? 'Badge sample analysis failed.',
+          error_code: result?.error_code,
+        };
+      }
+      return {
+        success: true,
+        status: result.status ?? 'complete',
+        updated_at: result.updated_at,
+        summary: result.summary,
+      };
+    } catch (err) {
+      console.error('[eventsService.triggerBadgeSampleAnalysis] exception:', err);
+      return {
+        success: false,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        error_code: 'exception',
+      };
+    }
+  },
+
+  // COD-EVENTS-BADGES-048
+  badgeDownloadUrlByCode(badgeCode: string): string {
+    const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
+    return `${base.replace(/\/+$/, '')}/functions/v1/event-badge-download?code=${encodeURIComponent(badgeCode)}`;
+  },
+
+  badgeDownloadUrlByMobile(eventSlug: string, mobile: string): string {
+    const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
+    const params = new URLSearchParams({ event_slug: eventSlug, mobile });
+    return `${base.replace(/\/+$/, '')}/functions/v1/event-badge-download?${params.toString()}`;
+  },
+
+  // 051 — preview a sample badge for an event using a chosen template.
+  badgePreviewUrl(eventSlug: string, template: BadgeTemplateKey): string {
+    const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
+    const params = new URLSearchParams({ preview: '1', event_slug: eventSlug, template });
+    return `${base.replace(/\/+$/, '')}/functions/v1/event-badge-download?${params.toString()}`;
+  },
+
+  // 050 — admin hard-delete of an event registration row.
+  async deleteRsvp(
+    sessionToken: string,
+    rsvpId: string,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('delete_event_rsvp_with_session', {
+      p_session_token: sessionToken,
+      p_rsvp_id: rsvpId,
+    });
+    if (error) {
+      console.error('[eventsService.deleteRsvp] RPC error:', error);
+      // Surface the most likely root cause when PostgREST cannot resolve
+      // the function (e.g. migration not yet applied or schema cache
+      // stale). The toast message becomes specific instead of generic.
+      const status = (error as { code?: string; status?: number }).status;
+      if (status === 404 || (error.message ?? '').toLowerCase().includes('function')) {
+        return {
+          success: false,
+          error_code: 'rpc_not_found',
+          error: 'delete_event_rsvp_with_session is not available on the server. Re-run supabase db push --linked.',
+        };
+      }
+      return { success: false, error: error.message };
+    }
+    if (!data || typeof data !== 'object') {
+      return { success: false, error_code: 'unexpected_response', error: 'Empty RPC response' };
+    }
+    const result = data as { success?: boolean; error?: string; error_code?: string };
+    if (result.success !== true) {
+      console.warn('[eventsService.deleteRsvp] RPC returned not-success:', result);
+      return {
+        success: false,
+        error: result.error ?? 'Delete failed (no error message returned).',
+        error_code: result.error_code,
+      };
+    }
+    return { success: true };
+  },
+
+  async getBadges(
+    sessionToken: string,
+    eventId: string,
+  ): Promise<{
+    success: boolean;
+    rows: EventBadgeRow[];
+    error?: string;
+    error_code?: string;
+  }> {
+    const { data, error } = await supabase.rpc('get_event_badges_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, rows: [], error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: EventBadgeRow[];
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        rows: [],
+        error: result?.error ?? 'Failed to load badges',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, rows: result.data ?? [] };
+  },
+
+  async retryBadgeDelivery(
+    sessionToken: string,
+    deliveryId: string,
+  ): Promise<{ success: boolean; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('retry_event_badge_delivery_with_session', {
+      p_session_token: sessionToken,
+      p_delivery_id: deliveryId,
+    });
+    if (error) return { success: false, error: error.message };
+    return (
+      (data as { success: boolean; error?: string; error_code?: string }) ?? {
+        success: false,
+        error: 'Unknown error',
+      }
+    );
+  },
+
+  async sendBadgeDelivery(
+    sessionToken: string,
+    deliveryId: string,
+  ): Promise<{
+    success: boolean;
+    sent_at?: string;
+    recipient?: string;
+    error?: string;
+    error_code?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('event-badge-deliver', {
+        body: { session_token: sessionToken, delivery_id: deliveryId },
+      });
+      if (error) return { success: false, error: error.message, error_code: 'invoke_error' };
+      return (
+        (data as {
+          success: boolean;
+          sent_at?: string;
+          recipient?: string;
+          error?: string;
+          error_code?: string;
+        }) ?? { success: false, error: 'Unknown error' }
+      );
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        error_code: 'exception',
+      };
+    }
+  },
+
+  // COD-EVENTS-AADHAAR-DOC-AUTOFILL-063B
+  // Send an Aadhaar card file to the extract-event-aadhaar edge function for
+  // transient AI extraction. The file is never stored in DB or Storage.
+  async extractEventAadhaar(args: {
+    file: File;
+    eventId?: string;
+  }): Promise<{
+    success: boolean;
+    data?: EventAadhaarExtractionResult;
+    error?: string;
+    error_code?: string;
+  }> {
+    const invokeExtraction = async (file: File): Promise<{
+      success: boolean;
+      data?: EventAadhaarExtractionResult;
+      error?: string;
+      error_code?: string;
+    }> => {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (args.eventId) fd.append('event_id', args.eventId);
+      const { data, error } = await supabase.functions.invoke('extract-event-aadhaar', {
+        body: fd,
+      });
+      if (error) {
+        console.error('[eventsService.extractEventAadhaar] invoke error:', error);
+        return { success: false, error: error.message, error_code: 'invoke_error' };
+      }
+      const result = data as {
+        success?: boolean;
+        data?: EventAadhaarExtractionResult;
+        error?: string;
+        error_code?: string;
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error ?? 'Extraction failed.',
+          error_code: result?.error_code,
+        };
+      }
+      return { success: true, data: result.data };
+    };
+
+    const scoreExtraction = (data?: EventAadhaarExtractionResult): number => {
+      if (!data) return -1;
+      let score = Number(data.confidence ?? 0);
+      if (data.aadhaar_number) score += 2;
+      if (data.name || data.surname_guess || data.given_name_guess) score += 2;
+      const fullName = [data.surname_guess, data.given_name_guess].filter(Boolean).join(' ').trim();
+      if (fullName.split(/\s+/).filter(Boolean).length >= 3) score += 1;
+      return score;
+    };
+
+    try {
+      const mime = args.file.type.split(';')[0]?.trim().toLowerCase();
+      if (mime === 'application/pdf') {
+        try {
+          const { renderPdfFirstPageAsImages } = await import('./pdfImageRender');
+          const candidates = await renderPdfFirstPageAsImages(args.file);
+          let best: Awaited<ReturnType<typeof invokeExtraction>> | null = null;
+          for (const candidate of candidates) {
+            const result = await invokeExtraction(candidate);
+            if (result.success && scoreExtraction(result.data) > scoreExtraction(best?.data)) {
+              best = result;
+            }
+          }
+          if (best?.success && best.data && scoreExtraction(best.data) >= 2.5) {
+            return best;
+          }
+        } catch (pdfError) {
+          console.warn('[eventsService.extractEventAadhaar] PDF render fallback failed:', pdfError);
+        }
+      }
+      return await invokeExtraction(args.file);
+    } catch (err) {
+      console.error('[eventsService.extractEventAadhaar] exception:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        error_code: 'exception',
+      };
+    }
+  },
+
+  // COD-EVENTS-REGISTRATION-BADGE-EXPORT-AADHAAR-068 — Badge check-in
+  async lookupBadgeForCheckin(
+    sessionToken: string,
+    badgeCode: string,
+  ): Promise<{
+    success: boolean;
+    data?: {
+      badge_code: string;
+      full_name: string;
+      surname: string | null;
+      given_name: string | null;
+      email: string | null;
+      phone: string | null;
+      company: string | null;
+      event_title: string;
+      event_id: string;
+      rsvp_id: string;
+      rsvp_status: string;
+      visit_date: string | null;
+      visit_all_days: boolean;
+      issued_at: string;
+      checked_in_at: string | null;
+      checked_in_by: string | null;
+    };
+    error?: string;
+    error_code?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('lookup_event_badge_for_checkin_with_session', {
+        p_session_token: sessionToken,
+        p_badge_code: badgeCode.trim().toUpperCase(),
+      });
+      if (error) {
+        const status = (error as { code?: string; status?: number }).status;
+        if (status === 404 || (error.message ?? '').toLowerCase().includes('function')) {
+          return {
+            success: false,
+            error_code: 'rpc_not_found',
+            error: 'Check-in feature requires a database migration. Run: supabase db push --linked',
+          };
+        }
+        return { success: false, error: error.message };
+      }
+      const result = data as {
+        success?: boolean;
+        data?: Record<string, unknown>;
+        error?: string;
+        error_code?: string;
+      } | null;
+      if (!result?.success) {
+        return { success: false, error: result?.error ?? 'Badge not found.', error_code: result?.error_code };
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { success: true, data: result.data as any };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Unexpected error', error_code: 'exception' };
+    }
+  },
+
+  async checkInBadge(
+    sessionToken: string,
+    badgeCode: string,
+  ): Promise<{
+    success: boolean;
+    already_checked_in?: boolean;
+    checked_in_at?: string;
+    error?: string;
+    error_code?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('check_in_event_badge_with_session', {
+        p_session_token: sessionToken,
+        p_badge_code: badgeCode.trim().toUpperCase(),
+      });
+      if (error) {
+        const status = (error as { code?: string; status?: number }).status;
+        if (status === 404 || (error.message ?? '').toLowerCase().includes('function')) {
+          return {
+            success: false,
+            error_code: 'rpc_not_found',
+            error: 'Check-in feature requires a database migration. Run: supabase db push --linked',
+          };
+        }
+        return { success: false, error: error.message };
+      }
+      const result = data as {
+        success?: boolean;
+        already_checked_in?: boolean;
+        checked_in_at?: string;
+        error?: string;
+        error_code?: string;
+      } | null;
+      if (!result) return { success: false, error: 'Empty response.' };
+      return {
+        success: Boolean(result.success),
+        already_checked_in: Boolean(result.already_checked_in),
+        checked_in_at: result.checked_in_at,
+        error: result.error,
+        error_code: result.error_code,
+      };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Unexpected error', error_code: 'exception' };
+    }
+  },
+
+  // COD-EVENTS-CHECKIN-PERSIST-073 — Reverse attendance mark
+  async uncheckInBadge(
+    sessionToken: string,
+    badgeCode: string,
+  ): Promise<{
+    success: boolean;
+    already_cleared?: boolean;
+    error?: string;
+    error_code?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('uncheck_in_event_badge_with_session', {
+        p_session_token: sessionToken,
+        p_badge_code: badgeCode.trim().toUpperCase(),
+      });
+      if (error) {
+        const status = (error as { code?: string; status?: number }).status;
+        if (status === 404 || (error.message ?? '').toLowerCase().includes('function')) {
+          return {
+            success: false,
+            error_code: 'rpc_not_found',
+            error: 'Reverse check-in RPC not deployed. Run: supabase db push --linked',
+          };
+        }
+        return { success: false, error: error.message };
+      }
+      const result = data as {
+        success?: boolean;
+        already_cleared?: boolean;
+        error?: string;
+        error_code?: string;
+      } | null;
+      if (!result) return { success: false, error: 'Empty response.' };
+      return {
+        success: Boolean(result.success),
+        already_cleared: Boolean(result.already_cleared),
+        error: result.error,
+        error_code: result.error_code,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unexpected error',
+        error_code: 'exception',
+      };
+    }
   },
 
   computeMetrics(items: AdminEventListItem[]): EventSummaryMetrics {

@@ -4,6 +4,7 @@ import { sessionManager } from '../../lib/sessionManager';
 import { customAuth } from '../../lib/customAuth';
 import { logoutService } from '../../lib/logoutService';
 import { permissionService } from '../../lib/permissionService';
+import { hasAdminPanelAccess } from '../../lib/adminAccess';
 import { LogOut } from 'lucide-react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
@@ -47,16 +48,27 @@ export function AdminLayout() {
           return;
         }
 
-        // Primary gate: account_type
-        // Secondary gate: portal.admin_access permission (enables pure-member accounts
-        // with explicit portal access grant to enter the admin shell)
-        const accountTypeAccess =
+        // 056: admit anyone with at least one admin-domain permission so
+        // permissioned non-admins (e.g. role=editor with events.rsvp.view
+        // override) can actually reach the admin shell their permissions
+        // already authorize them to use. The accountType + portal.admin_access
+        // fast-paths are kept as cheap pre-checks; the broader permission
+        // sweep runs only when those don't already grant access. Per-page
+        // <PermissionGate> + server _with_session RPC checks remain the
+        // authoritative authorization for individual modules.
+        let hasAdminAccess =
           userData.account_type === 'admin' ||
           userData.account_type === 'both';
 
-        let hasAdminAccess = accountTypeAccess;
-        if (!accountTypeAccess) {
+        if (!hasAdminAccess) {
+          // Fast path: the explicit portal grant.
           hasAdminAccess = await permissionService.hasPermission(userData.id, 'portal.admin_access');
+        }
+
+        if (!hasAdminAccess) {
+          // Broad path: any admin-domain permission via role/override.
+          const userPerms = await permissionService.getUserPermissions(userData.id);
+          hasAdminAccess = hasAdminPanelAccess(userData.account_type, userPerms);
         }
 
         if (!isMounted) return;

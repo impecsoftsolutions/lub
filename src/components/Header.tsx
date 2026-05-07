@@ -4,6 +4,8 @@ import { Menu, X, LogOut, LayoutDashboard, Shield, User, ChevronDown, Key } from
 import { organizationProfileService } from '../lib/supabase';
 import { useMember } from '../contexts/useMember';
 import { logoutService } from '../lib/logoutService';
+import { usePermissions } from '../hooks/usePermissions';
+import { hasAdminPanelAccess } from '../lib/adminAccess';
 
 const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -17,6 +19,7 @@ const Header: React.FC = () => {
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { member, isAuthenticated: isMemberAuthenticated } = useMember();
+  const { permissions, isLoading: permissionsLoading } = usePermissions();
 
   useEffect(() => {
     const loadOrgLogo = async () => {
@@ -34,15 +37,17 @@ const Header: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const checkIfAdmin = () => {
-      if (member && (member.account_type === 'admin' || member.account_type === 'both')) {
-        setIsAdminUser(true);
-      } else {
-        setIsAdminUser(false);
-      }
-    };
-    checkIfAdmin();
-  }, [member]);
+    // 056: show "Admin Panel" entry to admin/both account_type users
+    // (existing behavior) AND to any signed-in user who has at least one
+    // admin-domain permission (role or override). Server-side _with_session
+    // RPCs remain the authoritative authorization layer.
+    if (permissionsLoading) {
+      // Avoid flicker on first paint; wait until permissions resolve.
+      return;
+    }
+    const accountType = member?.account_type ?? null;
+    setIsAdminUser(hasAdminPanelAccess(accountType, permissions));
+  }, [member, permissions, permissionsLoading]);
 
   useEffect(() => {
     setPhotoError(false);

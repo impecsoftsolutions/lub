@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-07  
-**Updated by:** Codex (`COD-EVENTS-BADGE-CAMERA-SCANNER-072` closeout)
+**Updated by:** Claude (074 follow-up: check-in stale-cache fix + button label)
 
 ---
 
@@ -33,19 +33,32 @@
 ## Last Verified
 
 - **When:** 2026-05-07
-- **What:** `COD-EVENTS-BADGE-CAMERA-SCANNER-072` - admin badge check-in camera scanner.
-- **Deploy/apply commands run:** None (frontend-only slice).
-- **Result:** Lint PASS, Build PASS, Phase 1 readonly smoke PASS on retry.
+- **What:** `COD-EVENTS-CHECKIN-UI-FOLLOWUP-074` — UI follow-up: check-in columns in registrations + undo check-in action.
+- **Deploy/apply commands run:** None (UI-only slice; no migrations or edge function changes).
+- **Result:** Lint PASS (0 errors / 3 expected shadcn warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
 
 Runtime outcomes:
-- Admin check-in page now supports camera QR scanning in addition to manual badge code/URL entry.
-- Scanner requests rear camera, continuously detects QR payload, normalizes to badge code, and auto-runs existing lookup flow.
-- Existing manage/view permission behavior remains unchanged.
-- Manual lookup and attendance marking behavior remains unchanged.
+- `AdminEventRegistrations`: registrations table and XLSX export now show Checked In (green badge / `—`), Checked In At (formatted timestamp), and Check-in Source (`Admin`, `QR Scan`, `Manual`).
+- `AdminEventCheckin`: detail card now seeds checked-in state from `row.checked_in_at` on load; when checked in, shows "Attendance recorded" + amber "Undo check-in" button; Undo calls `eventsService.uncheckInBadge` and clears state on success.
 
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 074 Check-in UI — Registrations Columns + Undo Action
+
+- Closed on 2026-05-07.
+- UI-only slice; no migrations or edge function changes.
+- `AdminEventRegistrations.tsx`: added `CheckCircle2` import, `formatCheckinTime`/`formatCheckinSource` helpers, 3 table columns (Checked In / Checked In At / Source), 3 XLSX export columns, `check_in_source` added to search haystack.
+- `AdminEventCheckin.tsx`: added `isUndoing` state, `handleUndo` using `eventsService.uncheckInBadge`, `selectRow` now seeds `checkedIn` from `row.checked_in_at`, detail card shows amber Undo button when checked in.
+- **074 follow-up (same session):** Fixed in-session stale-cache bug — after `checkInBadge` / `uncheckInBadge` success, the matching row in `allRsvps` is now patched in memory so re-selecting the same person without a page reload reflects the correct check-in state. Renamed "Search another" button to "Close".
+
+### 073 Check-in Persistence Backend
+
+- Closed on 2026-05-07.
+- Added migration `20260507020000_events_checkin_persist_073.sql`.
+- Includes: check-in source patch (`admin`), roster payload field exposure, and reverse check-in RPC.
+- `supabase db push --linked` applied successfully.
 
 ### 072 Badge Check-in Camera Scanner
 

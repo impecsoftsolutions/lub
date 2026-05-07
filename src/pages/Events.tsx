@@ -130,7 +130,7 @@ const toEventFeedItem = (event: PublicEvent): FeedItem => ({
   is_featured: event.is_featured,
   published_at: event.published_at,
   date_value: event.start_at,
-  cover_image_url: null,
+  cover_image_url: event.banner_image_url ?? null,
   event_type: event.event_type,
 });
 
@@ -414,7 +414,7 @@ const Events: React.FC = () => {
 const FeedCard: React.FC<{ item: FeedItem }> = ({ item }) => {
   const coverUrl = item.type === 'activity'
     ? buildActivityMediaUrl(item.cover_image_url, 'cover-card')
-    : null;
+    : (item.cover_image_url ?? null);
 
   return (
     <Link

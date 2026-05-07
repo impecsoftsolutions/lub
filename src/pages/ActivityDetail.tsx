@@ -1,10 +1,12 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
+  Camera,
   Check,
   Clock3,
+  Download,
   ExternalLink,
   Loader2,
   MapPin,
@@ -12,6 +14,8 @@ import {
   Play,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
+  Upload,
   Users,
   X,
   Tag,
@@ -32,6 +36,11 @@ import {
 } from '../lib/supabase';
 import { buildActivityMediaUrl } from '../lib/activityMedia';
 import { sessionManager } from '../lib/sessionManager';
+import { normalizeAadhaar, isValidAadhaarLength } from '../lib/aadhaar';
+
+function professionOptionsForEvent(rsvp: PublicEventDetail['rsvp'] | null | undefined) {
+  return rsvp?.profession_options?.length ? rsvp.profession_options : EVENT_RSVP_PROFESSION_OPTIONS;
+}
 
 function getYoutubeEmbedUrl(url: string): string | null {
   try {
@@ -133,10 +142,22 @@ interface EventViewProps {
 
 function eventDayList(start: string | null | undefined, end: string | null | undefined): string[] {
   if (!start) return [];
-  const s = new Date(start);
-  const e = end ? new Date(end) : s;
-  if (Number.isNaN(s.getTime())) return [];
-  const last = Number.isNaN(e.getTime()) ? s : e;
+  const startIso = String(start).slice(0, 10);
+  const endIso = String(end ?? start).slice(0, 10);
+  const parseIsoDay = (iso: string): Date | null => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+    const dt = new Date(y, mo, d);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt;
+  };
+  const s = parseIsoDay(startIso);
+  const e = parseIsoDay(endIso);
+  if (!s) return [];
+  const last = e ?? s;
   const days: string[] = [];
   const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
   const end0 = new Date(last.getFullYear(), last.getMonth(), last.getDate());
@@ -156,6 +177,8 @@ function formatDayLabel(iso: string): string {
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+const RSVP_ALL_DAYS_VALUE = '__all_days__';
+
 const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const agendaItems = Array.isArray(eventDetail.agenda_items) ? eventDetail.agenda_items : [];
   const venueMapUrl = (eventDetail.venue_map_url ?? '').trim();
@@ -166,22 +189,40 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const documents = assets.filter((a) => a.kind === 'document');
   const rsvp = eventDetail.rsvp ?? null;
   const rsvpOpen = Boolean(rsvp?.enabled && rsvp?.open);
+  const collectEmail = rsvp?.collect_email !== false;
+  const requireEmail = Boolean(rsvp?.require_email);
 
   const eventDays = eventDayList(eventDetail.start_at ?? null, eventDetail.end_at ?? null);
   const isMultiday = eventDays.length > 1;
 
   // RSVP form state
-  const [rsvpName, setRsvpName] = useState('');
+  const [rsvpSurname, setRsvpSurname] = useState('');
+  const [rsvpGivenName, setRsvpGivenName] = useState('');
   const [rsvpEmail, setRsvpEmail] = useState('');
   const [rsvpPhone, setRsvpPhone] = useState('');
   const [rsvpCompany, setRsvpCompany] = useState('');
   const [rsvpGender, setRsvpGender] = useState<EventRsvpGender | ''>('');
   const [rsvpMeal, setRsvpMeal] = useState<EventRsvpMealPreference | ''>('');
   const [rsvpProfession, setRsvpProfession] = useState<EventRsvpProfession | ''>('');
+  const [rsvpDesignation, setRsvpDesignation] = useState('');
+  // COD-EVENTS-REGISTRATION-COMPLETE-059
+  const [rsvpAadhaar, setRsvpAadhaar] = useState('');
+  // COD-EVENTS-AADHAAR-DOC-AUTOFILL-063B — transient Aadhaar scan state
+  // 'success' = at least one field was applied
+  // 'partial' = had useful data but all form fields were already filled — nothing applied
+  // 'error'   = API/network failure, or extraction returned no usable fields
+  type AadhaarScanState = 'idle' | 'extracting' | 'success' | 'partial' | 'error';
+  const [aadhaarScanState, setAadhaarScanState] = useState<AadhaarScanState>('idle');
+  const [aadhaarScanError, setAadhaarScanError] = useState<string | null>(null);
+  const aadhaarFileInputRef = useRef<HTMLInputElement>(null);
+  const aadhaarCameraInputRef = useRef<HTMLInputElement>(null);
   const [rsvpVisitDate, setRsvpVisitDate] = useState<string>(isMultiday ? '' : eventDays[0] ?? '');
   const [rsvpNotes, setRsvpNotes] = useState('');
+  // Approved-member prefill: mobile we hand to BadgeMobileLookup as a default.
+  const [prefillMobile, setPrefillMobile] = useState<string>('');
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
+  const [rsvpBadgeCode, setRsvpBadgeCode] = useState<string | null>(null);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
 
   // Day-wise capacity helpers
@@ -193,6 +234,103 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
     const used = perDayUsed[day] ?? 0;
     return Math.max(perDayCap - used, 0);
   };
+  const allDaysSelectable =
+    !isPerDayMode || eventDays.every((day) => (remainingForDay(day) ?? 1) > 0);
+
+  // COD-EVENTS-REGISTRATION-COMPLETE-059
+  // Approved-member prefill. Quietly populate empty fields on mount; never
+  // overwrite anything the user has already typed. All fields stay editable.
+  useEffect(() => {
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    let cancelled = false;
+    void eventsService.getRegistrationPrefill(token).then((res) => {
+      if (cancelled) return;
+      if (!res.success || !res.data || !res.data.approved_member) return;
+      const p = res.data;
+      setRsvpSurname((cur) => (cur.trim().length === 0 && p.surname ? p.surname : cur));
+      setRsvpGivenName((cur) => (cur.trim().length === 0 && p.given_name ? p.given_name : cur));
+      setRsvpEmail((cur) => (cur.trim().length === 0 && p.email ? p.email : cur));
+      setRsvpPhone((cur) => (cur.trim().length === 0 && p.mobile ? p.mobile : cur));
+      setRsvpCompany((cur) => (cur.trim().length === 0 && p.organization ? p.organization : cur));
+      if (p.mobile) setPrefillMobile(p.mobile);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // COD-EVENTS-AADHAAR-DOC-AUTOFILL-063B / 064
+  // Handles a file chosen via Upload or Camera. Sends the file to the
+  // extract-event-aadhaar edge function for transient AI extraction,
+  // then fills ONLY empty form fields. The source file is never stored.
+  //
+  // Three outcome states:
+  //   success — at least one field was applied (green message)
+  //   partial — had useful fields but none applied (all already filled) (amber message)
+  //   error   — API/network failure, or extraction returned no usable fields (red message)
+  const handleAadhaarFile = useCallback(async (file: File) => {
+    setAadhaarScanState('extracting');
+    setAadhaarScanError(null);
+
+    const result = await eventsService.extractEventAadhaar({
+      file,
+      eventId: eventDetail.id,
+    });
+
+    if (!result.success || !result.data) {
+      const errorMessages: Record<string, string> = {
+        file_too_large: 'File is too large. Please use an image or PDF under 8 MB.',
+        unsupported_format: 'Unsupported file type. Use JPEG, PNG, WebP, or PDF.',
+        ai_disabled: 'Automatic extraction is not available right now. Please type the number manually.',
+        provider_unsupported: 'Automatic extraction is not available right now. Please type the number manually.',
+        no_api_key: 'Automatic extraction is not available right now. Please type the number manually.',
+        rate_limited: 'Too many attempts. Please wait a minute and try again.',
+        extraction_failed: 'Could not extract Aadhaar details. Please type the number manually.',
+        invoke_error: 'Could not reach the extraction service. Please try again or type the number manually.',
+      };
+      setAadhaarScanError(
+        errorMessages[result.error_code ?? ''] ??
+          'Could not extract details. Please type the number manually.',
+      );
+      setAadhaarScanState('error');
+      return;
+    }
+
+    const d = result.data;
+
+    // If extraction returned nothing useful, treat it as a soft error.
+    const hasUsefulData = Boolean(d.aadhaar_number || d.surname_guess || d.given_name_guess);
+    if (!hasUsefulData) {
+      setAadhaarScanError('Could not read useful details from the card. Please type the details manually.');
+      setAadhaarScanState('error');
+      return;
+    }
+
+    // Snapshot current form values to determine what WILL be applied.
+    // rsvpAadhaar/rsvpSurname/rsvpGivenName are in deps so this snapshot is current.
+    const willApplyAadhaar = Boolean(d.aadhaar_number && normalizeAadhaar(rsvpAadhaar).length === 0);
+    const willApplySurname = Boolean(d.surname_guess && rsvpSurname.trim().length === 0);
+    const willApplyGivenName = Boolean(d.given_name_guess && rsvpGivenName.trim().length === 0);
+
+    // No-overwrite autofill via setter function form (always reads latest value).
+    if (d.aadhaar_number) {
+      setRsvpAadhaar((cur) => (normalizeAadhaar(cur).length === 0 ? d.aadhaar_number! : cur));
+    }
+    if (d.surname_guess) {
+      setRsvpSurname((cur) => (cur.trim().length === 0 ? d.surname_guess! : cur));
+    }
+    if (d.given_name_guess) {
+      setRsvpGivenName((cur) => (cur.trim().length === 0 ? d.given_name_guess! : cur));
+    }
+
+    if (willApplyAadhaar || willApplySurname || willApplyGivenName) {
+      setAadhaarScanState('success');
+    } else {
+      // Had useful data but all relevant fields were already filled — nothing to apply.
+      setAadhaarScanState('partial');
+    }
+  }, [eventDetail.id, rsvpAadhaar, rsvpSurname, rsvpGivenName]);
 
   const [whatsappCopied, setWhatsappCopied] = useState(false);
 
@@ -215,25 +353,61 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
 
   const submitRsvp = async () => {
     setRsvpError(null);
-    if (!rsvpName.trim()) {
-      setRsvpError('Please enter your full name.');
+    if (!rsvpSurname.trim()) {
+      setRsvpError('Please enter your surname.');
       return;
     }
-    if (!rsvpEmail.trim() || !/^.+@.+\..+$/.test(rsvpEmail.trim())) {
+    if (!rsvpGivenName.trim()) {
+      setRsvpError('Please enter your given name.');
+      return;
+    }
+    const nextEmail = rsvpEmail.trim();
+    if (collectEmail && requireEmail && !nextEmail) {
+      setRsvpError('Please enter your email address.');
+      return;
+    }
+    if (collectEmail && nextEmail && !/^.+@.+\..+$/.test(nextEmail)) {
       setRsvpError('Please enter a valid email address.');
       return;
     }
-    if (rsvp?.collect_gender && !rsvpGender) {
+    if (rsvp?.require_gender && !rsvpGender) {
       setRsvpError('Please select your gender.');
       return;
     }
-    if (rsvp?.collect_meal && !rsvpMeal) {
+    if (rsvp?.require_meal && !rsvpMeal) {
       setRsvpError('Please select your meal preference.');
       return;
     }
-    if (rsvp?.collect_profession && !rsvpProfession) {
+    if (rsvp?.require_profession && !rsvpProfession) {
       setRsvpError('Please select your profession.');
       return;
+    }
+    if (rsvp?.require_phone && !rsvpPhone.trim()) {
+      setRsvpError('Please enter your mobile number.');
+      return;
+    }
+    if (rsvp?.require_company && !rsvpCompany.trim()) {
+      setRsvpError('Please enter your organisation.');
+      return;
+    }
+    if (rsvp?.collect_note && rsvp?.require_note && !rsvpNotes.trim()) {
+      setRsvpError('Please add a note.');
+      return;
+    }
+    if (rsvp?.collect_designation && rsvp?.require_designation && !rsvpDesignation.trim()) {
+      setRsvpError('Please enter your designation.');
+      return;
+    }
+    if (rsvp?.collect_aadhaar) {
+      const normalized = normalizeAadhaar(rsvpAadhaar);
+      if (rsvp.require_aadhaar && normalized.length === 0) {
+        setRsvpError('Please enter your Aadhaar Card number.');
+        return;
+      }
+      if (normalized.length > 0 && !isValidAadhaarLength(normalized)) {
+        setRsvpError('Please enter a valid 12 digit Aadhaar number.');
+        return;
+      }
     }
     if (isMultiday && !rsvpVisitDate) {
       setRsvpError('Please choose your day of visit.');
@@ -244,15 +418,20 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
       const token = sessionManager.getSessionToken();
       const result = await eventsService.submitRsvp({
         eventSlug: eventDetail.slug,
-        fullName: rsvpName.trim(),
-        email: rsvpEmail.trim(),
+        fullName: `${rsvpSurname.trim()} ${rsvpGivenName.trim()}`.trim(),
+        surname: rsvpSurname.trim() || null,
+        givenName: rsvpGivenName.trim() || null,
+        email: collectEmail ? (nextEmail || null) : null,
         phone: rsvp?.collect_phone ? rsvpPhone.trim() || null : null,
         company: rsvp?.collect_company ? rsvpCompany.trim() || null : null,
         gender: rsvp?.collect_gender ? (rsvpGender || null) : null,
         mealPreference: rsvp?.collect_meal ? (rsvpMeal || null) : null,
         profession: rsvp?.collect_profession ? (rsvpProfession || null) : null,
-        notes: rsvpNotes.trim() || null,
-        visitDate: rsvpVisitDate || null,
+        designation: rsvp?.collect_designation ? (rsvpDesignation.trim() || null) : null,
+        aadhaar: rsvp?.collect_aadhaar ? (normalizeAadhaar(rsvpAadhaar) || null) : null,
+        notes: rsvp?.collect_note ? (rsvpNotes.trim() || null) : null,
+        visitDate: rsvpVisitDate && rsvpVisitDate !== RSVP_ALL_DAYS_VALUE ? rsvpVisitDate : null,
+        visitAllDays: isMultiday && rsvpVisitDate === RSVP_ALL_DAYS_VALUE,
         sessionToken: token,
       });
       if (!result.success) {
@@ -267,19 +446,28 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           invalid_visit_date: 'Selected day is outside the event window.',
           invalid_full_name: 'Please enter your full name.',
           invalid_email: 'Please enter a valid email address.',
-          invalid_phone: 'Please enter a valid phone number.',
-          invalid_company: 'Please enter a valid company name.',
-          invalid_notes: 'Notes are too long (max 1000 characters).',
+          email_required: 'Please enter your email address.',
+          invalid_phone: 'Please enter a valid mobile number.',
+          phone_required: 'Please enter your mobile number.',
+          invalid_company: 'Please enter a valid organisation name.',
+          company_required: 'Please enter your organisation.',
+          invalid_notes: 'Note is too long (max 1000 characters).',
+          note_required: 'Please add a note.',
           gender_required: 'Please select your gender.',
           invalid_gender: 'Please select a valid gender.',
           meal_required: 'Please select your meal preference.',
           invalid_meal_preference: 'Please select a valid meal preference.',
           profession_required: 'Please select your profession.',
           invalid_profession: 'Please select a valid profession.',
+          designation_required: 'Please enter your designation.',
+          invalid_designation: 'Designation is too long (max 120 characters).',
+          aadhaar_required: 'Please enter your Aadhaar Card number.',
+          invalid_aadhaar: 'Please enter a valid 12 digit Aadhaar number.',
         };
         setRsvpError(messages[result.error_code ?? ''] ?? result.error ?? 'Could not submit your registration.');
         return;
       }
+      setRsvpBadgeCode(result.badge_code ?? null);
       setRsvpSuccess(true);
       void onRefresh();
     } finally {
@@ -510,9 +698,39 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                     <p className="text-sm font-medium text-green-800 dark:text-green-300">
                       Thanks for registering — we have you on the list.
                     </p>
-                    <p className="mt-1 text-xs text-green-700 dark:text-green-400">
-                      We&rsquo;ll send event details to {rsvpEmail.trim()}.
-                    </p>
+                    {collectEmail && rsvpEmail.trim() && (
+                      <p className="mt-1 text-xs text-green-700 dark:text-green-400">
+                        We&rsquo;ll send event details to {rsvpEmail.trim()}.
+                      </p>
+                    )}
+                    {rsvpBadgeCode && (
+                      <div className="mt-3 rounded-md border border-green-200 bg-white/80 p-3 dark:border-green-800 dark:bg-background/40">
+                        <p className="text-xs text-green-800 dark:text-green-300">
+                          Your badge is ready. Badge No.{' '}
+                          <span className="font-mono font-semibold">{rsvpBadgeCode}</span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <a
+                            href={`/events/badge/${encodeURIComponent(rsvpBadgeCode)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Open Badge
+                          </a>
+                          <a
+                            href={`/events/badge/${encodeURIComponent(rsvpBadgeCode)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-green-300 bg-background px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-50 dark:border-green-800 dark:text-green-300 dark:hover:bg-green-900/20"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Download Badge
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : !rsvpOpen ? (
@@ -533,17 +751,18 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                       </span>
                     )}
                     {isPerDayMode && perDayCap != null && (
-                      <span>
+                      <div className="space-y-1">
                         Per-day capacity: <strong className="text-foreground">{perDayCap}</strong>
-                        {rsvpVisitDate && (
-                          <>
-                            {' · '}
-                            Remaining for {formatDayLabel(rsvpVisitDate)}:
-                            {' '}
-                            <strong className="text-foreground">{remainingForDay(rsvpVisitDate) ?? '—'}</strong>
-                          </>
-                        )}
-                      </span>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          {eventDays.map((day) => (
+                            <span key={day}>
+                              {formatDayLabel(day)}:
+                              {' '}
+                              <strong className="text-foreground">{remainingForDay(day) ?? '—'}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     )}
                     {rsvp.deadline_at && (
                       <span>
@@ -569,6 +788,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                           disabled={rsvpSubmitting}
                         >
                           <option value="">Select a day…</option>
+                          <option value={RSVP_ALL_DAYS_VALUE} disabled={!allDaysSelectable}>
+                            {allDaysSelectable ? 'All days' : 'All days — Full on one or more dates'}
+                          </option>
                           {eventDays.map((day) => {
                             const remaining = remainingForDay(day);
                             const full = isPerDayMode && remaining != null && remaining <= 0;
@@ -586,29 +808,151 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                         </select>
                       </div>
                     )}
+                    {rsvp.collect_aadhaar && (
+                      <div className="space-y-2 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground">
+                          Aadhaar Card{rsvp.require_aadhaar ? ' *' : ''}
+                        </label>
+                        {/* Aadhaar number text input */}
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          value={rsvpAadhaar}
+                          onChange={(e) => {
+                            // Allow user to type spaces freely; cap at 14 chars
+                            // (12 digits + 2 spaces). Pure-digit normalization
+                            // happens at submit time.
+                            const next = e.target.value.replace(/[^0-9 ]/g, '').slice(0, 14);
+                            setRsvpAadhaar(next);
+                          }}
+                          placeholder="12-digit number"
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting || aadhaarScanState === 'extracting'}
+                        />
+
+                        {/* Upload / Camera buttons */}
+                        {/* Hidden file inputs — referenced by the buttons below */}
+                        <input
+                          ref={aadhaarFileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) void handleAadhaarFile(file);
+                            // Reset so the same file can be re-selected if needed
+                            e.target.value = '';
+                          }}
+                        />
+                        <input
+                          ref={aadhaarCameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) void handleAadhaarFile(file);
+                            e.target.value = '';
+                          }}
+                        />
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => aadhaarFileInputRef.current?.click()}
+                            disabled={rsvpSubmitting || aadhaarScanState === 'extracting'}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/60 disabled:opacity-60 transition-colors"
+                          >
+                            {aadhaarScanState === 'extracting' ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Upload className="h-3.5 w-3.5" />
+                            )}
+                            Upload Aadhaar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aadhaarCameraInputRef.current?.click()}
+                            disabled={rsvpSubmitting || aadhaarScanState === 'extracting'}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/60 disabled:opacity-60 transition-colors"
+                          >
+                            {aadhaarScanState === 'extracting' ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Camera className="h-3.5 w-3.5" />
+                            )}
+                            Take Photo
+                          </button>
+                          {aadhaarScanState === 'extracting' && (
+                            <span className="text-xs text-muted-foreground">
+                              Reading card details…
+                            </span>
+                          )}
+                          {aadhaarScanState === 'success' && (
+                            <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400 font-medium">
+                              <Check className="h-3.5 w-3.5" />
+                              Details extracted — please verify before submitting.
+                            </span>
+                          )}
+                          {aadhaarScanState === 'partial' && (
+                            <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                              Details read. Your existing entries were not overwritten.
+                            </span>
+                          )}
+                        </div>
+
+                        {aadhaarScanState === 'error' && aadhaarScanError && (
+                          <p className="text-xs text-destructive">{aadhaarScanError}</p>
+                        )}
+
+                        {/* Privacy notice — shown whenever collect_aadhaar is on */}
+                        <p className="flex items-start gap-1 text-[11px] text-muted-foreground leading-relaxed">
+                          <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />
+                          We use the photo only to read these fields. The image is not stored.
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground">Full name *</label>
+                      <label className="text-xs font-medium text-foreground">Surname *</label>
                       <input
                         type="text"
-                        value={rsvpName}
-                        onChange={(e) => setRsvpName(e.target.value)}
+                        value={rsvpSurname}
+                        onChange={(e) => setRsvpSurname(e.target.value.slice(0, 100))}
                         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                         disabled={rsvpSubmitting}
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground">Email *</label>
+                      <label className="text-xs font-medium text-foreground">Given name *</label>
                       <input
-                        type="email"
-                        value={rsvpEmail}
-                        onChange={(e) => setRsvpEmail(e.target.value)}
+                        type="text"
+                        value={rsvpGivenName}
+                        onChange={(e) => setRsvpGivenName(e.target.value.slice(0, 100))}
                         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                         disabled={rsvpSubmitting}
                       />
                     </div>
+                    {collectEmail && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">
+                          Email {requireEmail ? '*' : ''}
+                        </label>
+                        <input
+                          type="email"
+                          value={rsvpEmail}
+                          onChange={(e) => setRsvpEmail(e.target.value)}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        />
+                      </div>
+                    )}
                     {rsvp.collect_phone && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Phone</label>
+                        <label className="text-xs font-medium text-foreground">
+                          Mobile {rsvp.require_phone ? '*' : ''}
+                        </label>
                         <input
                           type="tel"
                           value={rsvpPhone}
@@ -620,7 +964,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                     )}
                     {rsvp.collect_company && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Company</label>
+                        <label className="text-xs font-medium text-foreground">
+                          Organisation {rsvp.require_company ? '*' : ''}
+                        </label>
                         <input
                           type="text"
                           value={rsvpCompany}
@@ -632,7 +978,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                     )}
                     {rsvp.collect_gender && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Gender *</label>
+                        <label className="text-xs font-medium text-foreground">
+                          Gender {rsvp.require_gender ? '*' : ''}
+                        </label>
                         <select
                           value={rsvpGender}
                           onChange={(e) => setRsvpGender(e.target.value as EventRsvpGender | '')}
@@ -648,7 +996,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                     )}
                     {rsvp.collect_meal && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Meal preference *</label>
+                        <label className="text-xs font-medium text-foreground">
+                          Meal preference {rsvp.require_meal ? '*' : ''}
+                        </label>
                         <select
                           value={rsvpMeal}
                           onChange={(e) => setRsvpMeal(e.target.value as EventRsvpMealPreference | '')}
@@ -664,7 +1014,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                     )}
                     {rsvp.collect_profession && (
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Profession *</label>
+                        <label className="text-xs font-medium text-foreground">
+                          Profession {rsvp.require_profession ? '*' : ''}
+                        </label>
                         <select
                           value={rsvpProfession}
                           onChange={(e) => setRsvpProfession(e.target.value as EventRsvpProfession | '')}
@@ -672,22 +1024,41 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                           disabled={rsvpSubmitting}
                         >
                           <option value="">Select…</option>
-                          {EVENT_RSVP_PROFESSION_OPTIONS.map((opt) => (
+                          {professionOptionsForEvent(rsvp).map((opt) => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                           ))}
                         </select>
                       </div>
                     )}
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-xs font-medium text-foreground">Notes (optional)</label>
-                      <textarea
-                        rows={3}
-                        value={rsvpNotes}
-                        onChange={(e) => setRsvpNotes(e.target.value.slice(0, 1000))}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        disabled={rsvpSubmitting}
-                      />
-                    </div>
+                    {rsvp.collect_designation && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">
+                          Designation{rsvp.require_designation ? ' *' : ''}
+                        </label>
+                        <input
+                          type="text"
+                          value={rsvpDesignation}
+                          onChange={(e) => setRsvpDesignation(e.target.value.slice(0, 120))}
+                          placeholder="e.g. Managing Director"
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          disabled={rsvpSubmitting}
+                        />
+                      </div>
+                    )}
+                    {rsvp.collect_note && (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground">
+                          Note{rsvp.require_note ? ' *' : ''}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={rsvpNotes}
+                          onChange={(e) => setRsvpNotes(e.target.value.slice(0, 1000))}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          disabled={rsvpSubmitting}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {rsvpError && (
@@ -715,6 +1086,11 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           </section>
         )}
 
+        {/* Badge mobile lookup (visitor self-serve) */}
+        {rsvp?.enabled && (
+          <BadgeMobileLookup eventSlug={eventDetail.slug} defaultMobile={prefillMobile} />
+        )}
+
         <div className="pt-4 border-t border-border">
           <Link
             to="/events"
@@ -726,6 +1102,99 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
         </div>
       </div>
     </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public badge lookup — visitor enters mobile, gets their badge PDF.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BadgeMobileLookup: React.FC<{ eventSlug: string; defaultMobile?: string }> = ({
+  eventSlug,
+  defaultMobile,
+}) => {
+  const [mobile, setMobile] = useState('');
+  // COD-EVENTS-REGISTRATION-COMPLETE-059
+  // Prefill mobile from approved-member profile only when the field is empty.
+  useEffect(() => {
+    if (!defaultMobile) return;
+    setMobile((cur) => (cur.trim().length === 0 ? defaultMobile : cur));
+  }, [defaultMobile]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const trimmed = mobile.trim();
+    if (!trimmed) {
+      setError('Please enter the mobile number you registered with.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const url = eventsService.badgeDownloadUrlByMobile(eventSlug, trimmed);
+      const resp = await fetch(url, { method: 'GET' });
+      if (resp.status === 410) {
+        setError('Badge downloads are closed for this event.');
+        return;
+      }
+      if (resp.status === 404) {
+        setError('No badge found for that mobile number. Make sure you registered with this number.');
+        return;
+      }
+      if (!resp.ok) {
+        setError('Could not retrieve badge. Please try again later.');
+        return;
+      }
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `badge-${eventSlug}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-semibold tracking-tight inline-flex items-center gap-2">
+        <Download className="h-5 w-5" />
+        Already registered? Get your badge
+      </h2>
+      <form onSubmit={(e) => void onSubmit(e)} className="rounded-lg border border-border bg-card p-5 space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Enter the mobile number you used to register and we'll generate your badge as a PDF (4 in × 6 in). Available until the event ends.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[200px] space-y-1.5">
+            <label className="text-xs font-medium text-foreground">Mobile</label>
+            <input
+              type="tel"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              placeholder="e.g. 9876543210"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              disabled={busy}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Get my badge
+          </button>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </form>
+    </section>
   );
 };
 
@@ -963,4 +1432,3 @@ const ActivityDetail: React.FC = () => {
 };
 
 export default ActivityDetail;
-

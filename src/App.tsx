@@ -6,12 +6,14 @@ import Directory from './pages/Directory';
 import Events from './pages/Events';
 import News from './pages/News';
 import ActivityDetail from './pages/ActivityDetail';
+import EventBadgeDownload from './pages/EventBadgeDownload';
 import AdminActivities from './pages/AdminActivities';
 import AdminActivityForm from './pages/AdminActivityForm';
 import AdminActivitySettings from './pages/AdminActivitySettings';
 import AdminEvents from './pages/AdminEvents';
 import AdminEventForm from './pages/AdminEventForm';
 import AdminEventRegistrations from './pages/AdminEventRegistrations';
+import AdminEventCheckin from './pages/AdminEventCheckin';
 import Leadership from './pages/Leadership';
 import Join from './pages/Join';
 import MembershipBenefits from './pages/MembershipBenefits';
@@ -126,6 +128,7 @@ function App() {
             <Route path="/members" element={<Directory />} />
             <Route path="/member/:id/:companySlug/:nameSlug" element={<MemberProfile />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/events/badge/:code" element={<EventBadgeDownload />} />
             <Route path="/events/:slug" element={<ActivityDetail />} />
             <Route path="/news" element={<News />} />
             <Route path="/activities" element={<Navigate to="/events" replace />} />
@@ -208,6 +211,7 @@ function App() {
             <Route path="/admin/content/events/new" element={<AdminEventForm />} />
             <Route path="/admin/content/events/:id/edit" element={<AdminEventForm />} />
             <Route path="/admin/content/events/:id/registrations" element={<AdminEventRegistrations />} />
+            <Route path="/admin/content/events/:id/checkin" element={<AdminEventCheckin />} />
             <Route path="/admin/content/activities" element={<AdminActivities />} />
             <Route path="/admin/content/activities/new" element={<AdminActivityForm />} />
             <Route path="/admin/content/activities/:id/edit" element={<AdminActivityForm />} />

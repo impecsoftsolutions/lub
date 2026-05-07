@@ -182,6 +182,23 @@ interface DraftEventOutput {
 
 const MAX_WHATSAPP_MESSAGE_CHARS = 1200;
 
+// 045: deterministic cap on AI-generated event description.
+const MAX_DESCRIPTION_WORDS = 100;
+
+function capDescriptionWords(input: string, maxWords: number): string {
+  if (!input) return '';
+  // Normalize whitespace (collapse runs, preserve paragraph breaks).
+  const normalized = input
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (!normalized) return '';
+  const words = normalized.split(/\s+/);
+  if (words.length <= maxWords) return normalized;
+  return `${words.slice(0, maxWords).join(' ')}…`;
+}
+
 interface ExtractionFields {
   event_type?: string;
   location?: string;
@@ -317,7 +334,7 @@ function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
     'title: short, descriptive, <= 90 characters, no trailing punctuation.',
     'slug: lowercase letters, digits, and hyphens only, <= 60 characters; client/server may re-validate.',
     'excerpt: 1-2 sentences, <= 280 characters, plain text, listing-card friendly.',
-    'description: 2-4 short paragraphs (~150-500 words), plain text, no Markdown.',
+    'description: a concise summary, plain text, no Markdown. STRICTLY at most 100 words. The admin can expand it later in the form, so keep this short.',
     'invitation_text: a short invitation paragraph addressed to members; avoid all-caps; do not include a salutation header.',
     'agenda_items: chronological array; each title is required; time is optional but preferred (e.g. "10:00 AM"); leave the array empty when no agenda is implied.',
     'event_type: pick the closest of the listed values. If unsure, use "general".',
@@ -573,7 +590,7 @@ function parseDraftJson(content: string): DraftEventOutput {
     title,
     slug: slugifyServer(aiSlug || title),
     excerpt,
-    description,
+    description: capDescriptionWords(description, MAX_DESCRIPTION_WORDS),
     event_type,
     visibility,
     start_at: startAtRaw || null,

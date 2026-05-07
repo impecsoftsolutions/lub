@@ -6,7 +6,12 @@ interface WorksheetColumn {
 }
 
 function escapeXml(value: string): string {
-  return value
+  // Strip null bytes and XML-illegal control characters (U+0000–U+001F except
+  // tab U+0009, newline U+000A, carriage return U+000D). These cause Excel to
+  // reject the file as corrupt.
+  // eslint-disable-next-line no-control-regex
+  const cleaned = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  return cleaned
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -141,5 +146,7 @@ export async function downloadSingleSheetXlsx(params: {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // Revoke after a delay so the browser has time to start the download.
+  // Immediate revocation can silently fail on Safari and some mobile browsers.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
