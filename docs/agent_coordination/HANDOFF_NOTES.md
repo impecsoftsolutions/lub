@@ -4,49 +4,39 @@ Keep this file short and overwrite it instead of appending a journal.
 
 ## Single-Board Rule
 
-Only `docs/agent_coordination/TASK_BOARD.md` is authoritative.
+Only `docs/agent_coordination/TASK_BOARD.md` is authoritative.  
 Do not edit task rows in worktree-local board copies.
 
-## Current Owner - Codex
+## Current Owner
 
-## Current Slice - COD-EVENTS-REGISTRATION-MEDIA-041 (Runtime closeout complete)
+No active Events slice. `COD-EVENTS-BADGE-CAMERA-SCANNER-072` is closed by Codex.
 
-## Status
+## Closed Slice - COD-EVENTS-BADGE-CAMERA-SCANNER-072
 
-Closed end-to-end.
+### Scope
 
-## Codex Runtime Closeout Completed
+- Added camera QR scanning to `/admin/content/events/:id/checkin`.
+- Scanner detects QR payload from live camera feed and reuses existing badge lookup + check-in logic.
+- Manual code/URL lookup remains intact as fallback.
+- No DB migration. No Supabase function deploy.
 
-1. Applied migration:
-   - `supabase/migrations/20260507000000_events_registration_media_041.sql`
+### Files Changed
 
-2. Deployed edge function:
-   - `event-media-upload`
+- `src/pages/AdminEventCheckin.tsx`
+- `docs/CURRENT_STATE.md`
+- `docs/agent_coordination/TASK_BOARD.md`
+- `docs/agent_coordination/HANDOFF_NOTES.md`
 
-3. Runtime probes passed:
-   - Per-day capacity (`capacity_full_for_date`) behavior
-   - Multi-day `visit_date_required`
-   - Single-day auto-assign of `visit_date`
-   - Registrations list load via `get_event_rsvps_with_session`
-   - Asset upload flow (banner/flyer/document) + public render/download
-   - Permission denials for unauthorized asset mutation calls
+### Validation
 
-4. Production defect found and fixed during closeout:
-   - Problem: `delete_event_asset_with_session` attempted direct delete on
-     `storage.objects`, blocked by storage trigger.
-   - Fix applied with migration:
-     `supabase/migrations/20260507001000_event_asset_delete_rpc_hotfix.sql`
-   - Result: delete RPC now removes DB asset rows and clears banner pointers
-     without direct storage-table delete.
+```bash
+npm run lint                  # PASS - 0 errors / 3 expected shadcn warnings
+npm run build                 # PASS
+npm run test:e2e:phase1:local # PASS - 3 passed / 12 skipped
+```
 
-## Validation
+Note: first readonly run failed during admin login (`Login rejected`), immediate retry passed. This is consistent with known intermittent auth flake and not tied to this scanner change.
 
-- `npm run lint` -> PASS (0 errors / 3 expected warnings)
-- `npm run build` -> PASS
-- `npm run test:e2e:phase1:local` -> PASS (3 passed / 12 skipped)
+## Ready Queue
 
-## Notes
-
-- Keep commit scope strict in this dirty worktree.
-- Do not stage unrelated handshake deletions, `.playwright-mcp/`, `artifacts/`,
-  `.temp/`, or export artifacts.
+No active Events slice is open at handoff.

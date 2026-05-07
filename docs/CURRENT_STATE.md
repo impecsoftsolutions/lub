@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-03
-**Updated by:** Codex (`COD-EVENTS-REGISTRATION-MEDIA-041` runtime closeout + `041X` hotfix)
+**Last updated:** 2026-05-07  
+**Updated by:** Codex (`COD-EVENTS-BADGE-CAMERA-SCANNER-072` closeout)
 
 ---
 
@@ -17,58 +17,63 @@
 
 | Check | Status |
 |-------|--------|
-| Build (`npm run build`) | PASS (2026-05-03, COD-EVENTS-REGISTRATION-MEDIA-041) |
-| Lint (`npm run lint`) | PASS - 0 errors, 3 expected warnings in shadcn primitives (2026-05-03, COD-EVENTS-REGISTRATION-MEDIA-041) |
-| Phase 1 destructive smoke | **15 passed** (verified 2026-03-13 baseline) |
-| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped (2026-05-03, COD-EVENTS-REGISTRATION-MEDIA-041) |
-
-Phase 1 destructive baseline remains the non-negotiable floor.
+| Lint (`npm run lint`) | PASS - 0 errors, 3 expected shadcn warnings |
+| Build (`npm run build`) | PASS |
+| Phase 1 destructive smoke | **15 passed** baseline |
+| Phase 1 readonly smoke | PASS - 3 passed / 12 skipped |
 
 ---
 
 ## Active Stream
 
-**Active stream:** none (latest events runtime closeout finished)  
-**Current owner:** Codex  
-**Task board:** `docs/agent_coordination/TASK_BOARD.md` - single source of truth.
-
-**Current handoff state:** `COD-EVENTS-REGISTRATION-MEDIA-041` is fully closed. Codex applied migration `supabase/migrations/20260507000000_events_registration_media_041.sql`, deployed `event-media-upload`, and completed runtime probes (per-day capacity/day selection, `visit_date_required`, single-day auto-assignment, registrations list load, asset upload/render/download, and permission denials). During closeout, a production defect was found in `delete_event_asset_with_session` (direct delete on `storage.objects` blocked by storage trigger). Codex added and applied hotfix migration `supabase/migrations/20260507001000_event_asset_delete_rpc_hotfix.sql`; delete RPC now removes asset rows and clears banner pointers without direct storage-table delete.
-
-Most recently completed streams:
-- **COD-EVENTS-REGISTRATION-MEDIA-041X**: Runtime hotfix for event asset delete RPC.
-- **COD-EVENTS-REGISTRATION-MEDIA-041**: Events registration/media feature batch, runtime verified.
-- **COD-EVENTS-AI-DATES-SHARE-040A-HOTFIX**: Date extraction + RSVP share panel hotfix, runtime verified.
-- **COD-EVENTS-NEXT-040A**: RSVP field expansion + WhatsApp manual-trigger generation, runtime verified.
-- **COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039**: RSVP + bridge + maps + WhatsApp, runtime verified.
+**Active stream:** None.
 
 ---
 
 ## Last Verified
 
-- **When:** 2026-05-03
-- **What:** `COD-EVENTS-REGISTRATION-MEDIA-041` runtime closeout + `041X` hotfix
-- **Result:** PASS for lint, build, and Phase 1 readonly smoke. Migration 041 applied, `event-media-upload` deployed, runtime probes passed for RSVP capacity/visit-date logic and media flow, and delete-RPC hotfix migration applied.
-- **Commands:**
-  ```
-  npm run lint -> PASS (0 errors / 3 expected warnings)
-  npm run build -> PASS
-  npm run test:e2e:phase1:local -> PASS (3 passed / 12 skipped)
-  ```
+- **When:** 2026-05-07
+- **What:** `COD-EVENTS-BADGE-CAMERA-SCANNER-072` - admin badge check-in camera scanner.
+- **Deploy/apply commands run:** None (frontend-only slice).
+- **Result:** Lint PASS, Build PASS, Phase 1 readonly smoke PASS on retry.
+
+Runtime outcomes:
+- Admin check-in page now supports camera QR scanning in addition to manual badge code/URL entry.
+- Scanner requests rear camera, continuously detects QR payload, normalizes to badge code, and auto-runs existing lookup flow.
+- Existing manage/view permission behavior remains unchanged.
+- Manual lookup and attendance marking behavior remains unchanged.
+
+---
+
+## Recently Closed Events Follow-ups
+
+### 072 Badge Check-in Camera Scanner
+
+- Closed on 2026-05-07.
+- Added camera scanner UI and loop on `/admin/content/events/:id/checkin`.
+- No schema changes, no edge function changes.
+- Safe fallback remains available: manual entry/paste.
+
+### 071 Badge Layout / Profession Options / Badge Download / Aadhaar Reports
+
+- Closed end-to-end on 2026-05-07.
+- Migrations `070`, `071`, and `071x` applied.
+- Badge renderer deployed and verified.
 
 ---
 
 ## In Progress / Dirty State
 
-- Repo worktree is dirty from multiple prior slices and handoffs. Treat the current tree as collaborative state; do not revert unrelated changes.
-- Commit-scope policy is active: stage and commit only explicit slice-manifest files; do not use broad staging (`git add .`) in this repo state.
+- Worktree remains collaboratively dirty from prior slices; do not revert unrelated files.
+
+---
 
 ## Deferred / Next Candidate Work
 
-1. `COD-PUBLIC-001` (News half) - real News page blocked; no backend content source identified yet.
-2. `COD-MSME-SHOWCASE-001` - MSME product showcase platform (needs product scoping with user).
-3. `COD-MSME-ISSUES-001` - MSME issue intake, AI categorization, and representation workflow (needs product refinement).
-4. `COD-MEMBERS-EXPORT-002` - low-priority export UX follow-ups only after higher-priority product work.
-5. Multi-provider AI runtime - structural follow-up to make `normalize-member` and `draft-activity-content` support providers beyond OpenAI.
+1. `COD-MSME-SHOWCASE-001`
+2. `COD-MSME-ISSUES-001`
+3. `COD-PUBLIC-001`
+4. `COD-MEMBERS-EXPORT-002`
 
 ---
 
