@@ -65,6 +65,7 @@ import { AdminContextProvider } from './contexts/AdminContext';
 import { sessionManager } from './lib/sessionManager';
 import { applyStoredTheme } from './lib/themeManager';
 import { DateTimeFormatBootstrap } from './components/DateTimeFormatBootstrap';
+import { useOrganisationProfile } from './hooks/useOrganisationProfile';
 // Restore persisted theme and color mode before first render
 applyStoredTheme();
 
@@ -230,4 +231,39 @@ function App() {
   );
 }
 
-export default App;
+function FaviconManager() {
+  const { profile } = useOrganisationProfile();
+
+  useEffect(() => {
+    const logoUrl = (profile?.organization_logo_url ?? '').trim();
+    if (!logoUrl) return;
+
+    const ensureLink = (rel: string) => {
+      let link = document.head.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = logoUrl;
+      return link;
+    };
+
+    ensureLink('icon');
+    ensureLink('shortcut icon');
+    ensureLink('apple-touch-icon');
+  }, [profile?.organization_logo_url]);
+
+  return null;
+}
+
+function AppWithFavicon() {
+  return (
+    <>
+      <FaviconManager />
+      <App />
+    </>
+  );
+}
+
+export default AppWithFavicon;
