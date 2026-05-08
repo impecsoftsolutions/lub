@@ -272,6 +272,7 @@ const AdminEventForm: React.FC = () => {
   const [analysisPollTimedOut, setAnalysisPollTimedOut] = useState(false);
   const [docLabelDraft, setDocLabelDraft] = useState('');
   const [rsvpDeadlineAt, setRsvpDeadlineAt] = useState('');
+  const [rsvpDeadlineEnabled, setRsvpDeadlineEnabled] = useState(false);
   const [rsvpCollectEmail, setRsvpCollectEmail] = useState(true);
   const [rsvpRequireEmail, setRsvpRequireEmail] = useState(false);
   const [rsvpCollectPhone, setRsvpCollectPhone] = useState(true);
@@ -408,6 +409,11 @@ const AdminEventForm: React.FC = () => {
         setBannerImageUrl(data.banner_image_url ?? null);
         setAssets(Array.isArray(data.assets) ? data.assets : []);
         setRsvpDeadlineAt(toDateTimeInput(rsvpCfg.deadline_at ?? null));
+        setRsvpDeadlineEnabled(
+          meta.rsvp_deadline_enabled === undefined
+            ? Boolean(rsvpCfg.deadline_at)
+            : Boolean(meta.rsvp_deadline_enabled),
+        );
         setRsvpCollectEmail(Boolean(meta.rsvp_collect_email ?? rsvpCfg.collect_email ?? true));
         setRsvpRequireEmail(Boolean(meta.rsvp_require_email ?? rsvpCfg.require_email ?? false));
         setRsvpCollectPhone(rsvpCfg.collect_phone !== false);
@@ -733,6 +739,7 @@ const AdminEventForm: React.FC = () => {
       badge_include_surname: badgeIncludeSurname,
       badge_name_max_chars: badgeNameMaxChars,
       badge_name_font_size: badgeNameFontSize,
+      rsvp_deadline_enabled: rsvpEnabled ? rsvpDeadlineEnabled : false,
     };
     return {
       title: title.trim(),
@@ -757,7 +764,10 @@ const AdminEventForm: React.FC = () => {
       rsvp_enabled: rsvpEnabled,
       rsvp_capacity:
         capacityNum != null && Number.isFinite(capacityNum) && capacityNum > 0 ? capacityNum : null,
-      rsvp_deadline_at: rsvpDeadlineAt ? new Date(rsvpDeadlineAt).toISOString() : null,
+      rsvp_deadline_at:
+        rsvpEnabled && rsvpDeadlineEnabled && rsvpDeadlineAt
+          ? new Date(rsvpDeadlineAt).toISOString()
+          : null,
       rsvp_collect_phone: rsvpCollectPhone,
       rsvp_collect_company: rsvpCollectCompany,
       rsvp_collect_gender: rsvpCollectGender,
@@ -814,6 +824,17 @@ const AdminEventForm: React.FC = () => {
       const capNum = Number(rsvpCapacity.trim());
       if (!Number.isFinite(capNum) || capNum <= 0) {
         showToast('error', 'Registration capacity must be a positive whole number.');
+        return null;
+      }
+    }
+    if (rsvpEnabled && rsvpDeadlineEnabled && !rsvpDeadlineAt) {
+      showToast('error', 'Set a registration deadline or disable custom deadline.');
+      return null;
+    }
+    if (rsvpEnabled && rsvpDeadlineEnabled && rsvpDeadlineAt) {
+      const eventEnd = endAt || startAt;
+      if (eventEnd && new Date(rsvpDeadlineAt) > new Date(eventEnd)) {
+        showToast('error', 'Registration deadline cannot be after the event end date/time.');
         return null;
       }
     }
@@ -2255,12 +2276,35 @@ const AdminEventForm: React.FC = () => {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-foreground">Registration deadline (optional)</label>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-medium text-foreground">Registration deadline</label>
+                      <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={rsvpDeadlineEnabled}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            setRsvpDeadlineEnabled(next);
+                            if (next && !rsvpDeadlineAt) {
+                              const fallback = endAt || startAt;
+                              if (fallback) setRsvpDeadlineAt(fallback);
+                            }
+                          }}
+                          className="h-3.5 w-3.5 rounded border-input accent-primary"
+                        />
+                        Enable custom deadline
+                      </label>
+                    </div>
                     <Input
                       type="datetime-local"
                       value={rsvpDeadlineAt}
+                      disabled={!rsvpDeadlineEnabled}
                       onChange={(event) => setRsvpDeadlineAt(event.target.value)}
+                      placeholder="Defaults to event end when disabled"
                     />
+                    <p className="text-[11px] text-muted-foreground">
+                      When disabled, registration closes at the event end date/time and the deadline is hidden on the public page.
+                    </p>
                   </div>
                   <div className="md:col-span-2 rounded-md border border-border bg-background/50 p-3">
                     <div className="mb-2 grid grid-cols-[1fr_auto_auto] gap-2 px-1 text-[11px] font-medium text-muted-foreground">
@@ -2312,7 +2356,7 @@ const AdminEventForm: React.FC = () => {
                         />
                       </div>
                       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
-                        <span className="text-xs text-foreground">Organisation</span>
+                        <span className="text-xs text-foreground">Company / Organization</span>
                         <input
                           type="checkbox"
                           checked={rsvpCollectCompany}
@@ -2553,7 +2597,7 @@ const AdminEventForm: React.FC = () => {
                           <th className="px-2 py-1">Name</th>
                           <th className="px-2 py-1">Email</th>
                           <th className="px-2 py-1">Mobile</th>
-                          <th className="px-2 py-1">Organisation</th>
+                          <th className="px-2 py-1">Company / Organization</th>
                           <th className="px-2 py-1">Gender</th>
                           <th className="px-2 py-1">Meal</th>
                           <th className="px-2 py-1">Profession</th>

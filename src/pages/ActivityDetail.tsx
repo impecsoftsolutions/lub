@@ -211,6 +211,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const documents = assets.filter((a) => a.kind === 'document');
   const rsvp = eventDetail.rsvp ?? null;
   const rsvpOpen = Boolean(rsvp?.enabled && rsvp?.open);
+  const showDeadline = Boolean(rsvp?.deadline_enabled);
   const collectEmail = rsvp?.collect_email !== false;
   const requireEmail = Boolean(rsvp?.require_email);
 
@@ -409,7 +410,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
       return;
     }
     if (rsvp?.require_company && !rsvpCompany.trim()) {
-      setRsvpError('Please enter your organisation.');
+      setRsvpError('Please enter your company / organization.');
       return;
     }
     if (rsvp?.collect_note && rsvp?.require_note && !rsvpNotes.trim()) {
@@ -471,8 +472,8 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           email_required: 'Please enter your email address.',
           invalid_phone: 'Please enter a valid mobile number.',
           phone_required: 'Please enter your mobile number.',
-          invalid_company: 'Please enter a valid organisation name.',
-          company_required: 'Please enter your organisation.',
+          invalid_company: 'Please enter a valid company / organization name.',
+          company_required: 'Please enter your company / organization.',
           invalid_notes: 'Note is too long (max 1000 characters).',
           note_required: 'Please add a note.',
           gender_required: 'Please select your gender.',
@@ -791,7 +792,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
               ) : !rsvpOpen ? (
                 <p className="text-sm text-muted-foreground">
                   Registrations are currently closed for this event.
-                  {rsvp.deadline_at && (
+                  {showDeadline && rsvp.deadline_at && (
                     <> Deadline was {new Date(rsvp.deadline_at).toLocaleString('en-IN')}.</>
                   )}
                 </p>
@@ -819,7 +820,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                         </div>
                       </div>
                     )}
-                    {rsvp.deadline_at && (
+                    {showDeadline && rsvp.deadline_at && (
                       <span>
                         Deadline: <strong className="text-foreground">{new Date(rsvp.deadline_at).toLocaleString('en-IN')}</strong>
                       </span>
@@ -1025,7 +1026,7 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                     {rsvp.collect_company && (
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-foreground">
-                          Organisation {rsvp.require_company ? '*' : ''}
+                          Company / Organization {rsvp.require_company ? '*' : ''}
                         </label>
                         <input
                           type="text"

@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-07  
-**Updated by:** Codex (`COD-EVENTS-REGISTRATION-SUBMIT-NO-POPUP-080`)
+**Last updated:** 2026-05-08  
+**Updated by:** Codex (`COD-EVENTS-REGISTRATION-DEADLINE-TOGGLE-081`)
 
 ---
 
@@ -32,19 +32,29 @@
 
 ## Last Verified
 
-- **When:** 2026-05-07
-- **What:** `COD-EVENTS-REGISTRATION-SUBMIT-NO-POPUP-080` - fixed public event registration submit flow so duplicate/error cases show inline error directly without opening/closing a blank badge tab.
-- **Deploy/apply commands run:** None (UI-only behavior fix).
+- **When:** 2026-05-08
+- **What:** `COD-EVENTS-REGISTRATION-DEADLINE-TOGGLE-081` - added admin toggle to enable/disable custom registration deadline, enforced default closure at event end when disabled, and hid deadline on public website when custom deadline is disabled.
+- **Deploy/apply commands run:** `supabase db push --linked` (applied `20260507025000_events_registration_deadline_toggle_081.sql`).
 - **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase1 readonly smoke PASS (3 passed / 12 skipped).
 
 Runtime notes:
-- `src/pages/ActivityDetail.tsx` no longer pre-opens `about:blank` before `submit_event_rsvp`.
-- On failed submit (duplicate email/mobile/aadhaar or any validation/server error), only inline red error is shown; no tab flicker.
-- On successful submit with `badge_code`, badge page still opens in a new tab as intended.
+- `src/pages/AdminEventForm.tsx`: added `Enable custom deadline` toggle under Registration settings.
+- If custom deadline is disabled, saved payload now writes `rsvp_deadline_at = null` and `ai_metadata.rsvp_deadline_enabled = false`.
+- Backend `get_event_by_slug` + `submit_event_rsvp` now treat effective close time as:
+  - custom deadline when enabled,
+  - otherwise event end datetime (fallback to event start when end is missing).
+- Public page now shows deadline text only when `rsvp.deadline_enabled = true`.
 
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 081 Registration deadline toggle
+
+- Closed on 2026-05-08.
+- Added migration: `supabase/migrations/20260507025000_events_registration_deadline_toggle_081.sql` and applied to linked DB.
+- Updated admin UI to support explicit custom deadline enable/disable.
+- Updated public event registration rendering so disabled custom deadline is hidden while registration still auto-closes at event end.
 
 ### 078 Excerpt + Invitation Visibility
 

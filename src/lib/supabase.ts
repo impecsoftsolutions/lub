@@ -6876,6 +6876,7 @@ export interface BadgeDesignAnalysis {
 export interface EventRsvpPublicConfig {
   enabled: boolean;
   open: boolean;
+  deadline_enabled?: boolean;
   deadline_at: string | null;
   capacity: number | null;
   capacity_mode?: EventCapacityMode;
