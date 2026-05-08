@@ -189,6 +189,24 @@ const toCoverSeedUrl = (url: string | null | undefined): string | null => {
   }
 };
 
+const resolveRenderableImageUrl = async (
+  primaryUrl: string,
+  fallbackUrl: string | null,
+): Promise<string> => {
+  const canLoad = (url: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+
+  const primaryOk = await canLoad(primaryUrl);
+  if (primaryOk) return primaryUrl;
+  if (fallbackUrl) return fallbackUrl;
+  return primaryUrl;
+};
+
 // Ratio choices for the in-modal gallery crop selector. `aspect: null` means
 // "Original — keep native ratio, no crop, just resize+compress".
 const GALLERY_CROP_RATIO_OPTIONS = [
@@ -334,21 +352,31 @@ const AdminActivityForm: React.FC = () => {
         setCoverTransform(null);
         setOriginalStatus(data.status);
 
-        setGallery(
-          (data.media ?? [])
-            .sort((a: ActivityMediaItem, b: ActivityMediaItem) => a.display_order - b.display_order)
-            .map((m: ActivityMediaItem) => ({
-              mediaId: m.id,
-              previewUrl: buildActivityMediaUrl(m.storage_url, 'gallery-grid') ?? m.storage_url,
-              storageUrl: m.storage_url,
-              blob: null,
-              originalFile: null,
-              transform: null,
-              originalObjectKey: m.original_object_key ?? null,
-              originalFilename: m.original_filename ?? null,
-              storageProvider: m.storage_provider ?? null,
-            }))
+        const mappedGallery = (data.media ?? [])
+          .sort((a: ActivityMediaItem, b: ActivityMediaItem) => a.display_order - b.display_order)
+          .map((m: ActivityMediaItem) => ({
+            mediaId: m.id,
+            previewUrl: buildActivityMediaUrl(m.storage_url, 'gallery-grid') ?? m.storage_url,
+            storageUrl: m.storage_url,
+            blob: null,
+            originalFile: null,
+            transform: null,
+            originalObjectKey: m.original_object_key ?? null,
+            originalFilename: m.original_filename ?? null,
+            storageProvider: m.storage_provider ?? null,
+          }));
+
+        const normalizedGallery = await Promise.all(
+          mappedGallery.map(async (item) => {
+            const previewUrl = await resolveRenderableImageUrl(
+              item.previewUrl,
+              buildActivityMediaUrl(data.cover_image_url, 'cover-admin'),
+            );
+            return { ...item, previewUrl };
+          }),
         );
+        if (cancelled) return;
+        setGallery(normalizedGallery);
       } catch (err) {
         console.error('[AdminActivityForm] load error:', err);
         showToast('error', 'Failed to load activity.');
@@ -1875,21 +1903,8 @@ const AdminActivityForm: React.FC = () => {
                         className="h-full w-full object-cover"
                         onError={(event) => {
                           const img = event.currentTarget;
-                          const current = img.getAttribute('src') ?? '';
-                          const fallbackGallery =
-                            buildActivityMediaUrl(item.storageUrl ?? item.previewUrl, 'gallery-lightbox');
-                          const fallbackCover =
-                            buildActivityMediaUrl(item.storageUrl ?? item.previewUrl, 'cover-admin');
                           const fallbackFinal = coverPreview ?? null;
-
-                          if (fallbackGallery && current !== fallbackGallery) {
-                            img.src = fallbackGallery;
-                            return;
-                          }
-                          if (fallbackCover && current !== fallbackCover) {
-                            img.src = fallbackCover;
-                            return;
-                          }
+                          const current = img.getAttribute('src') ?? '';
                           if (fallbackFinal && current !== fallbackFinal) {
                             img.src = fallbackFinal;
                             return;
