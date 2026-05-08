@@ -113,6 +113,7 @@ const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
 const MAX_PDF_BYTES = 30 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
 const ALLOWED_SOURCE_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
+const RSVP_ROSTER_PREVIEW_LIMIT = 3;
 
 function assetFileName(asset: EventAsset): string {
   return asset.label || asset.storage_path.split('/').pop() || 'Uploaded file';
@@ -311,6 +312,7 @@ const AdminEventForm: React.FC = () => {
   });
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [rsvpStatusFilter, setRsvpStatusFilter] = useState<EventRsvpStatus | 'all'>('all');
+  const [showAllRsvpRows, setShowAllRsvpRows] = useState(false);
 
   // Bridge (event -> activity)
   const [bridgeActivityId, setBridgeActivityId] = useState<string | null>(null);
@@ -945,6 +947,7 @@ const AdminEventForm: React.FC = () => {
         showToast('error', result.error ?? 'Failed to load registrations.');
         return;
       }
+      setShowAllRsvpRows(false);
       setRsvpRows(result.rows);
       setRsvpSummary(result.summary);
     } finally {
@@ -971,6 +974,11 @@ const AdminEventForm: React.FC = () => {
     showToast('success', 'Registration updated.');
     void loadRsvps();
   };
+
+  const visibleRsvpRows = useMemo(
+    () => (showAllRsvpRows ? rsvpRows : rsvpRows.slice(0, RSVP_ROSTER_PREVIEW_LIMIT)),
+    [rsvpRows, showAllRsvpRows],
+  );
 
   // ── Bridge to activity ────────────────────────────────────────────────────
   const handleBridgeToActivity = async () => {
@@ -2590,6 +2598,7 @@ const AdminEventForm: React.FC = () => {
                     {rsvpLoading ? 'Loading…' : 'No registrations yet.'}
                   </p>
                 ) : (
+                  <>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -2606,7 +2615,7 @@ const AdminEventForm: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {rsvpRows.map((row) => (
+                        {visibleRsvpRows.map((row) => (
                           <tr key={row.id} className="border-t border-border align-top">
                             <td className="px-2 py-1.5 text-foreground">{row.full_name}</td>
                             <td className="px-2 py-1.5 text-muted-foreground break-all">
@@ -2662,6 +2671,22 @@ const AdminEventForm: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+                  {rsvpRows.length > RSVP_ROSTER_PREVIEW_LIMIT && (
+                    <div className="flex items-center justify-between pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Showing {visibleRsvpRows.length} of {rsvpRows.length} registrations.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAllRsvpRows((prev) => !prev)}
+                      >
+                        {showAllRsvpRows ? 'Show less' : `Show all (${rsvpRows.length})`}
+                      </Button>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             )}
