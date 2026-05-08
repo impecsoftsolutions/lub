@@ -1873,6 +1873,29 @@ const AdminActivityForm: React.FC = () => {
                         src={item.previewUrl}
                         alt=""
                         className="h-full w-full object-cover"
+                        onError={(event) => {
+                          const img = event.currentTarget;
+                          const current = img.getAttribute('src') ?? '';
+                          const fallbackGallery =
+                            buildActivityMediaUrl(item.storageUrl ?? item.previewUrl, 'gallery-lightbox');
+                          const fallbackCover =
+                            buildActivityMediaUrl(item.storageUrl ?? item.previewUrl, 'cover-admin');
+                          const fallbackFinal = coverPreview ?? null;
+
+                          if (fallbackGallery && current !== fallbackGallery) {
+                            img.src = fallbackGallery;
+                            return;
+                          }
+                          if (fallbackCover && current !== fallbackCover) {
+                            img.src = fallbackCover;
+                            return;
+                          }
+                          if (fallbackFinal && current !== fallbackFinal) {
+                            img.src = fallbackFinal;
+                            return;
+                          }
+                          img.onerror = null;
+                        }}
                       />
                       {/* Drag handle overlay */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />

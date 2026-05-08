@@ -62,9 +62,10 @@ interface LightboxProps {
   images: string[];
   startIndex: number;
   onClose: () => void;
+  fallbackImageUrl?: string | null;
 }
 
-const Lightbox: React.FC<LightboxProps> = ({ images, startIndex, onClose }) => {
+const Lightbox: React.FC<LightboxProps> = ({ images, startIndex, onClose, fallbackImageUrl = null }) => {
   const [current, setCurrent] = useState(startIndex);
 
   useEffect(() => {
@@ -104,6 +105,15 @@ const Lightbox: React.FC<LightboxProps> = ({ images, startIndex, onClose }) => {
         src={images[current]}
         alt={`Photo ${current + 1}`}
         className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
+        onError={(event) => {
+          const img = event.currentTarget;
+          const currentSrc = img.getAttribute('src') ?? '';
+          if (fallbackImageUrl && currentSrc !== fallbackImageUrl) {
+            img.src = fallbackImageUrl;
+            return;
+          }
+          img.onerror = null;
+        }}
         onClick={(event) => event.stopPropagation()}
       />
 
@@ -1470,6 +1480,15 @@ const ActivityDetail: React.FC = () => {
                     alt={`Photo ${index + 1}`}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
+                    onError={(event) => {
+                      const img = event.currentTarget;
+                      const currentSrc = img.getAttribute('src') ?? '';
+                      if (coverUrl && currentSrc !== coverUrl) {
+                        img.src = coverUrl;
+                        return;
+                      }
+                      img.onerror = null;
+                    }}
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <div className="rounded-full bg-white/0 group-hover:bg-white/20 p-2 transition-colors">
@@ -1517,6 +1536,7 @@ const ActivityDetail: React.FC = () => {
           images={galleryUrls}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
+          fallbackImageUrl={coverUrl}
         />
       )}
     </div>
