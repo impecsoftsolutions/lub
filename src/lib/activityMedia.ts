@@ -31,6 +31,9 @@ export function buildActivityMediaUrl(
     if (variant.startsWith('cover-') && url.pathname.startsWith('/v1/activities/gallery/')) {
       url.pathname = url.pathname.replace('/v1/activities/gallery/', '/v1/activities/cover/');
     }
+    if (variant.startsWith('gallery-') && url.pathname.startsWith('/v1/activities/cover/')) {
+      url.pathname = url.pathname.replace('/v1/activities/cover/', '/v1/activities/gallery/');
+    }
     url.searchParams.set('variant', variant);
     return url.toString();
   } catch {
