@@ -257,6 +257,10 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
     const used = perDayUsed[day] ?? 0;
     return Math.max(perDayCap - used, 0);
   };
+  const registeredForDay = (day: string): number | null => {
+    if (!isPerDayMode || perDayCap == null) return null;
+    return Math.max(perDayUsed[day] ?? 0, 0);
+  };
   const allDaysSelectable =
     !isPerDayMode || eventDays.every((day) => (remainingForDay(day) ?? 1) > 0);
 
@@ -814,7 +818,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                             <span key={day}>
                               {formatDayLabel(day)}:
                               {' '}
-                              <strong className="text-foreground">{remainingForDay(day) ?? '—'}</strong>
+                              <strong className="text-foreground">
+                                {registeredForDay(day) ?? '—'} / {perDayCap}
+                              </strong>
                             </span>
                           ))}
                         </div>
@@ -860,8 +866,8 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                                 {formatDayLabel(day)}
                                 {isPerDayMode && remaining != null
                                   ? full
-                                    ? ' — Full'
-                                    : ` — ${remaining} seats left`
+                                    ? ` — ${(registeredForDay(day) ?? perDayCap)} / ${perDayCap} registered (Full)`
+                                    : ` — ${(registeredForDay(day) ?? 0)} / ${perDayCap} registered`
                                   : ''}
                               </option>
                             );
