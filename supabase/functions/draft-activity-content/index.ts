@@ -160,10 +160,24 @@ const MAX_SOURCE_FILES = 3;
 const MAX_SOURCE_FILE_IMAGE_BYTES = 10 * 1024 * 1024;  // 10 MB per image (JPEG/PNG)
 const MAX_SOURCE_FILE_PDF_BYTES = 20 * 1024 * 1024;    // 20 MB per PDF
 const MAX_SOURCE_FILES_TOTAL_BYTES = 30 * 1024 * 1024; // 30 MB cumulative
+const DECORATIVE_SYMBOL_REGEX = /\p{Extended_Pictographic}/gu;
 
 function toStringValue(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+function sanitizeGeneratedText(input: string): string {
+  if (!input) return '';
+  return input
+    .replace(DECORATIVE_SYMBOL_REGEX, '')
+    .replace(/\u200D/g, '')
+    .replace(/\uFE0F/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function sanitizeReasoningEffort(value: string | null | undefined): string | null {
@@ -257,7 +271,8 @@ function buildSystemPrompt(hasSourceFiles: boolean): string {
   const base = [
     'You draft public-facing copy for member-association activity posts.',
     'Tone: organisational activity reporting — factual, neutral, member-facing.',
-    'Avoid event marketing language, avoid news-headline clickbait, avoid emojis.',
+    'Avoid event marketing language, avoid news-headline clickbait.',
+    'Do not use emojis or decorative symbols (such as ✨, •, ★, 👉).',
     'Keep the description grounded in the supplied facts. Do not invent metrics, attendance figures, quotes, or outcomes.',
   ];
   if (hasSourceFiles) {
@@ -312,9 +327,9 @@ function parseAIDraftJson(content: string): {
     }
   }
   const obj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
-  const title = toStringValue(obj.title);
-  const description = toStringValue(obj.description);
-  const excerpt = toStringValue(obj.excerpt);
+  const title = sanitizeGeneratedText(toStringValue(obj.title));
+  const description = sanitizeGeneratedText(toStringValue(obj.description));
+  const excerpt = sanitizeGeneratedText(toStringValue(obj.excerpt));
   const aiSlug = toStringValue(obj.slug);
   if (!title || !description) {
     throw new Error('AI response missing required fields (title/description).');
@@ -367,7 +382,7 @@ function parseExtractionJson(content: string): ExtractionFields {
     'purpose', 'highlights', 'outcome', 'additional_notes',
   ];
   for (const key of STRING_KEYS) {
-    const v = toStringValue(obj[key]);
+    const v = sanitizeGeneratedText(toStringValue(obj[key]));
     if (v) fields[key] = v;
   }
   const ARRAY_KEYS: (keyof ExtractionFields)[] = ['activity_date_options', 'location_options'];
@@ -375,7 +390,7 @@ function parseExtractionJson(content: string): ExtractionFields {
     const raw = obj[key];
     if (!Array.isArray(raw)) continue;
     const values = raw
-      .map((item) => toStringValue(item))
+      .map((item) => sanitizeGeneratedText(toStringValue(item)))
       .filter((item): item is string => Boolean(item));
     if (values.length > 0) fields[key] = Array.from(new Set(values));
   }

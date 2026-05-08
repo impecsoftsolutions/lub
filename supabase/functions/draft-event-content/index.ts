@@ -181,6 +181,7 @@ interface DraftEventOutput {
 }
 
 const MAX_WHATSAPP_MESSAGE_CHARS = 1200;
+const DECORATIVE_SYMBOL_REGEX = /\p{Extended_Pictographic}/gu;
 
 // 045: deterministic cap on AI-generated event description.
 const MAX_DESCRIPTION_WORDS = 100;
@@ -212,6 +213,19 @@ interface ExtractionFields {
 function toStringValue(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+function sanitizeGeneratedText(input: string): string {
+  if (!input) return '';
+  return input
+    .replace(DECORATIVE_SYMBOL_REGEX, '')
+    .replace(/\u200D/g, '')
+    .replace(/\uFE0F/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function sanitizeReasoningEffort(value: string | null | undefined): string | null {
@@ -304,7 +318,8 @@ function slugifyServer(text: string): string {
 function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
   const base = [
     'You draft structured event posts for a member-association events CMS.',
-    'Tone: professional, welcoming, factual, member-facing. Avoid emojis and clickbait.',
+    'Tone: professional, welcoming, factual, member-facing.',
+    'Do not use emojis or decorative symbols (such as ✨, •, ★, 👉).',
     'Keep all output grounded in the supplied brief and any uploaded reference files.',
     'Do not invent dates, times, locations, speaker names, or attendance figures that are not present in the inputs.',
     'If a value cannot be determined, omit the field or set it to null.',
@@ -335,12 +350,12 @@ function buildDraftSystemPrompt(hasSourceFiles: boolean): string {
     'slug: lowercase letters, digits, and hyphens only, <= 60 characters; client/server may re-validate.',
     'excerpt: 1-2 sentences, <= 280 characters, plain text, listing-card friendly.',
     'description: a concise summary, plain text, no Markdown. STRICTLY at most 100 words. The admin can expand it later in the form, so keep this short.',
-    'invitation_text: a short invitation paragraph addressed to members; avoid all-caps; do not include a salutation header.',
+    'invitation_text: a short invitation paragraph addressed to members; avoid all-caps; do not include a salutation header; do not include emojis or decorative symbols.',
     'agenda_items: chronological array; each title is required; time is optional but preferred (e.g. "10:00 AM"); leave the array empty when no agenda is implied.',
     'event_type: pick the closest of the listed values. If unsure, use "general".',
     'visibility: default to "public" unless the brief indicates members-only.',
     'show_agenda_publicly: default true when an agenda is present; otherwise false.',
-    'whatsapp_invitation_message: a concise, ready-to-share WhatsApp invitation message for members. Plain text only (no Markdown), <= 1200 characters. Use short paragraphs and line breaks for readability. Open with a warm greeting, name the event, summarize what attendees will gain in 1-2 lines, then list date/time and venue (or online link) when known. End with a simple call-to-action to register or ask for details. Do not invent dates, venues, or speaker names that are not present in the inputs. Avoid all-caps and avoid heavy emoji use; a single welcoming emoji is acceptable but not required.',
+    'whatsapp_invitation_message: a concise, ready-to-share WhatsApp invitation message for members. Plain text only (no Markdown), <= 1200 characters. Use short paragraphs and line breaks for readability. Open with a warm greeting, name the event, summarize what attendees will gain in 1-2 lines, then list date/time and venue (or online link) when known. End with a simple call-to-action to register or ask for details. Do not invent dates, venues, or speaker names that are not present in the inputs. Avoid all-caps. Do not include emojis or decorative symbols.',
     // 040A-HOTFIX: explicit date guidance.
     'Date parsing rules — apply these with priority:',
     '  - "16 and 17 April 2026" / "16, 17 April 2026" / "16 & 17 April 2026" → start_at is the FIRST day, end_at is the SECOND day (same month, same year).',
@@ -542,10 +557,10 @@ function coerceAgendaItems(raw: unknown): Array<{ title: string; time?: string; 
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue;
     const obj = entry as Record<string, unknown>;
-    const title = toStringValue(obj.title);
+    const title = sanitizeGeneratedText(toStringValue(obj.title));
     if (!title) continue;
-    const time = toStringValue(obj.time);
-    const note = toStringValue(obj.note);
+    const time = sanitizeGeneratedText(toStringValue(obj.time));
+    const note = sanitizeGeneratedText(toStringValue(obj.note));
     const item: { title: string; time?: string; note?: string } = { title };
     if (time) item.time = time;
     if (note) item.note = note;
@@ -556,21 +571,21 @@ function coerceAgendaItems(raw: unknown): Array<{ title: string; time?: string; 
 
 function parseDraftJson(content: string): DraftEventOutput {
   const obj = parseJsonContent(content);
-  const title = toStringValue(obj.title);
-  const description = toStringValue(obj.description);
-  const excerpt = toStringValue(obj.excerpt);
+  const title = sanitizeGeneratedText(toStringValue(obj.title));
+  const description = sanitizeGeneratedText(toStringValue(obj.description));
+  const excerpt = sanitizeGeneratedText(toStringValue(obj.excerpt));
   const aiSlug = toStringValue(obj.slug);
   const eventTypeRaw = toStringValue(obj.event_type).toLowerCase();
   const visibilityRaw = toStringValue(obj.visibility).toLowerCase();
-  const invitationText = toStringValue(obj.invitation_text);
+  const invitationText = sanitizeGeneratedText(toStringValue(obj.invitation_text));
   const startAtRaw = toStringValue(obj.start_at);
   const endAtRaw = toStringValue(obj.end_at);
-  const locationRaw = toStringValue(obj.location);
+  const locationRaw = sanitizeGeneratedText(toStringValue(obj.location));
   const showAgendaPublicly =
     typeof obj.show_agenda_publicly === 'boolean'
       ? obj.show_agenda_publicly
       : false;
-  const whatsappRaw = toStringValue(obj.whatsapp_invitation_message);
+  const whatsappRaw = sanitizeGeneratedText(toStringValue(obj.whatsapp_invitation_message));
   const whatsappMessage = whatsappRaw.length > MAX_WHATSAPP_MESSAGE_CHARS
     ? whatsappRaw.slice(0, MAX_WHATSAPP_MESSAGE_CHARS)
     : whatsappRaw;
@@ -608,7 +623,7 @@ function parseExtractionJson(content: string): ExtractionFields {
   const fields: ExtractionFields = {};
   const STRING_KEYS: (keyof ExtractionFields)[] = ['event_type', 'location', 'start_at', 'end_at'];
   for (const key of STRING_KEYS) {
-    const v = toStringValue(obj[key]);
+    const v = sanitizeGeneratedText(toStringValue(obj[key]));
     if (v) (fields[key] as string | undefined) = v;
   }
   if (fields.event_type && !ALLOWED_EVENT_TYPES.has(String(fields.event_type).toLowerCase())) {
@@ -616,13 +631,13 @@ function parseExtractionJson(content: string): ExtractionFields {
   }
   if (Array.isArray(obj.location_options)) {
     const list = obj.location_options
-      .map((v) => toStringValue(v))
+      .map((v) => sanitizeGeneratedText(toStringValue(v)))
       .filter((v): v is string => Boolean(v));
     if (list.length > 0) fields.location_options = Array.from(new Set(list));
   }
   if (Array.isArray(obj.date_options)) {
     const list = obj.date_options
-      .map((v) => toStringValue(v))
+      .map((v) => sanitizeGeneratedText(toStringValue(v)))
       .filter((v): v is string => Boolean(v));
     if (list.length > 0) fields.date_options = Array.from(new Set(list));
   }
@@ -809,7 +824,7 @@ function buildWhatsappSystemPrompt(): string {
     'Open with a short warm greeting, name the event, summarize the value in 1-2 lines, then list date/time and venue (or online link) when known.',
     'End with a simple call-to-action to register or ask for details.',
     'Use short paragraphs and line breaks for readability.',
-    'Avoid all-caps. A single welcoming emoji is acceptable; do not require emojis.',
+    'Avoid all-caps. Do not use emojis or decorative symbols (such as ✨, •, ★, 👉).',
     'Do not invent dates, times, venues, speaker names, or sponsor names that are not present in the inputs.',
     'Return strict JSON only with this exact shape: { "whatsapp_invitation_message": string }',
   ].join(' ');
@@ -834,7 +849,7 @@ function buildWhatsappUserMessage(brief: string, inputs: DraftInputs): string {
 
 function parseWhatsappJson(content: string): { whatsapp_invitation_message: string } {
   const obj = parseJsonContent(content);
-  const raw = toStringValue(obj.whatsapp_invitation_message);
+  const raw = sanitizeGeneratedText(toStringValue(obj.whatsapp_invitation_message));
   const trimmed = raw.length > MAX_WHATSAPP_MESSAGE_CHARS ? raw.slice(0, MAX_WHATSAPP_MESSAGE_CHARS) : raw;
   if (!trimmed) {
     throw new Error('AI returned empty WhatsApp message.');
