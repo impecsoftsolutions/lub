@@ -274,6 +274,7 @@ const AdminEventForm: React.FC = () => {
   const [docLabelDraft, setDocLabelDraft] = useState('');
   const [rsvpDeadlineAt, setRsvpDeadlineAt] = useState('');
   const [rsvpDeadlineEnabled, setRsvpDeadlineEnabled] = useState(false);
+  const [rsvpHideCapacityPublicly, setRsvpHideCapacityPublicly] = useState(false);
   const [rsvpCollectEmail, setRsvpCollectEmail] = useState(true);
   const [rsvpRequireEmail, setRsvpRequireEmail] = useState(false);
   const [rsvpCollectPhone, setRsvpCollectPhone] = useState(true);
@@ -415,6 +416,11 @@ const AdminEventForm: React.FC = () => {
           meta.rsvp_deadline_enabled === undefined
             ? Boolean(rsvpCfg.deadline_at)
             : Boolean(meta.rsvp_deadline_enabled),
+        );
+        setRsvpHideCapacityPublicly(
+          meta.rsvp_hide_capacity_publicly === undefined
+            ? Boolean(rsvpCfg.hide_capacity_publicly ?? false)
+            : Boolean(meta.rsvp_hide_capacity_publicly),
         );
         setRsvpCollectEmail(Boolean(meta.rsvp_collect_email ?? rsvpCfg.collect_email ?? true));
         setRsvpRequireEmail(Boolean(meta.rsvp_require_email ?? rsvpCfg.require_email ?? false));
@@ -742,6 +748,7 @@ const AdminEventForm: React.FC = () => {
       badge_name_max_chars: badgeNameMaxChars,
       badge_name_font_size: badgeNameFontSize,
       rsvp_deadline_enabled: rsvpEnabled ? rsvpDeadlineEnabled : false,
+      rsvp_hide_capacity_publicly: rsvpEnabled ? rsvpHideCapacityPublicly : false,
     };
     return {
       title: title.trim(),
@@ -2312,6 +2319,18 @@ const AdminEventForm: React.FC = () => {
                     />
                     <p className="text-[11px] text-muted-foreground">
                       When disabled, registration closes at the event end date/time and the deadline is hidden on the public page.
+                    </p>
+                    <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rsvpHideCapacityPublicly}
+                        onChange={(event) => setRsvpHideCapacityPublicly(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      Hide capacity and filled-capacity numbers on website
+                    </label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Keep this unchecked to show registration counts publicly.
                     </p>
                   </div>
                   <div className="md:col-span-2 rounded-md border border-border bg-background/50 p-3">

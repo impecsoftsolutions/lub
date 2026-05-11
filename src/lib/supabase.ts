@@ -6876,6 +6876,7 @@ export interface BadgeDesignAnalysis {
 export interface EventRsvpPublicConfig {
   enabled: boolean;
   open: boolean;
+  hide_capacity_publicly?: boolean;
   deadline_enabled?: boolean;
   deadline_at: string | null;
   capacity: number | null;
@@ -6938,6 +6939,7 @@ export interface AdminEventListItem {
 
 export interface EventRsvpAdminConfig {
   enabled: boolean;
+  hide_capacity_publicly?: boolean;
   capacity: number | null;
   capacity_mode?: EventCapacityMode;
   per_day_capacity?: number | null;

@@ -221,6 +221,8 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const documents = assets.filter((a) => a.kind === 'document');
   const rsvp = eventDetail.rsvp ?? null;
   const rsvpOpen = Boolean(rsvp?.enabled && rsvp?.open);
+  const hideCapacityPublicly = Boolean(rsvp?.hide_capacity_publicly);
+  const showCapacityStats = !hideCapacityPublicly;
   const showDeadline = Boolean(rsvp?.deadline_enabled);
   const collectEmail = rsvp?.collect_email !== false;
   const requireEmail = Boolean(rsvp?.require_email);
@@ -813,14 +815,14 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {!isPerDayMode && rsvp.capacity != null && (
+                    {showCapacityStats && !isPerDayMode && rsvp.capacity != null && (
                       <span>
                         Capacity: <strong className="text-foreground">{rsvp.capacity}</strong>
                         {' · '}
                         Remaining: <strong className="text-foreground">{rsvp.remaining ?? rsvp.capacity - rsvp.used_count}</strong>
                       </span>
                     )}
-                    {isPerDayMode && perDayCap != null && (
+                    {showCapacityStats && isPerDayMode && perDayCap != null && (
                       <div className="space-y-1">
                         Per-day capacity: <strong className="text-foreground">{perDayCap}</strong>
                         <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -876,8 +878,12 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                                 {formatDayLabel(day)}
                                 {isPerDayMode && remaining != null
                                   ? full
-                                    ? ` — ${(registeredForDay(day) ?? perDayCap)} / ${perDayCap} registered (Full)`
-                                    : ` — ${(registeredForDay(day) ?? 0)} / ${perDayCap} registered`
+                                    ? (showCapacityStats
+                                        ? ` — ${(registeredForDay(day) ?? perDayCap)} / ${perDayCap} registered (Full)`
+                                        : ' — Full')
+                                    : (showCapacityStats
+                                        ? ` — ${(registeredForDay(day) ?? 0)} / ${perDayCap} registered`
+                                        : '')
                                   : ''}
                               </option>
                             );
