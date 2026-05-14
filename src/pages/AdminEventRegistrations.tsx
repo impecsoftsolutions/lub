@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Download, Loader2, Mail, QrCode, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
+import JSZip from 'jszip';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
@@ -24,6 +25,7 @@ import Toast from '../components/Toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { downloadSingleSheetXlsx } from '../lib/xlsxExport';
+import { renderPdfFirstPageAsJpegBlob } from '../lib/pdfImageRender';
 
 function labelFrom<T extends string>(
   v: T | null | undefined,
@@ -56,12 +58,30 @@ function formatCheckinSource(src: string | null | undefined): string {
   return src;
 }
 
-function formatVisitDate(iso: string | null | undefined, visitAllDays = false): string {
-  if (visitAllDays) return 'All days';
+function formatAllDaysLabel(dayCount: number): string {
+  const normalized = Number.isFinite(dayCount) && dayCount > 0 ? Math.floor(dayCount) : 0;
+  if (normalized <= 0) return 'Multiple days';
+  return `${normalized} day${normalized === 1 ? '' : 's'}`;
+}
+
+function formatVisitDate(iso: string | null | undefined, visitAllDays = false, dayCount = 0): string {
+  if (visitAllDays) return formatAllDaysLabel(dayCount);
   if (!iso) return '—';
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function safeFileName(value: string): string {
+  const normalized = value
+    .normalize('NFKD')
+    .replace(/[^\w\s-]+/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+  return normalized || 'registration';
 }
 
 function eventDayList(start: string | null, end: string | null): string[] {
@@ -116,6 +136,8 @@ const AdminEventRegistrations: React.FC = () => {
   const [sendingDeliveryId, setSendingDeliveryId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EventRsvpRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -321,10 +343,10 @@ const AdminEventRegistrations: React.FC = () => {
     ];
     if (includeEmail) columns.push({ key: 'email', header: 'Email' });
     if (includeMobile) columns.push({ key: 'phone', header: 'Mobile' });
-    if (includeOrg) columns.push({ key: 'company', header: 'Organisation' });
+    if (includeOrg) columns.push({ key: 'company', header: 'Company / Organization' });
     if (includeVisit) {
       columns.push({ key: 'visit_date', header: 'Visit Day' });
-      columns.push({ key: 'visit_all_days', header: 'All Days' });
+      columns.push({ key: 'visit_span', header: 'Visit Span' });
     }
     if (includeGender) columns.push({ key: 'gender', header: 'Gender' });
     if (includeMeal) columns.push({ key: 'meal_preference', header: 'Meal Preference' });
@@ -351,8 +373,8 @@ const AdminEventRegistrations: React.FC = () => {
       if (includeMobile) out.phone = r.phone ?? '';
       if (includeOrg) out.company = r.company ?? '';
       if (includeVisit) {
-        out.visit_date = r.visit_all_days ? '' : (r.visit_date ?? '');
-        out.visit_all_days = r.visit_all_days ? 'Yes' : 'No';
+        out.visit_date = formatVisitDate(r.visit_date ?? null, Boolean(r.visit_all_days), eventDaysCount).replace(/^—$/, '');
+        out.visit_span = r.visit_all_days ? formatAllDaysLabel(eventDaysCount) : '';
       }
       if (includeGender) {
         out.gender = labelFrom<EventRsvpGender>(r.gender ?? null, EVENT_RSVP_GENDER_OPTIONS).replace(/^—$/, '');
@@ -387,6 +409,96 @@ const AdminEventRegistrations: React.FC = () => {
       showToast('error', 'Failed to generate Excel file.');
     }
   }, [event, filteredRows, eventDays.length, showAadhaar, showToast, badgeByRsvpId]);
+
+  const handleBulkDownloadBadgesZip = useCallback(async () => {
+    if (eventEnded) {
+      showToast('error', 'Badge downloads are closed for this event.');
+      return;
+    }
+    const targets = filteredRows
+      .map((row) => ({ row, badge: badgeByRsvpId.get(row.id) }))
+      .filter((entry): entry is { row: EventRsvpRow; badge: EventBadgeRow } => Boolean(entry.badge));
+    if (targets.length === 0) {
+      showToast('error', 'No badges available in the current filtered list.');
+      return;
+    }
+
+    setIsBulkDownloading(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder('badges');
+      let added = 0;
+      const failedCodes: string[] = [];
+
+      for (let i = 0; i < targets.length; i += 1) {
+        const { row, badge } = targets[i];
+        try {
+          const endpoint = eventsService.badgeDownloadUrlByCode(badge.badge_code);
+          const response = await fetch(endpoint, {
+            headers: { Accept: 'application/pdf' },
+          });
+          if (!response.ok) {
+            failedCodes.push(badge.badge_code);
+            setBulkProgress({ done: i + 1, total: targets.length });
+            continue;
+          }
+          const pdfBlob = await response.blob();
+          const pdfBytes = await pdfBlob.arrayBuffer();
+          const jpgBlob = await renderPdfFirstPageAsJpegBlob(pdfBytes);
+          const order = String(i + 1).padStart(4, '0');
+          const name = safeFileName(row.full_name ?? 'registration');
+          const fileName = `${order}-${name}-${badge.badge_code}.jpg`;
+          folder?.file(fileName, jpgBlob);
+          added += 1;
+        } catch {
+          failedCodes.push(badge.badge_code);
+        } finally {
+          setBulkProgress({ done: i + 1, total: targets.length });
+        }
+      }
+
+      if (added === 0) {
+        showToast('error', 'Could not generate JPG badges for this selection.');
+        return;
+      }
+
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const slugBase = (event?.slug && event.slug.length > 0 ? event.slug : event?.title ?? 'event')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80) || 'event';
+      const zipName = `event-badges-jpg-${slugBase}-${yyyy}-${mm}-${dd}.zip`;
+      const zipBlob = await zip.generateAsync({
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 },
+      });
+      const url = URL.createObjectURL(zipBlob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = zipName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+
+      if (failedCodes.length > 0) {
+        showToast('success', `Downloaded ${added}/${targets.length} badges. ${failedCodes.length} failed.`);
+      } else {
+        showToast('success', `Downloaded ${added} badge JPG${added === 1 ? '' : 's'} as ZIP.`);
+      }
+    } catch {
+      showToast('error', 'Failed to generate badge ZIP.');
+    } finally {
+      setIsBulkDownloading(false);
+      setBulkProgress(null);
+    }
+  }, [badgeByRsvpId, event, eventEnded, filteredRows, showToast]);
 
   if (!canView && !canManage) {
     return (
@@ -436,6 +548,22 @@ const AdminEventRegistrations: React.FC = () => {
               >
                 <Download className="h-3.5 w-3.5 mr-1.5" />
                 Export ({filteredRows.length})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleBulkDownloadBadgesZip()}
+                disabled={isLoading || filteredRows.length === 0 || eventEnded || isBulkDownloading}
+                title={eventEnded ? 'Badge downloads are closed for this event' : 'Bulk download badge JPGs (current filters) as ZIP'}
+              >
+                {isBulkDownloading ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                {isBulkDownloading && bulkProgress
+                  ? `Badges ZIP (${bulkProgress.done}/${bulkProgress.total})`
+                  : `Badges ZIP (${filteredRows.length})`}
               </Button>
               <Button variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
                 {isLoading ? (
@@ -493,7 +621,7 @@ const AdminEventRegistrations: React.FC = () => {
               onChange={(e) => setVisitDateFilter(e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="all">All days</option>
+              <option value="all">All visit dates</option>
               {eventDays.map((day) => (
                 <option key={day} value={day}>{formatVisitDate(day)}</option>
               ))}
@@ -519,7 +647,7 @@ const AdminEventRegistrations: React.FC = () => {
                   <th className="px-3 py-2 font-medium">Name</th>
                   <th className="px-3 py-2 font-medium">Email</th>
                   <th className="px-3 py-2 font-medium">Mobile</th>
-                  <th className="px-3 py-2 font-medium">Organisation</th>
+                  <th className="px-3 py-2 font-medium">Company / Organization</th>
                   <th className="px-3 py-2 font-medium">Day of Visit</th>
                   <th className="px-3 py-2 font-medium">Gender</th>
                   <th className="px-3 py-2 font-medium">Meal</th>
@@ -544,7 +672,7 @@ const AdminEventRegistrations: React.FC = () => {
                     <td className="px-3 py-2 text-muted-foreground">{row.phone ?? '—'}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.company ?? '—'}</td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {formatVisitDate(row.visit_date ?? null, Boolean(row.visit_all_days))}
+                      {formatVisitDate(row.visit_date ?? null, Boolean(row.visit_all_days), eventDays.length)}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {labelFrom<EventRsvpGender>(row.gender ?? null, EVENT_RSVP_GENDER_OPTIONS)}
