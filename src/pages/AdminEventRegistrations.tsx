@@ -166,9 +166,11 @@ const AdminEventRegistrations: React.FC = () => {
     window.setTimeout(() => setToast(null), 4000);
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!id) return;
-    setIsLoading(true);
+    if (!opts?.silent) {
+      setIsLoading(true);
+    }
     try {
       const token = sessionManager.getSessionToken();
       if (!token) {
@@ -196,7 +198,9 @@ const AdminEventRegistrations: React.FC = () => {
         setBadges(badgesResult.rows);
       }
     } finally {
-      setIsLoading(false);
+      if (!opts?.silent) {
+        setIsLoading(false);
+      }
     }
   }, [id, navigate, showToast, statusFilter]);
 
@@ -390,7 +394,7 @@ const AdminEventRegistrations: React.FC = () => {
       } else {
         showToast('success', `Badge emailed to ${result.recipient ?? 'recipient'}.`);
       }
-      await load();
+      await load({ silent: true });
     } finally {
       setSendingDeliveryId(null);
     }
@@ -412,7 +416,7 @@ const AdminEventRegistrations: React.FC = () => {
       }
       showToast('success', `Registration for ${deleteTarget.full_name} deleted.`);
       setDeleteTarget(null);
-      await load();
+      await load({ silent: true });
     } finally {
       setIsDeleting(false);
     }
@@ -431,7 +435,7 @@ const AdminEventRegistrations: React.FC = () => {
       return;
     }
     showToast('success', 'Registration updated.');
-    void load();
+    void load({ silent: true });
   };
 
   // COD-EVENTS-REGISTRATION-COMPLETE-059 — Excel export of currently filtered rows.
