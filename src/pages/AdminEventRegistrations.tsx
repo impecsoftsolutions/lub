@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Download, Loader2, Mail, QrCode, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, ChevronsUpDown, Download, Loader2, Mail, QrCode, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
 import JSZip from 'jszip';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -115,6 +115,26 @@ function eventDayList(start: string | null, end: string | null): string[] {
   return days;
 }
 
+type RegistrationSortKey =
+  | 'full_name'
+  | 'email'
+  | 'phone'
+  | 'company'
+  | 'visit_date'
+  | 'gender'
+  | 'meal_preference'
+  | 'profession'
+  | 'designation'
+  | 'aadhaar_number'
+  | 'status'
+  | 'checked_in'
+  | 'checked_in_at'
+  | 'check_in_source'
+  | 'badge_code'
+  | 'delivery_status';
+
+type SortDirection = 'asc' | 'desc';
+
 const AdminEventRegistrations: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -138,6 +158,8 @@ const AdminEventRegistrations: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [sortKey, setSortKey] = useState<RegistrationSortKey>('visit_date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -223,6 +245,122 @@ const AdminEventRegistrations: React.FC = () => {
       return hay.includes(q);
     });
   }, [rows, search, visitDateFilter, badgeByRsvpId]);
+
+  const sortedRows = useMemo(() => {
+    const copy = [...filteredRows];
+    const collator = new Intl.Collator('en-IN', { sensitivity: 'base', numeric: true });
+    const statusOrder: Record<EventRsvpStatus, number> = {
+      confirmed: 1,
+      pending: 2,
+      waitlisted: 3,
+      cancelled: 4,
+    };
+    const deliveryOrder: Record<EventBadgeDeliveryStatus, number> = {
+      sent: 1,
+      pending: 2,
+      failed: 3,
+    };
+
+    const compareText = (a: string | null | undefined, b: string | null | undefined) =>
+      collator.compare((a ?? '').trim(), (b ?? '').trim());
+    const compareNumber = (a: number, b: number) => a - b;
+    const compareDate = (a: string | null | undefined, b: string | null | undefined) => {
+      const ta = a ? new Date(a).getTime() : 0;
+      const tb = b ? new Date(b).getTime() : 0;
+      return compareNumber(Number.isNaN(ta) ? 0 : ta, Number.isNaN(tb) ? 0 : tb);
+    };
+
+    copy.sort((a, b) => {
+      let base = 0;
+      const badgeA = badgeByRsvpId.get(a.id);
+      const badgeB = badgeByRsvpId.get(b.id);
+      const deliveryA = badgeA?.latest_delivery;
+      const deliveryB = badgeB?.latest_delivery;
+
+      switch (sortKey) {
+        case 'full_name':
+          base = compareText(a.full_name, b.full_name);
+          break;
+        case 'email':
+          base = compareText(a.email, b.email);
+          break;
+        case 'phone':
+          base = compareText(a.phone, b.phone);
+          break;
+        case 'company':
+          base = compareText(a.company, b.company);
+          break;
+        case 'visit_date': {
+          const keyA = a.visit_all_days ? `0-${String(eventDays.length).padStart(3, '0')}` : `1-${a.visit_date ?? ''}`;
+          const keyB = b.visit_all_days ? `0-${String(eventDays.length).padStart(3, '0')}` : `1-${b.visit_date ?? ''}`;
+          base = compareText(keyA, keyB);
+          break;
+        }
+        case 'gender':
+          base = compareText(a.gender, b.gender);
+          break;
+        case 'meal_preference':
+          base = compareText(a.meal_preference, b.meal_preference);
+          break;
+        case 'profession':
+          base = compareText(a.profession, b.profession);
+          break;
+        case 'designation':
+          base = compareText(a.designation, b.designation);
+          break;
+        case 'aadhaar_number':
+          base = compareText(a.aadhaar_number, b.aadhaar_number);
+          break;
+        case 'status':
+          base = compareNumber(statusOrder[a.status], statusOrder[b.status]);
+          break;
+        case 'checked_in':
+          base = compareNumber(a.checked_in_at ? 1 : 0, b.checked_in_at ? 1 : 0);
+          break;
+        case 'checked_in_at':
+          base = compareDate(a.checked_in_at, b.checked_in_at);
+          break;
+        case 'check_in_source':
+          base = compareText(a.check_in_source, b.check_in_source);
+          break;
+        case 'badge_code':
+          base = compareText(badgeA?.badge_code, badgeB?.badge_code);
+          break;
+        case 'delivery_status':
+          base = compareNumber(
+            deliveryA ? deliveryOrder[deliveryA.status] : 99,
+            deliveryB ? deliveryOrder[deliveryB.status] : 99,
+          );
+          break;
+        default:
+          base = 0;
+          break;
+      }
+
+      if (base === 0) {
+        return compareText(a.full_name, b.full_name);
+      }
+      return sortDirection === 'asc' ? base : -base;
+    });
+
+    return copy;
+  }, [badgeByRsvpId, eventDays.length, filteredRows, sortDirection, sortKey]);
+
+  const handleSort = useCallback((key: RegistrationSortKey) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection('asc');
+  }, [sortKey]);
+
+  const sortIcon = useCallback((key: RegistrationSortKey) => {
+    if (sortKey !== key) return <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-3.5 w-3.5" />
+      : <ArrowDown className="h-3.5 w-3.5" />;
+  }, [sortDirection, sortKey]);
 
   // Event-end gate: download blocked once now > end_at + 12h grace.
   const downloadDeadline = useMemo(() => {
@@ -543,17 +681,17 @@ const AdminEventRegistrations: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => void handleExport()}
-                disabled={isLoading || filteredRows.length === 0}
+                disabled={isLoading || sortedRows.length === 0}
                 title="Export currently filtered registrations to Excel"
               >
                 <Download className="h-3.5 w-3.5 mr-1.5" />
-                Export ({filteredRows.length})
+                Export ({sortedRows.length})
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => void handleBulkDownloadBadgesZip()}
-                disabled={isLoading || filteredRows.length === 0 || eventEnded || isBulkDownloading}
+                disabled={isLoading || sortedRows.length === 0 || eventEnded || isBulkDownloading}
                 title={eventEnded ? 'Badge downloads are closed for this event' : 'Bulk download badge JPGs (current filters) as ZIP'}
               >
                 {isBulkDownloading ? (
@@ -563,7 +701,7 @@ const AdminEventRegistrations: React.FC = () => {
                 )}
                 {isBulkDownloading && bulkProgress
                   ? `Badges ZIP (${bulkProgress.done}/${bulkProgress.total})`
-                  : `Badges ZIP (${filteredRows.length})`}
+                  : `Badges ZIP (${sortedRows.length})`}
               </Button>
               <Button variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
                 {isLoading ? (
@@ -635,7 +773,7 @@ const AdminEventRegistrations: React.FC = () => {
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading registrations...
             </div>
-          ) : filteredRows.length === 0 ? (
+          ) : sortedRows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
               <Users className="h-10 w-10 opacity-30" />
               <p className="text-sm">No registrations match your filters.</p>
@@ -644,28 +782,94 @@ const AdminEventRegistrations: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Name</th>
-                  <th className="px-3 py-2 font-medium">Email</th>
-                  <th className="px-3 py-2 font-medium">Mobile</th>
-                  <th className="px-3 py-2 font-medium">Company / Organization</th>
-                  <th className="px-3 py-2 font-medium">Day of Visit</th>
-                  <th className="px-3 py-2 font-medium">Gender</th>
-                  <th className="px-3 py-2 font-medium">Meal</th>
-                  <th className="px-3 py-2 font-medium">Profession</th>
-                  <th className="px-3 py-2 font-medium">Designation</th>
-                  {showAadhaar && <th className="px-3 py-2 font-medium">Aadhaar Card</th>}
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Checked In</th>
-                  <th className="px-3 py-2 font-medium">Checked In At</th>
-                  <th className="px-3 py-2 font-medium">Source</th>
-                  <th className="px-3 py-2 font-medium">Badge No.</th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('full_name')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Name {sortIcon('full_name')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('email')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Email {sortIcon('email')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('phone')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Mobile {sortIcon('phone')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('company')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Company / Organization {sortIcon('company')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('visit_date')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Day of Visit {sortIcon('visit_date')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('gender')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Gender {sortIcon('gender')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('meal_preference')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Meal {sortIcon('meal_preference')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('profession')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Profession {sortIcon('profession')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('designation')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Designation {sortIcon('designation')}
+                    </button>
+                  </th>
+                  {showAadhaar && (
+                    <th className="px-3 py-2 font-medium">
+                      <button type="button" onClick={() => handleSort('aadhaar_number')} className="inline-flex items-center gap-1 hover:text-foreground">
+                        Aadhaar Card {sortIcon('aadhaar_number')}
+                      </button>
+                    </th>
+                  )}
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Status {sortIcon('status')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('checked_in')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Checked In {sortIcon('checked_in')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('checked_in_at')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Checked In At {sortIcon('checked_in_at')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('check_in_source')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Source {sortIcon('check_in_source')}
+                    </button>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('badge_code')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Badge No. {sortIcon('badge_code')}
+                    </button>
+                  </th>
                   <th className="px-3 py-2 font-medium">Badge</th>
-                  <th className="px-3 py-2 font-medium">Email delivery</th>
+                  <th className="px-3 py-2 font-medium">
+                    <button type="button" onClick={() => handleSort('delivery_status')} className="inline-flex items-center gap-1 hover:text-foreground">
+                      Email delivery {sortIcon('delivery_status')}
+                    </button>
+                  </th>
                   {canManage && <th className="px-3 py-2 font-medium text-right">Action</th>}
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id} className="border-b border-border/70 last:border-0 align-top">
                     <td className="px-3 py-2 text-foreground">{row.full_name}</td>
                     <td className="px-3 py-2 text-muted-foreground break-all">{row.email ?? '—'}</td>
