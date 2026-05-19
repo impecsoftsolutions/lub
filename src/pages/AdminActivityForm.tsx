@@ -20,6 +20,9 @@ import {
   Sparkles,
   AlertCircle,
   Download,
+  Lock,
+  Unlock,
+  Pencil,
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -59,6 +62,27 @@ function slugify(text: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .slice(0, 80);
+}
+
+function toDateTimeInput(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function toDateTimeInputFromDate(value: string | null): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const normalized = trimmed.includes('T') ? trimmed : `${trimmed}T10:00:00`;
+  return toDateTimeInput(normalized);
 }
 
 // â”€â”€â”€ Drag-reorder helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -201,9 +225,11 @@ const AdminActivityForm: React.FC = () => {
   const [title, setTitle]           = useState('');
   const [slug, setSlug]             = useState('');
   const [slugManual, setSlugManual] = useState(false);
+  const [slugEditing, setSlugEditing] = useState(false);
   const [excerpt, setExcerpt]       = useState('');
   const [description, setDescription] = useState('');
-  const [activityDate, setActivityDate] = useState('');
+  const [startAt, setStartAt]       = useState('');
+  const [endAt, setEndAt]           = useState('');
   const [location, setLocation]     = useState('');
   const [isFeatured, setIsFeatured] = useState(false);
   const [youtubeUrls, setYoutubeUrls] = useState<string[]>(['']);
@@ -283,9 +309,12 @@ const AdminActivityForm: React.FC = () => {
         setTitle(data.title);
         setSlug(data.slug);
         setSlugManual(true); // don't auto-generate when editing
+        setSlugEditing(false);
         setExcerpt(data.excerpt ?? '');
         setDescription(data.description ?? '');
-        setActivityDate(data.activity_date ?? '');
+        const hydratedStartAt = toDateTimeInput(data.start_at ?? null) || toDateTimeInputFromDate(data.activity_date ?? null);
+        setStartAt(hydratedStartAt);
+        setEndAt(toDateTimeInput(data.end_at ?? null));
         setLocation(data.location ?? '');
         setIsFeatured(data.is_featured);
         setYoutubeUrls(data.youtube_urls?.length ? data.youtube_urls : ['']);
@@ -392,13 +421,13 @@ const AdminActivityForm: React.FC = () => {
   // Status chip text â€” explicit rather than generic "Unavailable".
   let aiStatusLabel: string;
   if (aiAvailable) {
-    aiStatusLabel = `${aiProviderLabel}${aiModelLabel ? ` Â· ${aiModelLabel}` : ''}`;
+    aiStatusLabel = `${aiProviderLabel}${aiModelLabel ? ` · ${aiModelLabel}` : ''}`;
   } else if (!aiRuntimeProfile) {
     aiStatusLabel = 'Not configured';
   } else if (!isEnabled) {
-    aiStatusLabel = `${aiProviderLabel} Â· disabled`;
+    aiStatusLabel = `${aiProviderLabel} · disabled`;
   } else if (!providerSupported) {
-    aiStatusLabel = `${aiProviderLabel} Â· not supported`;
+    aiStatusLabel = `${aiProviderLabel} · not supported`;
   } else {
     aiStatusLabel = 'Unavailable';
   }
@@ -448,7 +477,7 @@ const AdminActivityForm: React.FC = () => {
       const result = await activitiesService.draftContent(
         token,
         {
-          activity_date: activityDate.trim() || null,
+          activity_date: startAt ? new Date(startAt).toISOString().slice(0, 10) : null,
           location: location.trim() || null,
           additional_notes: activityBrief.trim() || null,
         },
@@ -474,7 +503,7 @@ const AdminActivityForm: React.FC = () => {
     } finally {
       setAiGenerating(false);
     }
-  }, [activityBrief, activityDate, aiAvailable, aiSourceFiles, aiUnavailableMessage, location, showToast, slugManual]);
+  }, [activityBrief, aiAvailable, aiSourceFiles, aiUnavailableMessage, location, showToast, slugManual, startAt]);
 
   // â”€â”€ AI source-document handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -534,6 +563,27 @@ const AdminActivityForm: React.FC = () => {
   const handleAiSourceFileRemove = useCallback((index: number) => {
     setAiSourceFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
+
+  const onSlugEditClick = useCallback(() => {
+    setSlugEditing(true);
+    setSlugManual(true);
+  }, []);
+
+  const onSlugResetAuto = useCallback(() => {
+    const autoSlug = slugify(title);
+    setSlug(autoSlug);
+    setSlugManual(false);
+    setSlugEditing(false);
+  }, [title]);
+
+  const renderSlugIndicator = useCallback(() => {
+    if (!slug.trim()) return null;
+    return (
+      <span className="text-[11px] text-muted-foreground">
+        Final URL slug is auto-checked for uniqueness when saved.
+      </span>
+    );
+  }, [slug]);
 
   // â”€â”€ Auto-slug from title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -921,7 +971,9 @@ const AdminActivityForm: React.FC = () => {
         slug: slug.trim(),
         excerpt: excerpt.trim() || null,
         description: description.trim() || null,
-        activity_date: activityDate || null,
+        activity_date: startAt ? new Date(startAt).toISOString().slice(0, 10) : null,
+        start_at: startAt ? new Date(startAt).toISOString() : null,
+        end_at: endAt ? new Date(endAt).toISOString() : null,
         location: location.trim() || null,
         is_featured: isFeatured,
         youtube_urls: buildYoutubeList(),
@@ -933,6 +985,8 @@ const AdminActivityForm: React.FC = () => {
         const clearCover = uploadedCover === null;
         const result = await activitiesService.update(token, id, {
           ...basePayload,
+          clear_start_at: !startAt,
+          clear_end_at: !endAt,
           clear_cover: clearCover,
           ...(uploadedCover ?? {}),
           ...(uploadedCover === undefined && !clearCover ? {
@@ -982,7 +1036,7 @@ const AdminActivityForm: React.FC = () => {
       setIsSaving(false);
     }
   }, [
-    title, slug, excerpt, description, activityDate, location, isFeatured,
+    title, slug, excerpt, description, startAt, endAt, location, isFeatured,
     coverImageUrl, coverOriginalObjectKey, coverStorageProvider, resolveCoverForSave, buildYoutubeList, isEdit, id,
     processGalleryChanges, navigate, showToast,
   ]);
@@ -1007,7 +1061,11 @@ const AdminActivityForm: React.FC = () => {
         slug: slug.trim(),
         excerpt: excerpt.trim() || null,
         description: description.trim() || null,
-        activity_date: activityDate || null,
+        activity_date: startAt ? new Date(startAt).toISOString().slice(0, 10) : null,
+        start_at: startAt ? new Date(startAt).toISOString() : null,
+        end_at: endAt ? new Date(endAt).toISOString() : null,
+        clear_start_at: !startAt,
+        clear_end_at: !endAt,
         location: location.trim() || null,
         is_featured: isFeatured,
         clear_cover: clearCover,
@@ -1040,7 +1098,7 @@ const AdminActivityForm: React.FC = () => {
       setIsSaving(false);
     }
   }, [
-    isEdit, id, title, slug, excerpt, description, activityDate, location, isFeatured,
+    isEdit, id, title, slug, excerpt, description, startAt, endAt, location, isFeatured,
     coverImageUrl, coverOriginalObjectKey, coverStorageProvider, resolveCoverForSave, buildYoutubeList, processGalleryChanges, navigate, showToast,
   ]);
 
@@ -1268,26 +1326,55 @@ const AdminActivityForm: React.FC = () => {
           </div>
 
           {/* Slug */}
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-foreground">
-              URL Slug <span className="text-destructive">*</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground shrink-0">/events/</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-medium text-foreground">Slug</label>
+              <div className="flex items-center gap-2">
+                {!slugEditing && (
+                  <button
+                    type="button"
+                    onClick={onSlugEditClick}
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted/50"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit slug
+                  </button>
+                )}
+                {slugEditing && (
+                  <button
+                    type="button"
+                    onClick={onSlugResetAuto}
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted/50"
+                  >
+                    <Unlock className="h-3 w-3" />
+                    Reset to auto
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {slugEditing ? (
               <Input
                 value={slug}
-                onChange={(e) => {
-                  setSlugManual(true);
-                  setSlug(slugify(e.target.value));
-                }}
-                placeholder="annual-business-meet-2026"
-                className="font-mono text-sm"
+                onChange={(event) => setSlug(slugify(event.target.value))}
+                placeholder="activity-slug"
                 maxLength={80}
+                autoFocus
               />
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                <code className="rounded bg-background px-1.5 py-0.5 text-xs">
+                  {slug || '(auto from title)'}
+                </code>
+                <span className="ml-auto text-[11px] text-muted-foreground">Auto-managed</span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">Public URL: /events/{slug || 'activity-slug'}</p>
+              {renderSlugIndicator()}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Auto-generated from title and made unique when saved. Changing a published slug only breaks old direct links; the event remains visible on the public Events page.
-            </p>
           </div>
 
           {/* Excerpt */}
@@ -1318,20 +1405,31 @@ const AdminActivityForm: React.FC = () => {
             />
           </div>
 
-          {/* Date + Location side by side */}
+          {/* Start / End / Location */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                Activity Date
+                Start date & time
               </label>
               <Input
-                type="date"
-                value={activityDate}
-                onChange={(e) => setActivityDate(e.target.value)}
+                type="datetime-local"
+                value={startAt}
+                onChange={(event) => setStartAt(event.target.value)}
               />
             </div>
             <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                End date & time
+              </label>
+              <Input
+                type="datetime-local"
+                value={endAt}
+                onChange={(event) => setEndAt(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
               <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                 Location

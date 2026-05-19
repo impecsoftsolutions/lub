@@ -106,6 +106,29 @@ function scoreActivity(a: AdminActivityListItem, q: string): number {
   return score;
 }
 
+const toSortDateValue = (activity: AdminActivityListItem): string | null =>
+  activity.start_at ?? (activity.activity_date ? `${activity.activity_date}T00:00:00` : null);
+
+const formatActivityDateRange = (activity: AdminActivityListItem): string | null => {
+  const start = activity.start_at ?? null;
+  const end = activity.end_at ?? null;
+  if (start && end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (startDate.toDateString() === endDate.toDateString()) {
+      return startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    return `${startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} - ${endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  }
+  if (start) {
+    return new Date(start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  if (activity.activity_date) {
+    return new Date(activity.activity_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  return null;
+};
+
 // ─── Component ────────────────────────────────────────────────
 
 const AdminActivities: React.FC = () => {
@@ -293,15 +316,23 @@ const AdminActivities: React.FC = () => {
       }
       switch (sortKey) {
         case 'activity_date_desc':
-          if (!a.activity_date && !b.activity_date) break;
-          if (!a.activity_date) return 1;
-          if (!b.activity_date) return -1;
-          return b.activity_date.localeCompare(a.activity_date);
+          {
+            const aDate = toSortDateValue(a);
+            const bDate = toSortDateValue(b);
+            if (!aDate && !bDate) break;
+            if (!aDate) return 1;
+            if (!bDate) return -1;
+            return bDate.localeCompare(aDate);
+          }
         case 'activity_date_asc':
-          if (!a.activity_date && !b.activity_date) break;
-          if (!a.activity_date) return 1;
-          if (!b.activity_date) return -1;
-          return a.activity_date.localeCompare(b.activity_date);
+          {
+            const aDate = toSortDateValue(a);
+            const bDate = toSortDateValue(b);
+            if (!aDate && !bDate) break;
+            if (!aDate) return 1;
+            if (!bDate) return -1;
+            return aDate.localeCompare(bDate);
+          }
         case 'published_at_desc':
           if (!a.published_at && !b.published_at) break;
           if (!a.published_at) return 1;
@@ -537,16 +568,10 @@ const AdminActivities: React.FC = () => {
                         {/* Date / location */}
                         <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">
                           <div className="space-y-0.5">
-                            {activity.activity_date && (
+                            {formatActivityDateRange(activity) && (
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-xs">
-                                  {new Date(activity.activity_date).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })}
-                                </span>
+                                <span className="text-xs">{formatActivityDateRange(activity)}</span>
                               </div>
                             )}
                             {activity.location && (

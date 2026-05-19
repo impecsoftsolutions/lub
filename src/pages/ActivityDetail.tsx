@@ -1439,14 +1439,34 @@ const ActivityDetail: React.FC = () => {
 
       <div className="border-b border-border">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6 lg:px-8 text-sm text-muted-foreground">
-          {activity.activity_date && (
+          {(activity.start_at || activity.activity_date) && (
             <div className="flex items-center gap-1.5">
               <Calendar className="h-4 w-4 shrink-0" />
-              {new Date(activity.activity_date).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
+              {(() => {
+                const startRaw = activity.start_at ?? activity.activity_date;
+                if (!startRaw) return null;
+                const startDate = new Date(startRaw);
+                const endRaw = activity.end_at ?? null;
+                if (endRaw) {
+                  const endDate = new Date(endRaw);
+                  if (startDate.toDateString() !== endDate.toDateString()) {
+                    return `${startDate.toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })} - ${endDate.toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}`;
+                  }
+                }
+                return startDate.toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                });
+              })()}
             </div>
           )}
           {activity.location && (

@@ -5595,6 +5595,8 @@ export interface PublicActivity {
   title: string;
   excerpt: string | null;
   activity_date: string | null;
+  start_at: string | null;
+  end_at: string | null;
   location: string | null;
   cover_image_url: string | null;
   is_featured: boolean;
@@ -5616,6 +5618,8 @@ export interface AdminActivityListItem {
   status: ActivityStatus;
   is_featured: boolean;
   activity_date: string | null;
+  start_at: string | null;
+  end_at: string | null;
   location: string | null;
   cover_image_url: string | null;
   first_media_url?: string | null;
@@ -5633,6 +5637,8 @@ export interface AdminActivityDetail {
   excerpt: string | null;
   description: string | null;
   activity_date: string | null;
+  start_at: string | null;
+  end_at: string | null;
   location: string | null;
   status: ActivityStatus;
   is_featured: boolean;
@@ -5913,6 +5919,8 @@ export const activitiesService = {
       excerpt?: string | null;
       description?: string | null;
       activity_date?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
       location?: string | null;
       is_featured?: boolean;
       cover_image_url?: string | null;
@@ -5934,6 +5942,8 @@ export const activitiesService = {
       p_excerpt: payload.excerpt ?? null,
       p_description: payload.description ?? null,
       p_activity_date: payload.activity_date ?? null,
+      p_start_at: payload.start_at ?? null,
+      p_end_at: payload.end_at ?? null,
       p_location: payload.location ?? null,
       p_is_featured: payload.is_featured ?? false,
       p_cover_image_url: payload.cover_image_url ?? null,
@@ -5962,6 +5972,10 @@ export const activitiesService = {
       excerpt?: string | null;
       description?: string | null;
       activity_date?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
+      clear_start_at?: boolean;
+      clear_end_at?: boolean;
       location?: string | null;
       is_featured?: boolean;
       cover_image_url?: string | null;
@@ -5984,6 +5998,10 @@ export const activitiesService = {
       p_excerpt: payload.excerpt ?? null,
       p_description: payload.description ?? null,
       p_activity_date: payload.activity_date ?? null,
+      p_start_at: payload.start_at ?? null,
+      p_end_at: payload.end_at ?? null,
+      p_clear_start_at: payload.clear_start_at ?? false,
+      p_clear_end_at: payload.clear_end_at ?? false,
       p_location: payload.location ?? null,
       p_is_featured: payload.is_featured ?? null,
       p_cover_image_url: payload.cover_image_url ?? null,

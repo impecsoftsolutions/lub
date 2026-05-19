@@ -37,6 +37,7 @@ interface FeedItem {
   is_featured: boolean;
   published_at: string | null;
   date_value: string | null;
+  end_date_value?: string | null;
   cover_image_url: string | null;
   event_type?: string | null;
 }
@@ -59,7 +60,7 @@ const formatEventDate = (value: string | null): string => {
   });
 };
 
-const formatEventDateTime = (value: string | null, type: FeedItemType): string => {
+const formatEventDateTime = (value: string | null, type: FeedItemType, endValue?: string | null): string => {
   if (!value) return '';
   if (type === 'event') {
     return new Date(value).toLocaleString('en-IN', {
@@ -69,6 +70,13 @@ const formatEventDateTime = (value: string | null, type: FeedItemType): string =
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+  if (endValue) {
+    const start = new Date(value);
+    const end = new Date(endValue);
+    if (start.toDateString() !== end.toDateString()) {
+      return `${formatEventDate(value)} - ${formatEventDate(endValue)}`;
+    }
   }
   return formatEventDate(value);
 };
@@ -94,7 +102,7 @@ const scoreFeedItem = (item: FeedItem, query: string): number => {
   const excerpt = normalizeSearchText(item.excerpt ?? '');
   const location = normalizeSearchText(item.location ?? '');
   const slug = normalizeSearchText(item.slug);
-  const dateText = normalizeSearchText(formatEventDateTime(item.date_value, item.type));
+  const dateText = normalizeSearchText(formatEventDateTime(item.date_value, item.type, item.end_date_value));
   const typeText = normalizeSearchText(item.type === 'event' ? item.event_type ?? 'event' : 'activity');
   const haystack = `${title} ${excerpt} ${location} ${slug} ${dateText} ${typeText}`;
   const terms = q.split(' ').filter(Boolean);
@@ -130,6 +138,7 @@ const toEventFeedItem = (event: PublicEvent): FeedItem => ({
   is_featured: event.is_featured,
   published_at: event.published_at,
   date_value: event.start_at,
+  end_date_value: event.end_at,
   cover_image_url: event.banner_image_url ?? null,
   event_type: event.event_type,
 });
@@ -143,7 +152,8 @@ const toActivityFeedItem = (activity: PublicActivity): FeedItem => ({
   location: activity.location,
   is_featured: activity.is_featured,
   published_at: activity.published_at,
-  date_value: activity.activity_date,
+  date_value: activity.start_at ?? activity.activity_date,
+  end_date_value: activity.end_at ?? null,
   cover_image_url: activity.cover_image_url,
 });
 
@@ -463,7 +473,7 @@ const FeedCard: React.FC<{ item: FeedItem }> = ({ item }) => {
               ) : (
                 <Calendar className="h-3.5 w-3.5 shrink-0" />
               )}
-              {formatEventDateTime(item.date_value, item.type)}
+              {formatEventDateTime(item.date_value, item.type, item.end_date_value)}
             </div>
           )}
           {item.location && (
@@ -494,4 +504,3 @@ const FeedCard: React.FC<{ item: FeedItem }> = ({ item }) => {
 };
 
 export default Events;
-

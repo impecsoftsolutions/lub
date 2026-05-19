@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-08  
-**Updated by:** Codex (`COD-EVENTS-REGISTRATION-DEADLINE-TOGGLE-081`)
+**Last updated:** 2026-05-19  
+**Updated by:** Codex (`COD-ACTIVITIES-SLUG-DATETIME-PARITY-083`)
 
 ---
 
@@ -32,22 +32,27 @@
 
 ## Last Verified
 
-- **When:** 2026-05-08
-- **What:** `COD-EVENTS-REGISTRATION-DEADLINE-TOGGLE-081` - added admin toggle to enable/disable custom registration deadline, enforced default closure at event end when disabled, and hid deadline on public website when custom deadline is disabled.
-- **Deploy/apply commands run:** `supabase db push --linked` (applied `20260507025000_events_registration_deadline_toggle_081.sql`).
+- **When:** 2026-05-19
+- **What:** `COD-ACTIVITIES-SLUG-DATETIME-PARITY-083` - Activities now use Event-style slug UX in admin (`Edit slug`, auto-managed state, URL preview), and Activities support multi-day datetimes with `start_at` / `end_at` in DB/RPC/service/UI while keeping `activity_date` compatibility.
+- **Deploy/apply commands run:** `supabase db push --linked` (applied `20260519093000_activities_slug_datetime_083.sql`).
 - **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase1 readonly smoke PASS (3 passed / 12 skipped).
 
 Runtime notes:
-- `src/pages/AdminEventForm.tsx`: added `Enable custom deadline` toggle under Registration settings.
-- If custom deadline is disabled, saved payload now writes `rsvp_deadline_at = null` and `ai_metadata.rsvp_deadline_enabled = false`.
-- Backend `get_event_by_slug` + `submit_event_rsvp` now treat effective close time as:
-  - custom deadline when enabled,
-  - otherwise event end datetime (fallback to event start when end is missing).
-- Public page now shows deadline text only when `rsvp.deadline_enabled = true`.
+- `src/pages/AdminActivityForm.tsx`: slug field now mirrors Event UX and date fields are now `Start date & time` + `End date & time`.
+- `supabase/migrations/20260519093000_activities_slug_datetime_083.sql`: added `activities.start_at` + `activities.end_at`, backfilled `start_at` from legacy `activity_date`, and recreated activity read/write RPCs to include datetime fields.
+- `src/lib/supabase.ts`: activity types and create/update payloads now include `start_at` / `end_at`.
+- `src/pages/Events.tsx`, `src/pages/ActivityDetail.tsx`, `src/pages/AdminActivities.tsx`: activity date rendering now prefers datetime range (start/end) and falls back to legacy `activity_date`.
 
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 083 Activities slug/date parity
+
+- Closed on 2026-05-19.
+- Added migration: `supabase/migrations/20260519093000_activities_slug_datetime_083.sql` and applied to linked DB.
+- Updated Activities admin form to Event-style slug controls and multi-day datetime fields.
+- Updated public/admin activity list/detail consumers to render date ranges from `start_at/end_at` with `activity_date` fallback.
 
 ### 081 Registration deadline toggle
 
