@@ -20,6 +20,7 @@ import {
 import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
+  activitiesService,
   eventsService,
   type AdminEventListItem,
   type EventStatus,
@@ -212,9 +213,43 @@ const AdminEvents: React.FC = () => {
         showToast('error', result.error ?? 'Failed to create activity from event.');
         return;
       }
+      if (!result.reused) {
+        const eventDetail = await eventsService.getById(token, id);
+        if (eventDetail) {
+          const aiDraft = await activitiesService.draftFromEvent(token, {
+            title: eventDetail.title,
+            excerpt: eventDetail.excerpt,
+            description: eventDetail.description,
+            event_type: eventDetail.event_type,
+            visibility: eventDetail.visibility,
+            start_at: eventDetail.start_at,
+            end_at: eventDetail.end_at,
+            location: eventDetail.location,
+            invitation_text: eventDetail.invitation_text,
+            agenda_items: (eventDetail.agenda_items ?? []).map((a) => ({
+              title: a.title,
+              note: a.note ?? '',
+              speaker: a.speaker ?? '',
+              time: a.time ?? '',
+            })),
+          });
+          if (aiDraft.success && aiDraft.data) {
+            await activitiesService.update(token, result.activity_id, {
+              title: aiDraft.data.title,
+              slug: aiDraft.data.slug,
+              excerpt: aiDraft.data.excerpt || null,
+              description: aiDraft.data.description || null,
+              activity_date: eventDetail.start_at ? new Date(eventDetail.start_at).toISOString().slice(0, 10) : null,
+              location: eventDetail.location ?? null,
+            });
+          }
+        }
+      }
       showToast(
         'success',
-        result.reused ? 'Opening existing activity draft.' : 'Activity draft created from event.',
+        result.reused
+          ? 'Opening existing activity draft.'
+          : 'Activity draft created from event and AI-converted for activity tone.',
       );
       navigate(`/admin/content/activities/${result.activity_id}/edit`);
     } finally {
@@ -569,4 +604,3 @@ const AdminEvents: React.FC = () => {
 };
 
 export default AdminEvents;
-

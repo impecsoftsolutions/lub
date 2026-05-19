@@ -32,6 +32,7 @@ import {
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
+  activitiesService,
   eventsService,
   EVENT_RSVP_GENDER_OPTIONS,
   EVENT_RSVP_MEAL_OPTIONS,
@@ -1009,9 +1010,40 @@ const AdminEventForm: React.FC = () => {
         showToast('error', result.error ?? 'Failed to create activity from event.');
         return;
       }
+      if (!result.reused && original) {
+        const aiDraft = await activitiesService.draftFromEvent(token, {
+          title: original.title,
+          excerpt: original.excerpt,
+          description: original.description,
+          event_type: original.event_type,
+          visibility: original.visibility,
+          start_at: original.start_at,
+          end_at: original.end_at,
+          location: original.location,
+          invitation_text: original.invitation_text,
+          agenda_items: (original.agenda_items ?? []).map((a) => ({
+            title: a.title,
+            note: a.note ?? '',
+            speaker: a.speaker ?? '',
+            time: a.time ?? '',
+          })),
+        });
+        if (aiDraft.success && aiDraft.data) {
+          await activitiesService.update(token, result.activity_id, {
+            title: aiDraft.data.title,
+            slug: aiDraft.data.slug,
+            excerpt: aiDraft.data.excerpt || null,
+            description: aiDraft.data.description || null,
+            activity_date: original.start_at ? new Date(original.start_at).toISOString().slice(0, 10) : null,
+            location: original.location ?? null,
+          });
+        }
+      }
       showToast(
         'success',
-        result.reused ? 'Opening existing activity draft.' : 'Activity draft created from event.',
+        result.reused
+          ? 'Opening existing activity draft.'
+          : 'Activity draft created from event and AI-converted for activity tone.',
       );
       navigate(`/admin/content/activities/${result.activity_id}/edit`);
     } finally {

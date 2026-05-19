@@ -3,7 +3,7 @@
 // Slices: COD-ACTIVITIES-AI-001 + CLAUDE-ACTIVITIES-FOLLOWUP-002
 //         + CLAUDE-ACTIVITIES-NEXT-003 (COD-ACTIVITIES-AI-DOC-UI-003)
 //
-// Two operating modes (request body field `mode`):
+// Three operating modes (request body field `mode`):
 //
 //   "draft" (default) — Generates AI-assisted draft content (title, slug,
 //   excerpt, description) for an Activities post. Optional `source_files`
@@ -15,6 +15,9 @@
 //   participants, host, purpose, highlights, outcome, additional_notes) extracted
 //   from the document content. Used for auto-prefill in the AI panel before
 //   the admin clicks Generate.
+//
+//   "event_to_activity" — Converts source Event details into activity-suitable
+//   draft copy in activity-report tone.
 //
 // Source file limits:
 //   - Max 3 files per request
@@ -28,7 +31,7 @@
 // Request body:
 //   {
 //     session_token: string,
-//     mode?: "draft" | "extract_fields",   // defaults to "draft"
+//     mode?: "draft" | "extract_fields" | "event_to_activity",   // defaults to "draft"
 //     inputs?: {                            // used in draft mode
 //       activity_date?: string,
 //       location?: string,
@@ -38,6 +41,18 @@
 //       highlights?: string,
 //       outcome?: string,
 //       additional_notes?: string,
+//     },
+//     event_input?: {                       // used in event_to_activity mode
+//       title?: string,
+//       excerpt?: string,
+//       description?: string,
+//       event_type?: string,
+//       visibility?: string,
+//       start_at?: string,
+//       end_at?: string,
+//       location?: string,
+//       invitation_text?: string,
+//       agenda_items?: Array<{ title?: string; note?: string; speaker?: string; time?: string }>
 //     },
 //     source_files?: Array<{ name: string, mime: string, base64: string }>
 //   }
@@ -107,11 +122,25 @@ interface ExtractionFields {
   additional_notes?: string;
 }
 
+interface EventInputForActivity {
+  title?: string;
+  excerpt?: string;
+  description?: string;
+  event_type?: string;
+  visibility?: string;
+  start_at?: string;
+  end_at?: string;
+  location?: string;
+  invitation_text?: string;
+  agenda_items?: Array<Record<string, unknown>>;
+}
+
 interface DraftRequestBody {
   session_token?: string;
   /** Defaults to "draft" when absent. */
-  mode?: 'draft' | 'extract_fields';
+  mode?: 'draft' | 'extract_fields' | 'event_to_activity';
   inputs?: DraftInputs;
+  event_input?: EventInputForActivity;
   source_files?: SourceFile[];
 }
 
@@ -305,6 +334,56 @@ function buildUserFacts(inputs: DraftInputs): string {
     },
     null,
     2
+  );
+}
+
+function buildEventToActivityPrompt(eventInput: EventInputForActivity): string {
+  const agendaLines = Array.isArray(eventInput.agenda_items)
+    ? eventInput.agenda_items
+        .slice(0, 40)
+        .map((item) => {
+          const parts = [
+            toStringValue(item?.time),
+            toStringValue(item?.title),
+            toStringValue(item?.speaker),
+            toStringValue(item?.note),
+          ].filter(Boolean);
+          return parts.join(' | ');
+        })
+        .filter(Boolean)
+    : [];
+
+  return JSON.stringify(
+    {
+      task: 'convert_event_to_activity',
+      rules: [
+        'Rewrite this into completed-activity style copy.',
+        'Keep only factual content from provided event data.',
+        'Do not invent attendance counts, outcomes, quotes, or names.',
+        'Do not use invitation language such as "join", "register now", or "you are invited".',
+        'Do not use emojis or decorative symbols.',
+      ],
+      event: {
+        title: toStringValue(eventInput.title),
+        excerpt: toStringValue(eventInput.excerpt),
+        description: toStringValue(eventInput.description),
+        event_type: toStringValue(eventInput.event_type),
+        visibility: toStringValue(eventInput.visibility),
+        start_at: toStringValue(eventInput.start_at),
+        end_at: toStringValue(eventInput.end_at),
+        location: toStringValue(eventInput.location),
+        invitation_text: toStringValue(eventInput.invitation_text),
+        agenda_lines: agendaLines,
+      },
+      output: {
+        title: 'string',
+        slug: 'string',
+        excerpt: 'string',
+        description: 'string',
+      },
+    },
+    null,
+    2,
   );
 }
 
@@ -653,10 +732,10 @@ Deno.serve(async (req: Request) => {
   const rawMode = toStringValue(payload?.mode) || 'draft';
   const inputs: DraftInputs = payload?.inputs && typeof payload.inputs === 'object' ? payload.inputs : {};
 
-  if (rawMode !== 'draft' && rawMode !== 'extract_fields') {
-    return failClosed(`Invalid mode "${rawMode}". Expected "draft" or "extract_fields".`, 'generation_failed');
+  if (rawMode !== 'draft' && rawMode !== 'extract_fields' && rawMode !== 'event_to_activity') {
+    return failClosed(`Invalid mode "${rawMode}". Expected "draft", "extract_fields", or "event_to_activity".`, 'generation_failed');
   }
-  const mode = rawMode as 'draft' | 'extract_fields';
+  const mode = rawMode as 'draft' | 'extract_fields' | 'event_to_activity';
 
   if (!sessionToken) {
     return failClosed('Session token is required.', 'session_invalid');
@@ -745,8 +824,10 @@ Deno.serve(async (req: Request) => {
 
   // ── draft mode (default) ─────────────────────────────────────────────────
   try {
-    const systemPrompt = buildSystemPrompt(sourceFiles.length > 0);
-    const userPrompt = buildUserFacts(inputs);
+    const systemPrompt = buildSystemPrompt(sourceFiles.length > 0 || mode === 'event_to_activity');
+    const userPrompt = mode === 'event_to_activity'
+      ? buildEventToActivityPrompt(payload?.event_input ?? {})
+      : buildUserFacts(inputs);
 
     const draft = sourceFiles.length > 0
       ? await callOpenAIResponsesAPI(apiKey, model, reasoningEffort, systemPrompt, userPrompt, sourceFiles)

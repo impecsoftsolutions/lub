@@ -113,6 +113,7 @@ const AI_SOURCE_PER_IMAGE_MAX = 10 * 1024 * 1024;  // 10 MB per image (JPEG/PNG)
 const AI_SOURCE_PER_PDF_MAX = 20 * 1024 * 1024;    // 20 MB per PDF
 const AI_SOURCE_TOTAL_MAX = 30 * 1024 * 1024;      // 30 MB cumulative
 const AI_SOURCE_ACCEPTED_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+const AI_BRIEF_MAX_CHARS = 4000;
 
 const readFileAsBase64Plain = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -274,7 +275,8 @@ const AdminActivityForm: React.FC = () => {
   const [limits, setLimits] = useState<ActivityLimits>(activitiesService.defaultLimits);
 
   // AI assist state
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(true);
+  const [activityBrief, setActivityBrief] = useState('');
   const [aiInputs, setAiInputs] = useState({
     activity_date: '',
     location: '',
@@ -491,7 +493,7 @@ const AdminActivityForm: React.FC = () => {
       setAiError(aiUnavailableMessage ?? 'AI generation is not available.');
       return;
     }
-    const hasAnyInput = Object.values(aiInputs).some((v) => v.trim().length > 0);
+    const hasAnyInput = Object.values(aiInputs).some((v) => v.trim().length > 0) || activityBrief.trim().length > 0;
     const hasAnyFile = aiSourceFiles.length > 0;
     if (!hasAnyInput && !hasAnyFile) {
       setAiError('Please fill in at least one input field or attach a source document to guide the draft.');
@@ -520,7 +522,10 @@ const AdminActivityForm: React.FC = () => {
           host: aiInputs.host.trim() || null,
           highlights: aiInputs.highlights.trim() || null,
           outcome: aiInputs.outcome.trim() || null,
-          additional_notes: aiInputs.additional_notes.trim() || null,
+          additional_notes: [
+            activityBrief.trim() || null,
+            aiInputs.additional_notes.trim() || null,
+          ].filter(Boolean).join('\n\n') || null,
         },
         sourceFilesPayload.length > 0 ? sourceFilesPayload : undefined
       );
@@ -538,7 +543,7 @@ const AdminActivityForm: React.FC = () => {
     } finally {
       setAiGenerating(false);
     }
-  }, [aiAvailable, aiUnavailableMessage, aiInputs, aiSourceFiles]);
+  }, [activityBrief, aiAvailable, aiUnavailableMessage, aiInputs, aiSourceFiles]);
 
   const handleAiApplyTitle = useCallback(() => {
     if (!aiSuggestion) return;
@@ -1311,7 +1316,7 @@ const AdminActivityForm: React.FC = () => {
           >
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-base font-semibold text-foreground">Generate with AI</span>
+              <span className="text-base font-semibold text-foreground">Activity Brief</span>
               {aiAvailable ? (
                 <span className="ml-2 inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">
                   {aiStatusLabel}
@@ -1328,8 +1333,21 @@ const AdminActivityForm: React.FC = () => {
           {aiPanelOpen && (
             <div className="border-t border-border p-6 space-y-5">
               <p className="text-xs text-muted-foreground">
-                Upload event documents, click <strong>Extract Content</strong> to prefill the fields below, then review and adjust before clicking Generate. You can also fill the fields manually and apply suggestions individually or all at once.
+                Describe the activity in your own words, attach references if needed, then click <strong>Generate from Brief</strong>. You can still use extracted guided fields and apply suggestions individually.
               </p>
+
+              <div className="space-y-2">
+                <Textarea
+                  value={activityBrief}
+                  onChange={(e) => setActivityBrief(e.target.value.slice(0, AI_BRIEF_MAX_CHARS))}
+                  placeholder='Describe the activity. Example: "Vendor development review session held at CITD, Guntur on 17 May 2026 with MSME participants. Discussions covered GST compliance, finance facilitation, and export readiness."'
+                  rows={4}
+                  disabled={!aiAvailable || aiGenerating || aiExtracting}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {activityBrief.length} / {AI_BRIEF_MAX_CHARS} characters
+                </p>
+              </div>
 
               {!aiAvailable && aiUnavailableMessage && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-900/40 px-3 py-2 flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
@@ -1557,7 +1575,7 @@ const AdminActivityForm: React.FC = () => {
                   ) : (
                     <>
                       <Wand2 className="h-4 w-4 mr-2" />
-                      {aiSuggestion ? 'Regenerate' : 'Generate Draft'}
+                      {aiSuggestion ? 'Regenerate from Brief' : 'Generate from Brief'}
                     </>
                   )}
                 </Button>

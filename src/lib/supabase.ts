@@ -7273,6 +7273,84 @@ export const eventsService = {
     return result.data ?? null;
   },
 
+  /**
+   * Converts Event details into activity-suitable draft copy by calling
+   * `draft-activity-content` in `event_to_activity` mode.
+   */
+  async draftFromEvent(
+    sessionToken: string,
+    eventInput: {
+      title?: string | null;
+      excerpt?: string | null;
+      description?: string | null;
+      event_type?: string | null;
+      visibility?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
+      location?: string | null;
+      invitation_text?: string | null;
+      agenda_items?: Array<{ title?: string; note?: string; speaker?: string; time?: string }>;
+    },
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    error_code?: ActivityDraftErrorCode;
+    data?: { title: string; slug: string; excerpt: string; description: string };
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-activity-content', {
+        body: {
+          session_token: sessionToken,
+          mode: 'event_to_activity',
+          event_input: {
+            title: eventInput.title ?? null,
+            excerpt: eventInput.excerpt ?? null,
+            description: eventInput.description ?? null,
+            event_type: eventInput.event_type ?? null,
+            visibility: eventInput.visibility ?? null,
+            start_at: eventInput.start_at ?? null,
+            end_at: eventInput.end_at ?? null,
+            location: eventInput.location ?? null,
+            invitation_text: eventInput.invitation_text ?? null,
+            agenda_items: eventInput.agenda_items ?? [],
+          },
+        },
+      });
+      if (error) {
+        return {
+          success: false,
+          error: error.message ?? 'Event-to-activity conversion failed.',
+          error_code: 'generation_failed',
+        };
+      }
+      const result = data as {
+        success?: boolean;
+        error?: string;
+        error_code?: ActivityDraftErrorCode;
+        data?: { title?: string; slug?: string; excerpt?: string; description?: string };
+      } | null;
+      if (!result?.success || !result.data) {
+        return {
+          success: false,
+          error: result?.error ?? 'AI conversion returned no content.',
+          error_code: result?.error_code ?? 'generation_failed',
+        };
+      }
+      return {
+        success: true,
+        data: {
+          title: typeof result.data.title === 'string' ? result.data.title : '',
+          slug: typeof result.data.slug === 'string' ? result.data.slug : '',
+          excerpt: typeof result.data.excerpt === 'string' ? result.data.excerpt : '',
+          description: typeof result.data.description === 'string' ? result.data.description : '',
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Event-to-activity conversion failed.';
+      return { success: false, error: message, error_code: 'generation_failed' };
+    }
+  },
+
   async resolveShortUrl(shortCode: string): Promise<EventShortUrlResolution> {
     const code = shortCode.trim().toLowerCase();
     if (!code) {
