@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,10 +18,6 @@ import {
   MapPin,
   FileText,
   Sparkles,
-  ChevronDown,
-  ChevronUp,
-  Wand2,
-  Check,
   AlertCircle,
   Download,
 } from 'lucide-react';
@@ -51,9 +47,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { buildActivityMediaUrl } from '../lib/activityMedia';
 
-// ─── Constants ────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ─── Slug helper ──────────────────────────────────────────────
+// â”€â”€â”€ Slug helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function slugify(text: string): string {
   return text
@@ -65,7 +61,7 @@ function slugify(text: string): string {
     .slice(0, 80);
 }
 
-// ─── Drag-reorder helpers ─────────────────────────────────────
+// â”€â”€â”€ Drag-reorder helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function reorder<T>(list: T[], from: number, to: number): T[] {
   const result = [...list];
@@ -74,7 +70,7 @@ function reorder<T>(list: T[], from: number, to: number): T[] {
   return result;
 }
 
-// ─── Types ────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface GalleryItem {
   /** Set when the image is already persisted (from existing activity) */
@@ -106,7 +102,7 @@ interface ActivityImageTransform {
   } | null;
 }
 
-// AI source-document upload limits — module-level so they don't trigger
+// AI source-document upload limits â€” module-level so they don't trigger
 // react-hooks/exhaustive-deps warnings inside callbacks.
 const AI_SOURCE_MAX_FILES = 3;
 const AI_SOURCE_PER_IMAGE_MAX = 10 * 1024 * 1024;  // 10 MB per image (JPEG/PNG)
@@ -132,36 +128,6 @@ const formatSourceFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] => {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    const normalized = value?.trim();
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(normalized);
-  }
-  return result;
-};
-
-const normalizeDateCandidate = (value: string | null | undefined): string | null => {
-  const raw = value?.trim();
-  if (!raw) return null;
-  const iso = raw.match(/\b(19\d{2}|20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
-  if (iso) {
-    const [, y, m, d] = iso;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  const dmy = raw.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](19\d{2}|20\d{2})\b/);
-  if (dmy) {
-    const [, d, m, y] = dmy;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  return null;
 };
 
 const stripActivityMediaVariant = (url: string | null | undefined): string | null => {
@@ -209,7 +175,7 @@ const resolveRenderableImageUrl = async (
 };
 
 // Ratio choices for the in-modal gallery crop selector. `aspect: null` means
-// "Original — keep native ratio, no crop, just resize+compress".
+// "Original â€” keep native ratio, no crop, just resize+compress".
 const GALLERY_CROP_RATIO_OPTIONS = [
   { value: 'original', label: 'Original', aspect: null as number | null,           outputWidth: undefined, outputHeight: undefined },
   { value: '16:9',     label: '16:9',     aspect: 16 / 9 as number | null,         outputWidth: 1600,      outputHeight: 900 },
@@ -219,7 +185,7 @@ const GALLERY_CROP_RATIO_OPTIONS = [
   { value: '9:16',     label: '9:16',     aspect: 9 / 16 as number | null,         outputWidth: 900,       outputHeight: 1600 },
 ];
 
-// ─── Component ────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const AdminActivityForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -230,7 +196,7 @@ const AdminActivityForm: React.FC = () => {
   const canEdit    = useHasPermission('activities.edit_any');
   const canDelete  = useHasPermission('activities.delete');
 
-  // ── Form state ────────────────────────────────────────────
+  // â”€â”€ Form state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const [title, setTitle]           = useState('');
   const [slug, setSlug]             = useState('');
@@ -262,7 +228,7 @@ const AdminActivityForm: React.FC = () => {
   const [showGalleryCrop, setShowGalleryCrop] = useState(false);
   const [galleryQueue, setGalleryQueue]       = useState<File[]>([]);
   const galleryQueueRef = useRef<File[]>([]);
-  // Last ratio chosen during the current batch — used as the default for the
+  // Last ratio chosen during the current batch â€” used as the default for the
   // next file in the same batch so admins don't have to re-pick every time.
   // Reset to 'original' when a fresh batch is opened.
   const [galleryLastRatio, setGalleryLastRatio] = useState<string>('original');
@@ -275,41 +241,18 @@ const AdminActivityForm: React.FC = () => {
   const [limits, setLimits] = useState<ActivityLimits>(activitiesService.defaultLimits);
 
   // AI assist state
-  const [aiPanelOpen, setAiPanelOpen] = useState(true);
   const [activityBrief, setActivityBrief] = useState('');
-  const [aiInputs, setAiInputs] = useState({
-    activity_date: '',
-    location: '',
-    participants: '',
-    purpose: '',
-    host: '',
-    highlights: '',
-    outcome: '',
-    additional_notes: '',
-  });
-  const [aiExtractionChoices, setAiExtractionChoices] = useState<{
-    activityDateOptions: string[];
-    locationOptions: string[];
-  }>({ activityDateOptions: [], locationOptions: [] });
   const [aiRuntimeProfile, setAiRuntimeProfile] = useState<AIRuntimeProfile | null>(null);
-  const [aiSuggestion, setAiSuggestion] = useState<{
-    title: string;
-    slug: string;
-    excerpt: string;
-    description: string;
-  } | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  // AI source documents (optional — sent to edge function for richer drafts)
+  // AI source documents (optional â€” sent to edge function for richer drafts)
   const [aiSourceFiles, setAiSourceFiles] = useState<Array<{
     name: string;
     mime: string;
     size: number;
     base64: string;
   }>>([]);
-  // True while the extract_fields edge function call is in-flight after upload.
-  const [aiExtracting, setAiExtracting] = useState(false);
   const aiSourceInputRef = useRef<HTMLInputElement>(null);
 
   // Toast
@@ -322,7 +265,7 @@ const AdminActivityForm: React.FC = () => {
   // Drag state (simple index-based)
   const [dragFrom, setDragFrom] = useState<number | null>(null);
 
-  // ── Load existing activity ────────────────────────────────
+  // â”€â”€ Load existing activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     if (!id) return;
@@ -415,7 +358,7 @@ const AdminActivityForm: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Load AI runtime profile (no key, just provider/model/is_enabled) ─────
+  // â”€â”€ Load AI runtime profile (no key, just provider/model/is_enabled) â”€â”€â”€â”€â”€
 
   useEffect(() => {
     let cancelled = false;
@@ -431,19 +374,9 @@ const AdminActivityForm: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Pre-seed AI inputs from form values when panel opens ──────────────────
+  // â”€â”€ Pre-seed AI inputs from form values when panel opens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  useEffect(() => {
-    if (!aiPanelOpen) return;
-    setAiInputs((prev) => ({
-      ...prev,
-      // Only adopt if the user hasn't typed anything yet in the AI inputs
-      activity_date: prev.activity_date || activityDate,
-      location: prev.location || location,
-    }));
-  }, [aiPanelOpen, activityDate, location]);
-
-  // ── AI generation ─────────────────────────────────────────
+  // â”€â”€ AI generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // True availability honors both runtime enabled AND provider support.
   // Today only OpenAI is wired end-to-end; other providers must show an
@@ -456,16 +389,16 @@ const AdminActivityForm: React.FC = () => {
   const aiProviderLabel = aiRuntimeProfile?.provider ?? 'AI';
   const aiModelLabel = aiRuntimeProfile?.model ?? '';
 
-  // Status chip text — explicit rather than generic "Unavailable".
+  // Status chip text â€” explicit rather than generic "Unavailable".
   let aiStatusLabel: string;
   if (aiAvailable) {
-    aiStatusLabel = `${aiProviderLabel}${aiModelLabel ? ` · ${aiModelLabel}` : ''}`;
+    aiStatusLabel = `${aiProviderLabel}${aiModelLabel ? ` Â· ${aiModelLabel}` : ''}`;
   } else if (!aiRuntimeProfile) {
     aiStatusLabel = 'Not configured';
   } else if (!isEnabled) {
-    aiStatusLabel = `${aiProviderLabel} · disabled`;
+    aiStatusLabel = `${aiProviderLabel} Â· disabled`;
   } else if (!providerSupported) {
-    aiStatusLabel = `${aiProviderLabel} · not supported`;
+    aiStatusLabel = `${aiProviderLabel} Â· not supported`;
   } else {
     aiStatusLabel = 'Unavailable';
   }
@@ -475,10 +408,10 @@ const AdminActivityForm: React.FC = () => {
   if (!aiAvailable) {
     if (!aiRuntimeProfile) {
       aiUnavailableMessage =
-        'AI generation is not configured. Configure provider, model, and API key under Admin → Settings → AI Settings.';
+        'AI generation is not configured. Configure provider, model, and API key under Admin â†’ Settings â†’ AI Settings.';
     } else if (!isEnabled) {
       aiUnavailableMessage =
-        `AI generation is currently disabled. Enable it under Admin → Settings → AI Settings.`;
+        `AI generation is currently disabled. Enable it under Admin â†’ Settings â†’ AI Settings.`;
     } else if (!providerSupported) {
       aiUnavailableMessage =
         `AI is enabled but provider "${aiProviderLabel}" is not yet supported for Activities drafting. ` +
@@ -493,10 +426,10 @@ const AdminActivityForm: React.FC = () => {
       setAiError(aiUnavailableMessage ?? 'AI generation is not available.');
       return;
     }
-    const hasAnyInput = Object.values(aiInputs).some((v) => v.trim().length > 0) || activityBrief.trim().length > 0;
+    const hasBrief = activityBrief.trim().length > 0;
     const hasAnyFile = aiSourceFiles.length > 0;
-    if (!hasAnyInput && !hasAnyFile) {
-      setAiError('Please fill in at least one input field or attach a source document to guide the draft.');
+    if (!hasBrief && !hasAnyFile) {
+      setAiError('Please enter an activity brief or attach a reference file.');
       return;
     }
 
@@ -515,144 +448,41 @@ const AdminActivityForm: React.FC = () => {
       const result = await activitiesService.draftContent(
         token,
         {
-          activity_date: aiInputs.activity_date.trim() || null,
-          location: aiInputs.location.trim() || null,
-          participants: aiInputs.participants.trim() || null,
-          purpose: aiInputs.purpose.trim() || null,
-          host: aiInputs.host.trim() || null,
-          highlights: aiInputs.highlights.trim() || null,
-          outcome: aiInputs.outcome.trim() || null,
-          additional_notes: [
-            activityBrief.trim() || null,
-            aiInputs.additional_notes.trim() || null,
-          ].filter(Boolean).join('\n\n') || null,
+          activity_date: activityDate.trim() || null,
+          location: location.trim() || null,
+          additional_notes: activityBrief.trim() || null,
         },
         sourceFilesPayload.length > 0 ? sourceFilesPayload : undefined
       );
 
       if (!result.success || !result.data) {
         setAiError(result.error ?? 'AI drafting failed.');
-        setAiSuggestion(null);
         return;
       }
-      setAiSuggestion(result.data);
+
+      const drafted = result.data;
+      setTitle(drafted.title ?? '');
+      if (!slugManual) {
+        setSlug(slugify(drafted.slug || drafted.title || ''));
+      }
+      setExcerpt(drafted.excerpt ?? '');
+      setDescription(drafted.description ?? '');
+      showToast('success', 'Activity draft generated. Review and edit any field.');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'AI drafting failed.';
       setAiError(message);
-      setAiSuggestion(null);
     } finally {
       setAiGenerating(false);
     }
-  }, [activityBrief, aiAvailable, aiUnavailableMessage, aiInputs, aiSourceFiles]);
+  }, [activityBrief, activityDate, aiAvailable, aiSourceFiles, aiUnavailableMessage, location, showToast, slugManual]);
 
-  const handleAiApplyTitle = useCallback(() => {
-    if (!aiSuggestion) return;
-    setTitle(aiSuggestion.title);
-    if (!slugManual) {
-      setSlug(slugify(aiSuggestion.title));
-    }
-  }, [aiSuggestion, slugManual]);
-
-  const handleAiApplySlug = useCallback(() => {
-    if (!aiSuggestion) return;
-    // Always re-pass through client slugify to enforce /activities/:slug compatibility.
-    setSlug(slugify(aiSuggestion.slug || aiSuggestion.title));
-    setSlugManual(true);
-  }, [aiSuggestion]);
-
-  const handleAiApplyExcerpt = useCallback(() => {
-    if (!aiSuggestion) return;
-    setExcerpt(aiSuggestion.excerpt);
-  }, [aiSuggestion]);
-
-  const handleAiApplyDescription = useCallback(() => {
-    if (!aiSuggestion) return;
-    setDescription(aiSuggestion.description);
-  }, [aiSuggestion]);
-
-  const handleAiApplyAll = useCallback(() => {
-    if (!aiSuggestion) return;
-    setTitle(aiSuggestion.title);
-    setSlug(slugify(aiSuggestion.slug || aiSuggestion.title));
-    setSlugManual(true);
-    setExcerpt(aiSuggestion.excerpt);
-    setDescription(aiSuggestion.description);
-  }, [aiSuggestion]);
-
-  // ── AI source-document handlers ─────────────────────────────
+  // â”€â”€ AI source-document handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /**
    * Calls the edge function in extract_fields mode with the given file set and
-   * pre-fills any empty guided-input fields. Silent fail on error — the user
+   * pre-fills any empty guided-input fields. Silent fail on error â€” the user
    * still has the inputs grid to fill manually.
    */
-  const runExtraction = useCallback(async (files: typeof aiSourceFiles) => {
-    if (!aiAvailable || files.length === 0) return;
-    const token = sessionManager.getSessionToken();
-    if (!token) return;
-
-    setAiExtracting(true);
-    try {
-      const result = await activitiesService.extractFields(
-        token,
-        files.map((f) => ({ name: f.name, mime: f.mime, base64: f.base64 }))
-      );
-      if (result.success && result.fields) {
-        const f = result.fields;
-        const detectedDates = uniqueNonEmpty([
-          f.activity_date,
-          ...(f.activity_date_options ?? []),
-        ])
-          .map((value) => normalizeDateCandidate(value))
-          .filter((value): value is string => Boolean(value));
-        const detectedLocations = uniqueNonEmpty([
-          f.location,
-          ...(f.location_options ?? []),
-        ]);
-        const firstDetectedDate = detectedDates[0] ?? normalizeDateCandidate(f.activity_date);
-        const firstDetectedLocation = detectedLocations[0] ?? f.location?.trim() ?? '';
-
-        setAiExtractionChoices({
-          activityDateOptions: detectedDates,
-          locationOptions: detectedLocations,
-        });
-
-        if (!activityDate && firstDetectedDate) {
-          setActivityDate(firstDetectedDate);
-        }
-        if (!location.trim() && firstDetectedLocation) {
-          setLocation(firstDetectedLocation);
-        }
-
-        // Only fill fields that are still empty - never clobber typed values.
-        setAiInputs((prev) => ({
-          activity_date:    prev.activity_date    || firstDetectedDate  || f.activity_date || prev.activity_date,
-          location:         prev.location         || firstDetectedLocation || f.location || prev.location,
-          participants:     prev.participants      || f.participants     || prev.participants,
-          host:             prev.host              || f.host             || prev.host,
-          purpose:          prev.purpose           || f.purpose          || prev.purpose,
-          highlights:       prev.highlights        || f.highlights       || prev.highlights,
-          outcome:          prev.outcome           || f.outcome          || prev.outcome,
-          additional_notes: prev.additional_notes  || f.additional_notes || prev.additional_notes,
-        }));
-      }
-    } catch {
-      // Silent: extraction is a best-effort prefill; failures are not surfaced.
-    } finally {
-      setAiExtracting(false);
-    }
-  }, [activityDate, aiAvailable, location]);
-
-  const handleSelectExtractedDate = useCallback((value: string) => {
-    setAiInputs((prev) => ({ ...prev, activity_date: value }));
-    setActivityDate(value);
-  }, []);
-
-  const handleSelectExtractedLocation = useCallback((value: string) => {
-    setAiInputs((prev) => ({ ...prev, location: value }));
-    setLocation(value);
-  }, []);
-
   const handleAiSourceFilesPicked = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
@@ -705,7 +535,7 @@ const AdminActivityForm: React.FC = () => {
     setAiSourceFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // ── Auto-slug from title ─────────────────────────────────
+  // â”€â”€ Auto-slug from title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     if (!slugManual) {
@@ -713,7 +543,7 @@ const AdminActivityForm: React.FC = () => {
     }
   }, [title, slugManual]);
 
-  // ── Cover image handling ─────────────────────────────────
+  // â”€â”€ Cover image handling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleCoverFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -759,7 +589,7 @@ const AdminActivityForm: React.FC = () => {
     setCoverImageUrl(null);
   }, [coverPreview, coverImageBlob]);
 
-  // ── Gallery handling ─────────────────────────────────────
+  // â”€â”€ Gallery handling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Open the in-modal ratio-aware crop UI for the given file.
   const openCropForFile = useCallback(async (file: File) => {
@@ -866,7 +696,7 @@ const AdminActivityForm: React.FC = () => {
     });
   }, []);
 
-  // ── YouTube URL helpers ──────────────────────────────────
+  // â”€â”€ YouTube URL helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleYoutubeChange = useCallback((index: number, value: string) => {
     setYoutubeUrls((prev) => prev.map((u, i) => (i === index ? value : u)));
@@ -881,7 +711,7 @@ const AdminActivityForm: React.FC = () => {
     setYoutubeUrls((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // ── Drag reorder (gallery) ────────────────────────────────
+  // â”€â”€ Drag reorder (gallery) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleDragStart = useCallback((index: number) => {
     setDragFrom(index);
@@ -893,7 +723,7 @@ const AdminActivityForm: React.FC = () => {
     setDragFrom(null);
   }, [dragFrom]);
 
-  // ── Save helpers ─────────────────────────────────────────
+  // â”€â”€ Save helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const uploadCoverIfNeeded = useCallback(async (
     activityId: string,
@@ -1076,7 +906,7 @@ const AdminActivityForm: React.FC = () => {
     window.open(result.url, '_blank', 'noopener,noreferrer');
   }, [id, showToast]);
 
-  // ── Save as Draft ─────────────────────────────────────────
+  // â”€â”€ Save as Draft â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSaveDraft = useCallback(async () => {
     if (!title.trim()) { showToast('error', 'Title is required.'); return; }
@@ -1157,7 +987,7 @@ const AdminActivityForm: React.FC = () => {
     processGalleryChanges, navigate, showToast,
   ]);
 
-  // ── Publish ────────────────────────────────────────────────
+  // â”€â”€ Publish â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handlePublish = useCallback(async () => {
     if (!isEdit || !id) {
@@ -1214,7 +1044,7 @@ const AdminActivityForm: React.FC = () => {
     coverImageUrl, coverOriginalObjectKey, coverStorageProvider, resolveCoverForSave, buildYoutubeList, processGalleryChanges, navigate, showToast,
   ]);
 
-  // ── Archive ────────────────────────────────────────────────
+  // â”€â”€ Archive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleArchive = useCallback(async () => {
     if (!isEdit || !id) return;
@@ -1233,7 +1063,7 @@ const AdminActivityForm: React.FC = () => {
     }
   }, [isEdit, id, navigate, showToast]);
 
-  // ── Delete ─────────────────────────────────────────────────
+  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleDelete = useCallback(async () => {
     if (!isEdit || !id) return;
@@ -1252,18 +1082,18 @@ const AdminActivityForm: React.FC = () => {
     }
   }, [isEdit, id, navigate, showToast]);
 
-  // ── Render helpers ────────────────────────────────────────
+  // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const activeGallery = gallery.filter((g) => !g.pendingDelete);
   const galleryFull   = activeGallery.length >= limits.maxGalleryImages;
 
-  // ─────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-32 text-muted-foreground gap-2">
         <Loader2 className="h-5 w-5 animate-spin" />
-        Loading activity…
+        Loading activityâ€¦
       </div>
     );
   }
@@ -1273,12 +1103,10 @@ const AdminActivityForm: React.FC = () => {
   return (
     <PermissionGate permission={requiredPermission}>
       <div className="max-w-4xl space-y-8">
-        {/* Toast */}
         {toast && (
           <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
         )}
 
-        {/* Back + title */}
         <div className="flex items-center gap-3">
           <Link
             to="/admin/content/activities"
@@ -1307,357 +1135,119 @@ const AdminActivityForm: React.FC = () => {
           )}
         </div>
 
-        {/* ─── AI Assist Panel ─────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setAiPanelOpen((v) => !v)}
-            className="w-full flex items-center justify-between gap-3 px-6 py-4 hover:bg-muted/30 transition-colors text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-base font-semibold text-foreground">Activity Brief</span>
-              {aiAvailable ? (
-                <span className="ml-2 inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">
-                  {aiStatusLabel}
-                </span>
+        {/* AI Brief */}
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-base font-semibold text-foreground">Activity Brief</span>
+            {aiAvailable ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">
+                {aiStatusLabel}
+              </span>
+            ) : (
+              <span className="ml-2 inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-medium">
+                {aiStatusLabel}
+              </span>
+            )}
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            Describe the activity in your own words. AI fills the form; you can edit anything afterwards.
+          </p>
+
+          <Textarea
+            value={activityBrief}
+            onChange={(e) => setActivityBrief(e.target.value.slice(0, AI_BRIEF_MAX_CHARS))}
+            placeholder='Describe the activity in your own words. e.g. "MSME workshop held at CITD, Guntur on 17 May 2026. Sessions covered GST compliance, finance support, and export readiness."'
+            rows={4}
+            disabled={!aiAvailable || aiGenerating}
+          />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!aiAvailable || aiGenerating || aiSourceFiles.length >= AI_SOURCE_MAX_FILES}
+              onClick={() => aiSourceInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-1.5" />
+              Attach reference
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {`Up to ${AI_SOURCE_MAX_FILES} files (JPEG / PNG <= 10 MB, PDF <= 20 MB, total <= 30 MB)`}
+            </span>
+            <Button
+              type="button"
+              className="ml-auto"
+              onClick={() => void handleAiGenerate()}
+              disabled={!aiAvailable || aiGenerating}
+            >
+              {aiGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating…
+                </>
               ) : (
-                <span className="ml-2 inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-medium">
-                  {aiStatusLabel}
-                </span>
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate from Brief
+                </>
               )}
+            </Button>
+          </div>
+
+          <input
+            ref={aiSourceInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => { void handleAiSourceFilesPicked(e); }}
+          />
+
+          <p className="text-[11px] text-muted-foreground">{activityBrief.length} / {AI_BRIEF_MAX_CHARS} characters</p>
+
+          {aiSourceFiles.length > 0 && (
+            <ul className="space-y-1.5">
+              {aiSourceFiles.map((file, idx) => (
+                <li
+                  key={`${file.name}-${idx}`}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
+                >
+                  <div className="min-w-0 flex-1 flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs text-foreground truncate">{file.name}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{formatSourceFileSize(file.size)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAiSourceFileRemove(idx)}
+                    disabled={aiGenerating}
+                    className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                    title="Remove file"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {!aiAvailable && aiUnavailableMessage && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2 text-sm text-amber-800">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{aiUnavailableMessage}</span>
             </div>
-            {aiPanelOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
+          )}
 
-          {aiPanelOpen && (
-            <div className="border-t border-border p-6 space-y-5">
-              <p className="text-xs text-muted-foreground">
-                Describe the activity in your own words, attach references if needed, then click <strong>Generate from Brief</strong>. You can still use extracted guided fields and apply suggestions individually.
-              </p>
-
-              <div className="space-y-2">
-                <Textarea
-                  value={activityBrief}
-                  onChange={(e) => setActivityBrief(e.target.value.slice(0, AI_BRIEF_MAX_CHARS))}
-                  placeholder='Describe the activity. Example: "Vendor development review session held at CITD, Guntur on 17 May 2026 with MSME participants. Discussions covered GST compliance, finance facilitation, and export readiness."'
-                  rows={4}
-                  disabled={!aiAvailable || aiGenerating || aiExtracting}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  {activityBrief.length} / {AI_BRIEF_MAX_CHARS} characters
-                </p>
-              </div>
-
-              {!aiAvailable && aiUnavailableMessage && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-900/40 px-3 py-2 flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{aiUnavailableMessage}</span>
-                </div>
-              )}
-
-              {/* Source documents — placed at top so the upload-first workflow is obvious */}
-              <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Source documents (optional)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Attach up to {AI_SOURCE_MAX_FILES} files (JPEG / PNG / PDF — images ≤ 10 MB, PDFs ≤ 20 MB, total ≤ 30 MB).
-                      Use Extract Content to prefill the guided fields; documents are also sent as source material when generating the draft.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!aiAvailable || aiGenerating || aiExtracting || aiSourceFiles.length >= AI_SOURCE_MAX_FILES}
-                    onClick={() => aiSourceInputRef.current?.click()}
-                  >
-                    <Upload className="h-3.5 w-3.5 mr-1" />
-                    Add file
-                  </Button>
-                </div>
-                <input
-                  ref={aiSourceInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,application/pdf"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => { void handleAiSourceFilesPicked(e); }}
-                />
-                {aiSourceFiles.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No source documents attached.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {aiSourceFiles.map((file, idx) => (
-                      <li
-                        key={`${file.name}-${idx}`}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-1.5"
-                      >
-                        <div className="min-w-0 flex-1 flex items-center gap-2">
-                          <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="text-xs text-foreground truncate">{file.name}</span>
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {formatSourceFileSize(file.size)}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAiSourceFileRemove(idx)}
-                          disabled={aiGenerating || aiExtracting}
-                          className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                          title="Remove file"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Explicit extraction step */}
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={aiSourceFiles.length === 0 || !aiAvailable || aiExtracting || aiGenerating}
-                  onClick={() => void runExtraction(aiSourceFiles)}
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1" />
-                  Extract Content
-                </Button>
-                {aiExtracting && (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Extracting fields from documents…
-                  </span>
-                )}
-              </div>
-
-              {/* Inputs grid */}
-              <div className={cn('grid gap-4 sm:grid-cols-2', aiExtracting && 'opacity-60 pointer-events-none')}>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Activity date</label>
-                  <Input
-                    type="date"
-                    value={aiInputs.activity_date}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, activity_date: e.target.value }))}
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                  {aiExtractionChoices.activityDateOptions.length > 1 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {aiExtractionChoices.activityDateOptions.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleSelectExtractedDate(option)}
-                          className={cn(
-                            'rounded-full border px-2 py-0.5 text-[11px] transition-colors',
-                            aiInputs.activity_date === option
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-border bg-background text-muted-foreground hover:text-foreground'
-                          )}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Location</label>
-                  <Input
-                    value={aiInputs.location}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, location: e.target.value }))}
-                    placeholder="e.g. Bengaluru"
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                  {aiExtractionChoices.locationOptions.length > 1 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {aiExtractionChoices.locationOptions.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleSelectExtractedLocation(option)}
-                          className={cn(
-                            'rounded-full border px-2 py-0.5 text-[11px] transition-colors',
-                            aiInputs.location === option
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-border bg-background text-muted-foreground hover:text-foreground'
-                          )}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground">Participants / participant groups</label>
-                  <Textarea
-                    value={aiInputs.participants}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, participants: e.target.value }))}
-                    placeholder="e.g. 45 MSME owners from textiles & engineering sectors; LUB executive committee"
-                    rows={2}
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground">Purpose of the activity</label>
-                  <Textarea
-                    value={aiInputs.purpose}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, purpose: e.target.value }))}
-                    placeholder="What was the activity meant to achieve?"
-                    rows={2}
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Host / organizer</label>
-                  <Input
-                    value={aiInputs.host}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, host: e.target.value }))}
-                    placeholder="e.g. LUB Karnataka Chapter"
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Outcome / takeaway</label>
-                  <Input
-                    value={aiInputs.outcome}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, outcome: e.target.value }))}
-                    placeholder="One-line summary of what was achieved"
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground">Highlights</label>
-                  <Textarea
-                    value={aiInputs.highlights}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, highlights: e.target.value }))}
-                    placeholder="Key moments, notable speakers, panels, sessions, etc."
-                    rows={3}
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="block text-xs font-medium text-muted-foreground">Additional notes</label>
-                  <Textarea
-                    value={aiInputs.additional_notes}
-                    onChange={(e) => setAiInputs((prev) => ({ ...prev, additional_notes: e.target.value }))}
-                    placeholder="Anything else worth mentioning."
-                    rows={2}
-                    disabled={!aiAvailable || aiGenerating || aiExtracting}
-                  />
-                </div>
-              </div>
-
-              {aiError && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 flex items-start gap-2 text-sm text-destructive">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{aiError}</span>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  onClick={() => void handleAiGenerate()}
-                  disabled={!aiAvailable || aiGenerating || aiExtracting}
-                >
-                  {aiGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      {aiSuggestion ? 'Regenerate from Brief' : 'Generate from Brief'}
-                    </>
-                  )}
-                </Button>
-                {aiSuggestion && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAiApplyAll}
-                    disabled={aiGenerating || aiExtracting}
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    Apply All
-                  </Button>
-                )}
-              </div>
-
-              {aiSuggestion && (
-                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggestion</p>
-
-                  {/* Title */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">Title</span>
-                      <Button type="button" size="sm" variant="ghost" onClick={handleAiApplyTitle}>
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Apply
-                      </Button>
-                    </div>
-                    <p className="text-sm font-medium text-foreground bg-background border border-border rounded-md px-3 py-2">
-                      {aiSuggestion.title || <span className="text-muted-foreground italic">No title generated</span>}
-                    </p>
-                  </div>
-
-                  {/* Slug */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">Slug</span>
-                      <Button type="button" size="sm" variant="ghost" onClick={handleAiApplySlug}>
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Apply
-                      </Button>
-                    </div>
-                    <p className="text-sm font-mono text-foreground bg-background border border-border rounded-md px-3 py-2 break-all">
-                      {slugify(aiSuggestion.slug || aiSuggestion.title) || <span className="text-muted-foreground italic">No slug generated</span>}
-                    </p>
-                  </div>
-
-                  {/* Excerpt */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">Excerpt</span>
-                      <Button type="button" size="sm" variant="ghost" onClick={handleAiApplyExcerpt}>
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Apply
-                      </Button>
-                    </div>
-                    <p className="text-sm text-foreground bg-background border border-border rounded-md px-3 py-2 whitespace-pre-wrap">
-                      {aiSuggestion.excerpt || <span className="text-muted-foreground italic">No excerpt generated</span>}
-                    </p>
-                  </div>
-
-                  {/* Description */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">Description</span>
-                      <Button type="button" size="sm" variant="ghost" onClick={handleAiApplyDescription}>
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Apply
-                      </Button>
-                    </div>
-                    <p className="text-sm text-foreground bg-background border border-border rounded-md px-3 py-2 whitespace-pre-wrap max-h-64 overflow-auto">
-                      {aiSuggestion.description || <span className="text-muted-foreground italic">No description generated</span>}
-                    </p>
-                  </div>
-                </div>
-              )}
+          {aiError && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 flex items-start gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{aiError}</span>
             </div>
           )}
         </div>
-
-        {/* ─── Section 1: Core details ─────────────────────── */}
+        {/* --- Section 1: Core details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-5">
           <div className="flex items-center gap-2 text-base font-semibold">
             <FileText className="h-4 w-4 text-primary" />
@@ -1782,7 +1372,7 @@ const AdminActivityForm: React.FC = () => {
           </div>
         </div>
 
-        {/* ─── Section 2: Media ────────────────────────────── */}
+        {/* â”€â”€â”€ Section 2: Media â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-6">
           <div className="flex items-center gap-2 text-base font-semibold">
             <ImageIcon className="h-4 w-4 text-primary" />
@@ -1869,7 +1459,7 @@ const AdminActivityForm: React.FC = () => {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Drag to reorder. Max {limits.maxGalleryImages} photos.
-                  Pick a ratio inside the crop tool — Original keeps the native aspect.
+                  Pick a ratio inside the crop tool â€” Original keeps the native aspect.
                 </p>
               </div>
               <Button
@@ -2015,7 +1605,7 @@ const AdminActivityForm: React.FC = () => {
           </div>
         </div>
 
-        {/* ─── Footer actions ──────────────────────────────── */}
+        {/* â”€â”€â”€ Footer actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
           <div className="flex items-center gap-2">
             {isEdit && canDelete && originalStatus !== 'published' && (
@@ -2093,7 +1683,7 @@ const AdminActivityForm: React.FC = () => {
         />
       )}
 
-      {/* Gallery crop modal — ratio chooser lives inside the modal now */}
+      {/* Gallery crop modal â€” ratio chooser lives inside the modal now */}
       {galleryCropSrc && (() => {
         const queueSize = galleryQueue.length;
         const queuedSuffix = queueSize > 1 ? ` (${queueSize} remaining)` : '';
@@ -2117,6 +1707,9 @@ const AdminActivityForm: React.FC = () => {
 };
 
 export default AdminActivityForm;
+
+
+
 
 
 
