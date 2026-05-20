@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
@@ -46,6 +46,16 @@ interface MemberRegistration {
   is_active?: boolean;
   rejection_reason?: string;
   member_id?: string;
+  // Extended fields returned by the RPC and used for smart search
+  company_address?: string | null;
+  city?: string | null;
+  brand_names?: string | null;
+  gst_number?: string | null;
+  pan_company?: string | null;
+  pin_code?: string | null;
+  alternate_contact_name?: string | null;
+  alternate_mobile?: string | null;
+  website?: string | null;
 }
 
 interface RegistrationRpcRow extends Omit<MemberRegistration, 'company_designations'> {
@@ -83,6 +93,8 @@ const AdminRegistrations: React.FC = () => {
   const [filteredRegistrations, setFilteredRegistrations] = useState<MemberRegistration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -189,24 +201,48 @@ const AdminRegistrations: React.FC = () => {
   const filterRegistrations = useCallback(() => {
     let filtered = registrations;
 
-    // Filter by status
+    // Status filter is always applied immediately (no debounce)
     if (statusFilter !== 'all') {
       filtered = filtered.filter(reg => reg.status === statusFilter);
     }
 
-    // Filter by search term
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(reg =>
-        reg.full_name.toLowerCase().includes(term) ||
-        reg.email.toLowerCase().includes(term) ||
-        reg.mobile_number.includes(term) ||
-        (reg.member_id && reg.member_id.toLowerCase().includes(term))
-      );
+    // Smart AND-token search across all available fields.
+    // Each whitespace-separated token must appear somewhere in the combined
+    // search blob — matches name, email, mobile, company, address, city,
+    // district, state, products/services, member ID, GST, PAN, referrer, etc.
+    if (debouncedSearchTerm.trim()) {
+      const tokens = debouncedSearchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      filtered = filtered.filter(reg => {
+        const blob = [
+          reg.full_name,
+          reg.email,
+          reg.mobile_number,
+          reg.company_name,
+          reg.member_id,
+          reg.district,
+          reg.state,
+          reg.pin_code,
+          reg.products_services,
+          reg.referred_by,
+          reg.company_address,
+          reg.city,
+          reg.brand_names,
+          reg.gst_number,
+          reg.pan_company,
+          reg.alternate_contact_name,
+          reg.alternate_mobile,
+          reg.website,
+          reg.company_designations?.designation_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return tokens.every(tok => blob.includes(tok));
+      });
     }
 
     setFilteredRegistrations(filtered);
-  }, [registrations, searchTerm, statusFilter]);
+  }, [registrations, debouncedSearchTerm, statusFilter]);
 
   useEffect(() => {
     void loadRegistrations();
@@ -215,6 +251,13 @@ const AdminRegistrations: React.FC = () => {
   useEffect(() => {
     filterRegistrations();
   }, [filterRegistrations]);
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message, isVisible: true });
@@ -561,9 +604,14 @@ const AdminRegistrations: React.FC = () => {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search by name, email, or mobile number..."
+              placeholder="Search by name, email, mobile, company, address, products…"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchTerm(value);
+                if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                searchTimerRef.current = setTimeout(() => setDebouncedSearchTerm(value), 300);
+              }}
               className="pl-9"
             />
           </div>
@@ -597,7 +645,7 @@ const AdminRegistrations: React.FC = () => {
           <Users className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
           <h3 className="text-sm font-medium text-foreground mb-1">No registrations found</h3>
           <p className="text-sm text-muted-foreground">
-            {searchTerm || statusFilter !== 'all'
+            {debouncedSearchTerm || statusFilter !== 'all'
               ? 'Try adjusting your search or filter criteria'
               : 'No member registrations have been submitted yet'}
           </p>

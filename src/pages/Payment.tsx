@@ -212,11 +212,11 @@ const Payment: React.FC = () => {
                       </h3>
                       <div className="text-center">
                         <p className="text-muted-foreground mb-4">Scan QR Code directly using your mobile</p>
-                        <div className="bg-card rounded-lg p-4 inline-block shadow-sm border border-border">
+                        <div className="mx-auto w-full max-w-xs sm:max-w-sm bg-card rounded-lg p-3 shadow-sm border border-border">
                           <img
                             src={displayedPaymentDetails.qr_code_image_url}
                             alt={`QR Code for ${displayedPaymentDetails.state} payment`}
-                            className="w-48 h-48 object-cover rounded-lg max-w-full"
+                            className="block w-full h-auto object-contain rounded-md"
                           />
                         </div>
                       </div>

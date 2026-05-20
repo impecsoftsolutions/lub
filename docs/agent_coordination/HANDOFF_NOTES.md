@@ -11,7 +11,60 @@ Do not edit task rows in any local board copies.
 
 No active slice.
 
-## Closed Slice - COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090
+## Closed Slice - COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091
+
+### What changed
+
+**`supabase/migrations/20260520110000_member_registrations_smart_search_091.sql`:**
+- `CREATE OR REPLACE FUNCTION get_admin_member_registrations(...)` — replaces 4-field ILIKE OR search with:
+  - `concat_ws` blob of 18 fields: full_name, email, mobile_number, company_name, company_address, city, district, state, pin_code, products_services, brand_names, website, referred_by, member_id, gst_number, pan_company, alternate_contact_name, alternate_mobile
+  - AND-token matching: `unnest(string_to_array(trim(p_search_query), ' ')) AS tok` + `bool_and(lower(blob) LIKE '%' || lower(tok) || '%')`
+  - Empty/whitespace tokens filtered via `WHERE length(trim(tok)) > 0`
+- `NOTIFY pgrst, 'reload schema'`
+- Session wrapper `get_admin_member_registrations_with_session` unchanged (delegates to base function)
+
+**`src/pages/AdminRegistrations.tsx`:**
+- Added `useRef` to React import
+- Extended `MemberRegistration` interface: `company_address?`, `city?`, `brand_names?`, `gst_number?`, `pan_company?`, `pin_code?`, `alternate_contact_name?`, `alternate_mobile?`, `website?`
+- Added `debouncedSearchTerm` state + `searchTimerRef` ref
+- Replaced 4-field client-side filter with AND-token blob across 19 fields (including `company_designations?.designation_name`)
+- Search Input `onChange`: updates `searchTerm` immediately (for responsive input), debounces `debouncedSearchTerm` by 300ms
+- Cleanup `useEffect` clears timer on unmount
+- Updated placeholder: "Search by name, email, mobile, company, address, products…"
+- Empty-state condition uses `debouncedSearchTerm` (was `searchTerm`)
+
+### Files touched
+
+- `supabase/migrations/20260520110000_member_registrations_smart_search_091.sql` (new)
+- `src/pages/AdminRegistrations.tsx`
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected shadcn warnings)
+- `npm run build` PASS
+- `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped)
+
+### Runtime
+
+- Applied: `supabase db push --linked` → `20260520110000_member_registrations_smart_search_091.sql` OK
+- 7/7 runtime probes PASS:
+
+| Probe | Query | Result |
+|-------|-------|--------|
+| P1 company-name (bug case) | "Kanakadurga" | 1 row ✓ |
+| P2 full_name | "Atluri" | 2 rows ✓ |
+| P3 email prefix | "power" | 4 rows ✓ |
+| P4 mobile fragment | "4418" | 3 rows ✓ |
+| P5 AND-token company+state | "Power Andhra Pradesh" | 4 rows ✓ |
+| P6 AND-token name+district | "Atluri Visakhapatnam" | 1 row ✓ |
+| P7 no match | "zzznotamatch99xqq" | 0 rows ✓ |
+
+### Residual risks
+
+- AND-token search across 18 fields via `concat_ws` + `unnest`/`bool_and` is correct and safe for the current row count (< 5000). No index added — full-scan is acceptable at this scale. If row count grows to 50k+, a GIN trigram index on a generated column would improve performance.
+- Client-side debounce (300ms) means there's a brief lag between typing and results updating. This is intentional — keeps keystrokes from thrashing the filter on every character.
+
+## Previously Closed - COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090
 
 ### What changed
 

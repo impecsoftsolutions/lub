@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-20  
-**Updated by:** Claude (COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090 complete)
+**Updated by:** Claude (COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091 complete)
 
 ---
 
@@ -26,11 +26,19 @@
 
 ## Active Stream
 
-**Active stream:** None. COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090 complete and deployed.
+**Active stream:** None. COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091 complete and deployed.
 
 ---
 
 ## Last Verified
+
+- **When:** 2026-05-20
+- **What:** `COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091` — smart search across all member registration fields with AND-token matching in `get_admin_member_registrations`.
+- **Deploy/apply commands run:** `supabase db push --linked` — applied `20260520110000_member_registrations_smart_search_091.sql` OK.
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:** 7/7 PASS — "Kanakadurga" → 1 row (bug fixed), AND-token company+state → 4 rows, AND-token name+district → 1 row, garbage → 0 rows.
+
+## Previous Verified (090)
 
 - **When:** 2026-05-20
 - **What:** `COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090` — deterministic excerpt/description lead-distinctness enforcement in `draft-activity-content`.
@@ -74,6 +82,13 @@ Runtime notes:
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 091 Admin Member Registrations smart search — all fields + AND-token matching
+
+- Runtime-closed on 2026-05-20.
+- Migration `20260520110000_member_registrations_smart_search_091.sql`: replaces 4-field OR-search in `get_admin_member_registrations` with `concat_ws` blob across 18 fields + AND-token matching via `unnest(string_to_array(…,' '))` + `bool_and(LIKE)`. Session wrapper unchanged (delegates automatically).
+- `AdminRegistrations.tsx`: extends `MemberRegistration` interface with `company_address`, `city`, `brand_names`, `gst_number`, `pan_company`, `pin_code`, `alternate_contact_name`, `alternate_mobile`, `website`; replaces 4-field client-side filter with AND-token blob across 19 fields; adds 300 ms debounce via `useRef`; updates placeholder text.
+- Bug fixed: searching "Kanakadurga" (company name) now returns results (was returning 0).
 
 ### 090 Activity AI excerpt/description distinct lead enforcement
 
