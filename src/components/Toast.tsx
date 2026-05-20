@@ -33,7 +33,7 @@ const Toast: React.FC<ToastProps> = ({
   const iconColor = type === 'success' ? 'text-green-500' : 'text-red-500';
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+    <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-2 duration-300">
       <div className={`max-w-md w-full ${bgColor} border rounded-lg shadow-lg p-4`}>
         <div className="flex items-start">
           <div className="flex-shrink-0">

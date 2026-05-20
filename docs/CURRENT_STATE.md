@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-20  
-**Updated by:** Claude (COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091 complete)
+**Last updated:** 2026-05-21  
+**Updated by:** Claude (093x hotfix; Toast z-index fix; alternate mobile now editable in Add Assignment modal)
 
 ---
 
@@ -26,11 +26,27 @@
 
 ## Active Stream
 
-**Active stream:** None. COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091 complete and deployed.
+**Active stream:** None. COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093 complete and deployed.
 
 ---
 
 ## Last Verified
+
+- **When:** 2026-05-21
+- **What:** `COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093` + hotfix `093x` — alternate contact mobile + optional photo snapshots on leadership page for alternate assignments. Hotfix corrects `is_deleted` → `is_active` column reference in `admin_assign_member_lub_role`. `Toast` z-index raised from `z-50` to `z-[9999]` to fix toast messages hidden behind modal backdrops.
+- **Deploy/apply commands run:** `supabase db push --linked` — applied `20260520123000_alternate_contact_mobile_photo_leadership_093.sql` OK + `20260521000000_fix_assign_member_lub_role_is_deleted_093x.sql` OK.
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:** 6 probes still to confirm (Codex verification) — schema cols on new rows, backfill on existing alternate rows, admin list 25 cols, create new alternate assignment, leadership RPC 22 cols, main assignment regression clean. Core `Add Assignment` functionality should now work (was blocked by `is_deleted` column error).
+
+## Previous Verified (092)
+
+- **When:** 2026-05-20
+- **What:** `COD-DESIGNATIONS-ALTERNATE-CONTACT-ROLE-ASSIGNMENT-092` — alternate contact role assignment in Admin Designations, with kind-aware search, badges, leadership page rendering.
+- **Deploy/apply commands run:** `supabase db push --linked` — applied `20260520120000_member_lub_role_assignments_assignee_kind_092.sql` OK.
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:** 7/7 PASS — schema columns accessible, existing rows defaulted to `main`, leadership RPC returns new columns, admin get RPC auth check works, assign RPC accepts new params, validation order correct.
+
+## Previous Verified (091)
 
 - **When:** 2026-05-20
 - **What:** `COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091` — smart search across all member registration fields with AND-token matching in `get_admin_member_registrations`.
@@ -82,6 +98,24 @@ Runtime notes:
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 093 Alternate contact mobile + photo on leadership page (+ 093x hotfix)
+
+- Migration applied 2026-05-20; hotfix 093x applied 2026-05-21. 6 runtime probes pending.
+- Migration `20260520123000_alternate_contact_mobile_photo_leadership_093.sql`: adds `alternate_contact_mobile_snapshot` and `alternate_contact_photo_url_snapshot` (both nullable text) to `member_lub_role_assignments`. Backfills mobile from `member_registrations.alternate_mobile` for existing alternate rows (photo stays NULL). Recreates 5 RPCs: `admin_assign_member_lub_role` (13 args, new p_alternate_mobile/p_alternate_photo_url; mobile uses COALESCE(provided, member_registrations.alternate_mobile); photo uses NULLIF(provided,'')), `admin_assign_member_lub_role_with_session` (pass-through, 13 params), `admin_get_member_lub_role_assignments` (25 cols, search also includes alternate mobile snapshot), `admin_get_member_lub_role_assignments_with_session` (delegates), `get_public_leadership_assignments` (22 cols).
+- **Hotfix `20260521000000_fix_assign_member_lub_role_is_deleted_093x.sql`:** The 093 migration had a latent bug — `admin_assign_member_lub_role` body referenced `member_registrations.is_deleted` (doesn't exist; table uses `is_active`). This caused every `Add Assignment` attempt to fail with `column "is_deleted" does not exist`. Fixed: `WHERE id = p_member_id AND (is_active IS NULL OR is_active = true)`. Also re-GRANTs and `NOTIFY pgrst`.
+- **Toast fix `src/components/Toast.tsx`:** `z-50` raised to `z-[9999]` — modal backdrops also use z-50 and are rendered later in DOM; previously the modal sat on top of the toast, making all error/success toasts invisible while a modal was open.
+- `src/lib/supabase.ts`: added `alternate_mobile` to `MemberRoleCandidate`; added `alternate_contact_mobile_snapshot`/`alternate_contact_photo_url_snapshot` to `MemberLubRoleAssignment` + `MemberLubRoleAssignmentRpcRow`; updated `getAllAssignments` mapping; updated `createAssignment` params + RPC call with `p_alternate_mobile`/`p_alternate_photo_url`; `searchMemberCandidates` now fetches `alternate_mobile` and includes it on alternate candidate rows.
+- `AdminDesignationsManagement.tsx`: `assignmentForm` gains `alternate_photo_url`; alternate section shows read-only mobile (from selectedCandidate) + optional editable photo URL input; `handleAddAssignment` passes `alternate_mobile` from selectedCandidate and `alternate_photo_url` from form; `resetAssignmentForm` + clear button both reset `alternate_photo_url`; assignments table shows `alternate_contact_mobile_snapshot` (or '—') for alternate rows.
+- `Leadership.tsx`: added both new snapshot fields to `LeadershipAssignment` + `GroupedRole.members`; `groupAssignmentsByRole` passes both; card rendering: alternate → `photoUrl = alternate_contact_photo_url_snapshot || null`; `mobileNumber = alternate_contact_mobile_snapshot` (never main member mobile for alternate); mobile link hidden when `mobileNumber` is null/empty.
+
+### 092 Alternate contact role assignment in Admin Designations
+
+- Runtime-closed on 2026-05-20.
+- Migration `20260520120000_member_lub_role_assignments_assignee_kind_092.sql`: adds `assignee_kind` (NOT NULL DEFAULT 'main' CHECK ('main'|'alternate')) and `alternate_contact_name_snapshot` to `member_lub_role_assignments`. Replaces old unique constraint with `member_lub_role_assignments_unique_per_kind` index (includes `assignee_kind` so main+alternate can coexist). Recreates 5 RPCs: `admin_assign_member_lub_role` (11 args, new p_assignee_kind/p_alternate_contact_name, per-kind duplicate check), `admin_assign_member_lub_role_with_session` (pass-through), `admin_get_member_lub_role_assignments` (new columns in RETURNS TABLE/SELECT, search includes snapshot), `admin_get_member_lub_role_assignments_with_session` (delegates to updated base), `get_public_leadership_assignments` (new columns).
+- `src/lib/supabase.ts`: added `MemberRoleCandidate` export; updated `MemberLubRoleAssignment` + `MemberLubRoleAssignmentRpcRow` with new fields; updated `getAllAssignments` mapping; updated `createAssignment` to pass `p_assignee_kind`/`p_alternate_contact_name`; added `searchMemberCandidates` (searches alternate_contact_name, expands to main+alternate candidate rows).
+- `AdminDesignationsManagement.tsx`: search calls `searchMemberCandidates`; dropdown shows kind badges + secondary_text; selected card shows kind badge + alternate advisory; form tracks `assignee_kind`/`alternate_contact_name`; assignments table shows alternate name for alternate rows with "for [main]" subtitle.
+- `Leadership.tsx`: alternate assignments use `alternate_contact_name_snapshot` as display name, `photoUrl=null` (never shows main member's photo for alternate), no gender prefix.
 
 ### 091 Admin Member Registrations smart search — all fields + AND-token matching
 

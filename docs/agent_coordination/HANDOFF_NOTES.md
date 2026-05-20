@@ -11,7 +11,170 @@ Do not edit task rows in any local board copies.
 
 No active slice.
 
-## Closed Slice - COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091
+## Closed Slice - COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093 (+ 093x hotfix)
+
+### Additional changes in 093x (2026-05-21)
+
+**`supabase/migrations/20260521000000_fix_assign_member_lub_role_is_deleted_093x.sql`** — applied 2026-05-21:
+- Root cause: 093 migration recreated `admin_assign_member_lub_role` with `WHERE id = p_member_id AND (is_deleted IS NULL OR is_deleted = false)` — but `member_registrations` uses `is_active` (boolean), not `is_deleted`. This error was latent since before 092; both 092 and 093 carried it forward because the member-validation block wasn't changed in those slices.
+- Fix: `WHERE id = p_member_id AND (is_active IS NULL OR is_active = true)`. Same 13-param signature. Re-GRANTs on base + session wrapper. `NOTIFY pgrst`.
+- Applied via `supabase db push --linked` — confirmed OK.
+
+**`src/components/Toast.tsx`:**
+- Changed `z-50` → `z-[9999]` on the outermost `<div>`.
+- Root cause: Both `Toast` (rendered early in DOM at ~line 1058) and modal backdrops use `z-50`. Later-rendered elements win in the CSS stacking context, so the modal backdrop was sitting on top of the toast, making all toasts invisible while a modal was open. This caused the `is_deleted` runtime error to appear silent — the error toast was there, just invisible.
+- Fix is global; affects all pages that use the shared `Toast` component.
+
+### Original 093 changes
+
+**`supabase/migrations/20260520123000_alternate_contact_mobile_photo_leadership_093.sql`:**
+- `ALTER TABLE member_lub_role_assignments ADD COLUMN IF NOT EXISTS alternate_contact_mobile_snapshot text`
+- `ALTER TABLE member_lub_role_assignments ADD COLUMN IF NOT EXISTS alternate_contact_photo_url_snapshot text`
+- Backfill: `UPDATE ... SET alternate_contact_mobile_snapshot = NULLIF(trim(mr.alternate_mobile),'') ... WHERE assignee_kind='alternate'`
+- Recreated `admin_assign_member_lub_role` — now 13 params (added `p_alternate_mobile`, `p_alternate_photo_url`); mobile snapshot = `COALESCE(NULLIF(p_alternate_mobile,''), member_registrations.alternate_mobile)`; photo snapshot = `NULLIF(p_alternate_photo_url,'')`
+- Recreated `admin_assign_member_lub_role_with_session` — 13 params, pass-through
+- Recreated `admin_get_member_lub_role_assignments` — 25 cols RETURNS TABLE (adds both snapshots); search also matches alternate mobile snapshot
+- Recreated `admin_get_member_lub_role_assignments_with_session` — 25 cols, delegates to base
+- Recreated `get_public_leadership_assignments` — 22 cols RETURNS TABLE (adds both snapshots)
+- `NOTIFY pgrst, 'reload schema'`
+
+**`src/lib/supabase.ts`:**
+- `MemberRoleCandidate`: added `alternate_mobile: string | null`
+- `MemberLubRoleAssignment`: added `alternate_contact_mobile_snapshot?`, `alternate_contact_photo_url_snapshot?`
+- `MemberLubRoleAssignmentRpcRow`: added same
+- `getAllAssignments` mapping: includes both new snapshots
+- `createAssignment`: accepts `alternate_mobile?`, `alternate_photo_url?`; passes `p_alternate_mobile`, `p_alternate_photo_url` to RPC
+- `searchMemberCandidates`: now fetches `alternate_mobile` from member_registrations; main candidate has `alternate_mobile: null`; alternate candidate has `alternate_mobile: row.alternate_mobile?.trim() || null`
+
+**`src/pages/AdminDesignationsManagement.tsx`:**
+- `assignmentForm` gains `alternate_photo_url: ''`
+- `resetAssignmentForm` + clear-selected-member button both reset `alternate_photo_url`
+- Alternate section (after advisory note): shows read-only mobile from `selectedCandidate.alternate_mobile` (if present) + optional editable photo URL input
+- `handleAddAssignment`: passes `alternate_mobile` from `selectedCandidate` and `alternate_photo_url` from form
+- Assignments table: alternate rows show `assignment.alternate_contact_mobile_snapshot || '—'` below email
+
+**`src/pages/Leadership.tsx`:**
+- `LeadershipAssignment` + `GroupedRole.members`: added `alternate_contact_mobile_snapshot?`, `alternate_contact_photo_url_snapshot?`
+- `groupAssignmentsByRole`: passes both new fields
+- Card rendering: `mobileNumber = isAlternate ? member.alternate_contact_mobile_snapshot : member.member_mobile_number`; mobile tel link hidden when `mobileNumber` is null/empty; `photoUrl = isAlternate ? (member.alternate_contact_photo_url_snapshot || null) : member.member_profile_photo_url`
+
+### Files touched
+
+- `supabase/migrations/20260520123000_alternate_contact_mobile_photo_leadership_093.sql` (new)
+- `supabase/migrations/20260521000000_fix_assign_member_lub_role_is_deleted_093x.sql` (new — hotfix)
+- `src/lib/supabase.ts`
+- `src/pages/AdminDesignationsManagement.tsx`
+- `src/pages/Leadership.tsx`
+- `src/components/Toast.tsx` (z-index fix)
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected shadcn warnings)
+- `npm run build` PASS
+- `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped)
+
+### Runtime
+
+- Applied: `supabase db push --linked`:
+  - `20260520123000_alternate_contact_mobile_photo_leadership_093.sql` OK (2026-05-20)
+  - `20260521000000_fix_assign_member_lub_role_is_deleted_093x.sql` OK (2026-05-21)
+- **`Add Assignment` should now work** — the `is_deleted` column error is fixed and toasts are visible.
+- 6 runtime probes to perform (Codex verification):
+
+| Probe | What | Expected |
+|-------|------|---------|
+| P1 schema | `alternate_contact_mobile_snapshot`, `alternate_contact_photo_url_snapshot` present on table | ✓ columns exist |
+| P2 backfill | Existing alternate rows have `alternate_contact_mobile_snapshot` populated from member_registrations | ✓ value matches `alternate_mobile` in member row |
+| P3 admin list | `admin_get_member_lub_role_assignments_with_session` returns new cols for existing rows | ✓ 25 cols |
+| P4 assign new | Create new alternate assignment with `p_alternate_mobile` + `p_alternate_photo_url` → snapshots stored | ✓ both snapshotted |
+| P5 leadership RPC | `get_public_leadership_assignments` returns both new cols | ✓ 22 cols |
+| P6 main regression | Existing main assignment: both new snapshot cols NULL, mobile is member mobile | ✓ no regression |
+
+### Residual notes
+
+- Photo URL is user-provided at assignment creation time only (no auto-fill from member profile — `member_registrations.alternate_contact_photo_url` column doesn't exist). Admin must paste a URL when assigning.
+- Mobile is auto-filled from `member_registrations.alternate_mobile` if the caller doesn't supply `p_alternate_mobile`. Admin-provided value takes precedence (COALESCE order).
+- Snapshots are point-in-time copies. If the member updates their alternate contact details later, existing assignments' snapshots won't change.
+
+## Closed Slice - COD-DESIGNATIONS-ALTERNATE-CONTACT-ROLE-ASSIGNMENT-092
+
+### What changed
+
+**`supabase/migrations/20260520120000_member_lub_role_assignments_assignee_kind_092.sql`:**
+- `ALTER TABLE member_lub_role_assignments ADD COLUMN assignee_kind text NOT NULL DEFAULT 'main' CHECK ('main'|'alternate')`
+- `ALTER TABLE member_lub_role_assignments ADD COLUMN alternate_contact_name_snapshot text`
+- `DROP CONSTRAINT IF EXISTS member_lub_role_assignments_member_id_role_id_level_state_district_key` (old, truncated by PG)
+- `CREATE UNIQUE INDEX member_lub_role_assignments_unique_per_kind ON (..., assignee_kind)` — includes assignee_kind so main+alternate can coexist for same member+role+level
+- `DROP FUNCTION + CREATE FUNCTION admin_assign_member_lub_role` — new 11-arg signature adds `p_assignee_kind`, `p_alternate_contact_name`; duplicate check includes `assignee_kind`; INSERT writes both new columns
+- `DROP FUNCTION + CREATE FUNCTION admin_assign_member_lub_role_with_session` — passes new params through
+- `DROP FUNCTION + CREATE FUNCTION admin_get_member_lub_role_assignments` — adds `assignee_kind`, `alternate_contact_name_snapshot` to RETURNS TABLE + SELECT; search also matches `alternate_contact_name_snapshot`
+- `DROP FUNCTION + CREATE FUNCTION admin_get_member_lub_role_assignments_with_session` — delegates to updated base function
+- `DROP FUNCTION + CREATE FUNCTION get_public_leadership_assignments` — adds `assignee_kind`, `alternate_contact_name_snapshot` to RETURNS TABLE + SELECT
+- `NOTIFY pgrst, 'reload schema'`
+
+**`src/lib/supabase.ts`:**
+- Added exported `MemberRoleCandidate` interface
+- Updated `MemberLubRoleAssignment`: added `assignee_kind?`, `alternate_contact_name_snapshot?`
+- Updated `MemberLubRoleAssignmentRpcRow`: added `assignee_kind?`, `alternate_contact_name_snapshot?`
+- Updated `getAllAssignments` mapping: includes `assignee_kind`, `alternate_contact_name_snapshot`
+- Updated `createAssignment`: accepts `assignee_kind?`, `alternate_contact_name?`; passes `p_assignee_kind`, `p_alternate_contact_name` to RPC
+- Added `searchMemberCandidates(searchTerm)`: queries `member_registrations` including `alternate_contact_name`, expands each member into 'main' + 'alternate' `MemberRoleCandidate` rows; kept `searchMembers` unchanged (bulk flow)
+
+**`src/pages/AdminDesignationsManagement.tsx`:**
+- Import `MemberRoleCandidate`
+- `memberSearchResults` state type changed to `MemberRoleCandidate[]`
+- Added `selectedCandidate: MemberRoleCandidate | null` state
+- `assignmentForm` gains `assignee_kind: 'main' | 'alternate'` and `alternate_contact_name: string`
+- `searchMembers` now calls `searchMemberCandidates`
+- `handleMemberSelect(candidate: MemberRoleCandidate)`: sets `selectedCandidate`, populates `selectedMember` for display (alternate name used as full_name), updates `assignmentForm.assignee_kind` and `alternate_contact_name`
+- `resetAssignmentForm`: resets new fields and clears `selectedCandidate`
+- `handleAddAssignment`: passes `assignee_kind` and `alternate_contact_name` to `createAssignment`
+- Search results dropdown: shows Main/Alternate kind badges + `secondary_text`
+- Selected member card: shows kind badge + "Alternate for [main name]" subtitle + advisory note for alternate
+- Assignments table: shows alternate contact name (not main name) for alternate rows, adds "Alternate" badge, shows "for [main name]" subtitle
+- Search placeholder updated to mention alternate contact
+
+**`src/pages/Leadership.tsx`:**
+- `LeadershipAssignment` interface: added `assignee_kind?`, `alternate_contact_name_snapshot?`
+- `GroupedRole.members` type: added `assignee_kind?`, `alternate_contact_name_snapshot?`
+- `groupAssignmentsByRole`: passes both new fields into member list
+- Card rendering: alternate assignments use `alternate_contact_name_snapshot` as display name, set `photoUrl = null` (never shows main member's photo), no gender prefix for alternate
+
+### Files touched
+
+- `supabase/migrations/20260520120000_member_lub_role_assignments_assignee_kind_092.sql` (new)
+- `src/lib/supabase.ts`
+- `src/pages/AdminDesignationsManagement.tsx`
+- `src/pages/Leadership.tsx`
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected shadcn warnings)
+- `npm run build` PASS
+- `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped)
+
+### Runtime
+
+- Applied: `supabase db push --linked` → `20260520120000_member_lub_role_assignments_assignee_kind_092.sql` OK
+- NOTE: old unique constraint name was auto-truncated by PG (>63 chars), so the IF NOT EXISTS DROP produced `does not exist, skipping` — expected; new unique index `member_lub_role_assignments_unique_per_kind` was created correctly.
+- 7/7 runtime probes PASS:
+
+| Probe | What | Result |
+|-------|------|--------|
+| P1 schema columns | `assignee_kind`, `alternate_contact_name_snapshot` accessible | ✓ |
+| P2 existing rows | All existing rows defaulted to `assignee_kind='main'` | ✓ |
+| P3 leadership RPC | Returns `assignee_kind` + `alternate_contact_name_snapshot` in rows | ✓ |
+| P4 admin get RPC | Auth check works, schema valid | ✓ |
+| P5 assign RPC new params | `p_assignee_kind` + `p_alternate_contact_name` accepted, auth check fires | ✓ |
+| P6 business validation order | User ID check fires before assignee_kind validation (correct order) | ✓ |
+| P7 invalid kind check | Validation chain runs correctly | ✓ |
+
+### Residual risks
+
+- `alternate_contact_name_snapshot` is a point-in-time copy taken at assignment creation. If the member updates their alternate contact name later, the snapshot won't change. This is intentional (same as how role assignment stores member name at time of assignment — it's a snapshot by design).
+- The leadership page previously showed the main member's mobile for alternate assignments. This is resolved in 093 (`alternate_contact_mobile_snapshot`).
+
+## Previously Closed - COD-MEMBERS-REGISTRATION-SMART-SEARCH-ALL-FIELDS-091
 
 ### What changed
 

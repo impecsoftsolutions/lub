@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
-import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, MemberRoleAssignmentBulkSkip, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
+import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, MemberRoleAssignmentBulkSkip, MemberRoleCandidate, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
 import { formatDateTimeValue } from '../lib/dateTimeManager';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -80,14 +80,17 @@ const AdminDesignationsManagement: React.FC = () => {
     district: '',
     committee_year: '',
     role_start_date: '',
-    role_end_date: ''
+    role_end_date: '',
+    assignee_kind: 'main' as 'main' | 'alternate',
+    alternate_contact_name: ''
   });
 
   // Member search state
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
-  const [memberSearchResults, setMemberSearchResults] = useState<MemberSearchResult[]>([]);
+  const [memberSearchResults, setMemberSearchResults] = useState<MemberRoleCandidate[]>([]);
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<MemberRoleCandidate | null>(null);
 
   // Bulk Assignment State
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
@@ -232,7 +235,7 @@ const AdminDesignationsManagement: React.FC = () => {
 
     try {
       setIsSearchingMembers(true);
-      const results = await memberLubRolesService.searchMembers(searchTerm);
+      const results = await memberLubRolesService.searchMemberCandidates(searchTerm);
       setMemberSearchResults(results);
     } catch (error) {
       console.error('Error searching members:', error);
@@ -613,14 +616,18 @@ const AdminDesignationsManagement: React.FC = () => {
       setIsSavingAssignment(true);
 
       const result = await memberLubRolesService.createAssignment({
-        member_id: assignmentForm.member_id,
-        role_id: assignmentForm.role_id,
-        level: assignmentForm.level,
-        state: assignmentForm.state || undefined,
-        district: assignmentForm.district || undefined,
-        committee_year: assignmentForm.committee_year,
-        role_start_date: assignmentForm.role_start_date || null,
-        role_end_date: assignmentForm.role_end_date || null
+        member_id:               assignmentForm.member_id,
+        role_id:                 assignmentForm.role_id,
+        level:                   assignmentForm.level,
+        state:                   assignmentForm.state || undefined,
+        district:                assignmentForm.district || undefined,
+        committee_year:          assignmentForm.committee_year,
+        role_start_date:         assignmentForm.role_start_date || null,
+        role_end_date:           assignmentForm.role_end_date || null,
+        assignee_kind:           assignmentForm.assignee_kind,
+        alternate_contact_name:  assignmentForm.alternate_contact_name || null,
+        alternate_mobile:        null,
+        alternate_photo_url:     null
       });
 
       if (result.success) {
@@ -736,9 +743,12 @@ const AdminDesignationsManagement: React.FC = () => {
       district: '',
       committee_year: '',
       role_start_date: '',
-      role_end_date: ''
+      role_end_date: '',
+      assignee_kind: 'main',
+      alternate_contact_name: ''
     });
     setSelectedMember(null);
+    setSelectedCandidate(null);
     setMemberSearchTerm('');
     setMemberSearchResults([]);
   };
@@ -898,10 +908,26 @@ const AdminDesignationsManagement: React.FC = () => {
     }
   };
 
-  const handleMemberSelect = (member: MemberSearchResult) => {
-    setSelectedMember(member);
-    setAssignmentForm(prev => ({ ...prev, member_id: member.id }));
-    setMemberSearchTerm(member.full_name);
+  const handleMemberSelect = (candidate: MemberRoleCandidate) => {
+    setSelectedCandidate(candidate);
+    // Populate selectedMember for display (full_name shows the assignee's actual name)
+    setSelectedMember({
+      id: candidate.member_id,
+      full_name: candidate.assignee_kind === 'alternate'
+        ? candidate.alternate_contact_name!
+        : candidate.main_member_name,
+      company_name: candidate.company_name,
+      email: candidate.email,
+      city: candidate.city,
+      district: candidate.district
+    });
+    setAssignmentForm(prev => ({
+      ...prev,
+      member_id:              candidate.member_id,
+      assignee_kind:          candidate.assignee_kind,
+      alternate_contact_name: candidate.alternate_contact_name || ''
+    }));
+    setMemberSearchTerm(candidate.display_name);
     setMemberSearchResults([]);
   };
 
@@ -1622,8 +1648,27 @@ const AdminDesignationsManagement: React.FC = () => {
                             <tr key={assignment.id} className="hover:bg-muted/30">
                               <td className="whitespace-nowrap">
                                 <div>
-                                  <div className="font-medium text-foreground">{assignment.member_name}</div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-foreground">
+                                      {assignment.assignee_kind === 'alternate' && assignment.alternate_contact_name_snapshot
+                                        ? assignment.alternate_contact_name_snapshot
+                                        : assignment.member_name}
+                                    </span>
+                                    {assignment.assignee_kind === 'alternate' ? (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                        Alternate
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {assignment.assignee_kind === 'alternate' && (
+                                    <div className="text-xs text-muted-foreground">for {assignment.member_name}</div>
+                                  )}
                                   <div className="text-sm text-muted-foreground">{assignment.member_email}</div>
+                                  {assignment.assignee_kind === 'alternate' && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {assignment.alternate_contact_mobile_snapshot || '—'}
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="whitespace-nowrap">
@@ -1957,7 +2002,7 @@ const AdminDesignationsManagement: React.FC = () => {
                     type="text"
                     value={memberSearchTerm}
                     onChange={(e) => handleMemberSearchChange(e.target.value)}
-                    placeholder="Search by name or email..."
+                    placeholder="Search by name, email, or alternate contact…"
                     className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
                   />
                   {isSearchingMembers && (
@@ -1970,15 +2015,25 @@ const AdminDesignationsManagement: React.FC = () => {
                 {/* Search Results */}
                 {memberSearchResults.length > 0 && (
                   <div className="mt-2 border border-border rounded-lg max-h-60 overflow-y-auto">
-                    {memberSearchResults.map((member) => (
+                    {memberSearchResults.map((candidate, idx) => (
                       <button
-                        key={member.id}
-                        onClick={() => handleMemberSelect(member)}
+                        key={`${candidate.member_id}-${candidate.assignee_kind}-${idx}`}
+                        onClick={() => handleMemberSelect(candidate)}
                         className="w-full text-left px-3 py-3 hover:bg-muted/30 border-b border-border last:border-b-0"
                       >
-                        <div className="font-medium text-foreground mb-1">{member.full_name}</div>
-                        <div className="text-sm text-muted-foreground mb-0.5">{member.company_name} • {member.city}, {member.district}</div>
-                        <div className="text-sm text-muted-foreground">{member.email}</div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-foreground">{candidate.display_name}</span>
+                          {candidate.assignee_kind === 'alternate' ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 shrink-0">
+                              Alternate
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary shrink-0">
+                              Main
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{candidate.secondary_text}</div>
                       </button>
                     ))}
                   </div>
@@ -1987,22 +2042,46 @@ const AdminDesignationsManagement: React.FC = () => {
                 {/* Selected Member */}
                 {selectedMember && (
                   <div className="mt-2 p-3 bg-primary/5 border border-border rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-foreground">{selectedMember.full_name}</div>
-                        <div className="text-sm text-muted-foreground">{selectedMember.email}</div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-foreground">{selectedMember.full_name}</span>
+                          {selectedCandidate?.assignee_kind === 'alternate' ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 shrink-0">
+                              Alternate contact
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary shrink-0">
+                              Main member
+                            </span>
+                          )}
+                        </div>
+                        {selectedCandidate?.assignee_kind === 'alternate' && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            Alternate for {selectedCandidate.main_member_name}
+                          </div>
+                        )}
+                        <div className="text-sm text-muted-foreground mt-0.5">{selectedMember.email}</div>
                       </div>
                       <button
                         onClick={() => {
                           setSelectedMember(null);
-                          setAssignmentForm(prev => ({ ...prev, member_id: '' }));
+                          setSelectedCandidate(null);
+                          setAssignmentForm(prev => ({ ...prev, member_id: '', assignee_kind: 'main', alternate_contact_name: '' }));
                           setMemberSearchTerm('');
                         }}
-                        className="text-primary hover:text-primary/80"
+                        className="text-primary hover:text-primary/80 shrink-0"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
+                    {selectedCandidate?.assignee_kind === 'alternate' && (
+                      <div className="mt-2">
+                        <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1">
+                          This role will be assigned to the alternate contact, not the main member.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

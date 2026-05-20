@@ -34,6 +34,10 @@ interface LeadershipAssignment {
   committee_year: string | null;
   role_start_date: string | null;
   role_end_date: string | null;
+  assignee_kind?: string;
+  alternate_contact_name_snapshot?: string | null;
+  alternate_contact_mobile_snapshot?: string | null;
+  alternate_contact_photo_url_snapshot?: string | null;
 }
 
 interface GroupedRole {
@@ -45,6 +49,10 @@ interface GroupedRole {
     member_profile_photo_url: string | null;
     member_district: string;
     assignment_district: string | null;
+    assignee_kind?: string;
+    alternate_contact_name_snapshot?: string | null;
+    alternate_contact_mobile_snapshot?: string | null;
+    alternate_contact_photo_url_snapshot?: string | null;
   }>;
 }
 
@@ -243,7 +251,11 @@ const Leadership: React.FC = () => {
         member_gender: assignment.member_gender,
         member_profile_photo_url: assignment.member_profile_photo_url,
         member_district: assignment.member_district,
-        assignment_district: assignment.district
+        assignment_district: assignment.district,
+        assignee_kind: assignment.assignee_kind,
+        alternate_contact_name_snapshot: assignment.alternate_contact_name_snapshot,
+        alternate_contact_mobile_snapshot: assignment.alternate_contact_mobile_snapshot,
+        alternate_contact_photo_url_snapshot: assignment.alternate_contact_photo_url_snapshot
       });
 
       return acc;
@@ -424,8 +436,21 @@ const Leadership: React.FC = () => {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {roleGroup.members.map((member, idx) => {
-                        const displayName = getMemberDisplayName(member.member_full_name, member.member_gender);
+                        const isAlternate = member.assignee_kind === 'alternate';
+                        // Alternate assignments: show the alternate contact's name directly (no gender prefix).
+                        // Main assignments: apply the Shri./Smt. prefix based on gender.
+                        const displayName = isAlternate
+                          ? (member.alternate_contact_name_snapshot || member.member_full_name)
+                          : getMemberDisplayName(member.member_full_name, member.member_gender);
                         const district = member.member_district || member.assignment_district;
+                        // Alternate: use alternate photo snapshot (null if none); main: use member photo.
+                        const photoUrl = isAlternate
+                          ? (member.alternate_contact_photo_url_snapshot || null)
+                          : member.member_profile_photo_url;
+                        // Alternate: use alternate mobile snapshot only; main: use member mobile.
+                        const mobileNumber = isAlternate
+                          ? member.alternate_contact_mobile_snapshot
+                          : member.member_mobile_number;
 
                         return (
                           <div
@@ -433,10 +458,10 @@ const Leadership: React.FC = () => {
                             className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
                           >
                             <div className="flex-shrink-0">
-                              {member.member_profile_photo_url ? (
+                              {photoUrl ? (
                                 <img
-                                  src={member.member_profile_photo_url}
-                                  alt={member.member_full_name}
+                                  src={photoUrl}
+                                  alt={displayName}
                                   className="w-16 h-16 rounded-lg object-cover"
                                 />
                               ) : (
@@ -458,13 +483,15 @@ const Leadership: React.FC = () => {
                                   {district}
                                 </p>
                               )}
-                              <a
-                                href={`tel:${member.member_mobile_number}`}
-                                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-                              >
-                                <Phone className="w-4 h-4" />
-                                <span>{member.member_mobile_number}</span>
-                              </a>
+                              {mobileNumber && (
+                                <a
+                                  href={`tel:${mobileNumber}`}
+                                  className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                                >
+                                  <Phone className="w-4 h-4" />
+                                  <span>{mobileNumber}</span>
+                                </a>
+                              )}
                             </div>
                           </div>
                         );

@@ -136,6 +136,34 @@ export interface MemberLubRoleAssignment {
   member_email?: string;
   role_name?: string;
   lub_role_display_order?: number | null;
+  assignee_kind?: 'main' | 'alternate';
+  alternate_contact_name_snapshot?: string | null;
+  alternate_contact_mobile_snapshot?: string | null;
+  alternate_contact_photo_url_snapshot?: string | null;
+}
+
+/**
+ * A selectable candidate row in the Add Assignment member search.
+ * Each member with a non-empty alternate_contact_name produces two rows:
+ * one with kind='main' and one with kind='alternate'.
+ */
+export interface MemberRoleCandidate {
+  member_id: string;
+  assignee_kind: 'main' | 'alternate';
+  /** Friendly one-line label shown as the primary text in the search result. */
+  display_name: string;
+  /** Secondary hint shown below the display_name in the dropdown. */
+  secondary_text: string;
+  /** Always the main member's full_name (used for snapshot when kind=alternate). */
+  main_member_name: string;
+  /** Non-null only when kind='alternate'. */
+  alternate_contact_name: string | null;
+  /** Non-null only when kind='alternate' and the member has an alternate_mobile. */
+  alternate_mobile: string | null;
+  email: string;
+  company_name: string;
+  city: string;
+  district: string;
 }
 
 export interface FormFieldConfiguration {
@@ -549,6 +577,10 @@ interface MemberLubRoleAssignmentRpcRow {
   member_company_name: string;
   lub_role_name: string;
   lub_role_display_order?: number | null;
+  assignee_kind?: string;
+  alternate_contact_name_snapshot?: string | null;
+  alternate_contact_mobile_snapshot?: string | null;
+  alternate_contact_photo_url_snapshot?: string | null;
 }
 
 // User Roles Service
@@ -2844,6 +2876,10 @@ export const memberLubRolesService = {
         member_email: row.member_email,
         role_name: row.lub_role_name,
         lub_role_display_order: row.lub_role_display_order ?? null,
+        assignee_kind: (row.assignee_kind ?? 'main') as 'main' | 'alternate',
+        alternate_contact_name_snapshot: row.alternate_contact_name_snapshot ?? null,
+        alternate_contact_mobile_snapshot: row.alternate_contact_mobile_snapshot ?? null,
+        alternate_contact_photo_url_snapshot: row.alternate_contact_photo_url_snapshot ?? null,
         member_registrations: {
           full_name: row.member_full_name,
           company_name: row.member_company_name,
@@ -2872,6 +2908,10 @@ export const memberLubRolesService = {
     role_start_date?: string | null;
     role_end_date?: string | null;
     committee_year: string;
+    assignee_kind?: 'main' | 'alternate';
+    alternate_contact_name?: string | null;
+    alternate_mobile?: string | null;
+    alternate_photo_url?: string | null;
   }): Promise<{ success: boolean; error?: string }> {
     try {
       const sessionToken = sessionManager.getSessionToken();
@@ -2893,15 +2933,19 @@ export const memberLubRolesService = {
 
       const { data, error } = await supabase
         .rpc('admin_assign_member_lub_role_with_session', {
-          p_session_token: sessionToken,
-          p_member_id: params.member_id,
-          p_role_id: params.role_id,
-          p_level: params.level,
-          p_state: params.state || null,
-          p_district: params.district || null,
-          p_role_start_date: params.role_start_date || null,
-          p_role_end_date: params.role_end_date || null,
-          p_committee_year: params.committee_year || null
+          p_session_token:           sessionToken,
+          p_member_id:               params.member_id,
+          p_role_id:                 params.role_id,
+          p_level:                   params.level,
+          p_state:                   params.state || null,
+          p_district:                params.district || null,
+          p_role_start_date:         params.role_start_date || null,
+          p_role_end_date:           params.role_end_date || null,
+          p_committee_year:          params.committee_year || null,
+          p_assignee_kind:           params.assignee_kind || 'main',
+          p_alternate_contact_name:  params.alternate_contact_name || null,
+          p_alternate_mobile:        params.alternate_mobile || null,
+          p_alternate_photo_url:     params.alternate_photo_url || null
         });
 
       if (error) {
@@ -3041,6 +3085,86 @@ export const memberLubRolesService = {
       return data || [];
     } catch (error) {
       console.error('Error searching members:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Search for member candidates (main + alternate) for the Add Assignment flow.
+   * Searches main member fields AND alternate_contact_name.
+   * Returns up to 10 members, each optionally expanded into two candidate rows
+   * (one 'main', one 'alternate' when the member has an alternate contact).
+   */
+  async searchMemberCandidates(searchTerm: string): Promise<MemberRoleCandidate[]> {
+    try {
+      const { data, error } = await supabase
+        .from('member_registrations')
+        .select('id, full_name, company_name, email, city, district, alternate_contact_name, alternate_mobile')
+        .eq('status', 'approved')
+        .or(
+          `full_name.ilike.%${searchTerm}%,` +
+          `email.ilike.%${searchTerm}%,` +
+          `company_name.ilike.%${searchTerm}%,` +
+          `alternate_contact_name.ilike.%${searchTerm}%`
+        )
+        .limit(10);
+
+      if (error) {
+        throw error;
+      }
+
+      const rows = (data || []) as Array<{
+        id: string;
+        full_name: string;
+        company_name: string;
+        email: string;
+        city: string;
+        district: string;
+        alternate_contact_name: string | null;
+        alternate_mobile: string | null;
+      }>;
+
+      const candidates: MemberRoleCandidate[] = [];
+
+      for (const row of rows) {
+        const locationHint = [row.company_name, row.city, row.district].filter(Boolean).join(' • ');
+
+        // Main candidate — always present
+        candidates.push({
+          member_id: row.id,
+          assignee_kind: 'main',
+          display_name: row.full_name,
+          secondary_text: locationHint || row.email,
+          main_member_name: row.full_name,
+          alternate_contact_name: null,
+          alternate_mobile: null,
+          email: row.email,
+          company_name: row.company_name,
+          city: row.city,
+          district: row.district
+        });
+
+        // Alternate candidate — only when alternate_contact_name is non-empty
+        if (row.alternate_contact_name && row.alternate_contact_name.trim()) {
+          candidates.push({
+            member_id: row.id,
+            assignee_kind: 'alternate',
+            display_name: row.alternate_contact_name.trim(),
+            secondary_text: `Alternate for ${row.full_name}`,
+            main_member_name: row.full_name,
+            alternate_contact_name: row.alternate_contact_name.trim(),
+            alternate_mobile: row.alternate_mobile?.trim() || null,
+            email: row.email,
+            company_name: row.company_name,
+            city: row.city,
+            district: row.district
+          });
+        }
+      }
+
+      return candidates;
+    } catch (error) {
+      console.error('Error searching member candidates:', error);
       return [];
     }
   },
