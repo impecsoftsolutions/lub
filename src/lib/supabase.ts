@@ -5592,8 +5592,11 @@ export type ActivityMediaStorageProvider = 'supabase_storage' | 'cloudflare_r2' 
 export interface PublicActivity {
   id: string;
   slug: string;
+  short_url_code?: string | null;
+  short_url_enabled?: boolean | null;
   title: string;
   excerpt: string | null;
+  share_message?: string | null;
   activity_date: string | null;
   start_at: string | null;
   end_at: string | null;
@@ -5633,6 +5636,9 @@ export interface AdminActivityListItem {
 export interface AdminActivityDetail {
   id: string;
   slug: string;
+  short_url_code?: string | null;
+  short_url_enabled?: boolean | null;
+  share_message?: string | null;
   title: string;
   excerpt: string | null;
   description: string | null;
@@ -5651,6 +5657,15 @@ export interface AdminActivityDetail {
   cover_original_width?: number | null;
   cover_original_height?: number | null;
   youtube_urls: string[];
+  source_event_id?: string | null;
+  source_event?: {
+    id: string;
+    slug: string;
+    title: string;
+    status: EventStatus;
+    start_at: string | null;
+    end_at: string | null;
+  } | null;
   created_by: string | null;
   created_at: string;
   published_by: string | null;
@@ -5745,6 +5760,15 @@ interface ActivitiesRpcEnvelope<T> {
   error?: string;
 }
 
+export interface ActivityShortUrlResolution {
+  success: boolean;
+  slug?: string;
+  short_code?: string;
+  target_path?: string;
+  error?: string;
+  errorCode?: string;
+}
+
 export interface ActivityMediaUploadResult {
   success: boolean;
   error?: string;
@@ -5832,6 +5856,38 @@ export const activitiesService = {
     return result.data ?? null;
   },
 
+  async resolveShortUrl(shortCode: string): Promise<ActivityShortUrlResolution> {
+    const code = shortCode.trim().toLowerCase();
+    if (!code) {
+      return { success: false, error: 'Short code is required.', errorCode: 'invalid_code' };
+    }
+    const { data, error } = await supabase.rpc('resolve_activity_short_url', {
+      p_short_code: code,
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    const result = data as {
+      success?: boolean;
+      data?: { slug?: string; short_code?: string; target_path?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Short URL not found.',
+        errorCode: result?.error_code ?? 'not_found',
+      };
+    }
+    return {
+      success: true,
+      slug: result.data?.slug,
+      short_code: result.data?.short_code,
+      target_path: result.data?.target_path,
+    };
+  },
+
   // ── Admin read RPCs ──────────────────────────────────────
 
   async getAll(
@@ -5890,6 +5946,114 @@ export const activitiesService = {
     return result.data ?? {};
   },
 
+  async ensureShortShareUrl(
+    sessionToken: string,
+    activityId: string,
+  ): Promise<{ success: boolean; short_code?: string; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('ensure_activity_short_url_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { short_code?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to get short URL.',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, short_code: result.data?.short_code };
+  },
+
+  async refreshShortShareUrl(
+    sessionToken: string,
+    activityId: string,
+  ): Promise<{ success: boolean; short_code?: string; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('refresh_activity_short_url_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { short_code?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to refresh short URL.',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, short_code: result.data?.short_code };
+  },
+
+  async setShortShareUrlEnabled(
+    sessionToken: string,
+    activityId: string,
+    enabled: boolean,
+  ): Promise<{ success: boolean; enabled?: boolean; short_code?: string | null; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('set_activity_short_url_enabled_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+      p_enabled: enabled,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { short_url_enabled?: boolean; short_code?: string | null };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to update short URL setting.',
+        error_code: result?.error_code,
+      };
+    }
+    return {
+      success: true,
+      enabled: result.data?.short_url_enabled,
+      short_code: result.data?.short_code ?? null,
+    };
+  },
+
+  async saveShareMessage(
+    sessionToken: string,
+    activityId: string,
+    shareMessage: string,
+  ): Promise<{ success: boolean; share_message?: string | null; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('save_activity_share_message_with_session', {
+      p_session_token: sessionToken,
+      p_activity_id: activityId,
+      p_share_message: shareMessage,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { share_message?: string | null };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to save share message.',
+        error_code: result?.error_code,
+      };
+    }
+    return { success: true, share_message: result.data?.share_message ?? null };
+  },
+
   getLimits(settings?: ActivitySettings | null): ActivityLimits {
     const parsePositiveInt = (value: string | undefined, fallback: number): number => {
       if (!value) return fallback;
@@ -5933,6 +6097,7 @@ export const activitiesService = {
       cover_original_width?: number | null;
       cover_original_height?: number | null;
       youtube_urls?: string[];
+      source_event_id?: string | null;
     }
   ): Promise<{ success: boolean; activity_id?: string; slug?: string; error?: string }> {
     const { data, error } = await supabase.rpc('create_activity_with_session', {
@@ -5955,6 +6120,7 @@ export const activitiesService = {
       p_cover_original_width: payload.cover_original_width ?? null,
       p_cover_original_height: payload.cover_original_height ?? null,
       p_youtube_urls: payload.youtube_urls ?? [],
+      p_source_event_id: payload.source_event_id ?? null,
     });
     if (error) return { success: false, error: error.message };
     const result = data as { success: boolean; activity_id?: string; id?: string; slug?: string; error?: string };
@@ -5988,6 +6154,8 @@ export const activitiesService = {
       cover_original_width?: number | null;
       cover_original_height?: number | null;
       youtube_urls?: string[];
+      source_event_id?: string | null;
+      clear_source_event?: boolean;
     }
   ): Promise<{ success: boolean; slug?: string; error?: string }> {
     const { data, error } = await supabase.rpc('update_activity_with_session', {
@@ -6014,6 +6182,8 @@ export const activitiesService = {
       p_cover_original_width: payload.cover_original_width ?? null,
       p_cover_original_height: payload.cover_original_height ?? null,
       p_youtube_urls: payload.youtube_urls ?? null,
+      p_source_event_id: payload.source_event_id ?? null,
+      p_clear_source_event: payload.clear_source_event ?? false,
     });
     if (error) return { success: false, error: error.message };
     const result = data as { success: boolean; slug?: string; error?: string };
@@ -6222,7 +6392,7 @@ export const activitiesService = {
   },
 
   /**
-   * Generate AI-assisted draft content (title, slug, excerpt, description) for
+   * Generate AI-assisted draft content for
    * an Activities post. Routes through the `draft-activity-content` edge
    * function which validates the session token + permission server-side and
    * loads the AI provider/model/key from `ai_runtime_settings` via service
@@ -6250,7 +6420,16 @@ export const activitiesService = {
     success: boolean;
     error?: string;
     error_code?: ActivityDraftErrorCode;
-    data?: { title: string; slug: string; excerpt: string; description: string };
+    data?: {
+      title: string;
+      slug: string;
+      excerpt: string;
+      description: string;
+      activity_date?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
+      location?: string | null;
+    };
   }> {
     try {
       const body: Record<string, unknown> = { session_token: sessionToken, inputs };
@@ -6271,7 +6450,16 @@ export const activitiesService = {
         success?: boolean;
         error?: string;
         error_code?: ActivityDraftErrorCode;
-        data?: { title?: string; slug?: string; excerpt?: string; description?: string };
+        data?: {
+          title?: string;
+          slug?: string;
+          excerpt?: string;
+          description?: string;
+          activity_date?: string | null;
+          start_at?: string | null;
+          end_at?: string | null;
+          location?: string | null;
+        };
       } | null;
       if (!result?.success || !result.data) {
         return {
@@ -6287,11 +6475,73 @@ export const activitiesService = {
           slug: typeof result.data.slug === 'string' ? result.data.slug : '',
           excerpt: typeof result.data.excerpt === 'string' ? result.data.excerpt : '',
           description: typeof result.data.description === 'string' ? result.data.description : '',
+          activity_date: typeof result.data.activity_date === 'string' ? result.data.activity_date : null,
+          start_at: typeof result.data.start_at === 'string' ? result.data.start_at : null,
+          end_at: typeof result.data.end_at === 'string' ? result.data.end_at : null,
+          location: typeof result.data.location === 'string' ? result.data.location : null,
         },
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'AI drafting failed.';
       return { success: false, error: message, error_code: 'generation_failed' };
+    }
+  },
+
+  async draftShareMessage(
+    sessionToken: string,
+    input: {
+      title: string;
+      excerpt?: string | null;
+      description?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
+      location?: string | null;
+      short_url?: string | null;
+    },
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    error_code?: ActivityDraftErrorCode;
+  }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-activity-content', {
+        body: {
+          session_token: sessionToken,
+          mode: 'draft_share',
+          activity_input: input,
+        },
+      });
+      if (error) {
+        return {
+          success: false,
+          error: error.message ?? 'AI share message generation failed.',
+          error_code: 'generation_failed',
+        };
+      }
+      const result = data as {
+        success?: boolean;
+        data?: { share_message?: string };
+        error?: string;
+        error_code?: ActivityDraftErrorCode;
+      } | null;
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error ?? 'AI share message generation failed.',
+          error_code: result?.error_code ?? 'generation_failed',
+        };
+      }
+      return {
+        success: true,
+        message: typeof result.data?.share_message === 'string' ? result.data.share_message : '',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'AI share message generation failed.',
+        error_code: 'generation_failed',
+      };
     }
   },
 
@@ -6935,6 +7185,11 @@ export interface PublicEventDetail extends PublicEvent {
   banner_image_url?: string | null;
   assets?: EventAsset[];
   rsvp?: EventRsvpPublicConfig | null;
+  linked_activity?: {
+    id: string;
+    slug: string;
+    title: string;
+  } | null;
 }
 
 export interface AdminEventListItem {
@@ -6994,6 +7249,7 @@ export interface AdminEventDetail {
   id: string;
   slug: string;
   short_url_code?: string | null;
+  short_url_enabled?: boolean | null;
   title: string;
   excerpt: string | null;
   description: string | null;
@@ -7313,7 +7569,16 @@ export const eventsService = {
     success: boolean;
     error?: string;
     error_code?: ActivityDraftErrorCode;
-    data?: { title: string; slug: string; excerpt: string; description: string };
+    data?: {
+      title: string;
+      slug: string;
+      excerpt: string;
+      description: string;
+      activity_date?: string | null;
+      start_at?: string | null;
+      end_at?: string | null;
+      location?: string | null;
+    };
   }> {
     try {
       const { data, error } = await supabase.functions.invoke('draft-activity-content', {
@@ -7345,7 +7610,16 @@ export const eventsService = {
         success?: boolean;
         error?: string;
         error_code?: ActivityDraftErrorCode;
-        data?: { title?: string; slug?: string; excerpt?: string; description?: string };
+        data?: {
+          title?: string;
+          slug?: string;
+          excerpt?: string;
+          description?: string;
+          activity_date?: string | null;
+          start_at?: string | null;
+          end_at?: string | null;
+          location?: string | null;
+        };
       } | null;
       if (!result?.success || !result.data) {
         return {
@@ -7361,6 +7635,10 @@ export const eventsService = {
           slug: typeof result.data.slug === 'string' ? result.data.slug : '',
           excerpt: typeof result.data.excerpt === 'string' ? result.data.excerpt : '',
           description: typeof result.data.description === 'string' ? result.data.description : '',
+          activity_date: typeof result.data.activity_date === 'string' ? result.data.activity_date : null,
+          start_at: typeof result.data.start_at === 'string' ? result.data.start_at : null,
+          end_at: typeof result.data.end_at === 'string' ? result.data.end_at : null,
+          location: typeof result.data.location === 'string' ? result.data.location : null,
         },
       };
     } catch (err) {
@@ -7449,6 +7727,37 @@ export const eventsService = {
       };
     }
     return { success: true, short_code: result.data?.short_code };
+  },
+
+  async setShortShareUrlEnabled(
+    sessionToken: string,
+    eventId: string,
+    enabled: boolean,
+  ): Promise<{ success: boolean; enabled?: boolean; short_code?: string | null; error?: string; error_code?: string }> {
+    const { data, error } = await supabase.rpc('set_event_short_url_enabled_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+      p_enabled: enabled,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { short_url_enabled?: boolean; short_code?: string | null };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to update short URL setting.',
+        error_code: result?.error_code,
+      };
+    }
+    return {
+      success: true,
+      enabled: result.data?.short_url_enabled,
+      short_code: result.data?.short_code ?? null,
+    };
   },
 
   async getAll(

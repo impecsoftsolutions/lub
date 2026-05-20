@@ -168,7 +168,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
           ratioValue: activeOption?.value,
           isOriginal: true,
         });
-        onClose();
         return;
       }
 
@@ -193,7 +192,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         ratioValue: activeOption?.value,
         isOriginal: false,
       });
-      onClose();
     } catch (error) {
       console.error('Error processing image:', error);
       onError('Failed to process image. Please try again.');

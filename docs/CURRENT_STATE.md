@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-19  
-**Updated by:** Codex (`COD-ACTIVITIES-SLUG-DATETIME-PARITY-083`)
+**Last updated:** 2026-05-20  
+**Updated by:** Claude (COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090 complete)
 
 ---
 
@@ -26,26 +26,97 @@
 
 ## Active Stream
 
-**Active stream:** None.
+**Active stream:** None. COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090 complete and deployed.
 
 ---
 
 ## Last Verified
 
-- **When:** 2026-05-19
-- **What:** `COD-ACTIVITIES-SLUG-DATETIME-PARITY-083` - Activities now use Event-style slug UX in admin (`Edit slug`, auto-managed state, URL preview), and Activities support multi-day datetimes with `start_at` / `end_at` in DB/RPC/service/UI while keeping `activity_date` compatibility.
-- **Deploy/apply commands run:** `supabase db push --linked` (applied `20260519093000_activities_slug_datetime_083.sql`).
-- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase1 readonly smoke PASS (3 passed / 12 skipped).
+- **When:** 2026-05-20
+- **What:** `COD-ACTIVITIES-AI-EXCERPT-DESCRIPTION-DISTINCT-090` — deterministic excerpt/description lead-distinctness enforcement in `draft-activity-content`.
+- **Deploy/apply commands run:** `supabase functions deploy draft-activity-content` — deployed successfully.
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Synthetic tests:** 6/6 PASS (exact dup, extra clause, prefix, double-lead, already-distinct, Jaccard-rephrased).
+- **Runtime probe:** RAMP/Guntur brief → excerpt and description leads distinct; date/location extraction intact.
 
-Runtime notes:
-- `src/pages/AdminActivityForm.tsx`: slug field now mirrors Event UX and date fields are now `Start date & time` + `End date & time`.
-- `supabase/migrations/20260519093000_activities_slug_datetime_083.sql`: added `activities.start_at` + `activities.end_at`, backfilled `start_at` from legacy `activity_date`, and recreated activity read/write RPCs to include datetime fields.
-- `src/lib/supabase.ts`: activity types and create/update payloads now include `start_at` / `end_at`.
-- `src/pages/Events.tsx`, `src/pages/ActivityDetail.tsx`, `src/pages/AdminActivities.tsx`: activity date rendering now prefers datetime range (start/end) and falls back to legacy `activity_date`.
+## Previous Verified (089)
+
+- **When:** 2026-05-20
+- **What:** `COD-SHORT-URL-ENABLE-DISABLE-089` runtime closeout — all probes PASS.
+- **Deploy/apply commands run:**
+  - `supabase db push --linked` — applied both 088 + 089 migrations in sequence (OK)
+  - `supabase functions deploy draft-activity-content` — deployed successfully (draft_share mode active)
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:**
+  - A (Activity first-load schema): `activities.short_url_code='ydjjzdw'`, `short_url_enabled=true` ✓
+  - B (Event first-load schema): `events.short_url_code='rxzufva'`, `short_url_enabled=true` ✓
+  - C (Disable): `set_activity_short_url_enabled_with_session(..., false)` → `{success:true, short_url_enabled:false}`; `resolve_activity_short_url('ydjjzdw')` → `{error_code:'short_url_disabled'}` ✓; same for event ✓
+  - D (Re-enable, code preserved): `set_*_with_session(..., true)` → same code returned (`ydjjzdw` / `rxzufva`); resolver resolves correctly ✓ (no regeneration)
+  - E (Refresh neutered): `refresh_activity_short_url_with_session(...)` → `{error_code:'short_url_refresh_disabled'}` ✓; same for event ✓
 
 ---
 
+## Previous Verified (086)
+
+- **When:** 2026-05-19
+- **What:** `COD-EVENTS-ACTIVITY-EVENT-LINK-086` � Manual link from Activity to completed Event + public event-detail CTA to linked activity.
+- **Deploy/apply commands run:** `supabase db push --linked` (applied `20260519124000_activity_event_link_and_public_past_event_activity_086.sql`).
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+
+Runtime notes:
+- `create_activity_with_session` and `update_activity_with_session` now accept `source_event_id` linking with server-side validation:
+  - only completed published/archived events (or actor-owned drafts) are eligible
+  - one non-archived activity per event link is enforced
+- `get_activity_by_id_with_session` now returns `source_event_id` + `source_event` metadata for Activity edit hydration.
+- `get_event_by_slug` now returns `linked_activity` (published activity linked by `source_event_id`) for public rendering.
+- `AdminActivityForm` now includes �Link this activity to a past event (optional)� selector and saves/unlinks on draft/publish.
+- Event detail page now shows an �Event Activity� section with �Click here to see the activity� when the event is completed and a linked activity exists.
+---
+
 ## Recently Closed Events Follow-ups
+
+### 090 Activity AI excerpt/description distinct lead enforcement
+
+- Runtime-closed on 2026-05-20.
+- No migration. No service contract change. No frontend changes.
+- `draft-activity-content` gains:
+  - `isNearDuplicateLead` — lead-specific duplicate check (lower thresholds + Jaccard bag similarity at 0.62 to catch rephrased duplicates)
+  - `stripRepeatedLeadFromDescription` — removes repeated first sentence(s) from description's opening paragraph, preserving the AI-generated excerpt
+  - `enforceExcerptDescriptionDistinctness` — orchestrates: (1) strip from description first; (2) replace excerpt if description too short; (3) global sentence safety net; (4) guaranteed final assertion
+  - Prompt rule added: "The opening sentence of excerpt and description must be different."
+
+### 089 Short URL enable/disable toggle + permanence enforcement (Activities + Events)
+
+- Runtime-closed on 2026-05-20. All migrations applied, all probes PASS.
+- Migration `20260520100000_short_url_enable_disable_089.sql`: adds `short_url_enabled` to both tables; updates resolver RPCs to check flag; neuters refresh RPCs; adds `set_*_short_url_enabled_with_session` toggle RPCs; updates `get_activity_by_id_with_session` + `get_activity_by_slug` to include `short_url_enabled`; updates `get_event_by_id_with_session` to include both `short_url_code` and `short_url_enabled`.
+- AdminActivityForm + AdminEventForm: Refresh button replaced with `role="switch"` Enable/Disable toggle; first-load code display fixed by hydrating directly from getById payload and skipping redundant ensure call; `shortActivityUrl`/`shortEventUrl` memos respect enabled flag.
+- ActivityDetail: Share button respects `short_url_enabled` when choosing URL.
+- No edge function changes in 089.
+
+### 088 Activity short share URL + admin share panel + public Share button
+
+- Runtime-closed on 2026-05-20. Migration applied, edge function deployed.
+- Migration `20260520090000_activities_short_share_url_088.sql` adds `short_url_code`/`share_message` columns to `activities`, auto-generator trigger, backfill, `resolve_activity_short_url`, `ensure_activity_short_url_with_session`, `refresh_activity_short_url_with_session`, `save_activity_share_message_with_session` RPCs; updates `get_activity_by_slug` and `get_activity_by_id_with_session`.
+- `/a/:code` route → `ActivityShortRedirect` → `resolveShortUrl` → redirect to `/events/:slug`. Wired in `App.tsx`.
+- `draft-activity-content` edge function gains `draft_share` mode returning `{ share_message }` JSON.
+- `AdminActivityForm`: share panel (published only) with Public URL, Short URL, AI Generate Message, Copy Message, WhatsApp Share controls (refresh removed in 089).
+- `ActivityDetail`: Share button in metadata bar copies short message + short URL to clipboard (2.5 s "Copied!" feedback).
+
+### 085 Auto-classify past/upcoming events + Activities-first layout + View Past Events link
+
+- Closed in repo on 2026-05-20 (Claude).
+- `isPast` helper replaced with `toMs`/`isPastEvent`/`isPastActivity`/`isPastItem` using `end_date_value` boundary in `Events.tsx`.
+- Activities section moves to top when no upcoming events exist; "View Past Events" pill-link shown below Activities in `all`+no-search mode.
+- No DB migration or RPC changes.
+
+### 084 Activities AI date/location hotfix
+
+- Closed in repo on 2026-05-19.
+- `draft-activity-content` draft mode now returns `activity_date`, `start_at`, `end_at`, and `location` in addition to title/slug/excerpt/description.
+- Added deterministic fallback parsing for common English date patterns such as `16 and 17 May 2026`, `16-17 May 2026`, and single-day dates; default time remains 10:00-17:00 when no time is present.
+- Added venue/location fallback for lines like `Venue:` / `Location:` and common `held at ...` phrasing.
+- Admin Activity form now applies returned date/location fields into `Start date & time`, `End date & time`, and `Location`.
+- No DB migration. `supabase functions deploy draft-activity-content` is needed to activate this on the hosted Supabase edge function.
 
 ### 083 Activities slug/date parity
 
@@ -126,3 +197,4 @@ Runtime notes:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+

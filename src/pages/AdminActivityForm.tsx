@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -20,14 +20,20 @@ import {
   Sparkles,
   AlertCircle,
   Download,
+  Link2,
   Lock,
   Unlock,
   Pencil,
+  Share2,
+  Copy,
+  ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
 import {
   activitiesService,
+  eventsService,
   aiSettingsService,
   ACTIVITY_AI_SUPPORTED_PROVIDERS,
   type ActivityLimits,
@@ -36,6 +42,7 @@ import {
   type ActivityMediaStorageProvider,
   type AIRuntimeProfile,
   type AIProvider,
+  type EligibleEventRow,
 } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import {
@@ -64,25 +71,33 @@ function slugify(text: string): string {
     .slice(0, 80);
 }
 
-function toDateTimeInput(value: string | null): string {
+function toDateInput(value: string | null): string {
   if (!value) return '';
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   const pad = (n: number) => n.toString().padStart(2, '0');
   const year = date.getFullYear();
   const month = pad(date.getMonth() + 1);
   const day = pad(date.getDate());
-  const hour = pad(date.getHours());
-  const minute = pad(date.getMinutes());
-  return `${year}-${month}-${day}T${hour}:${minute}`;
+  return `${year}-${month}-${day}`;
 }
 
-function toDateTimeInputFromDate(value: string | null): string {
+function toDateInputFromDate(value: string | null): string {
   if (!value) return '';
   const trimmed = value.trim();
   if (!trimmed) return '';
   const normalized = trimmed.includes('T') ? trimmed : `${trimmed}T10:00:00`;
-  return toDateTimeInput(normalized);
+  return toDateInput(normalized);
+}
+
+function toActivityStartAtIso(dateValue: string): string {
+  return `${dateValue}T10:00:00`;
+}
+
+function toActivityEndAtIso(dateValue: string): string {
+  return `${dateValue}T17:00:00`;
 }
 
 // â”€â”€â”€ Drag-reorder helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -199,7 +214,7 @@ const resolveRenderableImageUrl = async (
 };
 
 // Ratio choices for the in-modal gallery crop selector. `aspect: null` means
-// "Original â€” keep native ratio, no crop, just resize+compress".
+// "Original - keep native ratio, no crop, just resize+compress".
 const GALLERY_CROP_RATIO_OPTIONS = [
   { value: 'original', label: 'Original', aspect: null as number | null,           outputWidth: undefined, outputHeight: undefined },
   { value: '16:9',     label: '16:9',     aspect: 16 / 9 as number | null,         outputWidth: 1600,      outputHeight: 900 },
@@ -231,6 +246,17 @@ const AdminActivityForm: React.FC = () => {
   const [startAt, setStartAt]       = useState('');
   const [endAt, setEndAt]           = useState('');
   const [location, setLocation]     = useState('');
+  const [linkedEventId, setLinkedEventId] = useState('');
+  const [linkedEventMeta, setLinkedEventMeta] = useState<{
+    id: string;
+    slug: string;
+    title: string;
+    status: string;
+    start_at: string | null;
+    end_at: string | null;
+  } | null>(null);
+  const [linkableEvents, setLinkableEvents] = useState<EligibleEventRow[]>([]);
+  const [linkableEventsLoading, setLinkableEventsLoading] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [youtubeUrls, setYoutubeUrls] = useState<string[]>(['']);
 
@@ -265,6 +291,12 @@ const AdminActivityForm: React.FC = () => {
   const [isSaving, setIsSaving]     = useState(false);
   const [originalStatus, setOriginalStatus] = useState<string>('draft');
   const [limits, setLimits] = useState<ActivityLimits>(activitiesService.defaultLimits);
+  const [shortShareCode, setShortShareCode] = useState('');
+  const [shortShareLoading, setShortShareLoading] = useState(false);
+  const [shortUrlEnabled, setShortUrlEnabled] = useState(true);
+  const [shortUrlToggling, setShortUrlToggling] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareGenerating, setShareGenerating] = useState(false);
 
   // AI assist state
   const [activityBrief, setActivityBrief] = useState('');
@@ -308,14 +340,19 @@ const AdminActivityForm: React.FC = () => {
 
         setTitle(data.title);
         setSlug(data.slug);
+        setShortShareCode((data.short_url_code ?? '').trim().toLowerCase());
+        setShortUrlEnabled(data.short_url_enabled !== false); // default true if null/undefined
+        setShareMessage(data.share_message ?? '');
         setSlugManual(true); // don't auto-generate when editing
         setSlugEditing(false);
         setExcerpt(data.excerpt ?? '');
         setDescription(data.description ?? '');
-        const hydratedStartAt = toDateTimeInput(data.start_at ?? null) || toDateTimeInputFromDate(data.activity_date ?? null);
+        const hydratedStartAt = toDateInput(data.start_at ?? null) || toDateInputFromDate(data.activity_date ?? null);
         setStartAt(hydratedStartAt);
-        setEndAt(toDateTimeInput(data.end_at ?? null));
+        setEndAt(toDateInput(data.end_at ?? null));
         setLocation(data.location ?? '');
+        setLinkedEventId(data.source_event_id ?? '');
+        setLinkedEventMeta(data.source_event ?? null);
         setIsFeatured(data.is_featured);
         setYoutubeUrls(data.youtube_urls?.length ? data.youtube_urls : ['']);
         setCoverImageUrl(data.cover_image_url);
@@ -384,6 +421,35 @@ const AdminActivityForm: React.FC = () => {
     };
 
     void loadSettings();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLinkableEvents = async () => {
+      const token = sessionManager.getSessionToken();
+      if (!token) return;
+      setLinkableEventsLoading(true);
+      try {
+        const result = await eventsService.getEligibleForActivity(token, 200);
+        if (!cancelled) {
+          if (result.success) {
+            setLinkableEvents(result.rows);
+          } else {
+            setLinkableEvents([]);
+            console.warn('[AdminActivityForm] failed to load linkable events:', result.error);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLinkableEvents([]);
+        }
+        console.warn('[AdminActivityForm] linkable events load exception:', err);
+      } finally {
+        if (!cancelled) setLinkableEventsLoading(false);
+      }
+    };
+    void loadLinkableEvents();
     return () => { cancelled = true; };
   }, []);
 
@@ -477,7 +543,7 @@ const AdminActivityForm: React.FC = () => {
       const result = await activitiesService.draftContent(
         token,
         {
-          activity_date: startAt ? new Date(startAt).toISOString().slice(0, 10) : null,
+          activity_date: startAt || null,
           location: location.trim() || null,
           additional_notes: activityBrief.trim() || null,
         },
@@ -496,6 +562,12 @@ const AdminActivityForm: React.FC = () => {
       }
       setExcerpt(drafted.excerpt ?? '');
       setDescription(drafted.description ?? '');
+      const draftedStart = toDateInput(drafted.start_at ?? null)
+        || toDateInputFromDate(drafted.activity_date ?? null);
+      const draftedEnd = toDateInput(drafted.end_at ?? null);
+      if (draftedStart) setStartAt(draftedStart);
+      if (draftedEnd) setEndAt(draftedEnd);
+      if (drafted.location) setLocation(drafted.location);
       showToast('success', 'Activity draft generated. Review and edit any field.');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'AI drafting failed.';
@@ -971,10 +1043,11 @@ const AdminActivityForm: React.FC = () => {
         slug: slug.trim(),
         excerpt: excerpt.trim() || null,
         description: description.trim() || null,
-        activity_date: startAt ? new Date(startAt).toISOString().slice(0, 10) : null,
-        start_at: startAt ? new Date(startAt).toISOString() : null,
-        end_at: endAt ? new Date(endAt).toISOString() : null,
+        activity_date: startAt || null,
+        start_at: startAt ? toActivityStartAtIso(startAt) : null,
+        end_at: endAt ? toActivityEndAtIso(endAt) : null,
         location: location.trim() || null,
+        source_event_id: linkedEventId || null,
         is_featured: isFeatured,
         youtube_urls: buildYoutubeList(),
       };
@@ -987,6 +1060,7 @@ const AdminActivityForm: React.FC = () => {
           ...basePayload,
           clear_start_at: !startAt,
           clear_end_at: !endAt,
+          clear_source_event: !linkedEventId,
           clear_cover: clearCover,
           ...(uploadedCover ?? {}),
           ...(uploadedCover === undefined && !clearCover ? {
@@ -1036,7 +1110,7 @@ const AdminActivityForm: React.FC = () => {
       setIsSaving(false);
     }
   }, [
-    title, slug, excerpt, description, startAt, endAt, location, isFeatured,
+    title, slug, excerpt, description, startAt, endAt, location, linkedEventId, isFeatured,
     coverImageUrl, coverOriginalObjectKey, coverStorageProvider, resolveCoverForSave, buildYoutubeList, isEdit, id,
     processGalleryChanges, navigate, showToast,
   ]);
@@ -1061,12 +1135,14 @@ const AdminActivityForm: React.FC = () => {
         slug: slug.trim(),
         excerpt: excerpt.trim() || null,
         description: description.trim() || null,
-        activity_date: startAt ? new Date(startAt).toISOString().slice(0, 10) : null,
-        start_at: startAt ? new Date(startAt).toISOString() : null,
-        end_at: endAt ? new Date(endAt).toISOString() : null,
+        activity_date: startAt || null,
+        start_at: startAt ? toActivityStartAtIso(startAt) : null,
+        end_at: endAt ? toActivityEndAtIso(endAt) : null,
         clear_start_at: !startAt,
         clear_end_at: !endAt,
         location: location.trim() || null,
+        source_event_id: linkedEventId || null,
+        clear_source_event: !linkedEventId,
         is_featured: isFeatured,
         clear_cover: clearCover,
         ...(uploadedCover ?? {}),
@@ -1098,7 +1174,7 @@ const AdminActivityForm: React.FC = () => {
       setIsSaving(false);
     }
   }, [
-    isEdit, id, title, slug, excerpt, description, startAt, endAt, location, isFeatured,
+    isEdit, id, title, slug, excerpt, description, startAt, endAt, location, linkedEventId, isFeatured,
     coverImageUrl, coverOriginalObjectKey, coverStorageProvider, resolveCoverForSave, buildYoutubeList, processGalleryChanges, navigate, showToast,
   ]);
 
@@ -1142,8 +1218,172 @@ const AdminActivityForm: React.FC = () => {
 
   // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  // ── Share Activity panel ─────────────────────────────────────────────────────
+
+  // Ensure short URL is created/loaded when editing a published activity with short URL enabled.
+  // Runs on mount and whenever enabled/status changes so first-load always shows the code.
+  useEffect(() => {
+    let active = true;
+    if (!isEdit || !id || originalStatus !== 'published' || !shortUrlEnabled) {
+      // Only clear code when not in the right state — preserve existing code when toggling off
+      if (!isEdit || !id || originalStatus !== 'published') setShortShareCode('');
+      return;
+    }
+    // If we already have a code from hydration, skip the network call
+    if (shortShareCode) return;
+    const run = async () => {
+      setShortShareLoading(true);
+      try {
+        const token = sessionManager.getSessionToken();
+        if (!token) return;
+        const result = await activitiesService.ensureShortShareUrl(token, id);
+        if (!active) return;
+        if (!result.success) {
+          // Non-fatal: short URL may not be critical
+          console.warn('[AdminActivityForm] Could not ensure short URL:', result.error);
+          return;
+        }
+        setShortShareCode((result.short_code ?? '').trim().toLowerCase());
+      } finally {
+        if (active) setShortShareLoading(false);
+      }
+    };
+    void run();
+    return () => { active = false; };
+    // shortShareCode intentionally excluded: we only want to auto-ensure when code is absent
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, id, originalStatus, shortUrlEnabled, showToast]);
+
+  const publicActivityUrl = useMemo(() => {
+    if (originalStatus !== 'published') return '';
+    const s = slug.trim();
+    if (!s) return '';
+    if (typeof window === 'undefined') return `/events/${s}`;
+    return `${window.location.origin}/events/${s}`;
+  }, [originalStatus, slug]);
+
+  const persistedShortActivityUrl = useMemo(() => {
+    if (originalStatus !== 'published' || !shortShareCode) return '';
+    if (typeof window === 'undefined') return `/a/${shortShareCode}`;
+    return `${window.location.origin}/a/${shortShareCode}`;
+  }, [originalStatus, shortShareCode]);
+
+  const shortActivityUrl = shortUrlEnabled ? persistedShortActivityUrl : '';
+
+  const buildDefaultSharePreview = useCallback((): string => {
+    const lines: string[] = [];
+    const t = title.trim();
+    if (t) lines.push(t);
+    const dateParts: string[] = [];
+    if (startAt) {
+      try { dateParts.push(new Date(startAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })); } catch { /* ignore */ }
+    }
+    if (endAt) {
+      try { dateParts.push(`to ${new Date(endAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`); } catch { /* ignore */ }
+    }
+    if (dateParts.length > 0) lines.push(dateParts.join(' '));
+    if (location.trim()) lines.push(`Venue: ${location.trim()}`);
+    const url = shortActivityUrl || publicActivityUrl;
+    if (url) { lines.push(''); lines.push(`Details: ${url}`); }
+    return lines.join('\n').trim();
+  }, [title, startAt, endAt, location, shortActivityUrl, publicActivityUrl]);
+
+  const sharePreview = useMemo(() => {
+    if (originalStatus !== 'published') return '';
+    const saved = shareMessage.trim();
+    if (saved) {
+      let next = saved;
+      if (publicActivityUrl && persistedShortActivityUrl) {
+        next = shortUrlEnabled
+          ? next.split(publicActivityUrl).join(persistedShortActivityUrl)
+          : next.split(persistedShortActivityUrl).join(publicActivityUrl);
+      }
+      next = next.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      const url = shortActivityUrl || publicActivityUrl;
+      if (url && !next.includes(url)) return `${next}\n\nDetails: ${url}`;
+      return next;
+    }
+    return buildDefaultSharePreview();
+  }, [
+    originalStatus,
+    shareMessage,
+    publicActivityUrl,
+    persistedShortActivityUrl,
+    shortActivityUrl,
+    shortUrlEnabled,
+    buildDefaultSharePreview,
+  ]);
+
+  const handleToggleShortUrl = useCallback(async (enable: boolean) => {
+    if (!id) return;
+    setShortUrlToggling(true);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) { showToast('error', 'Session expired.'); return; }
+      const result = await activitiesService.setShortShareUrlEnabled(token, id, enable);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Could not update short URL setting.');
+        return;
+      }
+      setShortUrlEnabled(enable);
+      if (enable && result.short_code) {
+        setShortShareCode(result.short_code.trim().toLowerCase());
+      }
+      showToast('success', enable ? 'Short URL enabled.' : 'Short URL disabled.');
+    } finally {
+      setShortUrlToggling(false);
+    }
+  }, [id, showToast]);
+
+  const copyTextSafely = useCallback(async (text: string, successMsg: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('success', successMsg);
+    } catch {
+      showToast('error', 'Could not copy. Select and copy manually.');
+    }
+  }, [showToast]);
+
+  const openWhatsappShare = useCallback(() => {
+    if (!sharePreview) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(sharePreview)}`, '_blank', 'noopener,noreferrer');
+  }, [sharePreview]);
+
+  const handleGenerateShareMessage = useCallback(async () => {
+    if (originalStatus !== 'published' || !id) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) { showToast('error', 'Session expired.'); return; }
+    setShareGenerating(true);
+    try {
+      const result = await activitiesService.draftShareMessage(token, {
+        title: title.trim(),
+        excerpt: excerpt.trim() || null,
+        description: description.trim() || null,
+        start_at: startAt || null,
+        end_at: endAt || null,
+        location: location.trim() || null,
+        short_url: shortActivityUrl || publicActivityUrl || null,
+      });
+      if (!result.success) { showToast('error', result.error ?? 'AI share message generation failed.'); return; }
+      const msg = (result.message ?? '').trim();
+      if (!msg) { showToast('error', 'AI returned an empty message. Try again.'); return; }
+      const saveResult = await activitiesService.saveShareMessage(token, id, msg);
+      if (!saveResult.success) { showToast('error', saveResult.error ?? 'Message generated but could not be saved.'); return; }
+      setShareMessage(saveResult.share_message ?? msg);
+      showToast('success', 'Share message generated and saved.');
+    } finally {
+      setShareGenerating(false);
+    }
+  }, [originalStatus, id, title, excerpt, description, startAt, endAt, location, shortActivityUrl, publicActivityUrl, showToast]);
+
+  // ── Render helpers ────────────────────────────────────────────────────────────
+
   const activeGallery = gallery.filter((g) => !g.pendingDelete);
   const galleryFull   = activeGallery.length >= limits.maxGalleryImages;
+  const linkedEventExistsInOptions = linkedEventId.length > 0
+    ? linkableEvents.some((evt) => evt.id === linkedEventId)
+    : false;
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1410,10 +1650,10 @@ const AdminActivityForm: React.FC = () => {
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                Start date & time
+                Start date
               </label>
               <Input
-                type="datetime-local"
+                type="date"
                 value={startAt}
                 onChange={(event) => setStartAt(event.target.value)}
               />
@@ -1421,10 +1661,10 @@ const AdminActivityForm: React.FC = () => {
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                End date & time
+                End date
               </label>
               <Input
-                type="datetime-local"
+                type="date"
                 value={endAt}
                 onChange={(event) => setEndAt(event.target.value)}
               />
@@ -1441,6 +1681,37 @@ const AdminActivityForm: React.FC = () => {
                 maxLength={200}
               />
             </div>
+          </div>
+
+          {/* Link to completed event (optional) */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+              Link this activity to a past event (optional)
+            </label>
+            <select
+              value={linkedEventId}
+              onChange={(event) => setLinkedEventId(event.target.value)}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              disabled={linkableEventsLoading}
+            >
+              <option value="">
+                {linkableEventsLoading ? 'Loading events...' : 'Not linked to any event'}
+              </option>
+              {linkedEventMeta && linkedEventId === linkedEventMeta.id && !linkedEventExistsInOptions && (
+                <option value={linkedEventMeta.id}>
+                  {linkedEventMeta.title} ({linkedEventMeta.status}) - /{linkedEventMeta.slug}
+                </option>
+              )}
+              {linkableEvents.map((evt) => (
+                <option key={evt.id} value={evt.id}>
+                  {evt.title} ({evt.status}){evt.end_at ? ` - ${new Date(evt.end_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : '' }
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              When linked, completed event pages will show a public link to this activity report.
+            </p>
           </div>
 
           {/* Featured */}
@@ -1557,7 +1828,7 @@ const AdminActivityForm: React.FC = () => {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Drag to reorder. Max {limits.maxGalleryImages} photos.
-                  Pick a ratio inside the crop tool â€” Original keeps the native aspect.
+                  Pick a ratio inside the crop tool - Original keeps the native aspect.
                 </p>
               </div>
               <Button
@@ -1703,7 +1974,167 @@ const AdminActivityForm: React.FC = () => {
           </div>
         </div>
 
-        {/* â”€â”€â”€ Footer actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* Share Activity panel — published activities only */}
+        {isEdit && originalStatus === 'published' && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+                <Share2 className="h-4 w-4" />
+                Share Activity
+              </h3>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void handleGenerateShareMessage()}
+                disabled={shareGenerating}
+              >
+                {shareGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Generate Share Message with AI
+              </Button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Public Activity URL</label>
+              <div className="flex gap-2">
+                <Input value={publicActivityUrl} readOnly className="font-mono text-xs" />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void copyTextSafely(publicActivityUrl, 'URL copied to clipboard.')}
+                  disabled={!publicActivityUrl}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  Copy URL
+                </Button>
+                {publicActivityUrl && (
+                  <a
+                    href={publicActivityUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open
+                  </a>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-medium text-foreground">Short Activity URL (permanent)</label>
+                <div className="flex items-center gap-2">
+                  {shortUrlToggling ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                  <span className="text-xs text-muted-foreground">{shortUrlEnabled ? 'Enabled' : 'Disabled'}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={shortUrlEnabled}
+                    aria-label="Enable short activity URL"
+                    onClick={() => void handleToggleShortUrl(!shortUrlEnabled)}
+                    disabled={shortUrlToggling || shortShareLoading || !id}
+                    className={cn(
+                      'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                      shortUrlEnabled ? 'bg-primary' : 'bg-muted',
+                      shortUrlToggling || shortShareLoading || !id ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform',
+                        shortUrlEnabled ? 'translate-x-4' : 'translate-x-0'
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+              {shortUrlEnabled ? (
+                <>
+                  <div className="flex gap-2">
+                    <Input
+                      value={shortShareLoading ? 'Generating...' : shortActivityUrl}
+                      readOnly
+                      className="font-mono text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void copyTextSafely(shortActivityUrl, 'Short URL copied to clipboard.')}
+                      disabled={!shortActivityUrl}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy Short URL
+                    </Button>
+                    {shortActivityUrl && (
+                      <a
+                        href={shortActivityUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Short URL is permanent and remains stable even if the activity slug changes.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Short URL is disabled. The existing short code is preserved and can be re-enabled at any time.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Share message preview</label>
+              <Textarea
+                rows={6}
+                value={sharePreview}
+                readOnly
+                className="font-mono text-[13px] leading-snug whitespace-pre-wrap"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Uses AI-generated message when saved, or a compact auto-built preview.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copyTextSafely(sharePreview, 'Share message copied to clipboard.')}
+                    disabled={!sharePreview}
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copy Message
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={openWhatsappShare}
+                    disabled={!sharePreview}
+                    className="bg-[#25D366] hover:bg-[#1da851] text-white"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                    Open WhatsApp Share
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer actions */}
         <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
           <div className="flex items-center gap-2">
             {isEdit && canDelete && originalStatus !== 'published' && (
@@ -1805,8 +2236,6 @@ const AdminActivityForm: React.FC = () => {
 };
 
 export default AdminActivityForm;
-
-
 
 
 

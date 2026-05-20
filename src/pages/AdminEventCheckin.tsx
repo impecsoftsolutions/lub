@@ -58,8 +58,14 @@ function extractBadgeCode(raw: string): string {
   return trimmed.toUpperCase();
 }
 
-function formatVisitDate(iso: string | null | undefined, visitAllDays = false): string {
-  if (visitAllDays) return 'All days';
+function formatAllDaysLabel(dayCount: number): string {
+  const normalized = Number.isFinite(dayCount) && dayCount > 0 ? Math.floor(dayCount) : 0;
+  if (normalized <= 0) return 'Multiple days';
+  return `${normalized} day${normalized === 1 ? '' : 's'}`;
+}
+
+function formatVisitDate(iso: string | null | undefined, visitAllDays = false, dayCount = 0): string {
+  if (visitAllDays) return formatAllDaysLabel(dayCount);
   if (!iso) return '-';
   try {
     return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', {
@@ -70,6 +76,25 @@ function formatVisitDate(iso: string | null | undefined, visitAllDays = false): 
   } catch {
     return iso;
   }
+}
+
+function eventDayCountFromRange(start: string | null | undefined, end: string | null | undefined): number {
+  if (!start) return 0;
+  const startIso = String(start).slice(0, 10);
+  const endIso = String(end ?? start).slice(0, 10);
+  const toDate = (iso: string): Date | null => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return null;
+    const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  };
+  const s = toDate(startIso);
+  const e = toDate(endIso) ?? s;
+  if (!s || !e) return 0;
+  const startDay = new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime();
+  const endDay = new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime();
+  const diffDays = Math.floor((endDay - startDay) / (24 * 60 * 60 * 1000));
+  return diffDays >= 0 ? diffDays + 1 : 1;
 }
 
 // Case-insensitive substring match across key registration fields.
@@ -114,6 +139,7 @@ const AdminEventCheckin: React.FC = () => {
   // ── Registration list + badges (loaded once on mount) ────────────────────
   const [allRsvps, setAllRsvps] = useState<EventRsvpRow[]>([]);
   const [badges, setBadges] = useState<EventBadgeRow[]>([]);
+  const [eventDayCount, setEventDayCount] = useState(1);
   const [rsvpsLoading, setRsvpsLoading] = useState(false);
 
   // ── Search input + dropdown ───────────────────────────────────────────────
@@ -169,10 +195,12 @@ const AdminEventCheckin: React.FC = () => {
     Promise.all([
       eventsService.getRsvps(token, id),
       eventsService.getBadges(token, id),
-    ]).then(([rsvpResult, badgeResult]) => {
+      eventsService.getById(token, id),
+    ]).then(([rsvpResult, badgeResult, eventDetail]) => {
       if (!cancelled) {
         setAllRsvps(rsvpResult.rows ?? []);
         setBadges(badgeResult.rows ?? []);
+        setEventDayCount(eventDayCountFromRange(eventDetail?.start_at, eventDetail?.end_at) || 1);
         setRsvpsLoading(false);
       }
     }).catch(() => {
@@ -675,7 +703,7 @@ const AdminEventCheckin: React.FC = () => {
               )}
               {selectedRow.company && (
                 <>
-                  <dt className="text-muted-foreground">Organisation</dt>
+                  <dt className="text-muted-foreground">Company / Organization</dt>
                   <dd className="text-foreground">{selectedRow.company}</dd>
                 </>
               )}
@@ -707,7 +735,7 @@ const AdminEventCheckin: React.FC = () => {
                 <>
                   <dt className="text-muted-foreground">Day of visit</dt>
                   <dd className="text-foreground">
-                    {formatVisitDate(selectedRow.visit_date, selectedRow.visit_all_days)}
+                    {formatVisitDate(selectedRow.visit_date, selectedRow.visit_all_days, eventDayCount)}
                   </dd>
                 </>
               )}

@@ -323,10 +323,11 @@ const AdminEventForm: React.FC = () => {
   // WhatsApp manual generation (040A)
   const [isGeneratingWhatsapp, setIsGeneratingWhatsapp] = useState(false);
   const [showWhatsappOverwriteConfirm, setShowWhatsappOverwriteConfirm] = useState(false);
-  // Short RSVP redirect URL (077)
+  // Short RSVP redirect URL (077) — enable/disable toggle (089)
   const [shortShareCode, setShortShareCode] = useState('');
   const [shortShareLoading, setShortShareLoading] = useState(false);
-  const [shortShareRefreshing, setShortShareRefreshing] = useState(false);
+  const [shortUrlEnabled, setShortUrlEnabled] = useState(true);
+  const [shortUrlToggling, setShortUrlToggling] = useState(false);
 
   const [original, setOriginal] = useState<AdminEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
@@ -397,6 +398,11 @@ const AdminEventForm: React.FC = () => {
         );
         setVenueMapUrl(data.venue_map_url ?? '');
         setWhatsappMessage(data.whatsapp_invitation_message ?? '');
+        // Hydrate short URL state — now returned by get_event_by_id_with_session (089)
+        if (data.short_url_code) {
+          setShortShareCode(data.short_url_code.trim().toLowerCase());
+        }
+        setShortUrlEnabled(data.short_url_enabled !== false); // default true if null/undefined
 
         const rsvpCfg = data.rsvp ?? {
           enabled: false,
@@ -1289,10 +1295,12 @@ const AdminEventForm: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    if (!isPublished || !id) {
-      setShortShareCode('');
+    if (!isPublished || !id || !shortUrlEnabled) {
+      if (!isPublished || !id) setShortShareCode('');
       return;
     }
+    // If hydrated from getById, skip network call
+    if (shortShareCode) return;
     const run = async () => {
       setShortShareLoading(true);
       try {
@@ -1301,7 +1309,7 @@ const AdminEventForm: React.FC = () => {
         const result = await eventsService.ensureShortShareUrl(token, id);
         if (!active) return;
         if (!result.success) {
-          showToast('error', result.error ?? 'Could not load short URL.');
+          console.warn('[AdminEventForm] Could not ensure short URL:', result.error);
           return;
         }
         setShortShareCode((result.short_code ?? '').trim().toLowerCase());
@@ -1313,7 +1321,9 @@ const AdminEventForm: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [isPublished, id, showToast]);
+    // shortShareCode intentionally excluded — only auto-ensure when code is absent
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPublished, id, shortUrlEnabled, showToast]);
 
   const publicEventUrl = useMemo(() => {
     if (!isPublished) return '';
@@ -1323,13 +1333,14 @@ const AdminEventForm: React.FC = () => {
     return `${window.location.origin}/events/${slugForUrl}`;
   }, [isPublished, slug, original?.slug]);
 
-  const shortEventUrl = useMemo(() => {
+  const persistedShortEventUrl = useMemo(() => {
     if (!isPublished || !shortShareCode) return '';
     if (typeof window === 'undefined') return `/r/${shortShareCode}`;
     return `${window.location.origin}/r/${shortShareCode}`;
   }, [isPublished, shortShareCode]);
 
-  const preferredShareUrl = shortEventUrl;
+  const shortEventUrl = shortUrlEnabled ? persistedShortEventUrl : '';
+  const preferredShareUrl = shortEventUrl || publicEventUrl;
 
   const normalizeRegistrationWording = useCallback((text: string): string => {
     if (!text) return '';
@@ -1376,8 +1387,10 @@ const AdminEventForm: React.FC = () => {
     const saved = whatsappMessage.trim();
     if (saved) {
       let nextMessage = normalizeRegistrationWording(saved);
-      if (publicEventUrl) {
-        nextMessage = nextMessage.split(publicEventUrl).join(preferredShareUrl || '');
+      if (publicEventUrl && persistedShortEventUrl) {
+        nextMessage = shortUrlEnabled
+          ? nextMessage.split(publicEventUrl).join(persistedShortEventUrl)
+          : nextMessage.split(persistedShortEventUrl).join(publicEventUrl);
       }
       nextMessage = nextMessage
         .replace(/[ \t]+\n/g, '\n')
@@ -1393,33 +1406,31 @@ const AdminEventForm: React.FC = () => {
     isPublished,
     whatsappMessage,
     publicEventUrl,
+    persistedShortEventUrl,
+    shortUrlEnabled,
     preferredShareUrl,
     normalizeRegistrationWording,
     buildDefaultShareMessage,
   ]);
 
-  const refreshShortShareUrl = useCallback(async () => {
+  const handleToggleShortUrl = useCallback(async (enable: boolean) => {
     if (!id) return;
-    if (!window.confirm('Regenerate short URL now? Old short links will stop working immediately.')) {
-      return;
-    }
-    setShortShareRefreshing(true);
+    setShortUrlToggling(true);
     try {
       const token = sessionManager.getSessionToken();
-      if (!token) {
-        showToast('error', 'Session expired.');
-        return;
-      }
-      const result = await eventsService.refreshShortShareUrl(token, id);
+      if (!token) { showToast('error', 'Session expired.'); return; }
+      const result = await eventsService.setShortShareUrlEnabled(token, id, enable);
       if (!result.success) {
-        showToast('error', result.error ?? 'Could not refresh short URL.');
+        showToast('error', result.error ?? 'Could not update short URL setting.');
         return;
       }
-      const nextCode = (result.short_code ?? '').trim().toLowerCase();
-      if (nextCode) setShortShareCode(nextCode);
-      showToast('success', 'Short registration URL refreshed.');
+      setShortUrlEnabled(enable);
+      if (enable && result.short_code) {
+        setShortShareCode(result.short_code.trim().toLowerCase());
+      }
+      showToast('success', enable ? 'Short URL enabled.' : 'Short URL disabled.');
     } finally {
-      setShortShareRefreshing(false);
+      setShortUrlToggling(false);
     }
   }, [id, showToast]);
 
@@ -3116,52 +3127,67 @@ const AdminEventForm: React.FC = () => {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <label className="text-xs font-medium text-foreground">Short Registration URL (permanent)</label>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={refreshShortShareUrl}
-                      disabled={shortShareLoading || shortShareRefreshing || !id}
-                    >
-                      {shortShareRefreshing ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      Refresh Short Registration URL
-                    </Button>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={shortShareLoading ? 'Generating short URL...' : shortEventUrl}
-                      readOnly
-                      className="font-mono text-xs"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void copyTextSafely(shortEventUrl, 'Short URL copied to clipboard.')}
-                      disabled={!shortEventUrl}
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      Copy Short URL
-                    </Button>
-                    {shortEventUrl && (
-                      <a
-                        href={shortEventUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                    <div className="flex items-center gap-2">
+                      {shortUrlToggling ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                      <span className="text-xs text-muted-foreground">{shortUrlEnabled ? 'Enabled' : 'Disabled'}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={shortUrlEnabled}
+                        aria-label="Enable short registration URL"
+                        onClick={() => void handleToggleShortUrl(!shortUrlEnabled)}
+                        disabled={shortUrlToggling || shortShareLoading || !id}
+                        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+                          shortUrlEnabled ? 'bg-primary' : 'bg-muted'
+                        } ${shortUrlToggling || shortShareLoading || !id ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                       >
-                        <ExternalLink className="h-4 w-4" />
-                        Open
-                      </a>
-                    )}
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            shortUrlEnabled ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Short URL is stable even if the event slug changes. Refresh creates a new short URL and invalidates the old one.
-                  </p>
+                  {shortUrlEnabled ? (
+                    <>
+                      <div className="flex gap-2">
+                        <Input
+                          value={shortShareLoading ? 'Generating...' : shortEventUrl}
+                          readOnly
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void copyTextSafely(shortEventUrl, 'Short URL copied to clipboard.')}
+                          disabled={!shortEventUrl}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy Short URL
+                        </Button>
+                        {shortEventUrl && (
+                          <a
+                            href={shortEventUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            Open
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Short URL is permanent and remains stable even if the event slug changes.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      Short URL is disabled. The existing short code is preserved and can be re-enabled at any time.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

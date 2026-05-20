@@ -64,7 +64,7 @@
 //     permission via public.has_permission(actor_id, code).
 //
 // Output — draft mode (success):
-//   { success: true, data: { title, slug, excerpt, description } }
+//   { success: true, data: { title, slug, excerpt, description, activity_date?, start_at?, end_at?, location? } }
 //
 // Output — extract_fields mode (success):
 //   { success: true, fields: { activity_date?, location?, participants?,
@@ -122,6 +122,17 @@ interface ExtractionFields {
   additional_notes?: string;
 }
 
+interface ActivityDraftOutput {
+  title: string;
+  slug: string;
+  excerpt: string;
+  description: string;
+  activity_date: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+}
+
 interface EventInputForActivity {
   title?: string;
   excerpt?: string;
@@ -135,12 +146,23 @@ interface EventInputForActivity {
   agenda_items?: Array<Record<string, unknown>>;
 }
 
+interface ActivityShareInput {
+  title?: string;
+  excerpt?: string;
+  description?: string;
+  start_at?: string;
+  end_at?: string;
+  location?: string;
+  short_url?: string;
+}
+
 interface DraftRequestBody {
   session_token?: string;
   /** Defaults to "draft" when absent. */
-  mode?: 'draft' | 'extract_fields' | 'event_to_activity';
+  mode?: 'draft' | 'extract_fields' | 'event_to_activity' | 'draft_share';
   inputs?: DraftInputs;
   event_input?: EventInputForActivity;
+  activity_input?: ActivityShareInput;
   source_files?: SourceFile[];
 }
 
@@ -190,6 +212,7 @@ const MAX_SOURCE_FILE_IMAGE_BYTES = 10 * 1024 * 1024;  // 10 MB per image (JPEG/
 const MAX_SOURCE_FILE_PDF_BYTES = 20 * 1024 * 1024;    // 20 MB per PDF
 const MAX_SOURCE_FILES_TOTAL_BYTES = 30 * 1024 * 1024; // 30 MB cumulative
 const DECORATIVE_SYMBOL_REGEX = /\p{Extended_Pictographic}/gu;
+const EXCERPT_MAX_CHARS = 280;
 
 function toStringValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -207,6 +230,254 @@ function sanitizeGeneratedText(input: string): string {
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function normalizeForSimilarity(input: string): string {
+  return String(input || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitSentences(input: string): string[] {
+  return String(input || '')
+    .replace(/\n+/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map((line) => sanitizeGeneratedText(line))
+    .filter(Boolean);
+}
+
+function leadingTokenMatchCount(left: string[], right: string[]): number {
+  const max = Math.min(left.length, right.length);
+  let count = 0;
+  for (let i = 0; i < max; i += 1) {
+    if (left[i] !== right[i]) break;
+    count += 1;
+  }
+  return count;
+}
+
+function isNearDuplicateSentence(leftRaw: string, rightRaw: string): boolean {
+  const left = normalizeForSimilarity(leftRaw);
+  const right = normalizeForSimilarity(rightRaw);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (left.startsWith(right) || right.startsWith(left)) return true;
+
+  const leftTokens = left.split(' ').filter(Boolean);
+  const rightTokens = right.split(' ').filter(Boolean);
+  if (leftTokens.length < 4 || rightTokens.length < 4) return false;
+
+  const leadingMatch = leadingTokenMatchCount(leftTokens, rightTokens);
+  if (leadingMatch >= 8) return true;
+
+  const window = Math.min(leftTokens.length, rightTokens.length, 16);
+  if (window >= 6) {
+    let same = 0;
+    for (let i = 0; i < window; i += 1) {
+      if (leftTokens[i] === rightTokens[i]) same += 1;
+    }
+    if (same / window >= 0.66) return true;
+  }
+
+  return false;
+}
+
+function excerptLooksRepeated(excerpt: string, description: string): boolean {
+  const sentences = splitSentences(description);
+  if (sentences.length === 0) return false;
+  return sentences.some((sentence) => isNearDuplicateSentence(excerpt, sentence));
+}
+
+function buildDistinctExcerpt(description: string, title: string, location?: string | null): string {
+  const locationSuffix = location ? ` at ${location}` : '';
+
+  const candidateA = sanitizeGeneratedText(
+    `This activity report summarises the key sessions, participation, and outcomes for ${title}${locationSuffix}.`,
+  ).slice(0, EXCERPT_MAX_CHARS);
+  if (!excerptLooksRepeated(candidateA, description)) return candidateA;
+
+  const candidateB = sanitizeGeneratedText(
+    `Key proceedings and takeaways from ${title} are captured in this activity update.`,
+  ).slice(0, EXCERPT_MAX_CHARS);
+  if (!excerptLooksRepeated(candidateB, description)) return candidateB;
+
+  return sanitizeGeneratedText(
+    `Activity report summary for ${title}.`,
+  ).slice(0, EXCERPT_MAX_CHARS);
+}
+
+// ── Excerpt / description lead distinctness enforcement ─────────────────────
+
+/** Returns the first sentence from a text block. Splits on paragraph then sentence boundaries. */
+function firstSentenceOf(text: string): string {
+  if (!text) return '';
+  const firstPara = String(text).split(/\n\n+/)[0] ?? '';
+  const parts = firstPara
+    .replace(/\n/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => sanitizeGeneratedText(s))
+    .filter(Boolean);
+  return parts[0] ?? '';
+}
+
+/** Jaccard similarity over meaningful tokens (length > 2). */
+function tokenBagSimilarity(leftTokens: string[], rightTokens: string[]): number {
+  const leftSet = new Set(leftTokens.filter((t) => t.length > 2));
+  const rightSet = new Set(rightTokens.filter((t) => t.length > 2));
+  if (leftSet.size === 0 || rightSet.size === 0) return 0;
+  let shared = 0;
+  for (const token of leftSet) {
+    if (rightSet.has(token)) shared += 1;
+  }
+  const union = leftSet.size + rightSet.size - shared;
+  return union > 0 ? shared / union : 0;
+}
+
+/**
+ * Compares the LEAD sentences of excerpt and description specifically.
+ * Uses lower thresholds than `isNearDuplicateSentence` (which checks all sentences)
+ * and adds Jaccard bag similarity to catch rephrased / reordered duplicates.
+ */
+function isNearDuplicateLead(excerptText: string, descriptionText: string): boolean {
+  const a = firstSentenceOf(excerptText);
+  const b = firstSentenceOf(descriptionText);
+  if (!a || !b) return false;
+  const left = normalizeForSimilarity(a);
+  const right = normalizeForSimilarity(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (left.startsWith(right) || right.startsWith(left)) return true;
+  const leftTokens = left.split(' ').filter(Boolean);
+  const rightTokens = right.split(' ').filter(Boolean);
+  if (leftTokens.length < 4 || rightTokens.length < 4) {
+    return tokenBagSimilarity(leftTokens, rightTokens) >= 0.75;
+  }
+  // Leading token overlap — threshold 5 (vs 8 in the global sentence check)
+  if (leadingTokenMatchCount(leftTokens, rightTokens) >= 5) return true;
+  // Positional window — threshold 0.60 and wider window (vs 0.66 / 16 globally)
+  const window = Math.min(leftTokens.length, rightTokens.length, 20);
+  if (window >= 6) {
+    let same = 0;
+    for (let i = 0; i < window; i += 1) {
+      if (leftTokens[i] === rightTokens[i]) same += 1;
+    }
+    if (same / window >= 0.60) return true;
+  }
+  // Jaccard bag — catches reordered / rephrased duplicates.
+  // Threshold 0.62: requires ~38% of the union of meaningful tokens to match.
+  // T6 (rephrased, reordered sentence) yields 0.647 — caught. T5 (distinct) yields 0.136 — safe.
+  if (tokenBagSimilarity(leftTokens, rightTokens) >= 0.62) return true;
+  return false;
+}
+
+/**
+ * Removes leading sentences from the description's first paragraph that
+ * near-duplicate the excerpt. Preserves paragraph structure. Caps at 3 removals.
+ */
+function stripRepeatedLeadFromDescription(excerpt: string, description: string): string {
+  if (!excerpt || !description) return description;
+  const paragraphs = String(description).split(/\n\n+/);
+  if (paragraphs.length === 0) return description;
+  const firstParaSentences = String(paragraphs[0])
+    .replace(/\n/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => sanitizeGeneratedText(s))
+    .filter(Boolean);
+  let removed = 0;
+  while (firstParaSentences.length > 0 && removed < 3) {
+    if (isNearDuplicateSentence(excerpt, firstParaSentences[0])) {
+      firstParaSentences.shift();
+      removed += 1;
+    } else {
+      break;
+    }
+  }
+  if (removed === 0) return description;
+  const newFirstPara = firstParaSentences.join(' ');
+  const rest = paragraphs.slice(1);
+  const parts = newFirstPara ? [newFirstPara, ...rest] : rest;
+  return sanitizeGeneratedText(parts.join('\n\n'));
+}
+
+/** Minimum word count a stripped description must retain to accept the strip. */
+const MIN_DESCRIPTION_WORDS_AFTER_STRIP = 50;
+
+/**
+ * Enforces that excerpt and description do not share near-duplicate lead sentences.
+ *
+ * Preference order:
+ *  1. Strip repeated lead from description (preserves AI-generated excerpt quality).
+ *  2. Replace excerpt with template if stripping would make description too short.
+ *  3. Final guaranteed assertion: always distinct before returning.
+ *
+ * Also runs the global `excerptLooksRepeated` safety net so no non-lead
+ * sentence repetition slips through.
+ */
+function enforceExcerptDescriptionDistinctness(draft: ActivityDraftOutput): ActivityDraftOutput {
+  let { excerpt, description } = draft;
+  const { title, location } = draft;
+
+  // Step 1: ensure excerpt is non-empty
+  if (!excerpt) {
+    excerpt = buildDistinctExcerpt(description, title, location ?? undefined);
+  }
+
+  // Fast-path: leads already distinct
+  if (!isNearDuplicateLead(excerpt, description)) {
+    // Global sentence safety net (non-lead repetition)
+    if (excerptLooksRepeated(excerpt, description)) {
+      excerpt = buildDistinctExcerpt(description, title, location ?? undefined);
+      if (excerptLooksRepeated(excerpt, description)) {
+        excerpt = sanitizeGeneratedText(
+          `This activity update highlights the key sessions and outcomes from ${title}.`,
+        ).slice(0, EXCERPT_MAX_CHARS);
+      }
+    }
+    return { ...draft, excerpt: excerpt.slice(0, EXCERPT_MAX_CHARS) };
+  }
+
+  // Leads are near-duplicate — primary fix: strip from description
+  const originalDescription = description;
+  const strippedDescription = stripRepeatedLeadFromDescription(excerpt, description);
+  const strippedWordCount = strippedDescription.trim().split(/\s+/).filter(Boolean).length;
+
+  if (strippedWordCount >= MIN_DESCRIPTION_WORDS_AFTER_STRIP) {
+    // Stripping succeeded and description is still substantial
+    description = strippedDescription;
+    // Re-check leads (rare: second sentence may also be near-duplicate)
+    if (isNearDuplicateLead(excerpt, description)) {
+      excerpt = buildDistinctExcerpt(description, title, location ?? undefined);
+    }
+  } else {
+    // Description would become too short — keep description, fix excerpt instead
+    description = originalDescription;
+    excerpt = buildDistinctExcerpt(description, title, location ?? undefined);
+  }
+
+  // Global sentence safety net
+  if (excerptLooksRepeated(excerpt, description)) {
+    excerpt = buildDistinctExcerpt(description, title, location ?? undefined);
+    if (excerptLooksRepeated(excerpt, description)) {
+      excerpt = sanitizeGeneratedText(
+        `This activity update highlights the key sessions and outcomes from ${title}.`,
+      ).slice(0, EXCERPT_MAX_CHARS);
+    }
+  }
+
+  // Final assertion: guarantee lead distinctness (last-resort fallback)
+  if (isNearDuplicateLead(excerpt, description)) {
+    excerpt = sanitizeGeneratedText(
+      `This activity report captures the key proceedings and outcomes from ${title}.`,
+    ).slice(0, EXCERPT_MAX_CHARS);
+  }
+
+  return {
+    ...draft,
+    excerpt: excerpt.slice(0, EXCERPT_MAX_CHARS),
+    description,
+  };
 }
 
 function sanitizeReasoningEffort(value: string | null | undefined): string | null {
@@ -311,11 +582,16 @@ function buildSystemPrompt(hasSourceFiles: boolean): string {
   }
   base.push(
     'Return strict JSON only with this exact shape:',
-    '{ "title": string, "slug": string, "excerpt": string, "description": string }',
+    '{ "title": string, "slug": string, "excerpt": string, "description": string, "activity_date": string|null, "start_at": string|null, "end_at": string|null, "location": string|null }',
     'title: short, descriptive, ≤ 90 characters, no trailing punctuation.',
     'slug: lowercase letters, digits, and hyphens only, ≤ 60 characters; will be re-validated client-side.',
     'excerpt: 1–2 sentences, ≤ 280 characters, plain text, suitable as listing card summary.',
-    'description: 2–4 short paragraphs (~150–500 words total), plain text, no Markdown, no headings.'
+    'excerpt must be an independent summary line and must not repeat or copy any sentence (or sentence fragment) from description.',
+    'The opening sentence of excerpt and the opening sentence of description must be different — do not start both with the same phrase or clause.',
+    'description: 2–4 short paragraphs (~150–500 words total), plain text, no Markdown, no headings.',
+    'Extract activity_date, start_at, end_at, and location from the brief or source files when clearly present.',
+    'For start_at and end_at, return ISO-like local datetime strings. If the date is clear but no time is present, use 10:00 for start_at and 17:00 for end_at.',
+    'For a multi-day activity, start_at must be the first day and end_at must be the last day. If no date or location is present, return null for that field.'
   );
   return base.join(' ');
 }
@@ -334,6 +610,37 @@ function buildUserFacts(inputs: DraftInputs): string {
     },
     null,
     2
+  );
+}
+
+function buildShareSystemPrompt(): string {
+  return [
+    'You write concise public share messages for Laghu Udyog Bharati activity pages.',
+    'Return strict JSON only with this exact shape: { "share_message": string }.',
+    'The share_message must be plain text, 2 to 5 short lines, and at most 550 characters.',
+    'Use completed-activity language, not invitation or registration language.',
+    'Do not use emojis, decorative symbols, bullets, Markdown, hashtags, or all-caps emphasis.',
+    'Include the activity title, one short value summary, date/location when provided, and the short URL when provided.',
+    'Do not invent dates, venue names, attendance counts, outcomes, quotes, or speaker names.',
+  ].join(' ');
+}
+
+function buildShareUserPrompt(input: ActivityShareInput): string {
+  return JSON.stringify(
+    {
+      task: 'draft_activity_share_message',
+      activity: {
+        title: toStringValue(input.title),
+        excerpt: toStringValue(input.excerpt),
+        description: toStringValue(input.description).slice(0, 1600),
+        start_at: toStringValue(input.start_at),
+        end_at: toStringValue(input.end_at),
+        location: toStringValue(input.location),
+        short_url: toStringValue(input.short_url),
+      },
+    },
+    null,
+    2,
   );
 }
 
@@ -362,6 +669,7 @@ function buildEventToActivityPrompt(eventInput: EventInputForActivity): string {
         'Do not invent attendance counts, outcomes, quotes, or names.',
         'Do not use invitation language such as "join", "register now", or "you are invited".',
         'Do not use emojis or decorative symbols.',
+        'Excerpt must be an independent summary and must not repeat or copy any sentence from description. The opening sentence of excerpt and the opening sentence of description must be different.',
       ],
       event: {
         title: toStringValue(eventInput.title),
@@ -387,12 +695,132 @@ function buildEventToActivityPrompt(eventInput: EventInputForActivity): string {
   );
 }
 
-function parseAIDraftJson(content: string): {
-  title: string;
-  slug: string;
-  excerpt: string;
-  description: string;
-} {
+const MONTHS_EN: Record<string, number> = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+const DEFAULT_START_HOUR = 10;
+const DEFAULT_END_HOUR = 17;
+
+function isoLocalNoTz(year: number, monthIndex0: number, day: number, hour: number, minute: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(monthIndex0 + 1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00`;
+}
+
+function toIsoDateLocal(value: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+function normalizeDateOnly(value: unknown): string | null {
+  const raw = toStringValue(value);
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return toIsoDateLocal(parsed);
+}
+
+function normalizeDateTime(value: unknown): string | null {
+  const raw = toStringValue(value);
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T10:00:00`;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return raw;
+}
+
+function isoLocalFromDateString(dateValue: string, hour: number): string | null {
+  const m = String(dateValue || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return isoLocalNoTz(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hour, 0);
+}
+
+interface DateRangeParse {
+  activity_date: string;
+  start_at: string;
+  end_at: string;
+}
+
+function fallbackParseDateRange(brief: string): DateRangeParse | null {
+  if (!brief || typeof brief !== 'string') return null;
+  const text = brief.replace(/\s+/g, ' ').trim();
+  const monthAlt = Object.keys(MONTHS_EN).join('|');
+
+  const reA = new RegExp(`\\b(\\d{1,2})\\s*(?:,|and|&)\\s*(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`, 'i');
+  const reB = new RegExp(`\\b(\\d{1,2})\\s*[-\\u2013/]\\s*(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`, 'i');
+  const reC = new RegExp(`\\b(${monthAlt})\\.?\\s+(\\d{1,2})\\s*(?:[-\\u2013/,]|and|&)\\s*(\\d{1,2})\\s*,?\\s*(\\d{4})\\b`, 'i');
+  const reD = new RegExp(`\\b(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(?:(\\d{4})\\s+)?(?:to|until|through|\\u2013|-)\\s+(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`, 'i');
+  const reE1 = new RegExp(`\\b(\\d{1,2})\\s+(${monthAlt})\\.?\\s+(\\d{4})\\b`, 'i');
+  const reE2 = new RegExp(`\\b(${monthAlt})\\.?\\s+(\\d{1,2})\\s*,?\\s*(\\d{4})\\b`, 'i');
+
+  let m: RegExpMatchArray | null;
+  let startYear = 0;
+  let startMonth = 0;
+  let startDay = 0;
+  let endYear = 0;
+  let endMonth = 0;
+  let endDay = 0;
+
+  if ((m = text.match(reA)) || (m = text.match(reB))) {
+    startDay = Number(m[1]);
+    endDay = Number(m[2]);
+    startMonth = endMonth = MONTHS_EN[m[3].toLowerCase()] - 1;
+    startYear = endYear = Number(m[4]);
+  } else if ((m = text.match(reC))) {
+    startMonth = endMonth = MONTHS_EN[m[1].toLowerCase()] - 1;
+    startDay = Number(m[2]);
+    endDay = Number(m[3]);
+    startYear = endYear = Number(m[4]);
+  } else if ((m = text.match(reD))) {
+    startDay = Number(m[1]);
+    startMonth = MONTHS_EN[m[2].toLowerCase()] - 1;
+    endDay = Number(m[4]);
+    endMonth = MONTHS_EN[m[5].toLowerCase()] - 1;
+    endYear = Number(m[6]);
+    startYear = m[3] ? Number(m[3]) : endYear;
+  } else if ((m = text.match(reE1))) {
+    startDay = endDay = Number(m[1]);
+    startMonth = endMonth = MONTHS_EN[m[2].toLowerCase()] - 1;
+    startYear = endYear = Number(m[3]);
+  } else if ((m = text.match(reE2))) {
+    startMonth = endMonth = MONTHS_EN[m[1].toLowerCase()] - 1;
+    startDay = endDay = Number(m[2]);
+    startYear = endYear = Number(m[3]);
+  } else {
+    return null;
+  }
+
+  const start_at = isoLocalNoTz(startYear, startMonth, startDay, DEFAULT_START_HOUR, 0);
+  const end_at = isoLocalNoTz(endYear, endMonth, endDay, DEFAULT_END_HOUR, 0);
+  return { activity_date: start_at.slice(0, 10), start_at, end_at };
+}
+
+function fallbackParseLocation(brief: string): string | null {
+  if (!brief || typeof brief !== 'string') return null;
+  const lines = brief.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    const match = line.match(/^(?:venue|location|place)\s*:\s*(.+)$/i);
+    if (match?.[1]) return sanitizeGeneratedText(match[1]).slice(0, 180) || null;
+  }
+  const text = brief.replace(/\s+/g, ' ').trim();
+  const heldAt = text.match(/\b(?:held|conducted|organized|organised|hosted)(?:\s+on\s+[^.;\n]+?)?\s+at\s+([^.;\n]+?)(?:\s+on\s+|\s+from\s+|[.;]|$)/i);
+  if (heldAt?.[1]) return sanitizeGeneratedText(heldAt[1]).slice(0, 180) || null;
+  return null;
+}
+
+function parseAIDraftJson(content: string): ActivityDraftOutput {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -408,17 +836,59 @@ function parseAIDraftJson(content: string): {
   const obj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
   const title = sanitizeGeneratedText(toStringValue(obj.title));
   const description = sanitizeGeneratedText(toStringValue(obj.description));
-  const excerpt = sanitizeGeneratedText(toStringValue(obj.excerpt));
+  const rawExcerpt = sanitizeGeneratedText(toStringValue(obj.excerpt));
   const aiSlug = toStringValue(obj.slug);
+  let activityDate = normalizeDateOnly(obj.activity_date);
+  let startAt = normalizeDateTime(obj.start_at);
+  let endAt = normalizeDateTime(obj.end_at);
+  const location = sanitizeGeneratedText(toStringValue(obj.location));
   if (!title || !description) {
     throw new Error('AI response missing required fields (title/description).');
   }
-  return {
+
+  if (!activityDate && startAt) {
+    activityDate = normalizeDateOnly(startAt);
+  }
+  if (activityDate && !startAt) {
+    startAt = isoLocalFromDateString(activityDate, DEFAULT_START_HOUR);
+  }
+  if (activityDate && !endAt) {
+    endAt = isoLocalFromDateString(activityDate, DEFAULT_END_HOUR);
+  }
+
+  // Deterministic post-processing: enforce excerpt/description lead distinctness.
+  // Prefers stripping the repeated sentence from description (preserving AI excerpt)
+  // over replacing excerpt with a template.
+  return enforceExcerptDescriptionDistinctness({
     title,
     slug: slugifyServer(aiSlug || title),
-    excerpt,
+    excerpt: rawExcerpt.slice(0, EXCERPT_MAX_CHARS),
     description,
-  };
+    activity_date: activityDate || null,
+    start_at: startAt || null,
+    end_at: endAt || null,
+    location: location || null,
+  });
+}
+
+function parseShareJson(content: string): { share_message: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      parsed = JSON.parse(content.slice(firstBrace, lastBrace + 1));
+    } else {
+      throw new Error('AI returned non-JSON share content.');
+    }
+  }
+  const obj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  const raw = sanitizeGeneratedText(toStringValue(obj.share_message))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return { share_message: raw.slice(0, 700) };
 }
 
 function buildExtractionSystemPrompt(): string {
@@ -483,7 +953,7 @@ async function callOpenAIChatCompletions(
   reasoningEffort: string | null,
   systemPrompt: string,
   userPrompt: string
-): Promise<{ title: string; slug: string; excerpt: string; description: string }> {
+): Promise<ActivityDraftOutput> {
   const requestBody: Record<string, unknown> = {
     model,
     response_format: { type: 'json_object' },
@@ -515,6 +985,46 @@ async function callOpenAIChatCompletions(
     throw new Error('AI returned empty content.');
   }
   return parseAIDraftJson(content);
+}
+
+async function callOpenAIChatCompletionsShare(
+  apiKey: string,
+  model: string,
+  reasoningEffort: string | null,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<{ share_message: string }> {
+  const requestBody: Record<string, unknown> = {
+    model,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  };
+  if (reasoningEffort && model.toLowerCase().startsWith('gpt-5')) {
+    requestBody.reasoning_effort = reasoningEffort;
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const body = (await response.json()) as OpenAICompletionResponse;
+  if (!response.ok) {
+    const message = body?.error?.message || `OpenAI request failed with ${response.status}`;
+    throw new Error(message);
+  }
+  const content = body?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== 'string') {
+    throw new Error('AI returned empty share content.');
+  }
+  return parseShareJson(content);
 }
 
 // ── OpenAI Responses API path (with source files) ───────────────────────────
@@ -562,7 +1072,7 @@ async function callOpenAIResponsesAPI(
   systemPrompt: string,
   userPrompt: string,
   sourceFiles: SourceFile[]
-): Promise<{ title: string; slug: string; excerpt: string; description: string }> {
+): Promise<ActivityDraftOutput> {
   const requestBody: Record<string, unknown> = {
     model,
     input: buildResponsesContent(systemPrompt, userPrompt, sourceFiles),
@@ -732,10 +1242,10 @@ Deno.serve(async (req: Request) => {
   const rawMode = toStringValue(payload?.mode) || 'draft';
   const inputs: DraftInputs = payload?.inputs && typeof payload.inputs === 'object' ? payload.inputs : {};
 
-  if (rawMode !== 'draft' && rawMode !== 'extract_fields' && rawMode !== 'event_to_activity') {
-    return failClosed(`Invalid mode "${rawMode}". Expected "draft", "extract_fields", or "event_to_activity".`, 'generation_failed');
+  if (rawMode !== 'draft' && rawMode !== 'extract_fields' && rawMode !== 'event_to_activity' && rawMode !== 'draft_share') {
+    return failClosed(`Invalid mode "${rawMode}". Expected "draft", "extract_fields", "event_to_activity", or "draft_share".`, 'generation_failed');
   }
-  const mode = rawMode as 'draft' | 'extract_fields' | 'event_to_activity';
+  const mode = rawMode as 'draft' | 'extract_fields' | 'event_to_activity' | 'draft_share';
 
   if (!sessionToken) {
     return failClosed('Session token is required.', 'session_invalid');
@@ -822,6 +1332,30 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  if (mode === 'draft_share') {
+    try {
+      const result = await callOpenAIChatCompletionsShare(
+        apiKey,
+        model,
+        reasoningEffort,
+        buildShareSystemPrompt(),
+        buildShareUserPrompt(payload?.activity_input ?? {}),
+      );
+      return jsonResponse({
+        success: true,
+        data: result,
+        ai: {
+          model,
+          generated_at: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI share message generation failed.';
+      console.error('[draft-activity-content] share generation error:', message);
+      return failClosed(`AI share message generation failed: ${message}`, 'generation_failed');
+    }
+  }
+
   // ── draft mode (default) ─────────────────────────────────────────────────
   try {
     const systemPrompt = buildSystemPrompt(sourceFiles.length > 0 || mode === 'event_to_activity');
@@ -833,7 +1367,41 @@ Deno.serve(async (req: Request) => {
       ? await callOpenAIResponsesAPI(apiKey, model, reasoningEffort, systemPrompt, userPrompt, sourceFiles)
       : await callOpenAIChatCompletions(apiKey, model, reasoningEffort, systemPrompt, userPrompt);
 
-    return jsonResponse({ success: true, data: draft });
+    const briefRaw = toStringValue(inputs.additional_notes);
+    let dateOutcome: 'ai_date_detected' | 'fallback_date_detected' | 'no_date_detected' = 'no_date_detected';
+    if (draft.start_at || draft.activity_date) {
+      dateOutcome = 'ai_date_detected';
+    } else if (briefRaw) {
+      const fallback = fallbackParseDateRange(briefRaw);
+      if (fallback) {
+        draft.activity_date = fallback.activity_date;
+        draft.start_at = fallback.start_at;
+        draft.end_at = draft.end_at || fallback.end_at;
+        dateOutcome = 'fallback_date_detected';
+      }
+    }
+    if (draft.activity_date && !draft.start_at) {
+      draft.start_at = isoLocalFromDateString(draft.activity_date, DEFAULT_START_HOUR);
+    }
+    if (draft.activity_date && !draft.end_at) {
+      draft.end_at = isoLocalFromDateString(draft.activity_date, DEFAULT_END_HOUR);
+    }
+    if (!draft.location && briefRaw) {
+      draft.location = fallbackParseLocation(briefRaw);
+    }
+    console.log(`[draft-activity-content] date_outcome=${dateOutcome} location_detected=${draft.location ? 'yes' : 'no'} brief_chars=${briefRaw.length} src_docs=${sourceFiles.length}`);
+
+    return jsonResponse({
+      success: true,
+      data: draft,
+      ai: {
+        model,
+        generated_at: new Date().toISOString(),
+        source_doc_count: sourceFiles.length,
+        brief_chars: briefRaw.length,
+        date_outcome: dateOutcome,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'AI drafting failed.';
     console.error('[draft-activity-content] generation error:', message);

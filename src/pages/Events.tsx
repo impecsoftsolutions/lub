@@ -81,18 +81,34 @@ const formatEventDateTime = (value: string | null, type: FeedItemType, endValue?
   return formatEventDate(value);
 };
 
-const isPast = (value: string | null, type: FeedItemType): boolean => {
-  if (!value) return false;
-  const date = new Date(value);
-  const boundary = toStartOfDay(new Date());
+// ---------------------------------------------------------------------------
+// Past-detection helpers
+// ---------------------------------------------------------------------------
 
-  if (type === 'event') {
-    return date < new Date();
-  }
-
-  const activityDay = toStartOfDay(date);
-  return activityDay < boundary;
+const toMs = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return isFinite(ms) ? ms : null;
 };
+
+// An event is past when its END time (or start if no end) has passed.
+const isPastEvent = (item: FeedItem): boolean => {
+  const ms = toMs(item.end_date_value) ?? toMs(item.date_value);
+  if (ms === null) return false;
+  return ms < Date.now();
+};
+
+// An activity is past when its END day (or start day if no end) is before today.
+const isPastActivity = (item: FeedItem): boolean => {
+  const ms = toMs(item.end_date_value) ?? toMs(item.date_value);
+  if (ms === null) return false;
+  const boundary = toStartOfDay(new Date()).getTime();
+  const itemDay = toStartOfDay(new Date(ms)).getTime();
+  return itemDay < boundary;
+};
+
+const isPastItem = (item: FeedItem): boolean =>
+  item.type === 'event' ? isPastEvent(item) : isPastActivity(item);
 
 const scoreFeedItem = (item: FeedItem, query: string): number => {
   const q = normalizeSearchText(query);
@@ -226,8 +242,10 @@ const Events: React.FC = () => {
       .filter(({ item, score }) => {
         if (q && score <= 0) return false;
         if (filter === 'featured' && !item.is_featured) return false;
-        if (filter === 'upcoming' && isPast(item.date_value, item.type)) return false;
-        if (filter === 'past' && !isPast(item.date_value, item.type)) return false;
+        // In 'all' mode only upcoming events appear in the Events section.
+        if (filter === 'all' && isPastEvent(item)) return false;
+        if (filter === 'upcoming' && isPastItem(item)) return false;
+        if (filter === 'past' && !isPastItem(item)) return false;
         return true;
       });
 
@@ -241,6 +259,7 @@ const Events: React.FC = () => {
   }, [eventItems, filter, searchQuery]);
 
   const filteredActivities = useMemo(() => {
+    if (filter === 'past') return [];
     const q = searchQuery.trim();
 
     const filtered = activityItems
@@ -248,8 +267,8 @@ const Events: React.FC = () => {
       .filter(({ item, score }) => {
         if (q && score <= 0) return false;
         if (filter === 'featured' && !item.is_featured) return false;
-        if (filter === 'upcoming' && isPast(item.date_value, item.type)) return false;
-        if (filter === 'past' && !isPast(item.date_value, item.type)) return false;
+        if (filter === 'upcoming' && isPastItem(item)) return false;
+        if (filter === 'past' && !isPastItem(item)) return false;
         return true;
       });
 
@@ -268,6 +287,30 @@ const Events: React.FC = () => {
   const totalVisible = visibleEvents.length + visibleActivities.length;
   const totalItems = filteredEvents.length + filteredActivities.length;
   const hasMore = totalItems > totalVisible;
+  const isPastEventsView = filter === 'past';
+
+  // Whether any loaded event is past (determines "View Past Events" link visibility).
+  const hasPastEvents = useMemo(() => eventItems.some(isPastEvent), [eventItems]);
+
+  // In 'all' mode with no search and no upcoming events: flip section order.
+  const noSearchActive = searchQuery.trim().length === 0;
+  const hasUpcomingEvents = filteredEvents.length > 0;
+  const showActivitiesFirst = filter === 'all' && noSearchActive && !hasUpcomingEvents;
+
+  // Show "View Past Events" link below Activities when in 'all' + no search + past events exist.
+  const showPastEventsLink = filter === 'all' && noSearchActive && hasPastEvents;
+
+  const handleViewPastEvents = () => {
+    setFilter('past');
+    setVisibleCount(PAGE_SIZE);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackToEventsAndActivities = () => {
+    setFilter('all');
+    setVisibleCount(PAGE_SIZE);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="bg-background text-foreground">
@@ -355,48 +398,101 @@ const Events: React.FC = () => {
             <ImageIcon className="mx-auto h-12 w-12 opacity-20 mb-4" />
             <p className="text-lg">{searchActive ? 'Nothing matches your search.' : 'Nothing published yet.'}</p>
             <p className="text-sm mt-1">{searchActive ? 'Try a different title, location, date, or type.' : 'Check back soon.'}</p>
+            {showPastEventsLink && (
+              <button
+                type="button"
+                onClick={handleViewPastEvents}
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                View Past Events
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         ) : (
           <>
-            <section className="mb-10 sm:mb-14">
-              <div className="mb-4 flex items-baseline justify-between gap-3 sm:mb-5">
-                <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Upcoming Events</h2>
-                <span className="text-xs text-muted-foreground sm:text-sm">
-                  {filteredEvents.length} item{filteredEvents.length === 1 ? '' : 's'}
-                </span>
-              </div>
-              {visibleEvents.length > 0 ? (
-                <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-                  {visibleEvents.map((item) => (
-                    <FeedCard key={`${item.type}:${item.id}`} item={item} />
-                  ))}
+            {/* ── Events section ── */}
+            {!showActivitiesFirst && (
+              <section className="mb-10 sm:mb-14">
+                <div className="mb-4 flex items-baseline justify-between gap-3 sm:mb-5">
+                  <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                    {isPastEventsView ? 'Past Events' : 'Upcoming Events'}
+                  </h2>
+                  <span className="text-xs text-muted-foreground sm:text-sm">
+                    {filteredEvents.length} item{filteredEvents.length === 1 ? '' : 's'}
+                  </span>
                 </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-                  No upcoming events right now.
-                </div>
-              )}
-            </section>
+                {visibleEvents.length > 0 ? (
+                  <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+                    {visibleEvents.map((item) => (
+                      <FeedCard key={`${item.type}:${item.id}`} item={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                    {isPastEventsView ? 'No past events to show.' : 'No upcoming events right now.'}
+                  </div>
+                )}
+              </section>
+            )}
 
-            <section>
-              <div className="mb-4 flex items-baseline justify-between gap-3 sm:mb-5">
-                <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Activities</h2>
-                <span className="text-xs text-muted-foreground sm:text-sm">
-                  {filteredActivities.length} item{filteredActivities.length === 1 ? '' : 's'}
-                </span>
+            {/* ── Activities section ── */}
+            {!isPastEventsView && (
+              <section className="mb-10 sm:mb-14">
+                <div className="mb-4 flex items-baseline justify-between gap-3 sm:mb-5">
+                  <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Activities</h2>
+                  <span className="text-xs text-muted-foreground sm:text-sm">
+                    {filteredActivities.length} item{filteredActivities.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                {visibleActivities.length > 0 ? (
+                  <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+                    {visibleActivities.map((item) => (
+                      <FeedCard key={`${item.type}:${item.id}`} item={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                    No activities to show in this filter.
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* ── "View Past Events" link — below Activities, all mode, no search ── */}
+            {showPastEventsLink && (
+              <div className="mb-10 sm:mb-14 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <button
+                  type="button"
+                  onClick={handleViewPastEvents}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                >
+                  View Past Events
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+                <div className="h-px flex-1 bg-border" />
               </div>
-              {visibleActivities.length > 0 ? (
-                <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-                  {visibleActivities.map((item) => (
-                    <FeedCard key={`${item.type}:${item.id}`} item={item} />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-                  No activities to show in this filter.
-                </div>
-              )}
-            </section>
+            )}
+
+            {/* ── "No upcoming events" note — only shown when Activities is first ── */}
+            {showActivitiesFirst && (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
+                No upcoming events right now.
+              </div>
+            )}
+
+            {isPastEventsView && (
+              <div className="mb-10 sm:mb-14 flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleBackToEventsAndActivities}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                >
+                  Back to Events & Activities
+                </button>
+              </div>
+            )}
 
             {hasMore && (
               <div className="mt-12 flex justify-center">

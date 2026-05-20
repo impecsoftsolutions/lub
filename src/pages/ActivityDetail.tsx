@@ -2,6 +2,7 @@
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
   Calendar,
   Camera,
   Check,
@@ -22,6 +23,7 @@ import {
   Tag,
   Globe,
   GlobeLock,
+  Share2,
 } from 'lucide-react';
 import {
   activitiesService,
@@ -220,6 +222,9 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
   const flyerImages = assets.filter((a) => a.kind === 'flyer' || a.kind === 'gallery');
   const documents = assets.filter((a) => a.kind === 'document');
   const rsvp = eventDetail.rsvp ?? null;
+  const linkedActivity = eventDetail.linked_activity ?? null;
+  const eventBoundaryIso = eventDetail.end_at ?? eventDetail.start_at;
+  const isCompletedEvent = eventBoundaryIso ? new Date(eventBoundaryIso).getTime() < Date.now() : false;
   const rsvpOpen = Boolean(rsvp?.enabled && rsvp?.open);
   const hideCapacityPublicly = Boolean(rsvp?.hide_capacity_publicly);
   const showCapacityStats = !hideCapacityPublicly;
@@ -641,6 +646,24 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold tracking-tight">About this Event</h2>
             <div className="whitespace-pre-wrap leading-7 text-foreground">{eventDetail.description}</div>
+          </section>
+        )}
+
+        {isCompletedEvent && linkedActivity && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Event Activity</h2>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm text-muted-foreground">
+                This event has a linked activity report.
+              </p>
+              <Link
+                to={`/events/${linkedActivity.slug}`}
+                className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
+              >
+                View activity report
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </section>
         )}
 
@@ -1206,9 +1229,12 @@ const BadgeMobileLookup: React.FC<{ eventSlug: string; defaultMobile?: string }>
   }, [defaultMobile]);
   const [error, setError] = useState<string | null>(null);
 
-  const parseBadgeCodeFromDisposition = (headerValue: string | null): string | null => {
+  const parseBadgeCodeFromHeaders = (headers: Headers): string | null => {
+    const explicit = (headers.get('x-badge-code') ?? '').trim().toUpperCase();
+    if (/^[A-Z0-9]{4,20}$/.test(explicit)) return explicit;
+    const headerValue = headers.get('content-disposition');
     if (!headerValue) return null;
-    const m = /badge-([A-Za-z0-9]+)\.pdf/i.exec(headerValue);
+    const m = /badge-([A-Za-z0-9]+)\.(?:pdf|jpe?g|png)/i.exec(headerValue);
     return m ? m[1].toUpperCase() : null;
   };
 
@@ -1228,7 +1254,7 @@ const BadgeMobileLookup: React.FC<{ eventSlug: string; defaultMobile?: string }>
 
     setIsChecking(true);
     try {
-      const response = await fetch(lookupUrl, { headers: { Accept: 'application/pdf' } });
+      const response = await fetch(lookupUrl);
       if (response.status === 404) {
         setError('No registration found with this mobile number or email.');
         return;
@@ -1242,7 +1268,7 @@ const BadgeMobileLookup: React.FC<{ eventSlug: string; defaultMobile?: string }>
         return;
       }
 
-      const codeFromHeader = parseBadgeCodeFromDisposition(response.headers.get('content-disposition'));
+      const codeFromHeader = parseBadgeCodeFromHeaders(response.headers);
       const target = codeFromHeader
         ? `/events/badge/${encodeURIComponent(codeFromHeader)}`
         : `/events/badge?${
@@ -1315,6 +1341,59 @@ const ActivityDetail: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const handleShareActivity = useCallback(async () => {
+    if (!activityDetail) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const persistedShortUrl = activityDetail.short_url_code
+      ? `${origin}/a/${activityDetail.short_url_code}`
+      : '';
+    const useShort = activityDetail.short_url_enabled !== false && Boolean(activityDetail.short_url_code);
+    const shortUrl = useShort
+      ? persistedShortUrl
+      : `${origin}/events/${activityDetail.slug}`;
+    const fullUrl = `${origin}/events/${activityDetail.slug}`;
+    let text = (activityDetail.share_message ?? '').trim();
+    if (text) {
+      // Normalize URL in saved text based on current enabled/disabled state.
+      if (useShort && fullUrl && shortUrl !== fullUrl) {
+        text = text.split(fullUrl).join(shortUrl);
+      } else if (!useShort && persistedShortUrl) {
+        text = text.split(persistedShortUrl).join(fullUrl);
+      }
+      // Ensure one final URL is present.
+      if (!text.includes(shortUrl)) {
+        text = `${text}\n\nDetails: ${shortUrl}`;
+      }
+    } else {
+      // Build a simple fallback
+      const parts: string[] = [];
+      parts.push(activityDetail.title);
+      if (activityDetail.start_at || activityDetail.activity_date) {
+        const raw = activityDetail.start_at ?? activityDetail.activity_date;
+        if (raw) {
+          parts.push(
+            new Date(raw).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            }),
+          );
+        }
+      }
+      if (activityDetail.location) parts.push(activityDetail.location);
+      parts.push(shortUrl);
+      text = parts.join('\n');
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2500);
+    } catch {
+      // clipboard not available; silently ignore
+    }
+  }, [activityDetail]);
 
   const loadDetail = useCallback(async () => {
     if (!slug) {
@@ -1475,6 +1554,18 @@ const ActivityDetail: React.FC = () => {
               {activity.location}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => void handleShareActivity()}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+          >
+            {shareCopied ? (
+              <Check className="h-4 w-4 text-green-600" />
+            ) : (
+              <Share2 className="h-4 w-4" />
+            )}
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
         </div>
       </div>
 

@@ -14,8 +14,9 @@
 // COALESCE(event.end_at, event.start_at) + 12h grace. After that the
 // function returns 410 with error_code='event_ended'.
 //
-// Returns: PDF bytes (Content-Type: application/pdf, 4 in × 6 in portrait)
-// or JSON { success:false, error_code, error } on failure.
+// Returns: badge bytes for website JPG flow (current renderer pipeline returns
+// PDF bytes which are converted to JPG on the web client), or JSON
+// { success:false, error_code, error } on failure.
 // =============================================================================
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'npm:pdf-lib@1.17.1';
@@ -262,6 +263,17 @@ function visitDayLabel(visitDate: string): string {
   return fmtDateOnly(`${visitDate}T00:00:00`);
 }
 
+function eventDayCount(start: string | null, end: string | null): number {
+  if (!start) return 0;
+  const s = new Date(String(start).slice(0, 10));
+  const e = new Date(String(end ?? start).slice(0, 10));
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 0;
+  const sDay = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate());
+  const eDay = Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate());
+  const diff = Math.floor((eDay - sDay) / (24 * 60 * 60 * 1000));
+  return diff >= 0 ? diff + 1 : 1;
+}
+
 function drawCentered(
   page: PDFPage,
   text: string,
@@ -442,7 +454,7 @@ async function renderBadgeWithTemplate(args: RenderArgs): Promise<Uint8Array> {
   const nameY = codeY - 21;
   drawCentered(page, displayName, nameY, fonts.helvBold, Math.min(nameOpts.fontSize, 17), colors.ink, PAGE_W);
 
-  // Organisation / designation. Do not fall back to profession; the badge
+  // Company / organization + designation. Do not fall back to profession; the badge
   // should show the visitor's designation only when it was collected.
   let cursor = nameY - 15;
   if (f.company) {
@@ -455,7 +467,7 @@ async function renderBadgeWithTemplate(args: RenderArgs): Promise<Uint8Array> {
   }
 
   // Visit day
-  const dayText = visitDayText(f.visitDate, f.visitAllDays);
+  const dayText = visitDayText(f.visitDate, f.visitAllDays, event);
   if (dayText) {
     drawCentered(page, dayText, Math.max(contentBottomY + 10, cursor), fonts.helv, 8, colors.subtle, PAGE_W);
   }
@@ -537,8 +549,11 @@ function composeBadgeName(
   return composed;
 }
 
-function visitDayText(visitDate: string, visitAllDays: boolean): string {
-  if (visitAllDays) return 'All event days';
+function visitDayText(visitDate: string, visitAllDays: boolean, event: EventRow): string {
+  if (visitAllDays) {
+    const days = eventDayCount(event.start_at, event.end_at);
+    return days > 0 ? `${days} day${days === 1 ? '' : 's'}` : 'Multiple days';
+  }
   if (visitDate) return visitDayLabel(visitDate);
   return '';
 }
@@ -592,9 +607,9 @@ async function renderBadgeClassic(args: RenderArgs): Promise<Uint8Array> {
     drawCentered(page, value.slice(0, 44), cursorY - 12, fonts.helvBold, 11, ink, PAGE_W);
     cursorY -= 30;
   };
-  drawRow('ORGANISATION', f.company);
+  drawRow('COMPANY / ORGANIZATION', f.company);
   drawRow('DESIGNATION', f.designation);
-  drawRow('DAY OF VISIT', visitDayText(f.visitDate, f.visitAllDays));
+  drawRow('DAY OF VISIT', visitDayText(f.visitDate, f.visitAllDays, event));
   drawRow('EVENT DATES', eventDateBand(event.start_at, event.end_at));
 
   const qrSize = 110;
@@ -638,7 +653,7 @@ async function renderBadgeMinimal(args: RenderArgs): Promise<Uint8Array> {
   let y = PAGE_H - 100;
   if (f.company) { drawCentered(page, f.company.slice(0, 40), y, fonts.helv, 12, ink, PAGE_W); y -= 18; }
   if (f.designation) { drawCentered(page, f.designation.slice(0, 42), y, fonts.helv, 10, subtle, PAGE_W); y -= 16; }
-  const dvt = visitDayText(f.visitDate, f.visitAllDays);
+  const dvt = visitDayText(f.visitDate, f.visitAllDays, event);
   if (dvt) { drawCentered(page, dvt, y, fonts.helv, 10, subtle, PAGE_W); y -= 16; }
   drawCentered(page, eventDateBand(event.start_at, event.end_at), y, fonts.helv, 10, subtle, PAGE_W);
 
@@ -681,7 +696,7 @@ async function renderBadgeBold(args: RenderArgs): Promise<Uint8Array> {
   cursorY -= Math.max(20, nameOpts.fontSize);
   if (f.company) { drawCentered(page, f.company.slice(0, 40), cursorY, fonts.helv, 12, ink, PAGE_W); cursorY -= 16; }
   if (f.designation) { drawCentered(page, f.designation.slice(0, 42), cursorY, fonts.helv, 10, subtle, PAGE_W); cursorY -= 14; }
-  const dvt = visitDayText(f.visitDate, f.visitAllDays);
+  const dvt = visitDayText(f.visitDate, f.visitAllDays, event);
   if (dvt) { drawCentered(page, dvt, cursorY, fonts.helv, 10, subtle, PAGE_W); cursorY -= 14; }
 
   const qrSize = 105;
@@ -728,7 +743,7 @@ async function renderBadgeCompact(args: RenderArgs): Promise<Uint8Array> {
   };
   drawTight('Org', f.company);
   drawTight('Designation', f.designation);
-  drawTight('Day', visitDayText(f.visitDate, f.visitAllDays));
+  drawTight('Day', visitDayText(f.visitDate, f.visitAllDays, event));
   drawTight('Dates', eventDateBand(event.start_at, event.end_at));
 
   const qrSize = 130;
@@ -852,6 +867,7 @@ Deno.serve(async (req: Request) => {
         'Cache-Control': 'no-store, must-revalidate',
         'Pragma': 'no-cache',
         'ETag': `"${design.etagSeed || 'preview'}"`,
+        'X-Badge-Code': sample.badge_code,
       },
     });
   }
@@ -904,6 +920,7 @@ Deno.serve(async (req: Request) => {
       'Cache-Control': 'no-store, must-revalidate',
       'Pragma': 'no-cache',
       'ETag': `"${[resolved.badge.badge_code, design.etagSeed].join(':')}"`,
+      'X-Badge-Code': resolved.badge.badge_code,
     },
   });
 });

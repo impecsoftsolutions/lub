@@ -3,8 +3,8 @@
 // Slice: COD-EVENTS-BADGES-048
 //
 // Triggered by admin "Send" / "Retry" action. Reads a delivery row,
-// composes an email containing a one-shot download link to
-// event-badge-download?code=<badge_code>, invokes the existing send-email
+// composes an email containing a one-shot website badge link,
+// invokes the existing send-email
 // function, then writes back the attempt result.
 //
 // Honest semantics:
@@ -117,7 +117,7 @@ function buildEmail(downloadUrl: string, event: EventRow, snap: Record<string, u
     dates ? `Dates: ${dates}` : '',
     event.location ? `Venue: ${event.location}` : '',
     '',
-    'Download your badge (4×6 inch PDF):',
+    'Download your badge (4x6 inch JPG):',
     downloadUrl,
     '',
     'Please bring this badge with you to the venue. The link expires shortly after the event ends.',
@@ -130,7 +130,7 @@ function buildEmail(downloadUrl: string, event: EventRow, snap: Record<string, u
       ${event.location ? `<p><strong>Venue:</strong> ${event.location}</p>` : ''}
       <p style="margin:20px 0">
         <a href="${downloadUrl}" style="display:inline-block;background:#1a4f8a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600">
-          Download your badge (PDF)
+          Download your badge (JPG)
         </a>
       </p>
       <p style="font-size:12px;color:#666">
@@ -227,11 +227,11 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Build the download URL. Prefer SITE_URL site path so users land on a
-  // friendly origin when configured; otherwise direct edge function URL.
+  // Build the download URL. Prefer the website badge page so visitors land on
+  // a friendly LUB URL and download JPG from there.
   const codeParam = encodeURIComponent(badge.badge_code);
   const downloadUrl = siteUrl
-    ? `${siteUrl.replace(/\/+$/, '')}/api/event-badge?code=${codeParam}`
+    ? `${siteUrl.replace(/\/+$/, '')}/events/badge/${codeParam}`
     : `${supabaseUrl}/functions/v1/event-badge-download?code=${codeParam}`;
 
   const { subject, text, html } = buildEmail(downloadUrl, event, badge.snapshot ?? {});

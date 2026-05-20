@@ -84,6 +84,46 @@ function safeFileName(value: string): string {
   return normalized || 'registration';
 }
 
+async function convertImageBlobToJpegBlob(input: Blob): Promise<Blob> {
+  const objectUrl = URL.createObjectURL(input);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('image_load_failed'));
+      el.src = objectUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas_context_missing');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    const jpegBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
+    });
+    if (!jpegBlob) throw new Error('jpeg_encode_failed');
+    return jpegBlob;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function badgeResponseToJpgBlob(response: Response): Promise<Blob> {
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
+  const sourceBlob = await response.blob();
+  if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
+    return sourceBlob;
+  }
+  if (contentType.startsWith('image/')) {
+    return convertImageBlobToJpegBlob(sourceBlob);
+  }
+  const pdfBytes = await sourceBlob.arrayBuffer();
+  return renderPdfFirstPageAsJpegBlob(pdfBytes);
+}
+
 function eventDayList(start: string | null, end: string | null): string[] {
   if (!start) return [];
   const startIso = String(start).slice(0, 10);
@@ -577,17 +617,13 @@ const AdminEventRegistrations: React.FC = () => {
         const { row, badge } = targets[i];
         try {
           const endpoint = eventsService.badgeDownloadUrlByCode(badge.badge_code);
-          const response = await fetch(endpoint, {
-            headers: { Accept: 'application/pdf' },
-          });
+          const response = await fetch(endpoint);
           if (!response.ok) {
             failedCodes.push(badge.badge_code);
             setBulkProgress({ done: i + 1, total: targets.length });
             continue;
           }
-          const pdfBlob = await response.blob();
-          const pdfBytes = await pdfBlob.arrayBuffer();
-          const jpgBlob = await renderPdfFirstPageAsJpegBlob(pdfBytes);
+          const jpgBlob = await badgeResponseToJpgBlob(response);
           const order = String(i + 1).padStart(4, '0');
           const name = safeFileName(row.full_name ?? 'registration');
           const fileName = `${order}-${name}-${badge.badge_code}.jpg`;
@@ -944,7 +980,7 @@ const AdminEventRegistrations: React.FC = () => {
                         }
                         return (
                           <a
-                            href={eventsService.badgeDownloadUrlByCode(badge.badge_code)}
+                            href={`/events/badge/${encodeURIComponent(badge.badge_code)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:bg-muted/50"

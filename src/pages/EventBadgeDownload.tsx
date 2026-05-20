@@ -5,6 +5,55 @@ import { eventsService } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { renderPdfFirstPageAsJpegBlob } from '../lib/pdfImageRender';
 
+function parseBadgeCodeFromHeaders(headers: Headers): string | null {
+  const explicit = (headers.get('x-badge-code') ?? '').trim().toUpperCase();
+  if (/^[A-Z0-9]{4,20}$/.test(explicit)) return explicit;
+  const disposition = headers.get('content-disposition');
+  if (!disposition) return null;
+  const match = /badge-([A-Za-z0-9]+)\.(?:pdf|jpe?g|png)/i.exec(disposition);
+  return match ? match[1].toUpperCase() : null;
+}
+
+async function convertImageBlobToJpegBlob(input: Blob): Promise<Blob> {
+  const objectUrl = URL.createObjectURL(input);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('image_load_failed'));
+      el.src = objectUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas_context_missing');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    const jpegBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
+    });
+    if (!jpegBlob) throw new Error('jpeg_encode_failed');
+    return jpegBlob;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function badgeResponseToJpegBlob(response: Response): Promise<Blob> {
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
+  const sourceBlob = await response.blob();
+  if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
+    return sourceBlob;
+  }
+  if (contentType.startsWith('image/')) {
+    return convertImageBlobToJpegBlob(sourceBlob);
+  }
+  const pdfBytes = await sourceBlob.arrayBuffer();
+  return renderPdfFirstPageAsJpegBlob(pdfBytes);
+}
+
 const EventBadgeDownload: React.FC = () => {
   const { code = '' } = useParams<{ code: string }>();
   const [searchParams] = useSearchParams();
@@ -17,32 +66,18 @@ const EventBadgeDownload: React.FC = () => {
   const email = useMemo(() => (searchParams.get('email') || '').trim(), [searchParams]);
 
   const [resolvedBadgeCode, setResolvedBadgeCode] = useState<string>('');
-  const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
   const [jpgObjectUrl, setJpgObjectUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
-
-  const parseBadgeCodeFromDisposition = (headerValue: string | null): string | null => {
-    if (!headerValue) return null;
-    const m = /badge-([A-Za-z0-9]+)\.pdf/i.exec(headerValue);
-    return m ? m[1].toUpperCase() : null;
-  };
 
   useEffect(() => {
     let cancelled = false;
-    let nextPdfUrl: string | null = null;
     let nextJpgUrl: string | null = null;
 
     const load = async () => {
       setIsLoading(true);
       setError(null);
-      setImageError(null);
       setResolvedBadgeCode('');
-      setPdfObjectUrl((old) => {
-        if (old) URL.revokeObjectURL(old);
-        return null;
-      });
       setJpgObjectUrl((old) => {
         if (old) URL.revokeObjectURL(old);
         return null;
@@ -62,9 +97,7 @@ const EventBadgeDownload: React.FC = () => {
           : mobile.length > 0
             ? eventsService.badgeDownloadUrlByMobile(eventSlug, mobile)
             : eventsService.badgeDownloadUrlByEmail(eventSlug, email);
-        const response = await fetch(endpoint, {
-          headers: { Accept: 'application/pdf' },
-        });
+        const response = await fetch(endpoint);
         if (response.status === 410) {
           setError('Badge downloads are closed for this event.');
           setIsLoading(false);
@@ -75,27 +108,16 @@ const EventBadgeDownload: React.FC = () => {
           setIsLoading(false);
           return;
         }
-        const contentDisposition = response.headers.get('content-disposition');
-        const discoveredCode = hasCode
-          ? badgeCode
-          : parseBadgeCodeFromDisposition(contentDisposition);
+
+        const discoveredCode = hasCode ? badgeCode : parseBadgeCodeFromHeaders(response.headers);
         setResolvedBadgeCode(discoveredCode ?? '');
 
-        const pdfBlob = await response.blob();
-        nextPdfUrl = URL.createObjectURL(pdfBlob);
-        const pdfBytes = await pdfBlob.arrayBuffer();
-        try {
-          const jpgBlob = await renderPdfFirstPageAsJpegBlob(pdfBytes);
-          nextJpgUrl = URL.createObjectURL(jpgBlob);
-        } catch {
-          setImageError('Preview image is unavailable, but you can still download the badge PDF.');
-        }
+        const jpgBlob = await badgeResponseToJpegBlob(response);
+        nextJpgUrl = URL.createObjectURL(jpgBlob);
         if (cancelled) {
-          if (nextPdfUrl) URL.revokeObjectURL(nextPdfUrl);
-          if (nextJpgUrl) URL.revokeObjectURL(nextJpgUrl);
+          URL.revokeObjectURL(nextJpgUrl);
           return;
         }
-        setPdfObjectUrl(nextPdfUrl);
         setJpgObjectUrl(nextJpgUrl);
       } catch {
         setError('Could not load the badge. Please try again.');
@@ -108,7 +130,6 @@ const EventBadgeDownload: React.FC = () => {
 
     return () => {
       cancelled = true;
-      if (nextPdfUrl) URL.revokeObjectURL(nextPdfUrl);
       if (nextJpgUrl) URL.revokeObjectURL(nextJpgUrl);
     };
   }, [badgeCode, eventSlug, mobile, email]);
@@ -118,16 +139,6 @@ const EventBadgeDownload: React.FC = () => {
     const link = document.createElement('a');
     link.href = jpgObjectUrl;
     link.download = `event-badge-${resolvedBadgeCode || badgeCode || 'download'}.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
-
-  const downloadPdf = () => {
-    if (!pdfObjectUrl) return;
-    const link = document.createElement('a');
-    link.href = pdfObjectUrl;
-    link.download = `event-badge-${resolvedBadgeCode || badgeCode || 'download'}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -146,25 +157,15 @@ const EventBadgeDownload: React.FC = () => {
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Event Badge</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Badge No. <span className="font-mono text-foreground">{resolvedBadgeCode || badgeCode || '—'}</span>
+                Badge No. <span className="font-mono text-foreground">{resolvedBadgeCode || badgeCode || '-'}</span>
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(jpgObjectUrl || pdfObjectUrl) && (
-                <>
-                  {jpgObjectUrl && (
-                    <Button type="button" variant="outline" size="sm" onClick={downloadJpg}>
-                      <Download className="mr-1.5 h-4 w-4" />
-                      Download JPG
-                    </Button>
-                  )}
-                  {pdfObjectUrl && (
-                    <Button type="button" variant="outline" size="sm" onClick={downloadPdf}>
-                      <Download className="mr-1.5 h-4 w-4" />
-                      Download PDF
-                    </Button>
-                  )}
-                </>
+              {jpgObjectUrl && (
+                <Button type="button" variant="outline" size="sm" onClick={downloadJpg}>
+                  <Download className="mr-1.5 h-4 w-4" />
+                  Download JPG
+                </Button>
               )}
             </div>
           </div>
@@ -187,16 +188,7 @@ const EventBadgeDownload: React.FC = () => {
                 alt={`Event badge ${resolvedBadgeCode || badgeCode}`}
                 className="h-auto max-h-[78vh] w-full max-w-[520px] rounded-md border border-border object-contain shadow-sm"
               />
-              {imageError && (
-                <p className="text-xs text-muted-foreground">{imageError}</p>
-              )}
             </div>
-          ) : pdfObjectUrl ? (
-            <iframe
-              title={`Event badge ${resolvedBadgeCode || badgeCode}`}
-              src={pdfObjectUrl}
-              className="h-[78vh] w-full bg-white"
-            />
           ) : null}
         </div>
       </main>
