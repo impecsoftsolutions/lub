@@ -8975,3 +8975,71 @@ export const leadershipService = {
     return filtered;
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard Service
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AdminDashboardMetrics {
+  approvedMembers: number;
+  pendingRegistrations: number;
+  maleMembers: number;
+  femaleMembers: number;
+  activeAdminUsers: number;
+  pendingCities: number;
+  activeDistrictUnits: number;
+  activeCities: number;
+  activeStates: number;
+  totalDesignations: number;
+  formFieldsConfigured: number;
+  lastUpdated: string | null;
+}
+
+export const dashboardService = {
+  async getMetricsWithSession(sessionToken: string): Promise<AdminDashboardMetrics> {
+    const { data, error } = await supabase.rpc('get_admin_dashboard_metrics_with_session', {
+      p_session_token: sessionToken
+    });
+
+    if (error) {
+      console.error('[dashboardService.getMetricsWithSession] RPC error:', error);
+      throw error;
+    }
+
+    const result = data as {
+      success: boolean;
+      error?: string;
+      approved_members?: number;
+      pending_registrations?: number;
+      male_members?: number;
+      female_members?: number;
+      active_admin_users?: number;
+      pending_cities?: number;
+      active_district_units?: number;
+      active_cities?: number;
+      active_states?: number;
+      total_designations?: number;
+      form_fields_configured?: number;
+      last_updated?: string;
+    };
+
+    if (!result?.success) {
+      throw new Error(result?.error ?? 'Dashboard metrics RPC failed');
+    }
+
+    return {
+      approvedMembers:      result.approved_members       ?? 0,
+      pendingRegistrations: result.pending_registrations  ?? 0,
+      maleMembers:          result.male_members           ?? 0,
+      femaleMembers:        result.female_members         ?? 0,
+      activeAdminUsers:     result.active_admin_users     ?? 0,
+      pendingCities:        result.pending_cities         ?? 0,
+      activeDistrictUnits:  result.active_district_units ?? 0,
+      activeCities:         result.active_cities          ?? 0,
+      activeStates:         result.active_states          ?? 0,
+      totalDesignations:    result.total_designations     ?? 0,
+      formFieldsConfigured: result.form_fields_configured ?? 0,
+      lastUpdated:          result.last_updated           ?? null,
+    };
+  }
+};

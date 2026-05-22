@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, adminCitiesService } from '../lib/supabase';
+import { supabase, dashboardService } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 
 export interface DashboardMetrics {
@@ -7,6 +7,10 @@ export interface DashboardMetrics {
   pendingRegistrations: number;
   pendingCities: number;
   activeAdminUsers: number;
+  maleMembers: number;
+  femaleMembers: number;
+  activeDistrictUnits: number;
+  activeCities: number;
 }
 
 export interface RecentActivity {
@@ -47,66 +51,41 @@ export const useDashboardData = (): DashboardData => {
 
       const sessionToken = sessionManager.getSessionToken();
 
-      const [
-        approvedMembersResult,
-        pendingRegistrationsResult,
-        pendingCitiesResult,
-        activeAdminUsersResult,
-        recentActivityResult,
-        activeStatesResult,
-        totalDesignationsResult,
-        formFieldsResult
-      ] = await Promise.all([
-        supabase
-          .from('member_registrations')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'approved'),
-        supabase
-          .from('member_registrations')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending'),
+      // Fetch dashboard metrics via the server-side RPC (single authenticated call).
+      // This ensures pending_registrations matches the sidebar badge count because
+      // both now go through the same resolve_custom_session_user_id auth path.
+      const [metricsResult, recentActivityResult] = await Promise.all([
         sessionToken
-          ? adminCitiesService.listPendingCustomCities(sessionToken)
-          : Promise.resolve({ success: false, items: [] }),
-        supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true })
-          .in('account_type', ['admin', 'both'])
-          .eq('account_status', 'active')
-          .eq('is_active', true)
-          .eq('is_frozen', false),
+          ? dashboardService.getMetricsWithSession(sessionToken)
+          : Promise.resolve(null),
         supabase
           .from('member_registrations')
           .select('id, full_name, email, status, created_at')
           .order('created_at', { ascending: false })
-          .limit(10),
-        supabase
-          .from('states_master')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_active', true),
-        supabase
-          .from('company_designations')
-          .select('*', { count: 'exact', head: true }),
-        supabase
-          .from('form_field_configurations')
-          .select('*', { count: 'exact', head: true })
+          .limit(10)
       ]);
 
-      setMetrics({
-        approvedMembers: approvedMembersResult.count || 0,
-        pendingRegistrations: pendingRegistrationsResult.count || 0,
-        pendingCities: pendingCitiesResult.success ? (pendingCitiesResult.items?.length || 0) : 0,
-        activeAdminUsers: activeAdminUsersResult.count || 0
-      });
+      if (metricsResult) {
+        setMetrics({
+          approvedMembers:     metricsResult.approvedMembers,
+          pendingRegistrations: metricsResult.pendingRegistrations,
+          pendingCities:       metricsResult.pendingCities,
+          activeAdminUsers:    metricsResult.activeAdminUsers,
+          maleMembers:         metricsResult.maleMembers,
+          femaleMembers:       metricsResult.femaleMembers,
+          activeDistrictUnits: metricsResult.activeDistrictUnits,
+          activeCities:        metricsResult.activeCities,
+        });
+
+        setSystemStatus({
+          activeStates:         metricsResult.activeStates,
+          totalDesignations:    metricsResult.totalDesignations,
+          formFieldsConfigured: metricsResult.formFieldsConfigured,
+          lastUpdated:          metricsResult.lastUpdated ? new Date(metricsResult.lastUpdated) : new Date(),
+        });
+      }
 
       setRecentActivity(recentActivityResult.data || []);
-
-      setSystemStatus({
-        activeStates: activeStatesResult.count || 0,
-        totalDesignations: totalDesignationsResult.count || 0,
-        formFieldsConfigured: formFieldsResult.count || 0,
-        lastUpdated: new Date()
-      });
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data. Please try refreshing.');

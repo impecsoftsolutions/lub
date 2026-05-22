@@ -47,6 +47,7 @@ import AdminFormFieldConfiguration from './pages/AdminFormFieldConfiguration';
 import AdminDeletedMembers from './pages/AdminDeletedMembers';
 import AdminValidationSettings from './pages/AdminValidationSettings';
 import AdminDashboardOverview from './pages/AdminDashboardOverview';
+import AdminLeadershipContacts from './pages/AdminLeadershipContacts';
 import PaymentSettings from './pages/AdminDashboard/PaymentSettings';
 import AdminAppearanceSettings from './pages/admin/AdminAppearanceSettings';
 import AdminSettingsHub from './pages/AdminSettingsHub';
@@ -184,6 +185,7 @@ function App() {
 
           <Route element={<AdminLayoutWrapper />}>
             <Route path="/admin/dashboard" element={<AdminDashboardOverview />} />
+            <Route path="/admin/dashboard/leadership-contacts" element={<AdminLeadershipContacts />} />
 
             <Route path="/admin/members/registrations" element={<AdminRegistrations />} />
             <Route path="/admin/members/registrations/:registrationId/edit" element={<AdminMemberEdit />} />

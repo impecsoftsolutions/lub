@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, MapPin, Shield, RefreshCw, AlertCircle, Lock } from 'lucide-react';
+import { Users, Clock, MapPin, Shield, RefreshCw, AlertCircle, Lock, UserRound, UserRoundX, Building2, Landmark } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useDashboardData } from '../hooks/useDashboardData';
@@ -69,7 +69,8 @@ const AdminDashboardOverview: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Row 1 — membership overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <DashboardCard
           title="Total Approved Members"
           value={metrics?.approvedMembers ?? '--'}
@@ -101,6 +102,31 @@ const AdminDashboardOverview: React.FC = () => {
         />
 
         <DashboardCard
+          title="Male Members"
+          value={metrics?.maleMembers ?? '--'}
+          icon={UserRound}
+          iconColor="text-blue-600 dark:text-blue-400"
+          iconBg="bg-blue-50 dark:bg-blue-900/20"
+          isLoading={isLoading}
+          onClick={() => navigate('/admin/registrations')}
+          delay={200}
+        />
+
+        <DashboardCard
+          title="Female Members"
+          value={metrics?.femaleMembers ?? '--'}
+          icon={UserRoundX}
+          iconColor="text-pink-600 dark:text-pink-400"
+          iconBg="bg-pink-50 dark:bg-pink-900/20"
+          isLoading={isLoading}
+          onClick={() => navigate('/admin/registrations')}
+          delay={300}
+        />
+      </div>
+
+      {/* Row 2 — geography & admin */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <DashboardCard
           title="Pending Cities"
           value={metrics?.pendingCities ?? '--'}
           icon={MapPin}
@@ -108,6 +134,26 @@ const AdminDashboardOverview: React.FC = () => {
           iconBg="bg-primary/5"
           isLoading={isLoading}
           onClick={() => navigate('/admin/pending-cities')}
+          delay={0}
+        />
+
+        <DashboardCard
+          title="Active District Units"
+          value={metrics?.activeDistrictUnits ?? '--'}
+          icon={Building2}
+          iconColor="text-amber-600 dark:text-amber-400"
+          iconBg="bg-amber-50 dark:bg-amber-900/20"
+          isLoading={isLoading}
+          delay={100}
+        />
+
+        <DashboardCard
+          title="Active Cities"
+          value={metrics?.activeCities ?? '--'}
+          icon={Landmark}
+          iconColor="text-emerald-600 dark:text-emerald-400"
+          iconBg="bg-emerald-50 dark:bg-emerald-900/20"
+          isLoading={isLoading}
           delay={200}
         />
 

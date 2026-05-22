@@ -87,7 +87,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       label: "Dashboard",
       icon: LayoutDashboard,
-      children: [{ label: "Overview", path: "/admin/dashboard" }]
+      children: [
+        { label: "Overview", path: "/admin/dashboard" },
+        { label: "Leadership Contacts", path: "/admin/dashboard/leadership-contacts" }
+      ]
     },
     {
       label: "Events & Activities",

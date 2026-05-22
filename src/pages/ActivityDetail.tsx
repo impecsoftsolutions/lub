@@ -642,6 +642,12 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
+        {/* Badge self-serve lookup — shown before event description so registered
+            attendees can get their badge without scrolling past all content */}
+        {rsvp?.enabled && (
+          <BadgeMobileLookup eventSlug={eventDetail.slug} defaultMobile={prefillMobile} />
+        )}
+
         {eventDetail.description && (
           <section className="space-y-3">
             <h2 className="text-xl font-semibold tracking-tight">About this Event</h2>
@@ -1190,11 +1196,6 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
               )}
             </div>
           </section>
-        )}
-
-        {/* Badge mobile lookup (visitor self-serve) */}
-        {rsvp?.enabled && (
-          <BadgeMobileLookup eventSlug={eventDetail.slug} defaultMobile={prefillMobile} />
         )}
 
         <div className="pt-4 border-t border-border">
