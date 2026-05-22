@@ -642,147 +642,6 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
-        {/* Badge self-serve lookup — shown before event description so registered
-            attendees can get their badge without scrolling past all content */}
-        {rsvp?.enabled && (
-          <BadgeMobileLookup eventSlug={eventDetail.slug} defaultMobile={prefillMobile} />
-        )}
-
-        {eventDetail.description && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold tracking-tight">About this Event</h2>
-            <div className="whitespace-pre-wrap leading-7 text-foreground">{eventDetail.description}</div>
-          </section>
-        )}
-
-        {isCompletedEvent && linkedActivity && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold tracking-tight">Event Activity</h2>
-            <div className="rounded-lg border border-border bg-card p-4">
-              <p className="text-sm text-muted-foreground">
-                This event has a linked activity report.
-              </p>
-              <Link
-                to={`/events/${linkedActivity.slug}`}
-                className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
-              >
-                View activity report
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {eventDetail.invitation_text && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold tracking-tight">Invitation</h2>
-            <div className="rounded-lg border border-border bg-muted/30 p-4 whitespace-pre-wrap leading-7 text-foreground">
-              {eventDetail.invitation_text}
-            </div>
-          </section>
-        )}
-
-        {agendaItems.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold tracking-tight">Agenda</h2>
-            <div className="space-y-3">
-              {agendaItems.map((item, index) => (
-                <div key={`agenda-${index}`} className="rounded-lg border border-border bg-card p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {item.time && (
-                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        {item.time}
-                      </span>
-                    )}
-                    <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
-                  </div>
-                  {item.note && (
-                    <p className="mt-2 text-sm text-muted-foreground leading-6">{item.note}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Additional images */}
-        {flyerImages.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold tracking-tight">Images</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {flyerImages.map((asset) => (
-                <a
-                  key={asset.id}
-                  href={asset.public_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative block aspect-[4/3] overflow-hidden rounded-lg bg-muted"
-                >
-                  <img
-                    src={asset.public_url}
-                    alt={asset.label ?? ''}
-                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                    loading="lazy"
-                  />
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Documents */}
-        {documents.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold tracking-tight">Materials</h2>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-              {documents.map((asset) => (
-                <li key={asset.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <a
-                      href={`/events/${encodeURIComponent(eventDetail.slug)}/material/${encodeURIComponent(asset.id)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted/20"
-                      title={`Open ${documentDisplayName(asset)}`}
-                    >
-                      {isDocumentImageAsset(asset.mime_type) ? (
-                        <img
-                          src={asset.public_url}
-                          alt={`${documentDisplayName(asset)} preview`}
-                          className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30 text-muted-foreground">
-                          <FileText className="h-5 w-5" />
-                          <span className="mt-0.5 text-[9px] font-semibold leading-none text-foreground">
-                            {documentPreviewLabel(asset)}
-                          </span>
-                        </div>
-                      )}
-                    </a>
-                    <div className="min-w-0">
-                      <a
-                        href={`/events/${encodeURIComponent(eventDetail.slug)}/material/${encodeURIComponent(asset.id)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-foreground hover:text-primary truncate inline-flex items-center gap-2"
-                      >
-                        <ExternalLink className="h-4 w-4 shrink-0" />
-                        {documentDisplayName(asset)}
-                      </a>
-                      {asset.byte_size && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {Math.ceil(asset.byte_size / 1024)} KB
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
 
         {/* Registration block */}
         {rsvp?.enabled && (
@@ -1195,6 +1054,147 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                 </>
               )}
             </div>
+          </section>
+        )}
+
+        {/* Badge self-serve lookup — shown immediately after registration form */}
+        {rsvp?.enabled && (
+          <BadgeMobileLookup eventSlug={eventDetail.slug} defaultMobile={prefillMobile} />
+        )}
+
+        {eventDetail.description && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">About this Event</h2>
+            <div className="whitespace-pre-wrap leading-7 text-foreground">{eventDetail.description}</div>
+          </section>
+        )}
+
+        {isCompletedEvent && linkedActivity && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Event Activity</h2>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm text-muted-foreground">
+                This event has a linked activity report.
+              </p>
+              <Link
+                to={`/events/${linkedActivity.slug}`}
+                className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
+              >
+                View activity report
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {eventDetail.invitation_text && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Invitation</h2>
+            <div className="rounded-lg border border-border bg-muted/30 p-4 whitespace-pre-wrap leading-7 text-foreground">
+              {eventDetail.invitation_text}
+            </div>
+          </section>
+        )}
+
+        {agendaItems.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Agenda</h2>
+            <div className="space-y-3">
+              {agendaItems.map((item, index) => (
+                <div key={`agenda-${index}`} className="rounded-lg border border-border bg-card p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.time && (
+                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {item.time}
+                      </span>
+                    )}
+                    <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                  </div>
+                  {item.note && (
+                    <p className="mt-2 text-sm text-muted-foreground leading-6">{item.note}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Additional images */}
+        {flyerImages.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Images</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {flyerImages.map((asset) => (
+                <a
+                  key={asset.id}
+                  href={asset.public_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative block aspect-[4/3] overflow-hidden rounded-lg bg-muted"
+                >
+                  <img
+                    src={asset.public_url}
+                    alt={asset.label ?? ''}
+                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                    loading="lazy"
+                  />
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Documents */}
+        {documents.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold tracking-tight">Materials</h2>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {documents.map((asset) => (
+                <li key={asset.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <a
+                      href={`/events/${encodeURIComponent(eventDetail.slug)}/material/${encodeURIComponent(asset.id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted/20"
+                      title={`Open ${documentDisplayName(asset)}`}
+                    >
+                      {isDocumentImageAsset(asset.mime_type) ? (
+                        <img
+                          src={asset.public_url}
+                          alt={`${documentDisplayName(asset)} preview`}
+                          className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30 text-muted-foreground">
+                          <FileText className="h-5 w-5" />
+                          <span className="mt-0.5 text-[9px] font-semibold leading-none text-foreground">
+                            {documentPreviewLabel(asset)}
+                          </span>
+                        </div>
+                      )}
+                    </a>
+                    <div className="min-w-0">
+                      <a
+                        href={`/events/${encodeURIComponent(eventDetail.slug)}/material/${encodeURIComponent(asset.id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-foreground hover:text-primary truncate inline-flex items-center gap-2"
+                      >
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                        {documentDisplayName(asset)}
+                      </a>
+                      {asset.byte_size && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {Math.ceil(asset.byte_size / 1024)} KB
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

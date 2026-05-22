@@ -1,25 +1,67 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, Phone, Mail, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, X, Phone, Mail, ChevronDown, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { memberLubRolesService, MemberLubRoleAssignment } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 type RoleFamily = 'all' | 'president' | 'secretary';
-type Level = 'all' | 'national' | 'state' | 'district' | 'city';
-type SortKey = 'role' | 'name' | 'level' | 'state' | 'year';
-type SortDir = 'asc' | 'desc';
+type Level = 'all' | 'state' | 'district';
 
-const LEADERSHIP_ROLE_KEYWORDS = ['president', 'general secretary', 'secretary general'];
+interface LeadershipAssignment extends MemberLubRoleAssignment {
+  committee_year?: string | null;
+  role_start_date?: string | null;
+  role_end_date?: string | null;
+}
 
-function isLeadershipRole(roleName: string): boolean {
-  const lower = roleName.toLowerCase();
-  return LEADERSHIP_ROLE_KEYWORDS.some((kw) => lower.includes(kw));
+interface UnitData {
+  key: string;
+  title: string;
+  subtitle?: string;
+  currentMembers: LeadershipAssignment[];
+  /** Historical members grouped by year, sorted desc (newest first). */
+  historicalByYear: [string, LeadershipAssignment[]][];
+  president: LeadershipAssignment | null;
+  secretary: LeadershipAssignment | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LEVEL_OPTIONS: { value: Level; label: string }[] = [
+  { value: 'all', label: 'All levels' },
+  { value: 'state', label: 'State units' },
+  { value: 'district', label: 'District units' },
+];
+
+const FAMILY_OPTIONS: { value: RoleFamily; label: string }[] = [
+  { value: 'all', label: 'All roles' },
+  { value: 'president', label: 'Presidents' },
+  { value: 'secretary', label: 'Secretaries' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Extract a 4-digit numeric year from a string. Returns null for unknown/null. */
+function parseYear(y: string | null | undefined): number | null {
+  if (!y) return null;
+  const match = y.trim().match(/\d{4}/);
+  if (!match) return null;
+  const n = parseInt(match[0], 10);
+  return isNaN(n) ? null : n;
 }
 
 function getRoleFamily(roleName: string): RoleFamily {
@@ -29,89 +71,452 @@ function getRoleFamily(roleName: string): RoleFamily {
   return 'all';
 }
 
-function getDisplayName(a: MemberLubRoleAssignment): string {
+function getDisplayName(a: LeadershipAssignment): string {
   if (a.assignee_kind === 'alternate' && a.alternate_contact_name_snapshot) {
     return a.alternate_contact_name_snapshot;
   }
   return a.member_name ?? a.member_registrations?.full_name ?? '—';
 }
 
-function getMobile(a: MemberLubRoleAssignment): string {
+function getMobile(a: LeadershipAssignment): string {
   if (a.assignee_kind === 'alternate') {
-    return a.alternate_contact_mobile_snapshot ?? '—';
+    return a.alternate_contact_mobile_snapshot ?? '';
   }
-  return a.member_registrations?.mobile_number ?? '—';
+  return a.member_registrations?.mobile_number ?? '';
 }
 
-function getEmail(a: MemberLubRoleAssignment): string {
-  return a.member_email ?? a.member_registrations?.email ?? '—';
+function getEmail(a: LeadershipAssignment): string {
+  return a.member_email ?? a.member_registrations?.email ?? '';
 }
 
-function formatPeriod(a: MemberLubRoleAssignment & { role_start_date?: string | null; role_end_date?: string | null }): string {
-  const start = a.role_start_date;
-  const end = a.role_end_date;
-  if (!start && !end) return '—';
-  if (start && end) return `${start} – ${end}`;
-  if (start) return `From ${start}`;
-  if (end) return `Until ${end}`;
-  return '—';
+/**
+ * Sort by lub_role_display_order ascending (Roles Master order), with
+ * null/undefined display_order roles falling back to role name alpha AFTER
+ * all ordered roles.
+ */
+function sortByDisplayOrder(assignments: LeadershipAssignment[]): LeadershipAssignment[] {
+  return assignments.slice().sort((a, b) => {
+    const oa = a.lub_role_display_order ?? null;
+    const ob = b.lub_role_display_order ?? null;
+    // Both have explicit order → sort by that order asc
+    if (oa !== null && ob !== null) return oa - ob;
+    // Only a has order → a comes first
+    if (oa !== null) return -1;
+    // Only b has order → b comes first
+    if (ob !== null) return 1;
+    // Neither has order → alpha by role name
+    return (a.role_name ?? '').localeCompare(b.role_name ?? '');
+  });
 }
 
-function levelLabel(level: string): string {
-  return level.charAt(0).toUpperCase() + level.slice(1);
+/**
+ * Resolve the best representative for a role family (president / secretary)
+ * from a candidate list (should already be pre-filtered to the selected year).
+ *
+ * Priority:
+ * 1. Latest committee year desc
+ * 2. Active period (no end date)
+ * 3. Most recently updated/created
+ *
+ * President slot: "president" in name but NOT "vice president".
+ * Secretary slot: "general secretary" OR "secretary general" in name.
+ */
+function resolveSummarySlot(
+  assignments: LeadershipAssignment[],
+  slot: 'president' | 'secretary'
+): LeadershipAssignment | null {
+  const candidates = assignments.filter((a) => {
+    const lower = (a.role_name ?? '').toLowerCase();
+    if (slot === 'president') {
+      return lower.includes('president') && !lower.includes('vice president');
+    }
+    return lower.includes('general secretary') || lower.includes('secretary general');
+  });
+
+  if (candidates.length === 0) return null;
+
+  return candidates.slice().sort((a, b) => {
+    const ya = a.committee_year ?? '';
+    const yb = b.committee_year ?? '';
+    if (ya !== yb) return yb.localeCompare(ya);
+    const aActive = !a.role_end_date ? 1 : 0;
+    const bActive = !b.role_end_date ? 1 : 0;
+    if (aActive !== bActive) return bActive - aActive;
+    const ua = a.updated_at ?? a.created_at ?? '';
+    const ub = b.updated_at ?? b.created_at ?? '';
+    return ub.localeCompare(ua);
+  })[0];
+}
+
+/**
+ * Split a flat member list into:
+ * - current: assignments whose committee_year matches effectiveYear
+ * - historical: all others, keyed by year string (or 'Unknown')
+ *
+ * When effectiveYear is empty (''), all members go into current (fallback
+ * for datasets with no parseable years).
+ */
+function splitByYear(
+  members: LeadershipAssignment[],
+  effectiveYear: string
+): { current: LeadershipAssignment[]; historical: Map<string, LeadershipAssignment[]> } {
+  const current: LeadershipAssignment[] = [];
+  const historical = new Map<string, LeadershipAssignment[]>();
+
+  for (const a of members) {
+    const y = (a.committee_year ?? '').trim();
+    if (!effectiveYear || y === effectiveYear) {
+      current.push(a);
+    } else {
+      const bucket = y || 'Unknown';
+      if (!historical.has(bucket)) historical.set(bucket, []);
+      historical.get(bucket)!.push(a);
+    }
+  }
+
+  return { current, historical };
+}
+
+/**
+ * Build unit records from a flat list of assignments.
+ * Pure function — takes effectiveYear and showHistorical as explicit params
+ * so useMemo deps are correctly tracked.
+ */
+function buildUnits(
+  rows: LeadershipAssignment[],
+  keyFn: (a: LeadershipAssignment) => string,
+  metaFn: (key: string) => { title: string; subtitle?: string },
+  effectiveYear: string,
+  showHistorical: boolean
+): UnitData[] {
+  const map = new Map<string, LeadershipAssignment[]>();
+  for (const a of rows) {
+    const key = keyFn(a);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(a);
+  }
+
+  return Array.from(map.entries())
+    .sort(([ka], [kb]) => ka.localeCompare(kb))
+    .map(([key, members]): UnitData | null => {
+      const { current, historical } = splitByYear(members, effectiveYear);
+
+      const historicalByYear = Array.from(historical.entries()).sort(([ya], [yb]) => {
+        // Sort desc by numeric year; 'Unknown' goes last
+        const na = parseYear(ya) ?? -1;
+        const nb = parseYear(yb) ?? -1;
+        return nb - na;
+      });
+
+      const totalVisible =
+        current.length +
+        (showHistorical
+          ? historicalByYear.reduce((s, [, arr]) => s + arr.length, 0)
+          : 0);
+
+      if (totalVisible === 0) return null; // hide units with no visible members
+
+      return {
+        key,
+        ...metaFn(key),
+        currentMembers: current,
+        historicalByYear,
+        president: resolveSummarySlot(current, 'president'),
+        secretary: resolveSummarySlot(current, 'secretary'),
+      };
+    })
+    .filter((u): u is UnitData => u !== null);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Extended assignment type (extra fields mapped from RPC but not in interface)
+// SummarySlot — one row in the collapsed card header
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface LeadershipAssignment extends MemberLubRoleAssignment {
-  committee_year?: string | null;
-  role_start_date?: string | null;
-  role_end_date?: string | null;
+interface SummarySlotProps {
+  label: string;
+  assignment: LeadershipAssignment | null;
 }
 
+const SummarySlot: React.FC<SummarySlotProps> = ({ label, assignment }) => {
+  const mobile = assignment ? getMobile(assignment) : '';
+
+  return (
+    <div className="flex items-start gap-2 min-w-0">
+      <span className="shrink-0 w-28 text-xs font-medium text-muted-foreground pt-0.5">
+        {label}
+      </span>
+      {assignment ? (
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">
+            {getDisplayName(assignment)}
+          </p>
+          {mobile ? (
+            <a
+              href={`tel:${mobile}`}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {mobile}
+            </a>
+          ) : (
+            <span className="text-xs text-muted-foreground/60">No mobile</span>
+          )}
+        </div>
+      ) : (
+        <span className="text-sm text-muted-foreground/50 italic">—</span>
+      )}
+    </div>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Component
+// MemberRow — one row in the expanded committee list
+// Kind badges intentionally omitted (assignee_kind used only for display
+// name and mobile resolution, not shown to admin users on this page).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LEVEL_OPTIONS: { value: Level; label: string }[] = [
-  { value: 'all', label: 'All levels' },
-  { value: 'national', label: 'National' },
-  { value: 'state', label: 'State' },
-  { value: 'district', label: 'District' },
-  { value: 'city', label: 'City' },
-];
+interface MemberRowProps {
+  a: LeadershipAssignment;
+}
 
-const FAMILY_OPTIONS: { value: RoleFamily; label: string }[] = [
-  { value: 'all', label: 'All roles' },
-  { value: 'president', label: 'Presidents' },
-  { value: 'secretary', label: 'Secretaries' },
-];
+const MemberRow: React.FC<MemberRowProps> = ({ a }) => {
+  const mobile = getMobile(a);
+  const email = getEmail(a);
+  const period = (() => {
+    if (!a.role_start_date && !a.role_end_date) return null;
+    if (a.role_start_date && a.role_end_date)
+      return `${a.role_start_date} – ${a.role_end_date}`;
+    if (a.role_start_date) return `From ${a.role_start_date}`;
+    return `Until ${a.role_end_date}`;
+  })();
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1.5 sm:gap-3 py-3 border-t border-border first:border-t-0">
+      {/* Role name + optional date period */}
+      <div className="sm:w-48 shrink-0">
+        <p className="text-sm font-medium text-foreground">{a.role_name ?? '—'}</p>
+        {period && (
+          <span className="text-[10px] text-muted-foreground/70 mt-0.5 block">{period}</span>
+        )}
+      </div>
+
+      {/* Display name + contact links */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground font-medium">{getDisplayName(a)}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+          {mobile ? (
+            <a
+              href={`tel:${mobile}`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Phone className="w-3 h-3" />
+              {mobile}
+            </a>
+          ) : null}
+          {email ? (
+            <a
+              href={`mailto:${email}`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Mail className="w-3 h-3" />
+              {email}
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UnitCard — collapsible card for one state/district unit
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface UnitCardProps {
+  title: string;
+  subtitle?: string;
+  president: LeadershipAssignment | null;
+  secretary: LeadershipAssignment | null;
+  /** Assignments matching the currently selected committee year. */
+  currentMembers: LeadershipAssignment[];
+  /** Older assignments grouped by year desc (only used when showHistorical=true). */
+  historicalByYear: [string, LeadershipAssignment[]][];
+  showHistorical: boolean;
+  selectedYear: string;
+  defaultOpen?: boolean;
+}
+
+const UnitCard: React.FC<UnitCardProps> = ({
+  title,
+  subtitle,
+  president,
+  secretary,
+  currentMembers,
+  historicalByYear,
+  showHistorical,
+  selectedYear,
+  defaultOpen = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  const totalVisible =
+    currentMembers.length +
+    (showHistorical
+      ? historicalByYear.reduce((s, [, arr]) => s + arr.length, 0)
+      : 0);
+
+  const sortedCurrent = useMemo(
+    () => sortByDisplayOrder(currentMembers),
+    [currentMembers]
+  );
+
+  // Dev-only completeness assertion: rendered row count must match header count.
+  if (import.meta.env.DEV) {
+    const renderedCount =
+      sortedCurrent.length +
+      (showHistorical
+        ? historicalByYear.reduce((s, [, arr]) => s + arr.length, 0)
+        : 0);
+    if (renderedCount !== totalVisible) {
+      console.warn(
+        `[UnitCard] "${title}" count mismatch: header=${totalVisible} rendered=${renderedCount}`,
+        { sortedCurrent: sortedCurrent.length, historicalByYear }
+      );
+    }
+  }
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Collapsed header / trigger */}
+        <CollapsibleTrigger className="w-full text-left">
+          <div className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer select-none">
+            <div className="shrink-0 mt-0.5 text-muted-foreground">
+              {isOpen ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              {/* Title row */}
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-2">
+                <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+                {subtitle && (
+                  <span className="text-xs text-muted-foreground">{subtitle}</span>
+                )}
+                <span className="text-xs text-muted-foreground/60">
+                  {totalVisible} assignment{totalVisible !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {/* Summary — President + General Secretary for selected year only */}
+              <div className="flex flex-col gap-1.5">
+                <SummarySlot label="President" assignment={president} />
+                <SummarySlot label="Gen. Secretary" assignment={secretary} />
+              </div>
+            </div>
+          </div>
+        </CollapsibleTrigger>
+
+        {/* Expanded content */}
+        <CollapsibleContent>
+          <div className="px-4 pb-4 pt-1 border-t border-border bg-muted/10">
+            {showHistorical ? (
+              <>
+                {/* ── Current year section ── */}
+                {sortedCurrent.length > 0 && (
+                  <>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 mt-2">
+                      Current Committee{selectedYear ? ` (${selectedYear})` : ''}
+                    </p>
+                    {sortedCurrent.map((a) => (
+                      <MemberRow key={a.id} a={a} />
+                    ))}
+                  </>
+                )}
+
+                {/* ── Historical years section ── */}
+                {historicalByYear.length > 0 && (
+                  <div className={sortedCurrent.length > 0 ? 'mt-5' : 'mt-2'}>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                      Previous Committees
+                    </p>
+                    {historicalByYear.map(([year, yearMembers]) => (
+                      <div key={year} className="mb-4 last:mb-0">
+                        <p className="text-[11px] font-semibold text-muted-foreground/80 pb-1 mb-0 border-b border-border">
+                          {year === 'Unknown' ? 'Unknown year' : year}
+                        </p>
+                        {sortByDisplayOrder(yearMembers).map((a) => (
+                          <MemberRow key={a.id} a={a} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {sortedCurrent.length === 0 && historicalByYear.length === 0 && (
+                  <p className="text-sm text-muted-foreground/60 py-2 mt-2">
+                    No assignments.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {/* ── Selected year only ── */}
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 mt-2">
+                  Full Committee
+                </p>
+                {sortedCurrent.length > 0 ? (
+                  sortedCurrent.map((a) => <MemberRow key={a.id} a={a} />)
+                ) : (
+                  <p className="text-sm text-muted-foreground/60 py-2">
+                    No assignments for this year.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main page component
+// ─────────────────────────────────────────────────────────────────────────────
 
 const AdminLeadershipContacts: React.FC = () => {
   const [allAssignments, setAllAssignments] = useState<LeadershipAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Filter state
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<Level>('all');
   const [familyFilter, setFamilyFilter] = useState<RoleFamily>('all');
-  const [sortKey, setSortKey] = useState<SortKey>('role');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  /** '' means "auto-select latest year from dataset". */
+  const [selectedYear, setSelectedYear] = useState<string>('');
+  const [showHistorical, setShowHistorical] = useState(false);
 
   // ── Load ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-
     const load = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const all = (await memberLubRolesService.getAllAssignments({})) as LeadershipAssignment[];
+        const all = (await memberLubRolesService.getAllAssignments(
+          {}
+        )) as LeadershipAssignment[];
+        // Load ALL assignments — level/role filtering happens in the filtered memo.
+        // No upfront role-name restriction: the full committee includes all roles,
+        // not just president/secretary. Summary slots still resolve president/secretary
+        // from the filtered set via resolveSummarySlot().
         if (!cancelled) {
-          const leadership = all.filter((a) => isLeadershipRole(a.role_name ?? a.lub_roles_master?.role_name ?? ''));
-          setAllAssignments(leadership);
+          setAllAssignments(all);
         }
       } catch (err) {
         if (!cancelled) {
@@ -122,94 +527,115 @@ const AdminLeadershipContacts: React.FC = () => {
         if (!cancelled) setIsLoading(false);
       }
     };
-
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // ── Filter + sort ────────────────────────────────────────────────────────────
+  // ── Available committee years (sorted desc, numeric years only) ─────────────
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    for (const a of allAssignments) {
+      const y = a.committee_year;
+      if (y && parseYear(y) !== null) years.add(y.trim());
+    }
+    return Array.from(years).sort((a, b) => {
+      const na = parseYear(a) ?? 0;
+      const nb = parseYear(b) ?? 0;
+      return nb - na; // desc
+    });
+  }, [allAssignments]);
+
+  // Effective year: user selection or auto-default to latest
+  const effectiveYear = useMemo(
+    () => selectedYear || availableYears[0] || '',
+    [selectedYear, availableYears]
+  );
+
+  const defaultYear = availableYears[0] ?? '';
+
+  // ── Filter (search + level + role — year applied inside buildUnits) ──────────
   const filtered = useMemo(() => {
     const lq = search.toLowerCase().trim();
+    return allAssignments.filter((a) => {
+      if (levelFilter === 'state' && a.level !== 'state') return false;
+      if (levelFilter === 'district' && a.level !== 'district') return false;
+      if (levelFilter === 'all' && a.level !== 'state' && a.level !== 'district')
+        return false;
+      if (familyFilter !== 'all' && getRoleFamily(a.role_name ?? '') !== familyFilter)
+        return false;
+      if (!lq) return true;
+      const searchable = [
+        getDisplayName(a),
+        a.role_name ?? '',
+        a.state ?? '',
+        a.district ?? '',
+        getMobile(a),
+        getEmail(a),
+        a.committee_year ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return searchable.includes(lq);
+    });
+  }, [allAssignments, search, levelFilter, familyFilter]);
 
-    return allAssignments
-      .filter((a) => {
-        if (levelFilter !== 'all' && a.level !== levelFilter) return false;
-        if (familyFilter !== 'all' && getRoleFamily(a.role_name ?? '') !== familyFilter) return false;
-        if (!lq) return true;
+  // ── Group into unit cards ───────────────────────────────────────────────────
+  const stateUnits = useMemo<UnitData[]>(() => {
+    if (levelFilter === 'district') return [];
+    return buildUnits(
+      filtered.filter((a) => a.level === 'state'),
+      (a) => (a.state ?? '').trim() || 'Unknown State',
+      (key) => ({ title: `${key} State Unit` }),
+      effectiveYear,
+      showHistorical
+    );
+  }, [filtered, levelFilter, effectiveYear, showHistorical]);
 
-        const name = getDisplayName(a).toLowerCase();
-        const role = (a.role_name ?? '').toLowerCase();
-        const state = (a.state ?? '').toLowerCase();
-        const district = (a.district ?? '').toLowerCase();
-        const mobile = getMobile(a).toLowerCase();
-        const email = getEmail(a).toLowerCase();
-        const year = (a.committee_year ?? '').toLowerCase();
+  const districtUnits = useMemo<UnitData[]>(() => {
+    if (levelFilter === 'state') return [];
+    return buildUnits(
+      filtered.filter((a) => a.level === 'district'),
+      (a) => {
+        const state = (a.state ?? '').trim() || 'Unknown State';
+        const district = (a.district ?? '').trim() || 'Unknown District';
+        return `${state}|||${district}`;
+      },
+      (key) => {
+        const [state, district] = key.split('|||');
+        return { title: `${district} District Unit`, subtitle: state };
+      },
+      effectiveYear,
+      showHistorical
+    );
+  }, [filtered, levelFilter, effectiveYear, showHistorical]);
 
-        return (
-          name.includes(lq) ||
-          role.includes(lq) ||
-          state.includes(lq) ||
-          district.includes(lq) ||
-          mobile.includes(lq) ||
-          email.includes(lq) ||
-          year.includes(lq)
-        );
-      })
-      .sort((a, b) => {
-        let va = '';
-        let vb = '';
+  // ── Totals ──────────────────────────────────────────────────────────────────
+  const totalUnits = stateUnits.length + districtUnits.length;
+  const totalContacts = [...stateUnits, ...districtUnits].reduce((s, u) => {
+    return (
+      s +
+      u.currentMembers.length +
+      (showHistorical
+        ? u.historicalByYear.reduce((s2, [, arr]) => s2 + arr.length, 0)
+        : 0)
+    );
+  }, 0);
 
-        switch (sortKey) {
-          case 'role':
-            va = a.role_name ?? '';
-            vb = b.role_name ?? '';
-            break;
-          case 'name':
-            va = getDisplayName(a);
-            vb = getDisplayName(b);
-            break;
-          case 'level':
-            va = a.level;
-            vb = b.level;
-            break;
-          case 'state':
-            va = a.state ?? '';
-            vb = b.state ?? '';
-            break;
-          case 'year':
-            va = a.committee_year ?? '';
-            vb = b.committee_year ?? '';
-            break;
-        }
-
-        const cmp = va.localeCompare(vb);
-        return sortDir === 'asc' ? cmp : -cmp;
-      });
-  }, [allAssignments, search, levelFilter, familyFilter, sortKey, sortDir]);
-
-  // ── Sort toggle ──────────────────────────────────────────────────────────────
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
-
-  const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return null;
-    return sortDir === 'asc'
-      ? <ChevronUp className="inline w-3 h-3 ml-0.5" />
-      : <ChevronDown className="inline w-3 h-3 ml-0.5" />;
-  };
-
-  const hasFilters = search.trim() !== '' || levelFilter !== 'all' || familyFilter !== 'all';
+  const hasFilters =
+    search.trim() !== '' ||
+    levelFilter !== 'all' ||
+    familyFilter !== 'all' ||
+    effectiveYear !== defaultYear ||
+    showHistorical;
 
   const clearFilters = () => {
     setSearch('');
     setLevelFilter('all');
     setFamilyFilter('all');
+    setSelectedYear('');
+    setShowHistorical(false);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -218,41 +644,75 @@ const AdminLeadershipContacts: React.FC = () => {
       <div>
         <PageHeader
           title="Leadership Contacts"
-          subtitle="Presidents and Secretaries across all levels and committee years"
+          subtitle="Presidents and Secretaries organised by state and district unit"
         />
 
-        {/* Filters */}
-        <div className="mb-4 flex flex-wrap gap-3 items-center">
+        {/* Filter bar */}
+        <div className="mb-5 flex flex-wrap gap-3 items-center">
+          {/* Search */}
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, role, state, mobile…"
+              placeholder="Search name, state, mobile, role…"
               className="pl-9 h-9"
             />
           </div>
 
+          {/* Level */}
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value as Level)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             {LEVEL_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
 
+          {/* Role family */}
           <select
             value={familyFilter}
             onChange={(e) => setFamilyFilter(e.target.value as RoleFamily)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             {FAMILY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
 
+          {/* Committee Year — only shown once years are available */}
+          {availableYears.length > 0 && (
+            <select
+              value={effectiveYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Show historical years toggle */}
+          <label className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer select-none whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={showHistorical}
+              onChange={(e) => setShowHistorical(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-input accent-primary"
+            />
+            Show historical years
+          </label>
+
+          {/* Clear */}
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5">
               <X className="w-3.5 h-3.5" />
@@ -260,9 +720,11 @@ const AdminLeadershipContacts: React.FC = () => {
             </Button>
           )}
 
+          {/* Stats */}
           {!isLoading && (
             <span className="ml-auto text-xs text-muted-foreground">
-              {filtered.length} contact{filtered.length !== 1 ? 's' : ''}
+              {totalUnits} unit{totalUnits !== 1 ? 's' : ''} · {totalContacts} contact
+              {totalContacts !== 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -274,150 +736,80 @@ const AdminLeadershipContacts: React.FC = () => {
           </div>
         )}
 
-        {/* Table */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th
-                    className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap hover:text-foreground"
-                    onClick={() => handleSort('role')}
-                  >
-                    Role <SortIcon k="role" />
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap hover:text-foreground"
-                    onClick={() => handleSort('name')}
-                  >
-                    Name <SortIcon k="name" />
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                    Kind
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                    Mobile
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                    Email
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap hover:text-foreground"
-                    onClick={() => handleSort('level')}
-                  >
-                    Level <SortIcon k="level" />
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap hover:text-foreground"
-                    onClick={() => handleSort('state')}
-                  >
-                    State <SortIcon k="state" />
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                    District
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none whitespace-nowrap hover:text-foreground"
-                    onClick={() => handleSort('year')}
-                  >
-                    Year <SortIcon k="year" />
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                    Period
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {isLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      {Array.from({ length: 10 }).map((__, j) => (
-                        <td key={j} className="px-4 py-3">
-                          <div className="h-4 rounded bg-muted" style={{ width: `${60 + (j * 7) % 40}%` }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
-                      {hasFilters
-                        ? 'No contacts match your filters.'
-                        : 'No leadership contacts found.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((a) => {
-                    const mobile = getMobile(a);
-                    const email = getEmail(a);
-                    return (
-                      <tr key={a.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">
-                          {a.role_name ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {getDisplayName(a)}
-                        </td>
-                        <td className="px-4 py-3">
-                          {a.assignee_kind === 'alternate' ? (
-                            <span className="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                              Alternate
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                              Main
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {mobile !== '—' ? (
-                            <a
-                              href={`tel:${mobile}`}
-                              className="inline-flex items-center gap-1.5 text-foreground hover:text-primary transition-colors"
-                            >
-                              <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                              {mobile}
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {email !== '—' ? (
-                            <a
-                              href={`mailto:${email}`}
-                              className="inline-flex items-center gap-1.5 text-foreground hover:text-primary transition-colors"
-                            >
-                              <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                              {email}
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-muted-foreground">{levelLabel(a.level)}</span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {a.state ?? <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {a.district ?? <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {a.committee_year ?? <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
-                          {formatPeriod(a)}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-border bg-card p-4 animate-pulse"
+              >
+                <div className="h-4 w-48 bg-muted rounded mb-3" />
+                <div className="space-y-2">
+                  <div className="h-3 w-64 bg-muted rounded" />
+                  <div className="h-3 w-56 bg-muted rounded" />
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && totalUnits === 0 && (
+          <div className="rounded-lg border border-border bg-card px-6 py-12 text-center text-muted-foreground">
+            {hasFilters
+              ? 'No units match your current filters.'
+              : 'No leadership contacts found. Assign President or Secretary roles in the Designations Management page.'}
+          </div>
+        )}
+
+        {/* State units */}
+        {!isLoading && stateUnits.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              State Level Units ({stateUnits.length})
+            </h2>
+            <div className="space-y-3">
+              {stateUnits.map((unit) => (
+                <UnitCard
+                  key={unit.key}
+                  title={unit.title}
+                  subtitle={unit.subtitle}
+                  president={unit.president}
+                  secretary={unit.secretary}
+                  currentMembers={unit.currentMembers}
+                  historicalByYear={unit.historicalByYear}
+                  showHistorical={showHistorical}
+                  selectedYear={effectiveYear}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* District units */}
+        {!isLoading && districtUnits.length > 0 && (
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              District Units ({districtUnits.length})
+            </h2>
+            <div className="space-y-3">
+              {districtUnits.map((unit) => (
+                <UnitCard
+                  key={unit.key}
+                  title={unit.title}
+                  subtitle={unit.subtitle}
+                  president={unit.president}
+                  secretary={unit.secretary}
+                  currentMembers={unit.currentMembers}
+                  historicalByYear={unit.historicalByYear}
+                  showHistorical={showHistorical}
+                  selectedYear={effectiveYear}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </PermissionGate>
   );

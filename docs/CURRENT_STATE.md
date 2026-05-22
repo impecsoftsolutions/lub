@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-22  
-**Updated by:** Claude (094 — dashboard metrics RPC, gender/units/cities cards, leadership contacts page, badge placement fix)
+**Updated by:** Claude (094z — fix committee ordering and missing members on leadership contacts page)
 
 ---
 
@@ -26,11 +26,19 @@
 
 ## Active Stream
 
-**Active stream:** None. COD-DASHBOARD-GENDER-UNITS-CITIES-LEADERSHIP-094 complete and deployed.
+**Active stream:** None. COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z complete. Pending user instruction to commit/deploy.
 
 ---
 
 ## Last Verified
+
+- **When:** 2026-05-22
+- **What:** `COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z` — (A) Fixed committee ordering: replaced hardcoded priority (president=0/secretary=1/others=99) with `lub_role_display_order` ascending from Roles Master; nulls fall back to role name alpha after ordered roles. (B) Fixed missing members: removed `isLeadershipRole()` filter from data load that was silently dropping all non-president/secretary roles (treasurer, vice president, joint secretary, etc.); expanded list now shows ALL state/district assignments matching filters; summary slots still resolve only president/secretary. (C) Added DEV-only count assertion in UnitCard (`import.meta.env.DEV`, no production noise).
+- **Deploy/apply commands run:** None (pending user instruction to commit/push).
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS (659.99 kB admin chunk — slightly smaller due to removed dead code), Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:** Pending — expanded list shows all committee roles, order matches Roles Master display_order, header count = rendered rows, role family filter still works, no kind badges, year/historical still functional.
+
+## Previous Verified (094)
 
 - **When:** 2026-05-22
 - **What:** `COD-DASHBOARD-GENDER-UNITS-CITIES-LEADERSHIP-094` — dashboard metrics RPC, 4 new dashboard cards (Male Members, Female Members, Active District Units, Active Cities), new Leadership Contacts admin page, badge lookup moved before "About this Event" on public event pages.
@@ -105,6 +113,12 @@ Runtime notes:
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 094y Event page registration-block-to-top + Leadership Contacts collapsible cards redesign
+
+- Validation run 2026-05-22: Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped). NOT yet committed or deployed (pending user instruction).
+- **Part A — `src/pages/ActivityDetail.tsx`**: Entire registration block (heading, capacity strip, Aadhaar section, submit button — ~413 lines) moved to the top of the event content area, before "About this Event". `BadgeMobileLookup` placed immediately after the registration block. Reorder was done via Python `readlines()` + slice reassembly (not Edit, to avoid non-unique block matching on a 1664-line file). File went from 1664 to 1665 lines. No logic changed — pure section reorder.
+- **Part B — `src/pages/AdminLeadershipContacts.tsx`**: Complete rewrite from flat sortable table to collapsible state/district unit cards. New sub-components: `SummarySlot` (label + name + mobile link), `MemberRow` (role + kind badge + year + period + name + tel + email), `UnitCard` (Collapsible wrapper). Collapsed view: unit title + member count + President summary slot + General Secretary summary slot. Expanded view: full committee sorted by committee year desc → role priority → name alpha. `resolveSummarySlot()` priority: latest year → active period (no end date) → most recently updated. President excludes "vice president". Secretary = "general secretary" OR "secretary general". Level filter simplified to all/state/district (national and city have no meaningful unit grouping). Uses `@radix-ui/react-collapsible` via shadcn. No new dependencies needed.
 
 ### 094 Dashboard metrics RPC + gender/units/cities cards + leadership contacts page + badge placement
 

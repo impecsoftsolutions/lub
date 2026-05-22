@@ -11,6 +11,219 @@ Do not edit task rows in any local board copies.
 
 No active slice.
 
+## Closed Slice - COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z
+
+### Root causes found
+
+**Bug 1 — Wrong ordering:**
+`sortByRoleAndName()` used hardcoded `ROLE_PRIORITY` map (`president=0`, `general/secretary general=1`, everything else=99). This ignored the `lub_role_display_order` field already present in the RPC payload (`MemberLubRoleAssignment.lub_role_display_order`). The field was mapped in `getAllAssignments` but never used for sort.
+
+**Bug 2 — Missing members:**
+In the `useEffect` data load:
+```typescript
+setAllAssignments(
+  all.filter((a) =>
+    isLeadershipRole(a.role_name ?? a.lub_roles_master?.role_name ?? '')
+  )
+);
+```
+`isLeadershipRole` checked for `['president', 'general secretary', 'secretary general']` keywords. Every assignment whose role name didn't contain one of these (e.g. Vice President, Treasurer, Joint Secretary, General Secretary-Finance, etc.) was silently dropped before reaching the UI. The "assignment count" in the unit card header came from the same filtered set, so the header count and rendered rows appeared consistent — but many members were simply never loaded.
+
+### Fixes applied — `src/pages/AdminLeadershipContacts.tsx` only
+
+**Fix 1 — Ordering:** Replaced `sortByRoleAndName` (hardcoded priority) with `sortByDisplayOrder` using `lub_role_display_order`:
+```typescript
+function sortByDisplayOrder(assignments: LeadershipAssignment[]): LeadershipAssignment[] {
+  return assignments.slice().sort((a, b) => {
+    const oa = a.lub_role_display_order ?? null;
+    const ob = b.lub_role_display_order ?? null;
+    if (oa !== null && ob !== null) return oa - ob;   // both ordered → asc
+    if (oa !== null) return -1;                        // only a ordered → a first
+    if (ob !== null) return 1;                         // only b ordered → b first
+    return (a.role_name ?? '').localeCompare(b.role_name ?? '');  // both null → alpha
+  });
+}
+```
+Applied in both `sortedCurrent` useMemo and historical year-bucket rendering.
+
+**Fix 2 — Completeness:** Data load now stores all assignments:
+```typescript
+setAllAssignments(all);
+```
+Level filtering (state/district only) is handled in the `filtered` memo via `levelFilter`. Role family filtering (president/secretary) is handled via the `familyFilter` dropdown. No upfront role-name restriction at load time.
+
+**Fix 3 — DEV assertion:** Added count invariant check inside `UnitCard`:
+```typescript
+if (import.meta.env.DEV) {
+  const renderedCount = sortedCurrent.length + (showHistorical ? historicalByYear.reduce(...) : 0);
+  if (renderedCount !== totalVisible) {
+    console.warn(`[UnitCard] "${title}" count mismatch: ...`);
+  }
+}
+```
+`import.meta.env.DEV` is `false` in Vite production builds — zero production log noise.
+
+**Dead code removed:** `LEADERSHIP_KEYWORDS`, `ROLE_PRIORITY`, `getRolePriority`, `sortByRoleAndName`, `isLeadershipRole`
+
+### Files touched
+
+- `src/pages/AdminLeadershipContacts.tsx`
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected shadcn warnings)
+- `npm run build` PASS (659.99 kB admin chunk — slightly smaller than 094y's 660.31 kB due to removed dead code)
+- `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped)
+
+### Runtime / deploy status
+
+**NOT yet committed or deployed — awaiting user instruction.**
+
+### Residual risks
+
+- `lub_role_display_order` comes from the RPC payload. If the DB has no `display_order` set on some roles (null), those roles fall back to alpha by role name — correct per spec.
+- The page now loads ALL role assignments (not just president/secretary), which may include more rows than before. If the DB has a very large number of assignments, the RPC result size increases. At current scale (< 500 state/district assignments) this is not a concern.
+- National and city-level assignments are still excluded from unit cards by the `filtered` memo (`levelFilter === 'all'` block). No change there.
+
+## Closed Slice - COD-DASHBOARD-LEADERSHIP-UX-COLLAPSIBLE-094Y-HOTFIX-KIND-HIDE-YEAR-CLARITY
+
+### What changed
+
+**`src/pages/AdminLeadershipContacts.tsx`** — complete rewrite of the previous 094y version:
+
+**Issue A fixed — kind badges hidden:**
+- Removed `Main` and `Alternate` badge spans from `MemberRow`
+- `assignee_kind` still used internally by `getDisplayName()` and `getMobile()` for correct alternate name/mobile resolution; not exposed in UI
+
+**Issue B fixed — year clarity:**
+
+New pure helper functions (defined outside component, no closure over state):
+- `parseYear(y)`: extracts 4-digit numeric year; returns `null` for unknown/null values
+- `splitByYear(members, effectiveYear)`: partitions members into `current` (matching selected year) and `historical` (Map keyed by year string or `'Unknown'`); when `effectiveYear = ''` all members go to `current` as fallback
+- `buildUnits(rows, keyFn, metaFn, effectiveYear, showHistorical)`: pure function replacing the inline grouping logic in both state and district memos; handles year splitting, `historicalByYear` sorting (desc), empty-unit pruning
+
+New state:
+- `selectedYear: string` — `''` means auto-select latest; `useMemo` derives `effectiveYear = selectedYear || availableYears[0] || ''`
+- `showHistorical: boolean` — default false
+
+New memos:
+- `availableYears`: unique parseable years from `allAssignments`, sorted desc. Excludes null/unknown years from dropdown.
+- `effectiveYear`: derived from `selectedYear` + `availableYears[0]`; stable `useMemo` (string primitive comparison)
+
+Filter bar additions (after role family dropdown):
+1. Committee Year `<select>` — lists `availableYears` desc; only rendered when `availableYears.length > 0`; changing it calls `setSelectedYear(value)`
+2. `Show historical years` native `<input type="checkbox">` — styled with `accent-primary`
+
+`UnitCard` prop changes:
+- `members: LeadershipAssignment[]` → removed
+- `currentMembers: LeadershipAssignment[]` — selected year assignments only
+- `historicalByYear: [string, LeadershipAssignment[]][]` — sorted year desc, only used when `showHistorical=true`
+- `showHistorical: boolean` — controls expanded view rendering
+- `selectedYear: string` — used in "Current Committee (YYYY)" heading
+
+`UnitCard` expanded view:
+- `showHistorical = OFF`: shows "Full Committee" heading + `sortByRoleAndName(currentMembers)` rows; if empty → "No assignments for this year."
+- `showHistorical = ON`: "Current Committee (YYYY)" section (if currentMembers > 0) + "Previous Committees" section with year subheadings (if historicalByYear > 0); each year bucket sorted by role priority → name alpha; `'Unknown'` bucket displayed as "Unknown year"
+
+Summary slots (collapsed header): always resolve from `currentMembers` only — never from historical.
+
+`hasFilters` covers: search, level, family, `effectiveYear !== defaultYear`, `showHistorical`.
+`clearFilters` resets: all of above, setting `selectedYear = ''` (triggers auto-default).
+
+`sortExpandedList` removed; replaced by `sortByRoleAndName` (role priority → name, no year — year grouping is external).
+
+### Files touched
+
+- `src/pages/AdminLeadershipContacts.tsx`
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected shadcn warnings)
+- `npm run build` PASS (660 kB admin chunk — +2 kB vs 094y, pre-existing chunk warnings only)
+- `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped)
+
+### Runtime / deploy status
+
+**NOT yet committed or deployed — awaiting user instruction.**
+
+User instruction in force: "from next time do not commit or push to live without instructions"
+
+### Residual risks
+
+- None introduced. Frontend-only change; no DB, RPC, or auth path touched.
+- If a unit has assignments for year X and none for year Y, selecting year Y while `showHistorical=OFF` will hide that unit (correct per spec). Admin may need to change year or toggle historical to see it.
+- The `'Unknown'` bucket in historical catches assignments with null/empty `committee_year`. The bucket label is "Unknown year". This is intentional by spec.
+
+## Closed Slice - COD-DASHBOARD-LEADERSHIP-UX-COLLAPSIBLE-094Y
+
+### What changed
+
+**`src/pages/ActivityDetail.tsx`** (line-based reorder, 1664→1665 lines):
+- Moved entire registration block (~413 lines, was at ~787-1199) to top of event content area (now lines 646-1058)
+- `BadgeMobileLookup` placed immediately after registration block (now lines 1060-1064)
+- "About this Event" and remaining sections now follow
+- Zero logic changes — pure section reorder via Python `readlines()` slice reassembly
+- Badge comment updated: `{/* Badge self-serve lookup — shown immediately after registration form */}`
+
+**`src/pages/AdminLeadershipContacts.tsx`** (complete rewrite):
+- Previous: flat sortable table (Role, Name, Kind, Mobile, Email, Level, State, District, Year, Period)
+- New: collapsible state/district unit card hierarchy
+
+New sub-components:
+- `SummarySlot`: label + name + tel link (or "—") — shown in collapsed view
+- `MemberRow`: role chip + kind badge + year + period + name + tel link + mailto link — shown in expanded view
+- `UnitCard`: `Collapsible` wrapper — title + count badge + summary slots (collapsed); full `MemberRow` list (expanded)
+
+Key functions:
+- `resolveSummarySlot(assignments, slot)`: priority = latest committee_year desc → active period (role_end_date IS NULL) → most recently updated. President = "president" but NOT "vice president". Secretary = "general secretary" OR "secretary general"
+- `sortExpandedList(assignments)`: committee_year desc → `getRolePriority()` → name alpha
+- `getRolePriority(roleName)`: president=0, general/secretary-general=1, others=99
+
+Grouping:
+- `stateUnits`: assignments where `level === 'state'`, grouped by `a.state` key, sorted alpha
+- `districtUnits`: assignments where `level === 'district'`, grouped by `${state}|||${district}` key, sorted alpha
+- National/city assignments are excluded (they don't group into named unit cards)
+- Level filter: `'all'` shows both state+district; `'state'` shows only state; `'district'` shows only district
+- Units with 0 visible members after filtering are hidden
+
+Uses: `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible` (already a project dependency)
+
+### Files touched
+
+- `src/pages/ActivityDetail.tsx`
+- `src/pages/AdminLeadershipContacts.tsx`
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected shadcn warnings)
+- `npm run build` PASS
+- `npm run test:e2e:phase1:local` PASS (3 passed / 12 skipped)
+
+### Runtime / deploy status
+
+**NOT yet committed or deployed — awaiting user instruction.**
+
+User instruction in force: "from next time do not commit or push to live without instructions"
+
+### Residual risks / pending
+
+- Runtime verification not yet run: event page content order should be confirmed visually; leadership contacts collapsible card render, filter, and mobile overflow should be checked
+- No DB migration, no edge function, no RPC changes — frontend-only slice
+- No new npm dependencies (collapsible is already installed via shadcn)
+
+### Pending Codex actions for 094
+
+These were already in flight from 094 (unchanged by 094y):
+
+| Probe | What | Expected |
+|-------|------|---------|
+| P1 metrics RPC | `get_admin_dashboard_metrics_with_session` returns correct counts | `pending_registrations` matches sidebar badge |
+| P2 dashboard cards | All 4 new cards (Male, Female, District Units, Cities) load without error | ✓ shows numbers |
+| P3 leadership page | `/admin/dashboard/leadership-contacts` renders | ✓ no blank page |
+| P4 event page order | Registration block above "About this Event" on live | ✓ form at top |
+
+---
+
 ## Closed Slice - COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093 (+ 093x hotfix)
 
 ### Additional changes in 093x (2026-05-21)
