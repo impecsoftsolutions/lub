@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-21  
-**Updated by:** Claude (093x hotfix; Toast z-index fix; alternate mobile now editable in Add Assignment modal)
+**Last updated:** 2026-05-22  
+**Updated by:** Claude (094 — dashboard metrics RPC, gender/units/cities cards, leadership contacts page, badge placement fix)
 
 ---
 
@@ -26,17 +26,24 @@
 
 ## Active Stream
 
-**Active stream:** None. COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093 complete and deployed.
+**Active stream:** None. COD-DASHBOARD-GENDER-UNITS-CITIES-LEADERSHIP-094 complete and deployed.
 
 ---
 
 ## Last Verified
 
+- **When:** 2026-05-22
+- **What:** `COD-DASHBOARD-GENDER-UNITS-CITIES-LEADERSHIP-094` — dashboard metrics RPC, 4 new dashboard cards (Male Members, Female Members, Active District Units, Active Cities), new Leadership Contacts admin page, badge lookup moved before "About this Event" on public event pages.
+- **Deploy/apply commands run:** `supabase db push --linked` — applied `20260522090000_admin_dashboard_metrics_with_session_094.sql` OK. `git push origin main` — Railway auto-deploy triggered.
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS.
+- **Runtime probes:** Pending Codex verification — RPC returns correct counts, pending_registrations matches sidebar badge, dashboard cards load correctly, leadership contacts page renders, badge lookup appears before event description on public event page.
+
+## Previous Verified (093x/093y)
+
 - **When:** 2026-05-21
-- **What:** `COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093` + hotfix `093x` — alternate contact mobile + optional photo snapshots on leadership page for alternate assignments. Hotfix corrects `is_deleted` → `is_active` column reference in `admin_assign_member_lub_role`. `Toast` z-index raised from `z-50` to `z-[9999]` to fix toast messages hidden behind modal backdrops.
-- **Deploy/apply commands run:** `supabase db push --linked` — applied `20260520123000_alternate_contact_mobile_photo_leadership_093.sql` OK + `20260521000000_fix_assign_member_lub_role_is_deleted_093x.sql` OK.
-- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
-- **Runtime probes:** 6 probes still to confirm (Codex verification) — schema cols on new rows, backfill on existing alternate rows, admin list 25 cols, create new alternate assignment, leadership RPC 22 cols, main assignment regression clean. Core `Add Assignment` functionality should now work (was blocked by `is_deleted` column error).
+- **What:** `COD-DESIGNATIONS-ALTERNATE-CONTACT-LEADERSHIP-MOBILE-PHOTO-093` + hotfix `093x` + backfill `093y` — alternate contact mobile + optional photo snapshots on leadership page for alternate assignments. Hotfix corrects `is_deleted` → `is_active`. Backfill 093y re-populates `alternate_contact_mobile_snapshot` for assignments created after 093 migration (backfill had run before any alternate assignments existed). `Toast` z-index raised from `z-50` to `z-[9999]`. Removed editable Mobile and Photo URL inputs from Add Assignment modal (mobile auto-sourced from member registration via RPC COALESCE).
+- **Deploy/apply commands run:** `supabase db push --linked` — applied 093, 093x, 093y OK.
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS.
 
 ## Previous Verified (092)
 
@@ -98,6 +105,18 @@ Runtime notes:
 ---
 
 ## Recently Closed Events Follow-ups
+
+### 094 Dashboard metrics RPC + gender/units/cities cards + leadership contacts page + badge placement
+
+- Migration applied 2026-05-22; pushed to live via `git push origin main`.
+- **`20260522090000_admin_dashboard_metrics_with_session_094.sql`**: new `get_admin_dashboard_metrics_with_session(text) RETURNS jsonb` RPC. SECURITY DEFINER, `dashboard.view` permission gate, single query returning 12 metrics. `pending_registrations` uses same auth path as sidebar badge (fixes count mismatch).
+- **`src/lib/supabase.ts`**: added `AdminDashboardMetrics` interface + `dashboardService.getMetricsWithSession`.
+- **`src/hooks/useDashboardData.ts`**: replaced 8 parallel `supabase.from(...)` direct queries with single `dashboardService.getMetricsWithSession` RPC call. `DashboardMetrics` interface extended with `maleMembers`, `femaleMembers`, `activeDistrictUnits`, `activeCities`.
+- **`src/pages/AdminDashboardOverview.tsx`**: added 4 new cards (Male Members blue, Female Members pink, Active District Units amber, Active Cities emerald). Cards reorganised into 2 grid rows.
+- **`src/pages/AdminLeadershipContacts.tsx`**: new page. Loads all LUB role assignments, filters for roles containing "president"/"general secretary"/"secretary general", renders sortable table with Role, Name, Kind, Mobile (tel link), Email (mailto), Level, State, District, Year, Period columns. Filters: smart search, Level dropdown, Role family dropdown. Route: `/admin/dashboard/leadership-contacts`.
+- **`src/App.tsx`**: added `<Route path="/admin/dashboard/leadership-contacts" element={<AdminLeadershipContacts />} />`.
+- **`src/components/admin/AppSidebar.tsx`**: added `{ label: "Leadership Contacts", path: "/admin/dashboard/leadership-contacts" }` as second child under Dashboard section.
+- **`src/pages/ActivityDetail.tsx`**: moved `BadgeMobileLookup` section from after the registration block to BEFORE "About this Event" — registered attendees now see it immediately on load without scrolling.
 
 ### 093 Alternate contact mobile + photo on leadership page (+ 093x hotfix)
 
