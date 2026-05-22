@@ -11,6 +11,29 @@ Do not edit task rows in any local board copies.
 
 No active slice.
 
+## Closed Slice - COD-AUTH-LOGIN-LOCKOUT-DURATION-095
+
+### What changed
+
+- Reduced lock duration in auth runtime from 30 minutes to 3 minutes.
+- Lock threshold remains unchanged at 5 failed attempts.
+- Updated frontend/auth lock message to match the new duration.
+
+### Files touched
+
+- `src/lib/customAuth.ts`
+- `supabase/migrations/20260522103000_reduce_login_lockout_to_3_minutes.sql`
+
+### Validation
+
+- `npm run lint` PASS (0 errors / 3 expected warnings)
+
+### Runtime / deploy status
+
+- Applied migration to linked DB:
+  - `supabase db push --linked`
+- Migration applied: `20260522103000_reduce_login_lockout_to_3_minutes.sql`
+
 ## Closed Slice - COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z
 
 ### Root causes found

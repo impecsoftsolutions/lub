@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
 **Last updated:** 2026-05-22  
-**Updated by:** Claude (094z â€” fix committee ordering and missing members on leadership contacts page)
+**Updated by:** Codex (095 - login lockout reduced to 3 minutes)
 
 ---
 
@@ -33,11 +33,18 @@
 ## Last Verified
 
 - **When:** 2026-05-22
-- **What:** `COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z` â€” (A) Fixed committee ordering: replaced hardcoded priority (president=0/secretary=1/others=99) with `lub_role_display_order` ascending from Roles Master; nulls fall back to role name alpha after ordered roles. (B) Fixed missing members: removed `isLeadershipRole()` filter from data load that was silently dropping all non-president/secretary roles (treasurer, vice president, joint secretary, etc.); expanded list now shows ALL state/district assignments matching filters; summary slots still resolve only president/secretary. (C) Added DEV-only count assertion in UnitCard (`import.meta.env.DEV`, no production noise).
-- **Deploy/apply commands run:** None (pending user instruction to commit/push).
-- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS (659.99 kB admin chunk â€” slightly smaller due to removed dead code), Phase 1 readonly smoke PASS (3 passed / 12 skipped).
-- **Runtime probes:** Pending â€” expanded list shows all committee roles, order matches Roles Master display_order, header count = rendered rows, role family filter still works, no kind badges, year/historical still functional.
+- **What:** `COD-AUTH-LOGIN-LOCKOUT-DURATION-095` — reduced failed-login lockout duration from 30 minutes to 3 minutes, while preserving lock threshold at 5 failed attempts.
+- **Deploy/apply commands run:** `supabase db push --linked` — applied `20260522103000_reduce_login_lockout_to_3_minutes.sql` successfully.
+- **Result:** Lint PASS (0 errors / 3 warnings). Runtime lock duration now 3 minutes.
+- **Runtime probes:** Sign-in lock error now counts down from 3 minutes max instead of 30 minutes.
 
+## Previous Verified (094Z)
+
+- **When:** 2026-05-22
+- **What:** `COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z` — (A) Fixed committee ordering: replaced hardcoded priority (president=0/secretary=1/others=99) with `lub_role_display_order` ascending from Roles Master; nulls fall back to role name alpha after ordered roles. (B) Fixed missing members: removed `isLeadershipRole()` filter from data load that was silently dropping all non-president/secretary roles (treasurer, vice president, joint secretary, etc.); expanded list now shows ALL state/district assignments matching filters; summary slots still resolve only president/secretary. (C) Added DEV-only count assertion in UnitCard (`import.meta.env.DEV`, no production noise).
+- **Deploy/apply commands run:** None (pending user instruction to commit/push).
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS (659.99 kB admin chunk — slightly smaller due to removed dead code), Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:** Pending — expanded list shows all committee roles, order matches Roles Master display_order, header count = rendered rows, role family filter still works, no kind badges, year/historical still functional.
 ## Previous Verified (094)
 
 - **When:** 2026-05-22
@@ -279,4 +286,6 @@ Runtime notes:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+
+
 

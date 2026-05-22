@@ -141,7 +141,7 @@ export const customAuth = {
         if (failedAttemptResult?.isLocked) {
           return {
             success: false,
-            error: 'Too many failed login attempts. Your account has been locked for 30 minutes.',
+            error: 'Too many failed login attempts. Your account has been locked for 3 minutes.',
             errorCode: AuthErrorCode.ACCOUNT_LOCKED,
             accountStatus: 'locked',
             lockedUntil: failedAttemptResult.lockedUntil,
