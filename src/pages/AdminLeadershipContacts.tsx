@@ -109,6 +109,14 @@ function sortByDisplayOrder(assignments: LeadershipAssignment[]): LeadershipAssi
   });
 }
 
+function normalizeRoleName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[.\-_/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Resolve the best representative for a role family (president / secretary)
  * from a candidate list (should already be pre-filtered to the selected year).
@@ -125,12 +133,15 @@ function resolveSummarySlot(
   assignments: LeadershipAssignment[],
   slot: 'president' | 'secretary'
 ): LeadershipAssignment | null {
+  const presidentRoles = new Set(['president']);
+  const secretaryRoles = new Set(['general secretary', 'secretary general', 'gen secretary']);
+
   const candidates = assignments.filter((a) => {
-    const lower = (a.role_name ?? '').toLowerCase();
+    const normalized = normalizeRoleName(a.role_name ?? '');
     if (slot === 'president') {
-      return lower.includes('president') && !lower.includes('vice president');
+      return presidentRoles.has(normalized);
     }
-    return lower.includes('general secretary') || lower.includes('secretary general');
+    return secretaryRoles.has(normalized);
   });
 
   if (candidates.length === 0) return null;

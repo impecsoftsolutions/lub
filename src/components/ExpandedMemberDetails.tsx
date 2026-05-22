@@ -108,7 +108,7 @@ const ExpandedMemberDetails: React.FC<ExpandedMemberDetailsProps> = ({
     const setting = visibilitySettings.find(s => s.field_name === fieldName);
     if (!setting) return false;
 
-    if (userRole.isLoggedIn) {
+    if (userRole.isMember) {
       return setting.show_to_members;
     } else {
       return setting.show_to_public;

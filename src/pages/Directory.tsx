@@ -144,10 +144,11 @@ const Directory: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && member) {
       const isAdminUser = member.account_type === 'admin' || member.account_type === 'both';
+      const isMemberUser = member.account_type === 'member' || member.account_type === 'both';
       setUserRole({
         isLoggedIn: true,
         isAdmin: isAdminUser,
-        isMember: true
+        isMember: isMemberUser
       });
     } else {
       setUserRole({
@@ -459,6 +460,7 @@ const Directory: React.FC = () => {
 
   const MemberCard: React.FC<{ member: MemberData }> = ({ member }) => {
     const isExpanded = expandedMemberId === member.id;
+    const canViewMemberDetails = userRole.isAdmin || userRole.isMember;
 
     const handleCardClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -488,7 +490,7 @@ const Directory: React.FC = () => {
           <span>{member.district}, {formatCityDisplay(member.city, member.other_city_name, member.is_custom_city)}</span>
         </div>
 
-        {userRole.isLoggedIn && (
+        {canViewMemberDetails && (
           <>
             {member.company_designations && (
               <div className="mb-3">
@@ -1002,17 +1004,21 @@ const Directory: React.FC = () => {
               </div>
             )}
 
-            {!userRole.isLoggedIn && filteredMembers.length > 0 && (
+            {!(userRole.isAdmin || userRole.isMember) && filteredMembers.length > 0 && (
               <div className="mt-6 bg-primary/10 border border-primary/20 rounded-lg p-4">
                 <div className="flex items-center justify-center text-center">
                   <EyeOff className="w-5 h-5 mr-2 text-primary" />
                   <span className="text-sm text-foreground">
-                    Contact details are hidden. <button
-                      onClick={() => navigate('/signin')}
-                      className="font-semibold underline hover:text-primary/80"
-                    >
-                      Sign in
-                    </button> to view full details
+                    {userRole.isLoggedIn ? (
+                      <>Contact details are hidden for general users. Approved member login is required to view full details.</>
+                    ) : (
+                      <>Contact details are hidden. <button
+                        onClick={() => navigate('/signin')}
+                        className="font-semibold underline hover:text-primary/80"
+                      >
+                        Sign in
+                      </button> to view full details.</>
+                    )}
                   </span>
                 </div>
               </div>
