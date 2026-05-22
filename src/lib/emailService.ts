@@ -33,7 +33,7 @@ export const emailService = {
     const fallbackContactNumber = organizationProfile?.contact_number?.trim() || '';
     const contactName = stateLeader?.president_name?.trim() || organizationName;
     const contactMobile = stateLeader?.president_mobile?.trim() || fallbackContactNumber;
-    const contactTitle = stateLeader ? 'State President' : 'Organization Contact';
+    const contactTitle = stateLeader ? 'State Contact' : 'Organization Contact';
 
     const stateText = data.state === 'Andhra Pradesh' ? 'Andhra Pradesh' : data.state;
     const referredByLine = data.referred_by ? `\nReferred by: ${data.referred_by}` : '';

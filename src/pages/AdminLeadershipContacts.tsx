@@ -15,7 +15,7 @@ import {
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type RoleFamily = 'all' | 'president' | 'secretary';
+type RoleFilter = 'all' | string;
 type Level = 'all' | 'state' | 'district';
 
 interface LeadershipAssignment extends MemberLubRoleAssignment {
@@ -31,8 +31,11 @@ interface UnitData {
   currentMembers: LeadershipAssignment[];
   /** Historical members grouped by year, sorted desc (newest first). */
   historicalByYear: [string, LeadershipAssignment[]][];
-  president: LeadershipAssignment | null;
-  secretary: LeadershipAssignment | null;
+  /**
+   * Top role holders for the card header, derived from DB role names
+   * and display order only (no hardcoded role keywords).
+   */
+  summaryAssignments: LeadershipAssignment[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,12 +46,6 @@ const LEVEL_OPTIONS: { value: Level; label: string }[] = [
   { value: 'all', label: 'All levels' },
   { value: 'state', label: 'State units' },
   { value: 'district', label: 'District units' },
-];
-
-const FAMILY_OPTIONS: { value: RoleFamily; label: string }[] = [
-  { value: 'all', label: 'All roles' },
-  { value: 'president', label: 'Presidents' },
-  { value: 'secretary', label: 'Secretaries' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,13 +59,6 @@ function parseYear(y: string | null | undefined): number | null {
   if (!match) return null;
   const n = parseInt(match[0], 10);
   return isNaN(n) ? null : n;
-}
-
-function getRoleFamily(roleName: string): RoleFamily {
-  const lower = roleName.toLowerCase();
-  if (lower.includes('president')) return 'president';
-  if (lower.includes('secretary')) return 'secretary';
-  return 'all';
 }
 
 function getDisplayName(a: LeadershipAssignment): string {
@@ -109,54 +99,24 @@ function sortByDisplayOrder(assignments: LeadershipAssignment[]): LeadershipAssi
   });
 }
 
-function normalizeRoleName(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[.\-_/]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 /**
- * Resolve the best representative for a role family (president / secretary)
- * from a candidate list (should already be pre-filtered to the selected year).
- *
- * Priority:
- * 1. Latest committee year desc
- * 2. Active period (no end date)
- * 3. Most recently updated/created
- *
- * President slot: "president" in name but NOT "vice president".
- * Secretary slot: "general secretary" OR "secretary general" in name.
+ * Build top card-header slots from DB role ordering only.
+ * One row per unique role name, in display-order sequence.
  */
-function resolveSummarySlot(
+function getTopSummaryAssignments(
   assignments: LeadershipAssignment[],
-  slot: 'president' | 'secretary'
-): LeadershipAssignment | null {
-  const presidentRoles = new Set(['president']);
-  const secretaryRoles = new Set(['general secretary', 'secretary general', 'gen secretary']);
-
-  const candidates = assignments.filter((a) => {
-    const normalized = normalizeRoleName(a.role_name ?? '');
-    if (slot === 'president') {
-      return presidentRoles.has(normalized);
-    }
-    return secretaryRoles.has(normalized);
-  });
-
-  if (candidates.length === 0) return null;
-
-  return candidates.slice().sort((a, b) => {
-    const ya = a.committee_year ?? '';
-    const yb = b.committee_year ?? '';
-    if (ya !== yb) return yb.localeCompare(ya);
-    const aActive = !a.role_end_date ? 1 : 0;
-    const bActive = !b.role_end_date ? 1 : 0;
-    if (aActive !== bActive) return bActive - aActive;
-    const ua = a.updated_at ?? a.created_at ?? '';
-    const ub = b.updated_at ?? b.created_at ?? '';
-    return ub.localeCompare(ua);
-  })[0];
+  maxSlots = 2
+): LeadershipAssignment[] {
+  const seenRoles = new Set<string>();
+  const top: LeadershipAssignment[] = [];
+  for (const a of sortByDisplayOrder(assignments)) {
+    const roleKey = (a.role_name ?? '').trim().toLowerCase();
+    if (!roleKey || seenRoles.has(roleKey)) continue;
+    seenRoles.add(roleKey);
+    top.push(a);
+    if (top.length >= maxSlots) break;
+  }
+  return top;
 }
 
 /**
@@ -232,8 +192,7 @@ function buildUnits(
         ...metaFn(key),
         currentMembers: current,
         historicalByYear,
-        president: resolveSummarySlot(current, 'president'),
-        secretary: resolveSummarySlot(current, 'secretary'),
+        summaryAssignments: getTopSummaryAssignments(current, 2),
       };
     })
     .filter((u): u is UnitData => u !== null);
@@ -346,8 +305,11 @@ const MemberRow: React.FC<MemberRowProps> = ({ a }) => {
 interface UnitCardProps {
   title: string;
   subtitle?: string;
-  president: LeadershipAssignment | null;
-  secretary: LeadershipAssignment | null;
+  /**
+   * Top role holders for the card header, derived from DB role names
+   * and display order only (no hardcoded role keywords).
+   */
+  summaryAssignments: LeadershipAssignment[];
   /** Assignments matching the currently selected committee year. */
   currentMembers: LeadershipAssignment[];
   /** Older assignments grouped by year desc (only used when showHistorical=true). */
@@ -360,8 +322,7 @@ interface UnitCardProps {
 const UnitCard: React.FC<UnitCardProps> = ({
   title,
   subtitle,
-  president,
-  secretary,
+  summaryAssignments,
   currentMembers,
   historicalByYear,
   showHistorical,
@@ -418,14 +379,19 @@ const UnitCard: React.FC<UnitCardProps> = ({
                   <span className="text-xs text-muted-foreground">{subtitle}</span>
                 )}
                 <span className="text-xs text-muted-foreground/60">
-                  {totalVisible} assignment{totalVisible !== 1 ? 's' : ''}
+                  {totalVisible} member{totalVisible !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              {/* Summary — President + General Secretary for selected year only */}
+              {/* Summary — top DB-ordered roles for selected year */}
               <div className="flex flex-col gap-1.5">
-                <SummarySlot label="President" assignment={president} />
-                <SummarySlot label="Gen. Secretary" assignment={secretary} />
+                {summaryAssignments.length > 0 ? (
+                  summaryAssignments.map((a) => (
+                    <SummarySlot key={a.id} label={a.role_name ?? 'Role'} assignment={a} />
+                  ))
+                ) : (
+                  <SummarySlot label="Role" assignment={null} />
+                )}
               </div>
             </div>
           </div>
@@ -469,7 +435,7 @@ const UnitCard: React.FC<UnitCardProps> = ({
 
                 {sortedCurrent.length === 0 && historicalByYear.length === 0 && (
                   <p className="text-sm text-muted-foreground/60 py-2 mt-2">
-                    No assignments.
+                    No members.
                   </p>
                 )}
               </>
@@ -483,7 +449,7 @@ const UnitCard: React.FC<UnitCardProps> = ({
                   sortedCurrent.map((a) => <MemberRow key={a.id} a={a} />)
                 ) : (
                   <p className="text-sm text-muted-foreground/60 py-2">
-                    No assignments for this year.
+                    No members for this year.
                   </p>
                 )}
               </>
@@ -507,7 +473,7 @@ const AdminLeadershipContacts: React.FC = () => {
   // Filter state
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<Level>('all');
-  const [familyFilter, setFamilyFilter] = useState<RoleFamily>('all');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   /** '' means "auto-select latest year from dataset". */
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [showHistorical, setShowHistorical] = useState(false);
@@ -523,9 +489,8 @@ const AdminLeadershipContacts: React.FC = () => {
           {}
         )) as LeadershipAssignment[];
         // Load ALL assignments — level/role filtering happens in the filtered memo.
-        // No upfront role-name restriction: the full committee includes all roles,
-        // not just president/secretary. Summary slots still resolve president/secretary
-        // from the filtered set via resolveSummarySlot().
+        // No upfront role-name restriction: the full committee includes all roles.
+        // Card summary slots are derived from DB role order in the selected year.
         if (!cancelled) {
           setAllAssignments(all);
         }
@@ -566,6 +531,33 @@ const AdminLeadershipContacts: React.FC = () => {
 
   const defaultYear = availableYears[0] ?? '';
 
+  const roleOptions = useMemo<{ value: string; label: string }[]>(() => {
+    const roleMap = new Map<string, number | null>();
+    for (const a of allAssignments) {
+      const role = (a.role_name ?? '').trim();
+      if (!role) continue;
+      const order = a.lub_role_display_order ?? null;
+      if (!roleMap.has(role)) {
+        roleMap.set(role, order);
+      } else {
+        const prev = roleMap.get(role);
+        if (prev === null && order !== null) roleMap.set(role, order);
+        else if (prev !== null && order !== null && order < prev) roleMap.set(role, order);
+      }
+    }
+
+    return Array.from(roleMap.entries())
+      .sort((a, b) => {
+        const [roleA, orderA] = a;
+        const [roleB, orderB] = b;
+        if (orderA !== null && orderB !== null) return orderA - orderB;
+        if (orderA !== null) return -1;
+        if (orderB !== null) return 1;
+        return roleA.localeCompare(roleB);
+      })
+      .map(([role]) => ({ value: role, label: role }));
+  }, [allAssignments]);
+
   // ── Filter (search + level + role — year applied inside buildUnits) ──────────
   const filtered = useMemo(() => {
     const lq = search.toLowerCase().trim();
@@ -574,7 +566,7 @@ const AdminLeadershipContacts: React.FC = () => {
       if (levelFilter === 'district' && a.level !== 'district') return false;
       if (levelFilter === 'all' && a.level !== 'state' && a.level !== 'district')
         return false;
-      if (familyFilter !== 'all' && getRoleFamily(a.role_name ?? '') !== familyFilter)
+      if (roleFilter !== 'all' && (a.role_name ?? '') !== roleFilter)
         return false;
       if (!lq) return true;
       const searchable = [
@@ -590,7 +582,7 @@ const AdminLeadershipContacts: React.FC = () => {
         .toLowerCase();
       return searchable.includes(lq);
     });
-  }, [allAssignments, search, levelFilter, familyFilter]);
+  }, [allAssignments, search, levelFilter, roleFilter]);
 
   // ── Group into unit cards ───────────────────────────────────────────────────
   const stateUnits = useMemo<UnitData[]>(() => {
@@ -637,14 +629,14 @@ const AdminLeadershipContacts: React.FC = () => {
   const hasFilters =
     search.trim() !== '' ||
     levelFilter !== 'all' ||
-    familyFilter !== 'all' ||
+    roleFilter !== 'all' ||
     effectiveYear !== defaultYear ||
     showHistorical;
 
   const clearFilters = () => {
     setSearch('');
     setLevelFilter('all');
-    setFamilyFilter('all');
+    setRoleFilter('all');
     setSelectedYear('');
     setShowHistorical(false);
   };
@@ -655,7 +647,7 @@ const AdminLeadershipContacts: React.FC = () => {
       <div>
         <PageHeader
           title="Leadership Contacts"
-          subtitle="Presidents and Secretaries organised by state and district unit"
+          subtitle="Leadership contacts organised by state and district unit"
         />
 
         {/* Filter bar */}
@@ -684,13 +676,14 @@ const AdminLeadershipContacts: React.FC = () => {
             ))}
           </select>
 
-          {/* Role family */}
+          {/* Role */}
           <select
-            value={familyFilter}
-            onChange={(e) => setFamilyFilter(e.target.value as RoleFamily)}
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
-            {FAMILY_OPTIONS.map((o) => (
+            <option value="all">All roles</option>
+            {roleOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -770,7 +763,7 @@ const AdminLeadershipContacts: React.FC = () => {
           <div className="rounded-lg border border-border bg-card px-6 py-12 text-center text-muted-foreground">
             {hasFilters
               ? 'No units match your current filters.'
-              : 'No leadership contacts found. Assign President or Secretary roles in the Designations Management page.'}
+              : 'No leadership contacts found. Assign roles in the Designations Management page.'}
           </div>
         )}
 
@@ -786,8 +779,7 @@ const AdminLeadershipContacts: React.FC = () => {
                   key={unit.key}
                   title={unit.title}
                   subtitle={unit.subtitle}
-                  president={unit.president}
-                  secretary={unit.secretary}
+                  summaryAssignments={unit.summaryAssignments}
                   currentMembers={unit.currentMembers}
                   historicalByYear={unit.historicalByYear}
                   showHistorical={showHistorical}
@@ -810,8 +802,7 @@ const AdminLeadershipContacts: React.FC = () => {
                   key={unit.key}
                   title={unit.title}
                   subtitle={unit.subtitle}
-                  president={unit.president}
-                  secretary={unit.secretary}
+                  summaryAssignments={unit.summaryAssignments}
                   currentMembers={unit.currentMembers}
                   historicalByYear={unit.historicalByYear}
                   showHistorical={showHistorical}
