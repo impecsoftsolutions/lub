@@ -9003,6 +9003,61 @@ export interface AdminDashboardMetrics {
   lastUpdated: string | null;
 }
 
+export interface AdminPaymentsReportFilters {
+  status?: string | null;
+  state?: string | null;
+  district?: string | null;
+  paymentMode?: string | null;
+  hasPaymentProof?: boolean | null;
+  fromDate?: string | null;
+  toDate?: string | null;
+  searchQuery?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AdminPaymentsReportRow {
+  registrationId: string;
+  fullName: string;
+  companyName: string;
+  email: string;
+  mobileNumber: string;
+  memberId: string | null;
+  state: string | null;
+  district: string | null;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  isActive: boolean;
+  amountPaid: number;
+  paymentDate: string | null;
+  paymentMode: string | null;
+  transactionId: string | null;
+  bankReference: string | null;
+  paymentProofUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminPaymentsReportRpcRow {
+  registration_id: string;
+  full_name: string;
+  company_name: string;
+  email: string;
+  mobile_number: string;
+  member_id: string | null;
+  state: string | null;
+  district: string | null;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  is_active: boolean;
+  amount_paid: number | string | null;
+  payment_date: string | null;
+  payment_mode: string | null;
+  transaction_id: string | null;
+  bank_reference: string | null;
+  payment_proof_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const dashboardService = {
   async getMetricsWithSession(sessionToken: string): Promise<AdminDashboardMetrics> {
     const { data, error } = await supabase.rpc('get_admin_dashboard_metrics_with_session', {
@@ -9050,4 +9105,78 @@ export const dashboardService = {
       lastUpdated:          result.last_updated           ?? null,
     };
   }
+};
+
+export const reportsService = {
+  async getPaymentModeOptions(): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('member_registrations')
+      .select('payment_mode')
+      .not('payment_mode', 'is', null);
+
+    if (error) {
+      console.error('[reportsService.getPaymentModeOptions] query error:', error);
+      throw error;
+    }
+
+    const options = Array.from(
+      new Set(
+        ((data as Array<{ payment_mode: string | null }> | null) ?? [])
+          .map((row) => (row.payment_mode ?? '').trim())
+          .filter((value) => value.length > 0)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+
+    return options;
+  },
+
+  async getPaymentsReportWithSession(
+    sessionToken: string,
+    filters: AdminPaymentsReportFilters = {}
+  ): Promise<AdminPaymentsReportRow[]> {
+    const { data, error } = await supabase.rpc('get_admin_payments_report_with_session', {
+      p_session_token: sessionToken,
+      p_status_filter: filters.status ?? null,
+      p_state_filter: filters.state ?? null,
+      p_district_filter: filters.district ?? null,
+      p_payment_mode_filter: filters.paymentMode ?? null,
+      p_has_payment_proof: filters.hasPaymentProof ?? null,
+      p_from_date: filters.fromDate ?? null,
+      p_to_date: filters.toDate ?? null,
+      p_search_query: filters.searchQuery ?? null,
+      p_limit: filters.limit ?? 500,
+      p_offset: filters.offset ?? 0,
+    });
+
+    if (error) {
+      console.error('[reportsService.getPaymentsReportWithSession] RPC error:', error);
+      const messageParts = [
+        (error as { message?: string }).message,
+        (error as { details?: string }).details,
+        (error as { hint?: string }).hint,
+      ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+      throw new Error(messageParts.join(' | ') || 'Failed to load payments report.');
+    }
+
+    return ((data as AdminPaymentsReportRpcRow[] | null) ?? []).map((row) => ({
+      registrationId: row.registration_id,
+      fullName: row.full_name,
+      companyName: row.company_name,
+      email: row.email,
+      mobileNumber: row.mobile_number,
+      memberId: row.member_id,
+      state: row.state,
+      district: row.district,
+      status: row.status,
+      isActive: Boolean(row.is_active),
+      amountPaid: Number(row.amount_paid ?? 0),
+      paymentDate: row.payment_date,
+      paymentMode: row.payment_mode,
+      transactionId: row.transaction_id,
+      bankReference: row.bank_reference,
+      paymentProofUrl: row.payment_proof_url,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  },
 };

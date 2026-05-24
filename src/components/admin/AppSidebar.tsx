@@ -9,6 +9,7 @@ import {
   Settings,
   Shield,
   BarChart3,
+  Receipt,
   LogOut,
   PanelLeftClose,
   Image,
@@ -77,6 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const canViewEvents       = useHasPermission('events.view');
   const canViewRsvp         = useHasPermission('events.rsvp.view');
   const canManageRsvp       = useHasPermission('events.rsvp.manage');
+  const canViewPaymentsReport = useHasPermission('reports.payments.view');
 
   // Close mobile sidebar on navigation
   useEffect(() => {
@@ -164,6 +166,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ]
     },
     {
+      label: "Reports",
+      icon: Receipt,
+      requiredPermission: "reports.payments.view",
+      children: [
+        { label: "Payments", path: "/admin/reports/payments" }
+      ]
+    },
+    {
       label: "Analytics",
       icon: BarChart3,
       disabled: true,
@@ -186,7 +196,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     'events.section.view': canViewEvents || canViewRsvp || canManageRsvp,
     // Section-level: show the Events & Activities group when any child is allowed.
     'events_or_activities.view': canViewContent || canViewEvents || canViewRsvp || canManageRsvp,
-  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent, canViewEvents, canViewRsvp, canManageRsvp]);
+    'reports.payments.view': canViewPaymentsReport,
+  }), [canViewMembers, canViewLocations, canViewOrganization, canViewSettings, canViewAdmin, canViewContent, canViewEvents, canViewRsvp, canManageRsvp, canViewPaymentsReport]);
 
   const navSections = useMemo(
     () =>

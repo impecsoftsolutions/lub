@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-05-22  
-**Updated by:** Codex (095 - login lockout reduced to 3 minutes)
+**Last updated:** 2026-05-24
+**Updated by:** Codex (COD-REPORTS-PAYMENTS-001)
 
 ---
 
@@ -26,12 +26,19 @@
 
 ## Active Stream
 
-**Active stream:** None. COD-DASHBOARD-LEADERSHIP-UX-ORDER-COMPLETENESS-094Z complete. Pending user instruction to commit/deploy.
+**Active stream:** `COD-REPORTS-PAYMENTS-001` complete in repo. Pending user instruction to apply migration and commit/deploy.
 
 ---
 
 ## Last Verified
 
+- **When:** 2026-05-24
+- **What:** `COD-REPORTS-PAYMENTS-001` - added Admin Reports > Payments end-to-end: secure `_with_session` payments report RPC, `reports.payments.view` permission seed+grants, report service contract, new `/admin/reports/payments` page with filters/summary/table, new sidebar section `Reports > Payments`, and `ViewApplicationModal` `readOnly` mode for no edit/approve/reject actions from report view.
+- **Deploy/apply commands run:** None yet (migration not applied to linked DB in this session).
+- **Result:** Lint PASS (0 errors / 3 warnings), Build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
+- **Runtime probes:** Pending post-migration runtime confirmation (`supabase db push --linked` + manual admin navigation check).
+
+## Previous Verified (095)
 - **When:** 2026-05-22
 - **What:** `COD-AUTH-LOGIN-LOCKOUT-DURATION-095` — reduced failed-login lockout duration from 30 minutes to 3 minutes, while preserving lock threshold at 5 failed attempts.
 - **Deploy/apply commands run:** `supabase db push --linked` — applied `20260522103000_reduce_login_lockout_to_3_minutes.sql` successfully.
@@ -286,6 +293,8 @@ Runtime notes:
 - Handoff notes: `docs/agent_coordination/HANDOFF_NOTES.md`
 - Project guide: `docs/lub_web_portal_project_guide_for_claude_code.md`
 - Latest deep handover: `docs/session_documents/session_78_smart_upload_batch_005.md`
+
+
 
 
 
