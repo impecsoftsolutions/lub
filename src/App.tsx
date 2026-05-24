@@ -73,6 +73,217 @@ import { useOrganisationProfile } from './hooks/useOrganisationProfile';
 applyStoredTheme();
 
 const LAST_NON_SIGNIN_ROUTE_KEY = 'lub:last_non_signin_route';
+const PUBLIC_SITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL ?? 'https://lub.org.in').replace(/\/+$/, '');
+
+interface SeoMetaConfig {
+  title: string;
+  description: string;
+  robots: string;
+  canonicalPath: string;
+  structuredData?: Record<string, unknown>[];
+}
+
+const DEFAULT_PUBLIC_DESCRIPTION = 'Laghu Udyog Bharati portal for members, events, leadership updates, and organization information.';
+
+function normalizePath(pathname: string): string {
+  if (!pathname || pathname === '/') return '/';
+  return pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+}
+
+function isNoIndexPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/dashboard') ||
+    pathname === '/signin' ||
+    pathname === '/signup' ||
+    pathname === '/verify-email' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname === '/events/badge' ||
+    pathname.startsWith('/events/badge/') ||
+    pathname.startsWith('/events/') && pathname.includes('/material/') ||
+    pathname.startsWith('/r/') ||
+    pathname.startsWith('/a/')
+  );
+}
+
+function getSeoMetaConfig(pathname: string): SeoMetaConfig {
+  const normalizedPath = normalizePath(pathname);
+  const noIndex = isNoIndexPath(normalizedPath);
+
+  const baseConfig: SeoMetaConfig = {
+    title: 'Laghu Udyog Bharati',
+    description: DEFAULT_PUBLIC_DESCRIPTION,
+    robots: noIndex ? 'noindex, nofollow' : 'index, follow',
+    canonicalPath: normalizedPath,
+  };
+
+  if (noIndex) {
+    if (normalizedPath.startsWith('/admin')) {
+      return {
+        ...baseConfig,
+        title: 'Admin Portal | Laghu Udyog Bharati',
+        description: 'Secure administrative workspace for Laghu Udyog Bharati operations.',
+      };
+    }
+
+    if (normalizedPath.startsWith('/dashboard')) {
+      return {
+        ...baseConfig,
+        title: 'Member Dashboard | Laghu Udyog Bharati',
+        description: 'Secure member dashboard for profile and membership management.',
+      };
+    }
+
+    return {
+      ...baseConfig,
+      title: 'Secure Page | Laghu Udyog Bharati',
+      description: 'Secure page for Laghu Udyog Bharati users.',
+    };
+  }
+
+  if (normalizedPath === '/') {
+    return {
+      ...baseConfig,
+      title: 'Laghu Udyog Bharati | MSME Network and Member Community',
+      description: 'Laghu Udyog Bharati supports MSMEs through events, networking, member services, and leadership initiatives.',
+      structuredData: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: 'Laghu Udyog Bharati',
+          url: PUBLIC_SITE_URL,
+        },
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'Laghu Udyog Bharati',
+          url: PUBLIC_SITE_URL,
+        },
+      ],
+    };
+  }
+
+  if (normalizedPath === '/events') {
+    return {
+      ...baseConfig,
+      title: 'Events | Laghu Udyog Bharati',
+      description: 'Explore upcoming and past Laghu Udyog Bharati events and activities.',
+    };
+  }
+
+  if (normalizedPath.startsWith('/events/')) {
+    return {
+      ...baseConfig,
+      title: 'Event Details | Laghu Udyog Bharati',
+      description: 'Event details, registration information, and updates from Laghu Udyog Bharati.',
+    };
+  }
+
+  if (normalizedPath === '/members') {
+    return {
+      ...baseConfig,
+      title: 'Member Directory | Laghu Udyog Bharati',
+      description: 'Browse the Laghu Udyog Bharati member directory and connect with MSME businesses.',
+    };
+  }
+
+  if (normalizedPath.startsWith('/member/')) {
+    return {
+      ...baseConfig,
+      title: 'Member Profile | Laghu Udyog Bharati',
+      description: 'View member profile information from the Laghu Udyog Bharati directory.',
+    };
+  }
+
+  if (normalizedPath === '/leadership') {
+    return {
+      ...baseConfig,
+      title: 'Leadership | Laghu Udyog Bharati',
+      description: 'Meet the Laghu Udyog Bharati leadership team and committee members.',
+    };
+  }
+
+  if (normalizedPath === '/news') {
+    return {
+      ...baseConfig,
+      title: 'News | Laghu Udyog Bharati',
+      description: 'Latest announcements and updates from Laghu Udyog Bharati.',
+    };
+  }
+
+  if (normalizedPath === '/join') {
+    return {
+      ...baseConfig,
+      title: 'Join LUB | Laghu Udyog Bharati',
+      description: 'Apply to become a Laghu Udyog Bharati member and grow your MSME network.',
+    };
+  }
+
+  if (normalizedPath === '/membership-benefits') {
+    return {
+      ...baseConfig,
+      title: 'Membership Benefits | Laghu Udyog Bharati',
+      description: 'Discover the benefits of becoming a Laghu Udyog Bharati member.',
+    };
+  }
+
+  if (normalizedPath === '/payment') {
+    return {
+      ...baseConfig,
+      title: 'Payment Information | Laghu Udyog Bharati',
+      description: 'State-wise payment details and membership payment guidance for Laghu Udyog Bharati.',
+    };
+  }
+
+  return baseConfig;
+}
+
+function ensureMetaTag(selector: string, attrs: Record<string, string>) {
+  let meta = document.head.querySelector(selector) as HTMLMetaElement | null;
+  if (!meta) {
+    meta = document.createElement('meta');
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (key !== 'content') {
+        meta!.setAttribute(key, value);
+      }
+    });
+    document.head.appendChild(meta);
+  }
+  if (attrs.content) {
+    meta.setAttribute('content', attrs.content);
+  }
+  return meta;
+}
+
+function ensureCanonicalLink(href: string) {
+  let link = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'canonical';
+    document.head.appendChild(link);
+  }
+  link.href = href;
+}
+
+function ensureStructuredData(nodes: Record<string, unknown>[]) {
+  const tagId = 'lub-seo-jsonld';
+  const existing = document.head.querySelector(`#${tagId}`);
+
+  if (!nodes.length) {
+    existing?.remove();
+    return;
+  }
+
+  let script = existing as HTMLScriptElement | null;
+  if (!script) {
+    script = document.createElement('script');
+    script.id = tagId;
+    script.type = 'application/ld+json';
+    document.head.appendChild(script);
+  }
+  script.textContent = JSON.stringify(nodes.length === 1 ? nodes[0] : nodes);
+}
 
 function ActivitySlugRedirect() {
   const { slug } = useParams<{ slug: string }>();
@@ -94,6 +305,33 @@ function RouteHistoryTracker() {
       // Ignore storage errors; signin guard has fallbacks.
     }
   }, [location]);
+
+  return null;
+}
+
+function SeoManager() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const { title, description, robots, canonicalPath, structuredData } = getSeoMetaConfig(location.pathname);
+    const canonicalUrl = `${PUBLIC_SITE_URL}${canonicalPath === '/' ? '' : canonicalPath}`;
+
+    document.title = title;
+    ensureMetaTag('meta[name="description"]', { name: 'description', content: description });
+    ensureMetaTag('meta[name="robots"]', { name: 'robots', content: robots });
+
+    ensureMetaTag('meta[property="og:title"]', { property: 'og:title', content: title });
+    ensureMetaTag('meta[property="og:description"]', { property: 'og:description', content: description });
+    ensureMetaTag('meta[property="og:type"]', { property: 'og:type', content: canonicalPath.startsWith('/events/') ? 'article' : 'website' });
+    ensureMetaTag('meta[property="og:url"]', { property: 'og:url', content: canonicalUrl });
+
+    ensureMetaTag('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' });
+    ensureMetaTag('meta[name="twitter:title"]', { name: 'twitter:title', content: title });
+    ensureMetaTag('meta[name="twitter:description"]', { name: 'twitter:description', content: description });
+
+    ensureCanonicalLink(canonicalUrl);
+    ensureStructuredData(structuredData ?? []);
+  }, [location.pathname]);
 
   return null;
 }
@@ -127,6 +365,7 @@ function App() {
         <PermissionProvider>
           <MemberContextProvider>
           <RouteHistoryTracker />
+          <SeoManager />
           <Routes>
           {/* Public Routes - All wrapped with MemberContextProvider for global login detection */}
           <Route element={<Layout />}>

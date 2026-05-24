@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+# Keep secure/private surfaces out of search indexes
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /signin
+Disallow: /signup
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /events/badge
+Disallow: /events/badge/
+Disallow: /events/*/material/
+Disallow: /r/
+Disallow: /a/
+
+Sitemap: https://lub.org.in/sitemap.xml
