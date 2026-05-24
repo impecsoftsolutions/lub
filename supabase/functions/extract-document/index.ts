@@ -1266,7 +1266,7 @@ async function callOpenAIResponses(
   model: string,
   instructions: string,
   inputContent: ResponsesInputItem[],
-  maxOutputTokens = 800,
+  maxOutputTokens = 450,
   reasoningEffort?: string | null,
   forceJsonFormat = false
 ): Promise<{ outputText: string | null; error: string | null }> {
@@ -1291,6 +1291,9 @@ async function callOpenAIResponses(
     body.text = { format: { type: 'json_object' } };
   }
 
+  const controller = new AbortController();
+  const timeoutMs = 30000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
     response = await fetch('https://api.openai.com/v1/responses', {
@@ -1299,10 +1302,16 @@ async function callOpenAIResponses(
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify(body),
     });
   } catch (fetchErr) {
+    if (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') {
+      return { outputText: null, error: `OpenAI timeout after ${timeoutMs}ms` };
+    }
     return { outputText: null, error: fetchErr instanceof Error ? fetchErr.message : 'Network error' };
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   const responseBody = await response.json() as Record<string, unknown>;
@@ -1657,6 +1666,18 @@ async function loadAIRuntimeSettings(): Promise<AIRuntimeSettingsRow | null> {
   }
 }
 
+/**
+ * Keep extract-document latency predictable.
+ * This endpoint is UX-critical; high reasoning efforts can push response times
+ * to 1-4 minutes on larger docs. We allow only lightweight effort tiers here.
+ */
+function normalizeReasoningEffortForExtraction(raw: string | null): string | null {
+  if (!raw) return null;
+  const value = raw.trim().toLowerCase();
+  if (value === 'minimal' || value === 'low') return value;
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
@@ -1748,7 +1769,7 @@ Deno.serve(async (req: Request) => {
     const model = String(settings.model || 'gpt-4o');
     const enabled = Boolean(settings.is_enabled);
     const apiKey = String(settings.api_key_secret ?? '');
-    const reasoningEffort = settings.reasoning_effort ?? null;
+    const reasoningEffort = normalizeReasoningEffortForExtraction(settings.reasoning_effort ?? null);
 
     if (!enabled || provider !== 'openai' || !apiKey) {
       console.log(`[extract-document] ai_error: disabled or misconfigured (enabled=${enabled} provider=${provider})`);
@@ -1846,8 +1867,9 @@ Deno.serve(async (req: Request) => {
         const gstLocationFieldsMissing =
           parsedDocType === 'gst_certificate' &&
           ['pin_code', 'city', 'district', 'state'].some((k) => !(parsedSanitized[k] ?? '').trim());
+        const shouldRetryForGstGaps = selectedDocType === 'unknown' && gstLocationFieldsMissing;
 
-        if (aiTextPathFailed || gstLocationFieldsMissing) {
+        if (aiTextPathFailed || shouldRetryForGstGaps) {
           const retryReason = aiTextPathFailed
             ? 'AI text parse failed'
             : 'GST location fields missing from text-path extraction';

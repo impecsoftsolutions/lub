@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Upload,
   FileText,
@@ -26,6 +26,7 @@ import {
   DesignationMaster,
   registrationDraftService,
   type JoinDraftConfigurationErrorCode,
+  type RegistrationDraftDocStatus,
   type RegistrationDraftExpectedDocType
 } from '../lib/supabase';
 import Toast from '../components/Toast';
@@ -38,12 +39,15 @@ import FieldCorrectionStepper, { type FieldCorrectionStep } from '../components/
 import SmartUploadDocument from '../components/SmartUploadDocument';
 import type { SmartDocType, DetectedDocType, ReasonCode } from '../lib/documentExtraction';
 import type { ExtractedFieldOption } from '../lib/documentExtraction';
+import type { SmartUploadRemovalEvent } from '../components/SmartUploadDocument';
 import { useMember } from '../contexts/useMember';
 import { supabase } from '../lib/supabase';
 import { sessionManager } from '../lib/sessionManager';
 import { formatDateValue } from '../lib/dateTimeManager';
 
 const SMART_UPLOAD_DATE_FIELD_KEYS = new Set(['payment_date', 'date_of_birth']);
+const REGISTRATION_DRAFT_BUCKET = 'registration-drafts';
+const DRAFT_DOC_READY_STATUSES = new Set<RegistrationDraftDocStatus>(['extracted', 'unreadable']);
 
 const correctionFieldLabels: Record<string, string> = {
   full_name: 'Full Name',
@@ -105,6 +109,18 @@ type RegistrationEntryStage = 'smart_steps' | 'smart_review' | 'form';
 type GuidedDocType = SmartDocType;
 type GuidedDocStatus = 'pending' | 'completed' | 'skipped' | 'no_document' | 'unreadable_confirmed';
 type GuidedStepMessageTone = 'neutral' | 'success' | 'error';
+type GuidedScopeRuntimeState = { hasQueued: boolean; hasProcessing: boolean; itemCount: number };
+
+interface GuidedDraftDocumentMeta {
+  id: string;
+  originalFilename: string | null;
+  fileMime: string | null;
+  storagePath: string | null;
+  detectedDocType: DetectedDocType | null;
+  reasonCode: ReasonCode | null;
+  status: RegistrationDraftDocStatus;
+  extractedFields: Record<string, string>;
+}
 
 interface GuidedDocConfig {
   docType: GuidedDocType;
@@ -347,6 +363,7 @@ const getPrefillCandidateValue = (
 const Join: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isPreviewMode = searchParams.get('preview') === '1';
   const {
     isFieldVisible,
@@ -401,6 +418,12 @@ const Join: React.FC = () => {
   // saveDocument / uploadDocumentFile RPCs return them.
   const [draftDocumentIds, setDraftDocumentIds] = useState<
     Partial<Record<GuidedDocType, string>>
+  >({});
+  const [guidedDraftDocumentMeta, setGuidedDraftDocumentMeta] = useState<
+    Partial<Record<GuidedDocType, GuidedDraftDocumentMeta>>
+  >({});
+  const [guidedScopeRuntimeState, setGuidedScopeRuntimeState] = useState<
+    Partial<Record<GuidedDocType, GuidedScopeRuntimeState>>
   >({});
   const hasHydratedDraftRef = useRef(false);
   const applyPrefillFromSources = useCallback((
@@ -531,6 +554,13 @@ const Join: React.FC = () => {
       window.history.scrollRestoration = previousScrollRestoration;
     };
   }, []);
+
+  useEffect(() => {
+    if (location.pathname !== '/join') {
+      return;
+    }
+    hasHydratedDraftRef.current = false;
+  }, [location.key, location.pathname]);
 
   const isFieldApplicable = useCallback(
     (fieldName: string, data: JoinFormData = formData): boolean => {
@@ -1442,6 +1472,7 @@ const Join: React.FC = () => {
         payment_proof: 'pending',
       };
       const nextDraftDocumentIds: Partial<Record<GuidedDocType, string>> = {};
+      const nextDraftDocumentMeta: Partial<Record<GuidedDocType, GuidedDraftDocumentMeta>> = {};
       const nextPerDocFields: Partial<Record<GuidedDocType, Record<string, string>>> = {};
       const mergedReviewData: Record<string, string> = {};
       const mergedDraftData: Record<string, string> = {};
@@ -1485,6 +1516,16 @@ const Join: React.FC = () => {
           stringFields[fieldKey] = text;
         }
         const normalizedFields = normalizeSmartUploadFields(stringFields);
+        nextDraftDocumentMeta[expected] = {
+          id: doc.id,
+          originalFilename: doc.original_filename ?? null,
+          fileMime: doc.file_mime ?? null,
+          storagePath: doc.storage_path ?? null,
+          detectedDocType: (doc.detected_doc_type ?? null) as DetectedDocType | null,
+          reasonCode: (doc.reason_code ?? null) as ReasonCode | null,
+          status: doc.status,
+          extractedFields: normalizedFields,
+        };
         if (Object.keys(normalizedFields).length > 0) {
           nextPerDocFields[expected] = normalizedFields;
           Object.assign(mergedReviewData, normalizedFields);
@@ -1530,6 +1571,7 @@ const Join: React.FC = () => {
       hasHydratedDraftRef.current = true;
       setGuidedDocStatus(nextStatuses);
       setDraftDocumentIds(nextDraftDocumentIds);
+      setGuidedDraftDocumentMeta(nextDraftDocumentMeta);
       setPerDocExtractedFields(nextPerDocFields);
       setSmartUploadReviewData(prev => ({ ...prev, ...mergedReviewData }));
       setSmartUploadDraft(prev => ({ ...prev, ...mergedDraftData }));
@@ -1650,6 +1692,52 @@ const Join: React.FC = () => {
   const guidedTotalSteps = guidedSelectedDocs.length;
   const guidedStepNumber = currentGuidedDocType ? guidedStepIndex + 1 : 0;
 
+  const getGuidedDraftMeta = useCallback(
+    (docType: GuidedDocType): GuidedDraftDocumentMeta | null => guidedDraftDocumentMeta[docType] ?? null,
+    [guidedDraftDocumentMeta]
+  );
+
+  const hasGuidedDraftStoredDocument = useCallback(
+    (docType: GuidedDocType): boolean => {
+      const meta = getGuidedDraftMeta(docType);
+      if (!meta?.storagePath) return false;
+      return DRAFT_DOC_READY_STATUSES.has(meta.status);
+    },
+    [getGuidedDraftMeta]
+  );
+
+  const getGuidedDraftDocumentName = useCallback(
+    (docType: GuidedDocType): string | null => {
+      const meta = getGuidedDraftMeta(docType);
+      if (!meta?.storagePath || !DRAFT_DOC_READY_STATUSES.has(meta.status)) return null;
+      return meta.originalFilename?.trim() || `${GUIDED_DOC_CONFIGS[docType].label}`;
+    },
+    [getGuidedDraftMeta]
+  );
+
+  const hydrateDraftFileForSubmission = useCallback(async (docType: GuidedDocType): Promise<File | null> => {
+    const meta = getGuidedDraftMeta(docType);
+    if (!meta?.storagePath || !DRAFT_DOC_READY_STATUSES.has(meta.status)) {
+      return null;
+    }
+    try {
+      const { data, error } = await supabase.storage
+        .from(REGISTRATION_DRAFT_BUCKET)
+        .download(meta.storagePath);
+      if (error || !data) {
+        console.warn('[Join] Failed to download draft document for submit:', docType, error?.message);
+        return null;
+      }
+      const fileName = meta.originalFilename?.trim() || `${docType}.bin`;
+      const mimeType = meta.fileMime || data.type || 'application/octet-stream';
+      const bytes = await data.arrayBuffer();
+      return new File([bytes], fileName, { type: mimeType });
+    } catch (error) {
+      console.warn('[Join] Unexpected draft document download failure:', docType, error);
+      return null;
+    }
+  }, [getGuidedDraftMeta]);
+
   // ── Rules-engine normalization
   // CLAUDE-SMART-UPLOAD-NORMALIZE-RULES-032 wired this in for a fixed
   // 9-key set. CLAUDE-SMART-UPLOAD-NORMALIZATION-DYNAMIC-FIELDS-036
@@ -1709,6 +1797,7 @@ const Join: React.FC = () => {
   }, [hydrateSmartUploadLocationFields, normalizeViaRulesEngine]);
 
   const handleSmartDraftExtractedFields = useCallback(async (fields: Record<string, string>) => {
+    setSmartUploadReviewData(prev => ({ ...prev, ...fields }));
     const hydratedFields = await hydrateSmartUploadLocationFields(fields);
     const ruleNormalized = await normalizeViaRulesEngine(hydratedFields);
     setSmartUploadReviewData(prev => ({ ...prev, ...ruleNormalized }));
@@ -1890,6 +1979,19 @@ const Join: React.FC = () => {
       const finalDocId = result.documentId ?? documentIdFromUpload;
       if (result.success && finalDocId) {
         setDraftDocumentIds(prev => ({ ...prev, [docType]: finalDocId }));
+        setGuidedDraftDocumentMeta(prev => ({
+          ...prev,
+          [docType]: {
+            id: finalDocId,
+            originalFilename: originalFilename ?? event.file.name ?? null,
+            fileMime: fileMime ?? event.file.type ?? null,
+            storagePath: storagePath ?? null,
+            detectedDocType: event.detectedDocType ?? null,
+            reasonCode: event.reasonCode ?? null,
+            status: persistedStatus,
+            extractedFields: (fieldsForPersist as Record<string, string>) ?? {},
+          },
+        }));
       }
     } catch (err) {
       console.warn('[Join] persistDraftExtraction failed:', err);
@@ -1919,6 +2021,11 @@ const Join: React.FC = () => {
       delete next[currentGuidedDocType];
       return next;
     });
+    setGuidedDraftDocumentMeta(prev => {
+      const next = { ...prev };
+      delete next[currentGuidedDocType];
+      return next;
+    });
     void persistDraftSkip(currentGuidedDocType, skipStatus);
     setIsVerifiedForSubmit(false);
     setGuidedStepMessage('');
@@ -1926,23 +2033,188 @@ const Join: React.FC = () => {
     moveGuidedStep('next');
   }, [currentGuidedDocType, handleFileChange, markCurrentGuidedDoc, moveGuidedStep, persistDraftSkip]);
 
+  const clearGuidedDocTemporaryData = useCallback(async (
+    docType: GuidedDocType,
+    additionalFieldMap?: Record<string, string>,
+  ): Promise<boolean> => {
+    const existingId = draftDocumentIds[docType];
+    if (existingId) {
+      const deletion = await registrationDraftService.deleteDocument(existingId);
+      if (!deletion.success) {
+        showToast('error', deletion.error || 'Failed to remove uploaded document. Please try again.');
+        return false;
+      }
+    }
+
+    if (docType === 'gst_certificate') {
+      handleFileChange('gstCertificate', null);
+    } else if (docType === 'udyam_certificate') {
+      handleFileChange('udyamCertificate', null);
+    } else if (docType === 'payment_proof') {
+      handleFileChange('paymentProof', null);
+    }
+
+    const docFields = perDocExtractedFields[docType] ?? {};
+    const docFieldKeys = new Set<string>([
+      ...Object.keys(docFields),
+      ...Object.keys(additionalFieldMap ?? {}),
+    ]);
+
+    setGuidedDocStatus(prev => ({ ...prev, [docType]: 'pending' }));
+    setGuidedStepMessage('');
+    setGuidedStepMessageTone('neutral');
+
+    setPerDocExtractedFields(prev => {
+      const next = { ...prev };
+      delete next[docType];
+      return next;
+    });
+
+    setDraftDocumentIds(prev => {
+      const next = { ...prev };
+      delete next[docType];
+      return next;
+    });
+    setGuidedDraftDocumentMeta(prev => {
+      const next = { ...prev };
+      delete next[docType];
+      return next;
+    });
+    setGuidedScopeRuntimeState(prev => ({
+      ...prev,
+      [docType]: { hasQueued: false, hasProcessing: false, itemCount: 0 },
+    }));
+
+    if (docFieldKeys.size > 0) {
+      setSmartUploadDraft(prev => {
+        const next = { ...prev };
+        for (const key of docFieldKeys) delete next[key];
+        return next;
+      });
+      setSmartUploadReviewData(prev => {
+        const next = { ...prev };
+        for (const key of docFieldKeys) delete next[key];
+        return next;
+      });
+      setSmartUploadFieldOptions(prev => {
+        const next = { ...prev };
+        for (const key of docFieldKeys) delete next[key];
+        return next;
+      });
+    }
+
+    setIsVerifiedForSubmit(false);
+    showToast('success', `${GUIDED_DOC_CONFIGS[docType].label} removed.`);
+    return true;
+  }, [draftDocumentIds, handleFileChange, perDocExtractedFields, showToast]);
+
+  const handleGuidedUploadedItemRemoved = useCallback(async (event: SmartUploadRemovalEvent): Promise<boolean> => {
+    if (!currentGuidedDocType || registrationEntryStage !== 'smart_steps') {
+      return true;
+    }
+    return clearGuidedDocTemporaryData(currentGuidedDocType, event.extractedFields ?? {});
+  }, [clearGuidedDocTemporaryData, currentGuidedDocType, registrationEntryStage]);
+
+  const handleGuidedScopeRuntimeChange = useCallback(({
+    scopeKey,
+    hasQueued,
+    hasProcessing,
+    itemCount,
+  }: {
+    scopeKey: SmartDocType | 'unknown';
+    hasQueued: boolean;
+    hasProcessing: boolean;
+    itemCount: number;
+  }) => {
+    if (scopeKey === 'unknown') {
+      return;
+    }
+    setGuidedScopeRuntimeState((prev) => {
+      const existing = prev[scopeKey];
+      if (
+        existing &&
+        existing.hasQueued === hasQueued &&
+        existing.hasProcessing === hasProcessing &&
+        existing.itemCount === itemCount
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [scopeKey]: { hasQueued, hasProcessing, itemCount },
+      };
+    });
+  }, []);
+
+  const guidedHydratedItems = useMemo(() => {
+    if (!currentGuidedDocType) return [];
+    const meta = guidedDraftDocumentMeta[currentGuidedDocType];
+    if (!meta) return [];
+    if (meta.status === 'skipped' || meta.status === 'no_document') return [];
+    const statusMap: Record<RegistrationDraftDocStatus, 'queued' | 'processing' | 'extracted' | 'unreadable' | 'failed' | 'mapped'> = {
+      queued: 'queued',
+      processing: 'processing',
+      extracted: 'mapped',
+      unreadable: 'unreadable',
+      failed: 'failed',
+      skipped: 'mapped',
+      no_document: 'mapped',
+    };
+    return [{
+      id: meta.id,
+      fileName: meta.originalFilename || `${GUIDED_DOC_CONFIGS[currentGuidedDocType].label}.pdf`,
+      fileMime: meta.fileMime,
+      detectedDocType: meta.detectedDocType,
+      status: statusMap[meta.status] ?? 'mapped',
+      extractedFields: meta.extractedFields ?? {},
+      reasonCode: meta.reasonCode,
+      pipelineUsed: null,
+    }];
+  }, [currentGuidedDocType, guidedDraftDocumentMeta]);
+
   const handleGuidedDocumentProcessed = useCallback((event: {
     status: 'extracted' | 'unreadable' | 'failed';
+    selectedDocType: SmartDocType | 'unknown';
     detectedDocType: DetectedDocType;
     extractedFields: Record<string, string>;
     reasonCode: ReasonCode | null;
     file: File;
   }) => {
-    if (!currentGuidedDocType || registrationEntryStage !== 'smart_steps') {
+    if (registrationEntryStage !== 'smart_steps') {
       return;
     }
 
+    const targetGuidedDocType =
+      event.selectedDocType !== 'unknown'
+        ? (event.selectedDocType as GuidedDocType)
+        : currentGuidedDocType;
+
+    if (!targetGuidedDocType) {
+      return;
+    }
+
+    const isCurrentStepDoc = targetGuidedDocType === currentGuidedDocType;
+    const updateGuidedDocStatus = (
+      status: GuidedDocStatus,
+      message = '',
+      tone: GuidedStepMessageTone = 'neutral'
+    ) => {
+      setGuidedDocStatus(prev => ({ ...prev, [targetGuidedDocType]: status }));
+      if (isCurrentStepDoc) {
+        setGuidedStepMessage(message);
+        setGuidedStepMessageTone(tone);
+      }
+    };
+
     // Capture per-doc extracted fields for the inline review panel,
     // regardless of whether the doc is storable or extract-only.
-    // Run the rules-engine normalization (CLAUDE-SMART-UPLOAD-NORMALIZE-RULES-032)
-    // so the panel shows canonical, form-compatible values.
-    if (event.status === 'extracted' && event.extractedFields) {
-      const docTypeForUpdate = currentGuidedDocType;
+    if (event.status === 'extracted' && event.extractedFields && event.detectedDocType === targetGuidedDocType) {
+      const docTypeForUpdate = targetGuidedDocType;
+      setPerDocExtractedFields(prev => ({
+        ...prev,
+        [docTypeForUpdate]: event.extractedFields,
+      }));
+      // Normalize in the background so the user sees extracted values immediately.
       void (async () => {
         const normalized = await normalizeViaRulesEngine({ ...event.extractedFields });
         setPerDocExtractedFields(prev => ({
@@ -1952,47 +2224,50 @@ const Join: React.FC = () => {
       })();
     }
 
-    if (currentGuidedDocType === 'payment_proof') {
+    if (targetGuidedDocType === 'payment_proof') {
       if (event.status === 'failed') {
-        setGuidedStepMessage('Payment proof upload failed. Please retry.');
-        setGuidedStepMessageTone('error');
-        void persistDraftExtraction(currentGuidedDocType, event);
+        updateGuidedDocStatus('pending', 'Payment proof upload failed. Please retry.', 'error');
+        void persistDraftExtraction(targetGuidedDocType, event);
         return;
       }
       // Payment proof upload itself counts for submit gating; extraction can be unreadable.
       handleFileChange('paymentProof', event.file);
       if (event.status === 'unreadable') {
-        markCurrentGuidedDoc('unreadable_confirmed', 'Payment proof uploaded. Extraction was unreadable; you can fill payment details manually.', 'error');
+        updateGuidedDocStatus(
+          'unreadable_confirmed',
+          'Payment proof uploaded. Extraction was unreadable; you can fill payment details manually.',
+          'error'
+        );
       } else {
-        markCurrentGuidedDoc('completed', 'Payment proof uploaded and processed.', 'success');
+        updateGuidedDocStatus('completed', 'Payment proof uploaded and processed.', 'success');
       }
-      void persistDraftExtraction(currentGuidedDocType, event);
+      void persistDraftExtraction(targetGuidedDocType, event);
       return;
     }
 
     if (event.status === 'failed' || event.status === 'unreadable') {
-      setGuidedStepMessage('Document could not be read clearly. Retry or skip this step.');
-      setGuidedStepMessageTone('error');
-      void persistDraftExtraction(currentGuidedDocType, event);
+      updateGuidedDocStatus('pending', 'Document could not be read clearly. Retry or skip this step.', 'error');
+      void persistDraftExtraction(targetGuidedDocType, event);
       return;
     }
 
-    if (event.detectedDocType === currentGuidedDocType) {
-      markCurrentGuidedDoc('completed', `${GUIDED_DOC_CONFIGS[currentGuidedDocType].label} processed.`, 'success');
-      void persistDraftExtraction(currentGuidedDocType, event);
+    if (event.detectedDocType === targetGuidedDocType) {
+      updateGuidedDocStatus('completed', `${GUIDED_DOC_CONFIGS[targetGuidedDocType].label} processed.`, 'success');
+      void persistDraftExtraction(targetGuidedDocType, event);
       return;
     }
 
-    setGuidedStepMessage(
+    updateGuidedDocStatus(
+      'pending',
       `Uploaded document was detected as ${
         event.detectedDocType === 'unknown' ? 'Unknown' : event.detectedDocType.replace(/_/g, ' ')
-      }. Please upload a valid ${GUIDED_DOC_CONFIGS[currentGuidedDocType].label}.`
+      }. Please upload a valid ${GUIDED_DOC_CONFIGS[targetGuidedDocType].label}.`,
+      'error'
     );
-    setGuidedStepMessageTone('error');
     // Persist the wrong-doc detection so the draft reflects user's last
     // attempt; skip storage upload (file is not what they expected).
-    void persistDraftExtraction(currentGuidedDocType, { ...event, status: 'failed' });
-  }, [currentGuidedDocType, handleFileChange, markCurrentGuidedDoc, normalizeViaRulesEngine, persistDraftExtraction, registrationEntryStage]);
+    void persistDraftExtraction(targetGuidedDocType, { ...event, status: 'failed', extractedFields: {} });
+  }, [currentGuidedDocType, handleFileChange, normalizeViaRulesEngine, persistDraftExtraction, registrationEntryStage]);
 
   const canAdvanceCurrentGuidedStep = (() => {
     if (!currentGuidedDocType || !currentGuidedStatus) return false;
@@ -2013,6 +2288,17 @@ const Join: React.FC = () => {
   //   submit gate (validateForm) still requires the file before submission.
   const handleGuidedNext = useCallback(() => {
     if (!currentGuidedDocType) return;
+    const runtimeState = guidedScopeRuntimeState[currentGuidedDocType];
+    if (runtimeState?.hasProcessing) {
+      setGuidedStepMessage('Extraction is in progress. Please wait for it to finish or remove the document.');
+      setGuidedStepMessageTone('error');
+      return;
+    }
+    if (runtimeState?.hasQueued) {
+      setGuidedStepMessage('Document is queued. Click "Extract details" first, or remove the document.');
+      setGuidedStepMessageTone('error');
+      return;
+    }
     if (canAdvanceCurrentGuidedStep) {
       moveGuidedStep('next');
       return;
@@ -2024,7 +2310,7 @@ const Join: React.FC = () => {
     // GST / Udyam / PAN / Aadhaar — auto-skip when the user has not done
     // anything actionable on this step yet.
     handleGuidedSkipCurrent();
-  }, [canAdvanceCurrentGuidedStep, currentGuidedDocType, handleGuidedSkipCurrent, moveGuidedStep]);
+  }, [canAdvanceCurrentGuidedStep, currentGuidedDocType, guidedScopeRuntimeState, handleGuidedSkipCurrent, moveGuidedStep]);
 
   const handleContinueFromSmartDraft = useCallback(async () => {
     if (Object.keys(smartUploadDraft).length > 0) {
@@ -2192,11 +2478,11 @@ const Join: React.FC = () => {
       if (field === 'city') return;
 
       const value = field === 'gst_certificate_url'
-        ? files.gstCertificate
+        ? (files.gstCertificate || (hasGuidedDraftStoredDocument('gst_certificate') ? getGuidedDraftDocumentName('gst_certificate') : null))
         : field === 'udyam_certificate_url'
-          ? files.udyamCertificate
+          ? (files.udyamCertificate || (hasGuidedDraftStoredDocument('udyam_certificate') ? getGuidedDraftDocumentName('udyam_certificate') : null))
           : field === 'payment_proof_url'
-            ? files.paymentProof
+            ? (files.paymentProof || (hasGuidedDraftStoredDocument('payment_proof') ? getGuidedDraftDocumentName('payment_proof') : null))
             : dataToValidate[field as keyof JoinFormData];
       if (isFieldRequired(field) && isFieldApplicable(field, dataToValidate)) {
         if (
@@ -2210,7 +2496,7 @@ const Join: React.FC = () => {
 
     // Product requirement: payment proof must exist before final submit,
     // even when users choose to fill the form manually first.
-    if (!isPreviewMode && !files.paymentProof) {
+    if (!isPreviewMode && !files.paymentProof && !hasGuidedDraftStoredDocument('payment_proof')) {
       newErrors.payment_proof_url = 'Payment Proof is required';
     }
 
@@ -2494,12 +2780,33 @@ const Join: React.FC = () => {
 
       // Submit registration
       console.log('[Join.tsx] Submitting registration to backend...');
+      const shouldAttachGstCertificate = isFieldApplicable('gst_certificate_url', sanitizedData);
+      const shouldAttachUdyamCertificate = isFieldApplicable('udyam_certificate_url', sanitizedData);
+      const shouldAttachPaymentProof = isFieldApplicable('payment_proof_url', sanitizedData);
+
+      const resolvedGstCertificate = shouldAttachGstCertificate
+        ? (files.gstCertificate ?? await hydrateDraftFileForSubmission('gst_certificate'))
+        : null;
+      const resolvedUdyamCertificate = shouldAttachUdyamCertificate
+        ? (files.udyamCertificate ?? await hydrateDraftFileForSubmission('udyam_certificate'))
+        : null;
+      const resolvedPaymentProof = shouldAttachPaymentProof
+        ? (files.paymentProof ?? await hydrateDraftFileForSubmission('payment_proof'))
+        : null;
+
+      if (shouldAttachPaymentProof && !resolvedPaymentProof) {
+        setErrors(prev => ({ ...prev, payment_proof_url: 'Payment Proof is required' }));
+        setFormErrorMessage('Please upload Payment Proof to continue');
+        showToast('error', 'Payment proof is missing. Please upload it again.');
+        return;
+      }
+
       const submissionFiles = {
         ...files,
         profilePhoto,
-        gstCertificate: isFieldApplicable('gst_certificate_url', sanitizedData) ? files.gstCertificate : null,
-        udyamCertificate: isFieldApplicable('udyam_certificate_url', sanitizedData) ? files.udyamCertificate : null,
-        paymentProof: isFieldApplicable('payment_proof_url', sanitizedData) ? files.paymentProof : null
+        gstCertificate: resolvedGstCertificate,
+        udyamCertificate: resolvedUdyamCertificate,
+        paymentProof: resolvedPaymentProof
       };
 
       const result = await memberRegistrationService.submitRegistration(
@@ -2809,6 +3116,13 @@ const Join: React.FC = () => {
   const smartUploadDraftEntries = Object.entries(smartUploadReviewData)
     .filter(([, value]) => value.trim() !== '');
 
+  const hasDraftBackedGstCertificate = hasGuidedDraftStoredDocument('gst_certificate');
+  const hasDraftBackedUdyamCertificate = hasGuidedDraftStoredDocument('udyam_certificate');
+  const hasDraftBackedPaymentProof = hasGuidedDraftStoredDocument('payment_proof');
+  const draftBackedGstCertificateName = getGuidedDraftDocumentName('gst_certificate');
+  const draftBackedUdyamCertificateName = getGuidedDraftDocumentName('udyam_certificate');
+  const draftBackedPaymentProofName = getGuidedDraftDocumentName('payment_proof');
+
   return (
     <div className="min-h-screen py-8">
       <Toast
@@ -2907,6 +3221,9 @@ const Join: React.FC = () => {
                   onAutofill={handleSmartDraftAutofill}
                   onConflictResolved={handleSmartDraftConflictResolved}
                   onFileReady={handleSmartFileReady}
+                  onScopeRuntimeStateChange={handleGuidedScopeRuntimeChange}
+                  onRemoveItem={handleGuidedUploadedItemRemoved}
+                  hydratedItems={guidedHydratedItems}
                   onExtractedFieldsDetected={handleSmartDraftExtractedFields}
                   onExtractedFieldOptionsDetected={handleSmartDraftFieldOptionsDetected}
                   onDocumentProcessed={handleGuidedDocumentProcessed}
@@ -3171,10 +3488,13 @@ const Join: React.FC = () => {
                       }`}
                     >
                       <Upload className="w-4 h-4" />
-                      {files.paymentProof ? 'Upload New File' : 'Upload File'}
+                      {(files.paymentProof || hasDraftBackedPaymentProof) ? 'Upload New File' : 'Upload File'}
                     </label>
-                    {files.paymentProof && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.paymentProof.name}</p>
+                    {(files.paymentProof || hasDraftBackedPaymentProof) && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Selected: {files.paymentProof?.name ?? draftBackedPaymentProofName}
+                        {!files.paymentProof && hasDraftBackedPaymentProof && ' (saved from Smart Upload)'}
+                      </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-1">Upload screenshot or receipt of your membership fee payment</p>
                     {errors.payment_proof_url && <p className="text-destructive text-sm mt-1">{errors.payment_proof_url}</p>}
@@ -4050,10 +4370,13 @@ const Join: React.FC = () => {
                       }`}
                     >
                       <Upload className="w-4 h-4" />
-                      {files.gstCertificate ? 'Upload New File' : 'Upload File'}
+                      {(files.gstCertificate || hasDraftBackedGstCertificate) ? 'Upload New File' : 'Upload File'}
                     </label>
-                    {files.gstCertificate && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.gstCertificate.name}</p>
+                    {(files.gstCertificate || hasDraftBackedGstCertificate) && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Selected: {files.gstCertificate?.name ?? draftBackedGstCertificateName}
+                        {!files.gstCertificate && hasDraftBackedGstCertificate && ' (saved from Smart Upload)'}
+                      </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG (Max 10MB)</p>
                     {errors.gst_certificate_url && <p className="text-destructive text-sm mt-1">{errors.gst_certificate_url}</p>}
@@ -4079,10 +4402,13 @@ const Join: React.FC = () => {
                       }`}
                     >
                       <Upload className="w-4 h-4" />
-                      {files.udyamCertificate ? 'Upload New File' : 'Upload File'}
+                      {(files.udyamCertificate || hasDraftBackedUdyamCertificate) ? 'Upload New File' : 'Upload File'}
                     </label>
-                    {files.udyamCertificate && (
-                      <p className="text-xs text-muted-foreground mt-1">Selected: {files.udyamCertificate.name}</p>
+                    {(files.udyamCertificate || hasDraftBackedUdyamCertificate) && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Selected: {files.udyamCertificate?.name ?? draftBackedUdyamCertificateName}
+                        {!files.udyamCertificate && hasDraftBackedUdyamCertificate && ' (saved from Smart Upload)'}
+                      </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG (Max 10MB)</p>
                     {errors.udyam_certificate_url && <p className="text-destructive text-sm mt-1">{errors.udyam_certificate_url}</p>}

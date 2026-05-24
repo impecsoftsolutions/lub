@@ -124,14 +124,63 @@ function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: strin
   });
 }
 
+function isImageMime(mimeType: string): boolean {
+  return /^image\/(jpe?g|png|webp|gif)$/i.test(mimeType);
+}
+
+async function readImageAsOptimizedBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  const srcDataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read image file'));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to decode image'));
+    img.src = srcDataUrl;
+  });
+
+  const maxDimension = 1600;
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to initialize image canvas');
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+  const commaIdx = optimizedDataUrl.indexOf(',');
+  if (commaIdx < 0) throw new Error('Failed to encode optimized image');
+  return {
+    base64: optimizedDataUrl.slice(commaIdx + 1),
+    mimeType: 'image/jpeg',
+  };
+}
+
 export async function extractDocument(
   file: File,
   selectedDocType: SmartDocType | 'unknown' = 'unknown'
 ): Promise<ExtractionResult> {
   try {
-    const { base64, mimeType } = await readFileAsBase64(file);
+    const mimeFromFile = (file.type || '').toLowerCase();
+    // Keep smart-upload responsive on slower networks by reducing payload size
+    // for camera/gallery images before sending them to the edge function.
+    const { base64, mimeType } = isImageMime(mimeFromFile)
+      ? await readImageAsOptimizedBase64(file)
+      : await readFileAsBase64(file);
 
-    const { data, error } = await supabase.functions.invoke('extract-document', {
+    // Prevent long-hanging extraction requests from leaving the UI in
+    // "Processing/Extracting" for several minutes.
+    const invokePromise = supabase.functions.invoke('extract-document', {
       body: {
         file_base64: base64,
         file_mime_type: mimeType,
@@ -139,6 +188,14 @@ export async function extractDocument(
         selected_doc_type: selectedDocType,
       },
     });
+    const timeoutMs = 45000;
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
+      window.setTimeout(() => resolve({ data: null, error: new Error(`extract_timeout_${timeoutMs}`) }), timeoutMs);
+    });
+    const { data, error } = (await Promise.race([
+      invokePromise,
+      timeoutPromise,
+    ])) as Awaited<typeof invokePromise> | { data: null; error: Error };
 
     if (error) {
       console.error('[documentExtraction] Edge function error:', error);

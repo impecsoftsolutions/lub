@@ -2737,6 +2737,10 @@ export const registrationDraftService = {
 
       const response = await fetch(buildFunctionUrl(DRAFT_UPLOAD_FUNCTION_PATH), {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
+        },
         body: formData,
       });
       const payload = await response.json().catch(() => ({})) as {
@@ -2782,7 +2786,11 @@ export const registrationDraftService = {
     try {
       const response = await fetch(buildFunctionUrl(DRAFT_DELETE_FUNCTION_PATH), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
+        },
         body: JSON.stringify({
           session_token: sessionToken,
           document_id: documentId,

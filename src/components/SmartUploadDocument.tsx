@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Upload,
   Camera,
@@ -46,12 +46,24 @@ interface SmartUploadItem {
   detectedMime: string | null;
 }
 
+const EMPTY_SCOPE_ITEMS: SmartUploadItem[] = [];
+
 interface ConflictField {
   fieldKey: string;
   label: string;
   extractedValue: string;
   currentValue: string;
   sourceDocType: DetectedDocType;
+}
+
+export interface SmartUploadRemovalEvent {
+  id: string;
+  file: File;
+  detectedDocType: DetectedDocType | null;
+  status: DocStatus;
+  extractedFields: Record<string, string>;
+  reasonCode: ReasonCode | null;
+  pipelineUsed: PipelineUsed | null;
 }
 
 export interface SmartUploadDocumentProps {
@@ -83,11 +95,41 @@ export interface SmartUploadDocumentProps {
    */
   onDocumentProcessed?: (event: {
     status: 'extracted' | 'unreadable' | 'failed';
+    selectedDocType: SmartDocType | 'unknown';
     detectedDocType: DetectedDocType;
     extractedFields: Record<string, string>;
     reasonCode: ReasonCode | null;
     file: File;
   }) => void;
+  /**
+   * Emits per-scope queue/runtime state so guided flows can prevent
+   * advancing while extraction is queued/processing.
+   */
+  onScopeRuntimeStateChange?: (state: {
+    scopeKey: SmartDocType | 'unknown';
+    hasQueued: boolean;
+    hasProcessing: boolean;
+    itemCount: number;
+  }) => void;
+  /**
+   * Optional hook before removing an uploaded item from the Smart Upload list.
+   * Return `false` to cancel removal (for example, when server-side cleanup fails).
+   */
+  onRemoveItem?: (event: SmartUploadRemovalEvent) => Promise<boolean | void> | boolean | void;
+  /**
+   * Optional hydrated items to render when the in-memory list is empty
+   * (e.g., resumed draft with extracted data but no local upload queue).
+   */
+  hydratedItems?: Array<{
+    id: string;
+    fileName: string;
+    fileMime?: string | null;
+    detectedDocType: DetectedDocType | null;
+    status: DocStatus;
+    extractedFields: Record<string, string>;
+    reasonCode: ReasonCode | null;
+    pipelineUsed?: PipelineUsed | null;
+  }>;
   /** Guided flows can suppress conflict UI and apply extracted values directly. */
   disableConflictModal?: boolean;
   disabled?: boolean;
@@ -378,14 +420,7 @@ function ConflictModal({ conflicts, choices, onChoiceChange, onConfirm, onDismis
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4 flex-shrink-0">
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
-          >
-            Keep all current
-          </button>
+        <div className="flex justify-start gap-3 border-t border-border px-6 py-4 flex-shrink-0">
           <button
             type="button"
             onClick={onConfirm}
@@ -394,6 +429,13 @@ function ConflictModal({ conflicts, choices, onChoiceChange, onConfirm, onDismis
             {extractedCount > 0
               ? `Apply ${extractedCount} extracted value${extractedCount !== 1 ? 's' : ''}`
               : 'Done'}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+          >
+            Keep all current
           </button>
         </div>
       </div>
@@ -417,17 +459,63 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
   extraControls,
   selectedDocType = 'unknown',
   onDocumentProcessed,
+  onScopeRuntimeStateChange,
+  onRemoveItem,
+  hydratedItems = [],
   disableConflictModal = false,
   disabled = false,
 }) => {
-  const [items, setItems] = useState<SmartUploadItem[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [itemsByScope, setItemsByScope] = useState<Record<string, SmartUploadItem[]>>({});
   const [conflictModal, setConflictModal] = useState<{
     show: boolean;
     conflicts: ConflictField[];
     choices: Record<string, 'extracted' | 'keep'>;
   }>({ show: false, conflicts: [], choices: {} });
   const [fieldSourceMap, setFieldSourceMap] = useState<Record<string, DetectedDocType>>({});
+  const currentScopeKey = selectedDocType;
+  const currentItems = useMemo<SmartUploadItem[]>(
+    () => itemsByScope[currentScopeKey] ?? EMPTY_SCOPE_ITEMS,
+    [currentScopeKey, itemsByScope]
+  );
+  const lastRuntimeSnapshotRef = useRef<Record<string, { hasQueued: boolean; hasProcessing: boolean; itemCount: number }>>({});
+
+  useEffect(() => {
+    if (!onScopeRuntimeStateChange) return;
+    const nextRuntimeState = {
+      hasQueued: currentItems.some(item => item.status === 'queued'),
+      hasProcessing: currentItems.some(item => item.status === 'processing'),
+      itemCount: currentItems.length,
+    };
+    const previousRuntimeState = lastRuntimeSnapshotRef.current[currentScopeKey];
+    if (
+      previousRuntimeState &&
+      previousRuntimeState.hasQueued === nextRuntimeState.hasQueued &&
+      previousRuntimeState.hasProcessing === nextRuntimeState.hasProcessing &&
+      previousRuntimeState.itemCount === nextRuntimeState.itemCount
+    ) {
+      return;
+    }
+    lastRuntimeSnapshotRef.current[currentScopeKey] = nextRuntimeState;
+    onScopeRuntimeStateChange({
+      scopeKey: currentScopeKey,
+      hasQueued: nextRuntimeState.hasQueued,
+      hasProcessing: nextRuntimeState.hasProcessing,
+      itemCount: nextRuntimeState.itemCount,
+    });
+  }, [currentItems, currentScopeKey, onScopeRuntimeStateChange]);
+
+  const updateScopeItems = useCallback(
+    (scopeKey: string, updater: (items: SmartUploadItem[]) => SmartUploadItem[]) => {
+      setItemsByScope(prev => {
+        const current = prev[scopeKey] ?? [];
+        return {
+          ...prev,
+          [scopeKey]: updater(current),
+        };
+      });
+    },
+    []
+  );
 
   const formFieldValuesRef = useRef(formFieldValues);
   useEffect(() => {
@@ -441,23 +529,58 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
+  const extractionSequenceRef = useRef(0);
+  const activeExtractionRef = useRef<Record<string, number>>({});
+  const cancelledItemIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    const cancelledSet = cancelledItemIdsRef.current;
+    return () => {
+      isMountedRef.current = false;
+      activeExtractionRef.current = {};
+      cancelledSet.clear();
+    };
+  }, []);
 
   // -------------------------------------------------------------------------
   // Core extraction logic
   // -------------------------------------------------------------------------
 
   const processExtraction = useCallback(
-    async (itemId: string, file: File) => {
-      setItems(prev =>
+    async (scopeKey: string, itemId: string, file: File) => {
+      const opKey = `${scopeKey}:${itemId}`;
+      if (cancelledItemIdsRef.current.has(opKey)) {
+        return;
+      }
+      const opId = ++extractionSequenceRef.current;
+      activeExtractionRef.current[opKey] = opId;
+      const isCurrentOpActive = () =>
+        isMountedRef.current &&
+        activeExtractionRef.current[opKey] === opId &&
+        !cancelledItemIdsRef.current.has(opKey);
+
+      updateScopeItems(scopeKey, prev =>
         prev.map(item => (item.id === itemId ? { ...item, status: 'processing' } : item))
       );
 
       try {
         // Guided flows can provide a selected document type hint.
-        const result = await extractDocument(file, selectedDocType);
+        const extractionTimeoutMs = 45000;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error(`extract_timeout_${extractionTimeoutMs}`)), extractionTimeoutMs);
+        });
+        const result = await Promise.race([
+          extractDocument(file, selectedDocType),
+          timeoutPromise,
+        ]);
+        if (!isCurrentOpActive()) {
+          return;
+        }
 
         if (!result.is_readable) {
-          setItems(prev =>
+          updateScopeItems(scopeKey, prev =>
             prev.map(item =>
               item.id === itemId
                 ? {
@@ -474,12 +597,14 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
           if (onDocumentProcessed) {
             onDocumentProcessed({
               status: 'unreadable',
+              selectedDocType: scopeKey,
               detectedDocType: result.detected_type,
               extractedFields: {},
               reasonCode: result.reason_code,
               file,
             });
           }
+          delete activeExtractionRef.current[opKey];
           return;
         }
 
@@ -496,6 +621,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         if (onDocumentProcessed) {
           onDocumentProcessed({
             status: 'extracted',
+            selectedDocType: scopeKey,
             detectedDocType: detectedType,
             extractedFields: normalizedExtractedFields,
             reasonCode: result.reason_code,
@@ -507,8 +633,11 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         if (onExtractedFieldOptionsDetected && resultFieldOptions) {
           onExtractedFieldOptionsDetected(resultFieldOptions);
         }
+        if (!isCurrentOpActive()) {
+          return;
+        }
 
-        setItems(prev =>
+        updateScopeItems(scopeKey, prev =>
           prev.map(item =>
             item.id === itemId
               ? {
@@ -582,6 +711,9 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
           onAutofill(toAutofill);
           setFieldSourceMap(prev => ({ ...prev, ...sourceUpdatesForAutofill }));
         }
+        if (!isCurrentOpActive()) {
+          return;
+        }
 
         if (conflicts.length > 0) {
           if (disableConflictModal) {
@@ -593,9 +725,10 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
             }
             onAutofill(extractedConflictValues);
             setFieldSourceMap(prev => ({ ...prev, ...sourceUpdatesForConflicts }));
-            setItems(prev =>
+            updateScopeItems(scopeKey, prev =>
               prev.map(item => (item.id === itemId ? { ...item, status: 'mapped' } : item))
             );
+            delete activeExtractionRef.current[opKey];
             return;
           }
 
@@ -609,24 +742,30 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
             choices: { ...prev.choices, ...defaultChoices },
           }));
         } else {
-          setItems(prev =>
+          updateScopeItems(scopeKey, prev =>
             prev.map(item => (item.id === itemId ? { ...item, status: 'mapped' } : item))
           );
         }
+        delete activeExtractionRef.current[opKey];
       } catch (err) {
+        if (!isCurrentOpActive()) {
+          return;
+        }
         console.error('[SmartUploadDocument] Extraction error:', err);
-        setItems(prev =>
+        updateScopeItems(scopeKey, prev =>
           prev.map(item => (item.id === itemId ? { ...item, status: 'failed' } : item))
         );
         if (onDocumentProcessed) {
           onDocumentProcessed({
             status: 'failed',
+            selectedDocType: scopeKey,
             detectedDocType: 'unknown',
             extractedFields: {},
             reasonCode: 'ai_error',
             file,
           });
         }
+        delete activeExtractionRef.current[opKey];
       }
     },
     [
@@ -639,6 +778,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
       onExtractedFieldsDetected,
       onFileReady,
       selectedDocType,
+      updateScopeItems,
     ]
   );
 
@@ -648,7 +788,9 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
 
   const handleFileSelected = useCallback((file: File) => {
     const id = generateId();
-    setItems(prev => [
+    const opKey = `${currentScopeKey}:${id}`;
+    cancelledItemIdsRef.current.delete(opKey);
+    updateScopeItems(currentScopeKey, prev => [
       ...prev,
       {
         id,
@@ -662,8 +804,8 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         detectedMime: null,
       },
     ]);
-    // No auto-processing — user must click Import Data
-  }, []);
+    // No auto-processing - user must click Import Data
+  }, [currentScopeKey, updateScopeItems]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -686,29 +828,44 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
   // -------------------------------------------------------------------------
 
   const handleImportData = useCallback(async () => {
-    const queuedItems = items.filter(i => i.status === 'queued');
-    if (queuedItems.length === 0 || isProcessing) return;
-    setIsProcessing(true);
-    try {
-      for (const item of queuedItems) {
-        await processExtraction(item.id, item.file);
-      }
-    } finally {
-      setIsProcessing(false);
+    const queuedItems = currentItems.filter(i => i.status === 'queued');
+    const hasProcessing = currentItems.some(i => i.status === 'processing');
+    if (queuedItems.length === 0 || hasProcessing) return;
+    for (const item of queuedItems) {
+      await processExtraction(currentScopeKey, item.id, item.file);
     }
-  }, [items, isProcessing, processExtraction]);
+  }, [currentItems, currentScopeKey, processExtraction]);
 
   // -------------------------------------------------------------------------
   // Item actions
   // -------------------------------------------------------------------------
 
   const handleRetry = (item: SmartUploadItem) => {
-    void processExtraction(item.id, item.file);
+    void processExtraction(currentScopeKey, item.id, item.file);
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    setItems(prev => prev.filter(i => i.id !== itemId));
-  };
+  const handleRemoveItem = useCallback(async (item: SmartUploadItem) => {
+    const opKey = `${currentScopeKey}:${item.id}`;
+    // Mark as cancelled immediately so in-flight extraction results are ignored.
+    cancelledItemIdsRef.current.add(opKey);
+    if (onRemoveItem) {
+      const decision = await onRemoveItem({
+        id: item.id,
+        file: item.file,
+        detectedDocType: item.detectedDocType,
+        status: item.status,
+        extractedFields: item.extractedFields,
+        reasonCode: item.reasonCode,
+        pipelineUsed: item.pipelineUsed,
+      });
+      if (decision === false) {
+        cancelledItemIdsRef.current.delete(opKey);
+        return;
+      }
+    }
+    delete activeExtractionRef.current[opKey];
+    updateScopeItems(currentScopeKey, prev => prev.filter(i => i.id !== item.id));
+  }, [currentScopeKey, onRemoveItem, updateScopeItems]);
 
   // -------------------------------------------------------------------------
   // Conflict modal actions
@@ -738,14 +895,14 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
       setFieldSourceMap(prev => ({ ...prev, ...sourceUpdates }));
     }
     setConflictModal({ show: false, conflicts: [], choices: {} });
-    setItems(prev =>
+    updateScopeItems(currentScopeKey, prev =>
       prev.map(item => (item.status === 'extracted' ? { ...item, status: 'mapped' } : item))
     );
   };
 
   const handleConflictDismiss = () => {
     setConflictModal({ show: false, conflicts: [], choices: {} });
-    setItems(prev =>
+    updateScopeItems(currentScopeKey, prev =>
       prev.map(item => (item.status === 'extracted' ? { ...item, status: 'mapped' } : item))
     );
   };
@@ -754,8 +911,28 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
   // Derived state
   // -------------------------------------------------------------------------
 
-  const queuedCount = items.filter(i => i.status === 'queued').length;
-  const importDisabled = disabled || isProcessing || queuedCount === 0;
+  const queuedCount = currentItems.filter(i => i.status === 'queued').length;
+  const hasVisibleProcessing = currentItems.some(i => i.status === 'processing');
+  const importDisabled = disabled || hasVisibleProcessing || queuedCount === 0;
+  const renderedItems = useMemo<SmartUploadItem[]>(() => {
+    if (currentItems.length > 0) {
+      return currentItems;
+    }
+    if (hydratedItems.length === 0) {
+      return [];
+    }
+    return hydratedItems.map((item) => ({
+      id: item.id,
+      file: new File([''], item.fileName || 'uploaded-document', { type: item.fileMime ?? 'application/octet-stream' }),
+      detectedDocType: item.detectedDocType,
+      status: item.status,
+      extractedFields: item.extractedFields ?? {},
+      fieldOptions: null,
+      reasonCode: item.reasonCode,
+      pipelineUsed: item.pipelineUsed ?? null,
+      detectedMime: item.fileMime ?? null,
+    }));
+  }, [currentItems, hydratedItems]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -807,9 +984,9 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
         </div>
 
         {/* Document list */}
-        {items.length > 0 && (
+        {renderedItems.length > 0 && (
           <div className="space-y-2">
-            {items.map(item => {
+            {renderedItems.map(item => {
               const summary = buildExtractionSummary(item.extractedFields);
               const canRetry =
                 (item.status === 'failed' || item.status === 'unreadable') &&
@@ -852,7 +1029,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
                     )}
                     <button
                       type="button"
-                      onClick={() => handleRemoveItem(item.id)}
+                      onClick={() => { void handleRemoveItem(item); }}
                       className="text-muted-foreground hover:text-destructive transition-colors"
                       aria-label="Remove"
                       title="Remove"
@@ -899,7 +1076,7 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
             disabled={importDisabled}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isProcessing ? (
+            {hasVisibleProcessing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Extracting…
@@ -952,3 +1129,4 @@ const SmartUploadDocument: React.FC<SmartUploadDocumentProps> = ({
 };
 
 export default SmartUploadDocument;
+
