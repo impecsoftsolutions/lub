@@ -1575,12 +1575,6 @@ const ActivityDetail: React.FC = () => {
           <p className="text-lg leading-8 text-muted-foreground">{activity.excerpt}</p>
         )}
 
-        {activity.description && (
-          <div className="prose prose-sm sm:prose max-w-none text-foreground leading-7 whitespace-pre-wrap">
-            {activity.description}
-          </div>
-        )}
-
         {galleryUrls.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-xl font-semibold tracking-tight">Photos</h2>
@@ -1636,6 +1630,12 @@ const ActivityDetail: React.FC = () => {
               ))}
             </div>
           </section>
+        )}
+
+        {activity.description && (
+          <div className="prose prose-sm sm:prose max-w-none text-foreground leading-7 whitespace-pre-wrap">
+            {activity.description}
+          </div>
         )}
 
         <div className="pt-4 border-t border-border">
