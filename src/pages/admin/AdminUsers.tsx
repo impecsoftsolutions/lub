@@ -405,6 +405,7 @@ const AdminUsers: React.FC = () => {
                       <th
                         className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[35%]"
                         onClick={() => handleSort('email')}
+                        aria-sort={sortField === 'email' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
                         <div className="flex items-center justify-between">
                           <span>Email</span>
@@ -421,6 +422,7 @@ const AdminUsers: React.FC = () => {
                       <th
                         className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[20%]"
                         onClick={() => handleSort('account_type')}
+                        aria-sort={sortField === 'account_type' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
                         <div className="flex items-center justify-between">
                           <span>Account Type</span>

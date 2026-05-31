@@ -810,6 +810,8 @@ const Directory: React.FC = () => {
                         : 'text-foreground hover:bg-muted/50'
                     }`}
                     title="List View"
+                    aria-label="List view"
+                    aria-pressed={viewMode === 'list'}
                   >
                     <List className="w-5 h-5" />
                   </button>
@@ -821,6 +823,8 @@ const Directory: React.FC = () => {
                         : 'text-foreground hover:bg-muted/50'
                     }`}
                     title="Card View"
+                    aria-label="Card view"
+                    aria-pressed={viewMode === 'card'}
                   >
                     <LayoutGrid className="w-5 h-5" />
                   </button>
@@ -828,6 +832,8 @@ const Directory: React.FC = () => {
               )}
               <button
                 onClick={() => setShowFilters(!showFilters)}
+                aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+                aria-expanded={showFilters}
                 className="inline-flex w-full sm:w-auto items-center justify-center px-5 sm:px-6 py-3 border border-border rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors"
               >
                 <Filter className="w-5 h-5 mr-2" />

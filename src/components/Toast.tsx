@@ -28,12 +28,22 @@ const Toast: React.FC<ToastProps> = ({
 
   if (!isVisible) return null;
 
-  const bgColor = type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
-  const textColor = type === 'success' ? 'text-green-800' : 'text-red-800';
-  const iconColor = type === 'success' ? 'text-green-500' : 'text-red-500';
+  // Mirror the design-system Badge success/destructive palettes so the toast
+  // respects dark mode. The error path intentionally retains `bg-red-50`, which
+  // a Phase 1 smoke fallback selector (`div.bg-red-50`) relies on.
+  const bgColor =
+    type === 'success'
+      ? 'bg-green-50 border-green-400 dark:bg-green-900/70'
+      : 'bg-red-50 border-red-400 dark:bg-red-900/70';
+  const textColor = type === 'success' ? 'text-green-800 dark:text-white/90' : 'text-red-800 dark:text-white/90';
+  const iconColor = type === 'success' ? 'text-green-500 dark:text-green-300' : 'text-red-500 dark:text-red-300';
 
   return (
-    <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-2 duration-300">
+    <div
+      role={type === 'error' ? 'alert' : 'status'}
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
+      className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-2 duration-300"
+    >
       <div className={`max-w-md w-full ${bgColor} border rounded-lg shadow-lg p-4`}>
         <div className="flex items-start">
           <div className="flex-shrink-0">
@@ -51,6 +61,7 @@ const Toast: React.FC<ToastProps> = ({
           <div className="ml-4 flex-shrink-0">
             <button
               onClick={onClose}
+              aria-label="Dismiss notification"
               className={`inline-flex ${textColor} hover:opacity-75 transition-opacity`}
             >
               <X className="w-4 h-4" />

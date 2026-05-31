@@ -259,6 +259,7 @@ const MemberDashboard: React.FC = () => {
               onClick={refreshMember}
               className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
               title="Refresh"
+              aria-label="Refresh dashboard"
             >
               <RefreshCw className="w-4 h-4" />
             </button>

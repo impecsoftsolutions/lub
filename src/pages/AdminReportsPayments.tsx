@@ -248,6 +248,11 @@ const AdminReportsPayments: React.FC = () => {
     });
   };
 
+  const ariaSortFor = (key: SortKey): 'ascending' | 'descending' | 'none' => {
+    if (sortState.key !== key) return 'none';
+    return sortState.direction === 'asc' ? 'ascending' : 'descending';
+  };
+
   const getSortIcon = (key: SortKey) => {
     if (sortState.key !== key) {
       return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/70" />;
@@ -452,8 +457,17 @@ const AdminReportsPayments: React.FC = () => {
         </div>
 
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <span>{error}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadRows(filters)}
+              disabled={isLoading}
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-1.5">Retry</span>
+            </Button>
           </div>
         )}
 
@@ -462,44 +476,44 @@ const AdminReportsPayments: React.FC = () => {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('paymentDate')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('paymentDate')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('paymentDate')}>
                       Payment Date
                       {getSortIcon('paymentDate')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('member')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('member')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('member')}>
                       Member
                       {getSortIcon('member')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('location')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('location')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('location')}>
                       Location
                       {getSortIcon('location')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('status')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('status')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('status')}>
                       Status
                       {getSortIcon('status')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('amount')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('amount')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('amount')}>
                       Amount
                       {getSortIcon('amount')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('modeRef')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('modeRef')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('modeRef')}>
                       Mode / Ref
                       {getSortIcon('modeRef')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort('submitted')}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('submitted')}>
+                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('submitted')}>
                       Submitted
                       {getSortIcon('submitted')}
                     </button>

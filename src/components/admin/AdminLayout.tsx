@@ -133,6 +133,7 @@ export function AdminLayout() {
             <span className="text-sm text-muted-foreground hidden sm:block">{userEmail}</span>
             <button
               onClick={handleSignOut}
+              aria-label="Sign out"
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
             >
               <LogOut className="w-4 h-4" />

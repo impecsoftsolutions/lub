@@ -28,6 +28,7 @@ const MemberNav: React.FC = () => {
                 <Link
                   key={link.path}
                   to={link.path}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
                     isActive
                       ? 'border-primary text-primary'

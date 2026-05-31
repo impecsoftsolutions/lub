@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { formatDateTimeValue, formatTimeValue } from '../../lib/dateTimeManager';
 
 interface Activity {
@@ -21,15 +22,15 @@ const RecentActivityList: React.FC<RecentActivityListProps> = ({
   isLoading = false,
   lastUpdated
 }) => {
-  const getStatusBadge = (status: string) => {
+  const getStatusVariant = (status: string): 'success' | 'destructive' | 'warning' => {
     switch (status) {
       case 'approved':
-        return 'bg-green-100 text-green-800';
+        return 'success';
       case 'rejected':
-        return 'bg-red-100 text-red-800';
+        return 'destructive';
       case 'pending':
       default:
-        return 'bg-amber-100 text-amber-800';
+        return 'warning';
     }
   };
 
@@ -61,15 +62,15 @@ const RecentActivityList: React.FC<RecentActivityListProps> = ({
       ) : activities.length > 0 ? (
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div key={activity.id} className="border-l-2 border-blue-500 pl-4 py-2">
+            <div key={activity.id} className="border-l-2 border-primary pl-4 py-2">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{activity.full_name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{activity.email}</p>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(activity.status)}`}>
+                <Badge variant={getStatusVariant(activity.status)}>
                   {activity.status.charAt(0).toUpperCase() + activity.status.slice(1)}
-                </span>
+                </Badge>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <Clock className="w-3 h-3 text-muted-foreground" />
