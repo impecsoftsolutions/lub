@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download } from 'lucide-react';
+import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download, MessageSquare, Copy } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -31,6 +31,7 @@ interface MemberRegistration {
   full_name: string;
   email: string;
   mobile_number: string;
+  gender?: string | null;
   company_name: string;
   company_designation_id: string;
   company_designations?: { designation_name: string } | null;
@@ -49,6 +50,9 @@ interface MemberRegistration {
   // Extended fields returned by the RPC and used for smart search
   company_address?: string | null;
   city?: string | null;
+  other_city_name?: string | null;
+  is_custom_city?: boolean | null;
+  date_of_birth?: string | null;
   brand_names?: string | null;
   gst_number?: string | null;
   pan_company?: string | null;
@@ -88,6 +92,218 @@ const DEFAULT_OPTIONAL_EXPORT_SELECTION: Record<OptionalExportColumnKey, boolean
   gender: false,
 };
 
+const GOOGLE_CONTACT_HEADERS = [
+  'First Name',
+  'Middle Name',
+  'Last Name',
+  'Phonetic First Name',
+  'Phonetic Middle Name',
+  'Phonetic Last Name',
+  'Name Prefix',
+  'Name Suffix',
+  'Nickname',
+  'File As',
+  'Organization Name',
+  'Organization Title',
+  'Organization Department',
+  'Birthday',
+  'Notes',
+  'Photo',
+  'Labels',
+  'E-mail 1 - Label',
+  'E-mail 1 - Value',
+  'Phone 1 - Label',
+  'Phone 1 - Value',
+  'Address 1 - Label',
+  'Address 1 - Formatted',
+  'Address 1 - Street',
+  'Address 1 - City',
+  'Address 1 - PO Box',
+  'Address 1 - Region',
+  'Address 1 - Postal Code',
+  'Address 1 - Country',
+  'Address 1 - Extended Address',
+] as const;
+
+type GoogleContactHeader = typeof GOOGLE_CONTACT_HEADERS[number];
+type GoogleContactRow = Record<GoogleContactHeader, string>;
+
+interface GenerateWelcomeMessageResponse {
+  success?: boolean;
+  data?: {
+    welcome_message?: string;
+  };
+  error?: string;
+  error_code?: string;
+}
+
+const STATE_ABBREVIATIONS: Record<string, string> = {
+  'andhra pradesh': 'AP',
+  telangana: 'TG',
+};
+
+const cleanContactValue = (value?: string | null) => (value ?? '').trim();
+
+const getStateShortCode = (state?: string | null) => {
+  const cleanState = cleanContactValue(state);
+  if (!cleanState) return '';
+
+  const mapped = STATE_ABBREVIATIONS[cleanState.toLowerCase()];
+  if (mapped) return mapped;
+
+  return cleanState
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+};
+
+const getContactCity = (registration: MemberRegistration) => {
+  if (registration.is_custom_city) {
+    return cleanContactValue(registration.other_city_name) || cleanContactValue(registration.city);
+  }
+
+  return cleanContactValue(registration.city) || cleanContactValue(registration.other_city_name);
+};
+
+const getGoogleContactName = (registration: MemberRegistration) => {
+  const stateCode = getStateShortCode(registration.state);
+  const district = cleanContactValue(registration.district);
+  const fullName = cleanContactValue(registration.full_name);
+  const locationPrefix = ['LUB', stateCode, district].filter(Boolean).join(' ');
+
+  return [locationPrefix || 'LUB', fullName].filter(Boolean).join(' - ');
+};
+
+const formatGoogleContactBirthday = (value?: string | null) => {
+  const cleanValue = cleanContactValue(value);
+  if (!cleanValue) return '';
+
+  return cleanValue.slice(0, 10);
+};
+
+const formatGoogleContactPhone = (value?: string | null) => {
+  const cleanValue = cleanContactValue(value);
+  if (!cleanValue) return '';
+
+  const digits = cleanValue.replace(/\D/g, '');
+  const localDigits = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+
+  if (localDigits.length === 10) {
+    return `+91 ${localDigits.slice(0, 5)} ${localDigits.slice(5)}`;
+  }
+
+  return cleanValue;
+};
+
+const formatGoogleContactAddressLine = (registration: MemberRegistration) => {
+  const street = cleanContactValue(registration.company_address);
+  const city = getContactCity(registration);
+  const district = cleanContactValue(registration.district);
+  const state = cleanContactValue(registration.state);
+  const pinCode = cleanContactValue(registration.pin_code);
+  const districtLine = district ? `${district} District` : '';
+  const cityStatePin = [
+    city,
+    [state, pinCode].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ');
+  const hasAddressData = Boolean(street || city || district || state || pinCode);
+
+  return [street, districtLine, cityStatePin, hasAddressData ? 'IN' : '']
+    .filter(Boolean)
+    .join('\n');
+};
+
+const buildGoogleContactRow = (registration: MemberRegistration): GoogleContactRow => {
+  const contactName = getGoogleContactName(registration);
+  const state = cleanContactValue(registration.state);
+  const city = getContactCity(registration);
+  const district = cleanContactValue(registration.district);
+  const companyAddress = cleanContactValue(registration.company_address);
+  const pinCode = cleanContactValue(registration.pin_code);
+  const hasAddressData = Boolean(companyAddress || city || district || state || pinCode);
+  const notes = [
+    cleanContactValue(registration.referred_by) ? `Referred by: ${cleanContactValue(registration.referred_by)}` : '',
+    cleanContactValue(registration.products_services) ? `Products: ${cleanContactValue(registration.products_services)}` : '',
+  ].filter(Boolean).join('\n');
+
+  return {
+    'First Name': contactName,
+    'Middle Name': '',
+    'Last Name': '',
+    'Phonetic First Name': '',
+    'Phonetic Middle Name': '',
+    'Phonetic Last Name': '',
+    'Name Prefix': '',
+    'Name Suffix': '',
+    Nickname: '',
+    'File As': contactName,
+    'Organization Name': cleanContactValue(registration.company_name),
+    'Organization Title': cleanContactValue(registration.company_designations?.designation_name),
+    'Organization Department': '',
+    Birthday: formatGoogleContactBirthday(registration.date_of_birth),
+    Notes: notes,
+    Photo: '',
+    Labels: `${state ? `LUB ${state}` : 'LUB'} ::: LUB ::: * myContacts`,
+    'E-mail 1 - Label': cleanContactValue(registration.email) ? '* ' : '',
+    'E-mail 1 - Value': cleanContactValue(registration.email),
+    'Phone 1 - Label': '',
+    'Phone 1 - Value': formatGoogleContactPhone(registration.mobile_number),
+    'Address 1 - Label': '',
+    'Address 1 - Formatted': formatGoogleContactAddressLine(registration),
+    'Address 1 - Street': companyAddress,
+    'Address 1 - City': city,
+    'Address 1 - PO Box': '',
+    'Address 1 - Region': state,
+    'Address 1 - Postal Code': pinCode,
+    'Address 1 - Country': hasAddressData ? 'IN' : '',
+    'Address 1 - Extended Address': district ? `${district} District` : '',
+  };
+};
+
+const escapeCsvValue = (value: string) => {
+  const normalizedValue = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (/[",\n]/.test(normalizedValue)) {
+    return `"${normalizedValue.replace(/"/g, '""')}"`;
+  }
+
+  return normalizedValue;
+};
+
+const serializeGoogleContactsCsv = (rows: GoogleContactRow[]) => {
+  const headerRow = GOOGLE_CONTACT_HEADERS.map(escapeCsvValue).join(',');
+  const dataRows = rows.map((row) =>
+    GOOGLE_CONTACT_HEADERS.map((header) => escapeCsvValue(row[header])).join(',')
+  );
+
+  return [headerRow, ...dataRows].join('\r\n');
+};
+
+const downloadTextFile = (fileName: string, contents: string, mimeType: string) => {
+  const blob = new Blob([contents], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const getSafeContactFileName = (registration: MemberRegistration) => {
+  const baseName = getGoogleContactName(registration)
+    .split('')
+    .filter((character) => character.charCodeAt(0) >= 32)
+    .join('')
+    .replace(/[<>:"/\\|?*]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 90);
+
+  return `${baseName || 'LUB Google Contact'}.csv`;
+};
+
 const AdminRegistrations: React.FC = () => {
   const [registrations, setRegistrations] = useState<MemberRegistration[]>([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState<MemberRegistration[]>([]);
@@ -102,6 +318,17 @@ const AdminRegistrations: React.FC = () => {
   const [selectedOptionalExportColumns, setSelectedOptionalExportColumns] = useState<Record<OptionalExportColumnKey, boolean>>(
     DEFAULT_OPTIONAL_EXPORT_SELECTION
   );
+  const [welcomeDialog, setWelcomeDialog] = useState<{
+    isOpen: boolean;
+    registration: MemberRegistration | null;
+  }>({
+    isOpen: false,
+    registration: null,
+  });
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [welcomeError, setWelcomeError] = useState('');
+  const [isWelcomeGenerating, setIsWelcomeGenerating] = useState(false);
+  const [isWelcomeCopied, setIsWelcomeCopied] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     registrationId: string;
@@ -430,6 +657,87 @@ const AdminRegistrations: React.FC = () => {
       ...current,
       [key]: !current[key],
     }));
+  };
+
+  const handleDownloadGoogleContact = (registration: MemberRegistration) => {
+    try {
+      const csv = serializeGoogleContactsCsv([buildGoogleContactRow(registration)]);
+      downloadTextFile(
+        getSafeContactFileName(registration),
+        csv,
+        'text/csv;charset=utf-8'
+      );
+      showToast('success', 'Google contact CSV downloaded');
+    } catch (error) {
+      console.error('[AdminRegistrations] Error downloading Google contact CSV:', error);
+      showToast('error', 'Failed to download Google contact CSV');
+    }
+  };
+
+  const handleGenerateWelcomeMessage = async (registration: MemberRegistration) => {
+    setWelcomeDialog({ isOpen: true, registration });
+    setWelcomeMessage('');
+    setWelcomeError('');
+    setIsWelcomeCopied(false);
+    setIsWelcomeGenerating(true);
+
+    try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        setWelcomeError('User session not found. Please log in again.');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke<GenerateWelcomeMessageResponse>(
+        'generate-member-welcome-message',
+        {
+          body: {
+            session_token: sessionToken,
+            member: {
+              full_name: registration.full_name,
+              gender: registration.gender,
+              mobile_number: registration.mobile_number,
+              company_name: registration.company_name,
+              company_designation: registration.company_designations?.designation_name,
+              district: registration.district,
+              state: registration.state,
+              products_services: registration.products_services,
+              brand_names: registration.brand_names,
+              referred_by: registration.referred_by,
+              website: registration.website,
+            },
+          },
+        }
+      );
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (!data?.success || !data.data?.welcome_message) {
+        throw new Error(data?.error || 'Failed to generate welcome message');
+      }
+
+      setWelcomeMessage(data.data.welcome_message);
+    } catch (error) {
+      console.error('[AdminRegistrations] Error generating welcome message:', error);
+      setWelcomeError(error instanceof Error ? error.message : 'Failed to generate welcome message');
+    } finally {
+      setIsWelcomeGenerating(false);
+    }
+  };
+
+  const handleCopyWelcomeMessage = async () => {
+    if (!welcomeMessage.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(welcomeMessage);
+      setIsWelcomeCopied(true);
+      showToast('success', 'Welcome message copied');
+      window.setTimeout(() => setIsWelcomeCopied(false), 2000);
+    } catch (error) {
+      console.error('[AdminRegistrations] Error copying welcome message:', error);
+      showToast('error', 'Failed to copy welcome message');
+    }
   };
 
   const handleEditMember = (member: MemberRegistration) => {
@@ -764,14 +1072,17 @@ const AdminRegistrations: React.FC = () => {
                             </span>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownloadGoogleContact(registration)}>
+                              <Download className="w-4 h-4" />Download Google Contact
+                            </DropdownMenuItem>
+                            {canViewMembers && (
+                              <DropdownMenuItem onClick={() => void handleGenerateWelcomeMessage(registration)}>
+                                <MessageSquare className="w-4 h-4" />Generate Welcome Message
+                              </DropdownMenuItem>
+                            )}
                             {canEdit && (
                               <DropdownMenuItem onClick={() => handleEditMember(registration)}>
                                 <Edit3 className="w-4 h-4" />Edit
-                              </DropdownMenuItem>
-                            )}
-                            {canViewMembers && (
-                              <DropdownMenuItem onClick={() => handleViewHistory(registration.id, registration.full_name)}>
-                                <History className="w-4 h-4" />Audit History
                               </DropdownMenuItem>
                             )}
                             {registration.status === 'approved' && canApprove && (
@@ -781,6 +1092,11 @@ const AdminRegistrations: React.FC = () => {
                                 ) : (
                                   <><Eye className="w-4 h-4" />Show in Directory</>
                                 )}
+                              </DropdownMenuItem>
+                            )}
+                            {canViewMembers && (
+                              <DropdownMenuItem onClick={() => handleViewHistory(registration.id, registration.full_name)}>
+                                <History className="w-4 h-4" />Audit History
                               </DropdownMenuItem>
                             )}
                             {registration.status === 'pending' && canApprove && (
@@ -907,6 +1223,109 @@ const AdminRegistrations: React.FC = () => {
                 <Download className="h-4 w-4" />
               )}
               Download XLSX
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Welcome Message Dialog */}
+      <Dialog
+        open={welcomeDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !isWelcomeGenerating) {
+            setWelcomeDialog({ isOpen: false, registration: null });
+            setWelcomeMessage('');
+            setWelcomeError('');
+            setIsWelcomeCopied(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Generate Welcome Message
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {welcomeDialog.registration && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-sm font-medium text-foreground">{welcomeDialog.registration.full_name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {welcomeDialog.registration.company_name}
+                  {welcomeDialog.registration.district ? ` · ${welcomeDialog.registration.district}` : ''}
+                </p>
+              </div>
+            )}
+
+            {isWelcomeGenerating && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary" />
+                  Generating welcome message...
+                </div>
+              </div>
+            )}
+
+            {welcomeError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {welcomeError}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-medium text-foreground">WhatsApp message</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => void handleCopyWelcomeMessage()}
+                  disabled={isWelcomeGenerating || !welcomeMessage.trim()}
+                  aria-label="Copy welcome message"
+                  title="Copy welcome message"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <Textarea
+                value={welcomeMessage}
+                onChange={(e) => {
+                  setWelcomeMessage(e.target.value);
+                  setIsWelcomeCopied(false);
+                }}
+                placeholder={isWelcomeGenerating ? 'AI is generating the message...' : 'Generated welcome message will appear here.'}
+                rows={15}
+                className="resize-y text-sm leading-relaxed"
+                disabled={isWelcomeGenerating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Review and edit the text if needed before copying it to WhatsApp.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWelcomeDialog({ isOpen: false, registration: null });
+                setWelcomeMessage('');
+                setWelcomeError('');
+                setIsWelcomeCopied(false);
+              }}
+              disabled={isWelcomeGenerating}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => void handleCopyWelcomeMessage()}
+              disabled={isWelcomeGenerating || !welcomeMessage.trim()}
+              className="gap-1.5"
+            >
+              <Copy className="h-4 w-4" />
+              {isWelcomeCopied ? 'Copied' : 'Copy Message'}
             </Button>
           </DialogFooter>
         </DialogContent>
