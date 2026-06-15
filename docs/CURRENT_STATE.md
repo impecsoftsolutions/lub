@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-06-14  
+**Last updated:** 2026-06-15  
 **Updated by:** Codex
 
 ---
@@ -33,6 +33,13 @@ No active implementation slice.
 ---
 
 ## Recently Completed
+
+### COD-MEMBER-DOCUMENT-VERIFY-001
+- **Branch:** `feature/ux-sprint-1`
+- **Commit:** Committed on `feature/ux-sprint-1` (2026-06-15)
+- **What shipped:** Added a read-only `Verify` action to Admin Member Registrations after `Generate Welcome Message`. The action is available for every visible registration row, including pending and approved records, and opens a document verification report modal that fetches available GST, UDYAM, and payment proof documents, runs the existing `extractDocument()` pipeline, compares extracted values against registered values, masks sensitive identifiers, shows document fetch/read warnings, and reports field-level plus overall verification status.
+- **Files:** `src/pages/AdminRegistrations.tsx`, `src/components/VerifyDocumentModal.tsx`
+- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS.
 
 ### COD-MEMBER-WELCOME-MESSAGE-AI-001
 - **Branch:** `feature/ux-sprint-1`

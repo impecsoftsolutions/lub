@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download, MessageSquare, Copy } from 'lucide-react';
+import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, AlertTriangle, CreditCard as Edit3, EyeOff, Eye, Trash2, History, Lock, MoreHorizontal, Download, MessageSquare, Copy, ShieldCheck } from 'lucide-react';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -11,6 +11,7 @@ import Toast from '../components/Toast';
 // EditMemberModal import removed — admin editing now uses /admin/members/registrations/:id/edit route (CLAUDE-UNIFIED-EDIT-UI-001)
 import AuditHistoryModal from '../components/AuditHistoryModal';
 import ViewApplicationModal from '../components/ViewApplicationModal';
+import VerifyDocumentModal from '../components/VerifyDocumentModal';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,11 @@ interface MemberRegistration {
   gst_number?: string | null;
   pan_company?: string | null;
   pin_code?: string | null;
+  amount_paid?: string | null;
+  payment_date?: string | null;
+  payment_mode?: string | null;
+  transaction_id?: string | null;
+  bank_reference?: string | null;
   alternate_contact_name?: string | null;
   alternate_mobile?: string | null;
   website?: string | null;
@@ -329,6 +335,7 @@ const AdminRegistrations: React.FC = () => {
   const [welcomeError, setWelcomeError] = useState('');
   const [isWelcomeGenerating, setIsWelcomeGenerating] = useState(false);
   const [isWelcomeCopied, setIsWelcomeCopied] = useState(false);
+  const [verifyRegistration, setVerifyRegistration] = useState<MemberRegistration | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     registrationId: string;
@@ -1080,6 +1087,9 @@ const AdminRegistrations: React.FC = () => {
                                 <MessageSquare className="w-4 h-4" />Generate Welcome Message
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem onClick={() => setVerifyRegistration(registration)}>
+                              <ShieldCheck className="w-4 h-4" />Verify
+                            </DropdownMenuItem>
                             {canEdit && (
                               <DropdownMenuItem onClick={() => handleEditMember(registration)}>
                                 <Edit3 className="w-4 h-4" />Edit
@@ -1485,6 +1495,12 @@ const AdminRegistrations: React.FC = () => {
           onReject={handleRejectFromView}
         />
       )}
+
+      <VerifyDocumentModal
+        registration={verifyRegistration}
+        isOpen={Boolean(verifyRegistration)}
+        onClose={() => setVerifyRegistration(null)}
+      />
 
     </div>
     </PermissionGate>
