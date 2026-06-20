@@ -412,12 +412,62 @@ export const customAuth = {
     }
   },
 
-  async changePassword(): Promise<PasswordChangeResult> {
-    return {
-      success: false,
-      error: 'Password-based authentication is no longer supported.',
-      errorCode: AuthErrorCode.INVALID_CREDENTIALS,
-    };
+  async changePassword(
+    sessionToken: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<PasswordChangeResult> {
+    try {
+      if (!sessionToken) {
+        return {
+          success: false,
+          error: 'Invalid session',
+          errorCode: AuthErrorCode.SESSION_INVALID,
+        };
+      }
+
+      if (newPassword.length < 6) {
+        return {
+          success: false,
+          error: 'Password must be at least 6 characters.',
+          errorCode: AuthErrorCode.WEAK_PASSWORD,
+        };
+      }
+
+      const { data, error } = await supabase.rpc('change_member_password_with_session', {
+        p_session_token: sessionToken,
+        p_current_password: currentPassword,
+        p_new_password: newPassword,
+      });
+
+      if (error) {
+        console.error('[customAuth] Change password database error:', error.message);
+        return {
+          success: false,
+          error: 'Unable to change password. Please try again.',
+          errorCode: AuthErrorCode.NETWORK_ERROR,
+        };
+      }
+
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error || 'Unable to change password.',
+          errorCode: mapAuthErrorCode(result?.error_code) ?? AuthErrorCode.INVALID_CREDENTIALS,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[customAuth] Change password error:', error);
+      return {
+        success: false,
+        error: 'Unable to change password. Please try again.',
+        errorCode: AuthErrorCode.NETWORK_ERROR,
+      };
+    }
   },
 
   async checkAccountStatus(): Promise<AccountStatus> {

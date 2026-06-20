@@ -34,6 +34,13 @@ No active implementation slice.
 
 ## Recently Completed
 
+### COD-MEMBER-CHANGE-PASSWORD-001
+- **Branch:** `feature/ux-sprint-1`
+- **Commit:** Pending local commit (2026-06-20)
+- **What shipped:** Added a logged-in member Change Password flow under `/dashboard/settings` > Privacy & Security. The settings page now links to `/dashboard/change-password`, the change-password page collects current password, new password, and confirmation, and the service layer calls a new session-token secured RPC. The RPC validates the active custom session, rejects inactive/suspended users, verifies the current password, enforces minimum 6 characters, rejects passwordless/placeholder accounts with a Forgot Password instruction, hashes the new password server-side, and invalidates other active sessions while preserving the current session.
+- **Files:** `src/pages/MemberSettings.tsx`, `src/pages/MemberChangePassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/components/ChangePasswordModal.tsx`, `supabase/migrations/20260620123000_member_change_password_with_session.sql`
+- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run db:migrations:audit` PASS. Migration `20260620123000` is applied to the linked DB. Invalid-session RPC probe returns normal JSON `{ success: false, error_code: "session_invalid" }`, confirming PostgREST can find the function.
+
 ### COD-AUTH-RESET-PGCRYPTO-SEARCH-PATH-002
 - **Branch:** `feature/ux-sprint-1`
 - **Commit:** Hotfix commit (2026-06-20)
@@ -140,7 +147,7 @@ No active implementation slice.
 ## In Progress / Dirty State
 
 - No active code slice.
-- Source worktree is clean after `cdff1ef` and `0fc5801`; only local artifacts remain untracked (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
+- Local source changes for `COD-MEMBER-CHANGE-PASSWORD-001` are present but not committed yet. Untracked local artifacts remain (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
 
 ---
 

@@ -89,25 +89,22 @@ const MemberSettings: React.FC = () => {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between py-2 opacity-50 cursor-not-allowed">
+              <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
                   <Shield className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-foreground">Privacy & Security</p>
-                    <p className="text-xs text-muted-foreground">Password-based authentication is no longer supported</p>
+                    <p className="text-xs text-muted-foreground">Change your account password</p>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 text-xs font-medium text-muted-foreground bg-muted border border-border rounded-full">
-                  Info
-                </span>
+                <Link
+                  to="/dashboard/change-password"
+                  className="px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-md hover:bg-muted/50 transition-colors"
+                >
+                  Change Password
+                </Link>
               </div>
             </div>
-          </div>
-
-          <div className="p-5">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium">Need Help?</span> Sign in with your email address and 10-digit mobile number. Contact support if your contact details need to be corrected.
-            </p>
           </div>
         </div>
       </div>

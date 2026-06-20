@@ -207,7 +207,7 @@ export const memberAuthService = {
     console.warn('[memberAuthService] signInMember is deprecated', email, password ? 'with password input' : '');
     return {
       success: false,
-      error: 'Password-based authentication is no longer supported.',
+      error: 'Use the main sign-in page with your email or mobile number and password.',
       data: null
     };
   },
@@ -216,7 +216,7 @@ export const memberAuthService = {
     console.warn('[memberAuthService] signInWithMobile is deprecated', mobileNumber, password ? 'with password input' : '');
     return {
       success: false,
-      error: 'Password-based authentication is no longer supported.',
+      error: 'Use the main sign-in page with your email or mobile number and password.',
       data: null
     };
   },
@@ -392,19 +392,32 @@ export const memberAuthService = {
     }
   },
 
-  async changePassword(newPassword: string) {
-    console.warn('[memberAuthService] changePassword is deprecated', newPassword ? 'with password input' : '');
-    return {
-      success: false,
-      error: 'Password-based authentication is no longer supported.'
-    };
+  async changePassword(currentPassword: string, newPassword: string) {
+    try {
+      const sessionToken = sessionManager.getSessionToken();
+
+      if (!sessionToken || sessionManager.isSessionExpired()) {
+        return {
+          success: false,
+          error: 'Your session has expired. Please sign in again.'
+        };
+      }
+
+      return await customAuth.changePassword(sessionToken, currentPassword, newPassword);
+    } catch (error) {
+      console.error('[memberAuthService] Change password error:', error);
+      return {
+        success: false,
+        error: 'Unable to change password. Please try again.'
+      };
+    }
   },
 
   async requestPasswordReset(email: string) {
     console.warn('[memberAuthService] requestPasswordReset is deprecated', email);
     return {
       success: false,
-      error: 'Password-based authentication is no longer supported.'
+      error: 'Use Forgot Password from the sign-in page to receive a reset link.'
     };
   },
 
@@ -412,7 +425,7 @@ export const memberAuthService = {
     console.warn('[memberAuthService] resetPassword is deprecated', newPassword ? 'with password input' : '');
     return {
       success: false,
-      error: 'Password-based authentication is no longer supported.'
+      error: 'Use the password reset link sent to your registered email address.'
     };
   },
 

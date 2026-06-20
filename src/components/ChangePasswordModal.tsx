@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { X, Shield } from 'lucide-react';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -24,8 +24,8 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
           <div className="bg-card px-4 pt-5 pb-4 sm:p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-section font-semibold text-foreground">Password Change Unavailable</h3>
-                <p className="text-sm text-muted-foreground">Password-based authentication has been removed.</p>
+                <h3 className="text-section font-semibold text-foreground">Change Password</h3>
+                <p className="text-sm text-muted-foreground">Use Privacy & Security in account settings to update your password.</p>
               </div>
               <button
                 onClick={onClose}
@@ -37,9 +37,9 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-amber-600" />
+                <Shield className="w-5 h-5 text-amber-600" />
                 <p className="text-sm font-medium text-amber-800">
-                  Use your email address and 10-digit mobile number to sign in.
+                  Password changes are available from the dedicated settings page.
                 </p>
               </div>
             </div>

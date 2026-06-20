@@ -8,6 +8,14 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### COD-MEMBER-CHANGE-PASSWORD-001
+- **Status:** Closed locally, pending commit
+- **Branch / Commit:** `feature/ux-sprint-1` / pending local commit (2026-06-20)
+- **Summary:** Added a logged-in member Change Password path from `/dashboard/settings` Privacy & Security to `/dashboard/change-password`. The page collects current password, new password, and confirmation; validates minimum length and matching confirmation client-side; calls the member auth service; and shows success after changing the password. Stale “password-based authentication is no longer supported” copy was removed from member settings and related auth/modal surfaces.
+- **Backend details:** New `change_member_password_with_session` RPC verifies the current custom session, checks inactive/suspended users, rejects placeholder/passwordless accounts with a Forgot Password instruction, verifies the current password with the existing password helpers, hashes the new password server-side, resets lockout counters, and deletes other sessions for the same user while keeping the current session.
+- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS, migration audit PASS. Migration `20260620123000_member_change_password_with_session.sql` applied to the linked DB. Invalid-session RPC probe returns normal JSON `{ success: false, error_code: "session_invalid" }`.
+- **Files:** `src/pages/MemberSettings.tsx`, `src/pages/MemberChangePassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/components/ChangePasswordModal.tsx`, `supabase/migrations/20260620123000_member_change_password_with_session.sql`
+
 ### COD-AUTH-RESET-PGCRYPTO-SEARCH-PATH-002
 - **Status:** Closed
 - **Branch / Commit:** `feature/ux-sprint-1` / hotfix commit (2026-06-20)
