@@ -25,6 +25,7 @@ import SignUpV2 from './pages/SignUpV2';
 import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import RedirectIfAuthenticated from './components/RedirectIfAuthenticated';
 import MemberDashboard from './pages/MemberDashboard';
 import MemberViewProfile from './pages/MemberViewProfile';
 import MemberEditProfile from './pages/MemberEditProfile';
@@ -392,8 +393,8 @@ function App() {
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUpV2 />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/forgot-password" element={<RedirectIfAuthenticated><ForgotPassword /></RedirectIfAuthenticated>} />
+            <Route path="/reset-password" element={<RedirectIfAuthenticated><ResetPassword /></RedirectIfAuthenticated>} />
 
             {/* Member Protected Routes */}
             <Route path="/dashboard" element={<MemberDashboard />} />
