@@ -8,6 +8,15 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### COD-AUTH-UNIVERSAL-PASSWORD-001
+- **Status:** Implemented locally, not committed
+- **Branch / Commit:** `feature/ux-sprint-1` / uncommitted (2026-06-20)
+- **Summary:** Reintroduced password auth on top of the existing custom-session model. New signup users provide a fixed Password field outside the dynamic signup payload. Sign-in now uses one Email or Mobile Number field plus Password. Forgot/reset password pages are active. A new `request-password-reset` Edge Function creates server-side reset tokens and emails reset links through the existing Resend `send-email` function.
+- **Backend details:** New migration adds `users.password_set_at`, backfills only bcrypt hashes (`$2%`), creates `member_password_tokens` with hashed tokens only, replaces `create_portal_user_with_session_v2` with a password-aware signature, adds `sign_in_with_password`, and adds token validation/completion RPCs. The login RPC short-circuits passwordless/placeholder hashes before calling `verify_password` and preserves locked/suspended/inactive/frozen/deactivated-member gates.
+- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS, migration audit PASS. Migration `20260620103000` is applied to the linked DB and `request-password-reset` Edge Function is deployed.
+- **Deployment note:** The migration keeps the existing 6-arg signup RPC and adds the password-aware overload, so currently deployed signup callers remain compatible while the new frontend can pass `p_password`.
+- **Files:** `src/pages/SignIn.tsx`, `src/pages/SignUpV2.tsx`, `src/pages/ForgotPassword.tsx`, `src/pages/ResetPassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/lib/passwordReset.ts`, `supabase/functions/request-password-reset/index.ts`, `supabase/migrations/20260620103000_universal_password_auth.sql`
+
 ### COD-MEMBER-WELCOME-MESSAGE-AI-001
 - **Status:** Implemented locally, not committed
 - **Branch / Commit:** `feature/ux-sprint-1` / uncommitted (2026-06-14)

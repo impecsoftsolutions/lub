@@ -112,6 +112,7 @@ export const memberAuthService = {
   async signUpMemberV2(
     email: string,
     mobile_number: string,
+    password: string,
     state: string | null,
     dynamicPayload: Record<string, unknown>
   ): Promise<SignUpResult> {
@@ -137,6 +138,14 @@ export const memberAuthService = {
         };
       }
 
+      if (password.length < 6) {
+        return {
+          success: false,
+          error: 'Password must be at least 6 characters.',
+          data: null
+        };
+      }
+
       if (dynamicPayload && typeof dynamicPayload !== 'object') {
         return {
           success: false,
@@ -149,6 +158,7 @@ export const memberAuthService = {
       const { data, error: rpcError } = await supabase.rpc('create_portal_user_with_session_v2', {
         p_email: normalizedEmail,
         p_mobile_number: normalizedMobile,
+        p_password: password,
         p_state: normalizedState || null,
         p_dynamic_payload: dynamicPayload || {},
         p_ip_address: null,

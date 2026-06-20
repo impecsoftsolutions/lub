@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-06-15  
+**Last updated:** 2026-06-20  
 **Updated by:** Codex
 
 ---
@@ -17,8 +17,8 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-06-14 (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-06-14 |
+| Lint (`npm run lint`) | PASS on 2026-06-20 (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-06-20 |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
 | Phase 1 readonly smoke | Last known PASS (3 passed / 12 skipped) |
 
@@ -33,6 +33,22 @@ No active implementation slice.
 ---
 
 ## Recently Completed
+
+### COD-AUTH-UNIVERSAL-PASSWORD-001
+- **Branch:** `feature/ux-sprint-1`
+- **Commit:** Uncommitted local implementation (2026-06-20)
+- **What shipped:** Implemented universal password auth for the custom-session portal flow. Signup now collects a fixed Password auth field outside the dynamic signup payload, sign-in now uses Email or Mobile Number + Password, forgot/reset password pages are active, and a new reset-request Edge Function emails one-time reset links through the existing Resend sender. Backend migration adds `users.password_set_at`, a separate hashed-token `member_password_tokens` table, password-aware signup/login/reset RPCs, placeholder-hash protection before `verify_password`, and full current account/member login gates in the new password login RPC.
+- **Files:** `src/pages/SignIn.tsx`, `src/pages/SignUpV2.tsx`, `src/pages/ForgotPassword.tsx`, `src/pages/ResetPassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/lib/passwordReset.ts`, `supabase/functions/request-password-reset/index.ts`, `supabase/migrations/20260620103000_universal_password_auth.sql`
+- **Follow-up:** Forgot Password messaging now shows exact no-account guidance for email vs mobile, returns a masked email after a reset email is sent, and hides the instruction subtitle after success.
+- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run db:migrations:audit` PASS. Migration `20260620103000` is applied to the linked DB and `request-password-reset` Edge Function is deployed.
+- **Deployment note:** The migration now keeps the existing 6-arg signup RPC and adds the new password-aware overload, so currently deployed signup callers remain compatible while the new frontend can pass `p_password`.
+
+### COD-MEMBER-DASHBOARD-STATUS-COMPACT-001
+- **Branch:** `feature/ux-sprint-1`
+- **Commit:** Uncommitted local implementation (2026-06-16)
+- **What shipped:** Compact member dashboard Application Status card on `/dashboard`. Status now renders inline as simple bold colored text beside `Application Status`; approved is green, pending is dark red, rejected uses destructive text, and unknown statuses fall back to muted text. Removed the previous badge/pill status display, removed the large status icon beside the status message, and cleared the leftover inner padding so the status message aligns with the heading while preserving the status data source and message text.
+- **Files:** `src/pages/MemberDashboard.tsx`
+- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected warnings). Local `/dashboard` opened on the existing dev server; unauthenticated browser session showed the expected profile-unavailable gate and no console errors, so approved/pending member states were verified by code path rather than an authenticated browser session.
 
 ### COD-MEMBER-DOCUMENT-VERIFY-001
 - **Branch:** `feature/ux-sprint-1`

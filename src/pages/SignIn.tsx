@@ -1,24 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Loader2, Lock, Mail, Phone } from 'lucide-react';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { AlertCircle, Loader2, Lock, Mail } from 'lucide-react';
 import { customAuth } from '../lib/customAuth';
 import {
-  AUTH_VALIDATION_MESSAGES,
+  isEmail,
+  isMobileNumber,
   normalizeEmail,
   normalizeMobileNumber,
-  validateEmailInput,
-  validateMobileNumberInput
 } from '../lib/credentialValidation';
 import { sessionManager } from '../lib/sessionManager';
 import { AuthErrorCode } from '../types/auth.types';
 import Toast from '../components/Toast';
 import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
 import { useMember } from '../contexts/useMember';
-import {
-  FormDraftConfigurationErrorCode,
-  signinFormConfigV2Service,
-  SigninFormFieldV2
-} from '../lib/supabase';
+import { SigninFormFieldV2 } from '../lib/supabase';
 
 type FormValue = string | boolean;
 type FormDataMap = Record<string, FormValue>;
@@ -26,13 +21,13 @@ const LAST_NON_SIGNIN_ROUTE_KEY = 'lub:last_non_signin_route';
 
 const DEFAULT_SIGNIN_FIELDS: SigninFormFieldV2[] = [
   {
-    id: 'signin-default-email',
+    id: 'signin-default-identifier',
     form_key: 'signin',
-    field_key: 'email',
-    label: 'Email Address',
-    field_type: 'email',
+    field_key: 'identifier',
+    label: 'Email or Mobile Number',
+    field_type: 'text',
     section_name: 'Core Details',
-    placeholder: 'your.email@example.com',
+    placeholder: 'Email address or 10-digit mobile number',
     help_text: null,
     option_items: null,
     default_value: '',
@@ -44,13 +39,13 @@ const DEFAULT_SIGNIN_FIELDS: SigninFormFieldV2[] = [
     validation_rule_id: null
   },
   {
-    id: 'signin-default-mobile',
+    id: 'signin-default-password',
     form_key: 'signin',
-    field_key: 'mobile_number',
-    label: 'Mobile Number',
-    field_type: 'tel',
+    field_key: 'password',
+    label: 'Password',
+    field_type: 'text',
     section_name: 'Core Details',
-    placeholder: '10-digit mobile number',
+    placeholder: 'Enter your password',
     help_text: null,
     option_items: null,
     default_value: '',
@@ -64,7 +59,6 @@ const DEFAULT_SIGNIN_FIELDS: SigninFormFieldV2[] = [
 ];
 
 const SignIn: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isPreviewMode = searchParams.get('preview') === '1';
 
@@ -72,11 +66,11 @@ const SignIn: React.FC = () => {
   const { isAuthenticated: isMemberAuthenticated, isLoading: isMemberLoading } = useMember();
 
   const [fields, setFields] = useState<SigninFormFieldV2[]>(DEFAULT_SIGNIN_FIELDS);
-  const [formData, setFormData] = useState<FormDataMap>({ email: '', mobile_number: '' });
+  const [formData, setFormData] = useState<FormDataMap>({ identifier: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewBlockReason, setPreviewBlockReason] = useState<FormDraftConfigurationErrorCode | null>(null);
+  const [previewBlockReason, setPreviewBlockReason] = useState<string | null>(null);
   const [formUnavailable, setFormUnavailable] = useState(false);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -102,7 +96,7 @@ const SignIn: React.FC = () => {
   );
 
   const hasCoreVisibleFields = useMemo(
-    () => ['email', 'mobile_number'].every(fieldKey => visibleFields.some(field => field.field_key === fieldKey)),
+    () => ['identifier', 'password'].every(fieldKey => visibleFields.some(field => field.field_key === fieldKey)),
     [visibleFields]
   );
 
@@ -149,79 +143,24 @@ const SignIn: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      try {
-        setIsLoading(true);
-        setPreviewBlockReason(null);
-        setFormUnavailable(false);
-
-        if (isPreviewMode) {
-          const draftResult = await signinFormConfigV2Service.getDraftConfiguration();
-
-          if (!draftResult.success || !draftResult.data) {
-            const code = draftResult.errorCode ?? 'load_failed';
-            if (code === 'no_session') {
-              navigate(`/signin?next=${encodeURIComponent('/signin?preview=1')}`, { replace: true });
-              return;
-            }
-            setPreviewBlockReason(code);
-            return;
-          }
-
-          setFields(draftResult.data);
-
-          const initialState: FormDataMap = {};
-          draftResult.data
-            .filter(field => field.is_visible)
-            .forEach(field => {
-              initialState[field.field_key] = field.field_type === 'checkbox'
-                ? field.default_value === 'true'
-                : (field.default_value ?? '');
-            });
-          setFormData(initialState);
-          return;
-        }
-
-        const configResult = await signinFormConfigV2Service.getConfiguration();
-
-        if (!configResult.success || !configResult.data) {
-          showToast('error', configResult.error || 'Failed to load sign-in configuration');
-          return;
-        }
-
-        if (configResult.data.length === 0) {
-          setFormUnavailable(true);
-          return;
-        }
-
-        setFields(configResult.data);
-
-        const initialState: FormDataMap = {};
-        configResult.data
-          .filter(field => field.is_visible)
-          .forEach(field => {
-            initialState[field.field_key] = field.field_type === 'checkbox'
-              ? field.default_value === 'true'
-              : (field.default_value ?? '');
-          });
-        setFormData(initialState);
-      } catch (error) {
-        console.error('Failed to initialize signin form:', error);
-        showToast('error', 'Failed to load sign-in form. Please refresh and try again.');
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(true);
+      setPreviewBlockReason(null);
+      setFormUnavailable(false);
+      setFields(DEFAULT_SIGNIN_FIELDS);
+      setFormData({ identifier: '', password: '' });
+      setIsLoading(false);
     };
 
     void load();
-  }, [isPreviewMode, navigate, showToast]);
+  }, []);
 
   const handleInputChange = (field: SigninFormFieldV2, rawValue: FormValue) => {
     let processedValue: FormValue = rawValue;
 
     if (typeof rawValue === 'string') {
-      if (field.field_key === 'email') {
+      if (field.field_key === 'identifier' && rawValue.includes('@')) {
         processedValue = normalizeEmail(rawValue);
-      } else if (field.field_key === 'mobile_number') {
+      } else if (field.field_key === 'identifier' && /^[\d\s()+-]+$/.test(rawValue)) {
         processedValue = normalizeMobileNumber(rawValue).slice(0, 10);
       }
     }
@@ -257,6 +196,9 @@ const SignIn: React.FC = () => {
       case AuthErrorCode.INVALID_CREDENTIALS:
         return 'Invalid credentials';
 
+      case AuthErrorCode.PASSWORD_PENDING:
+        return 'Please set your password using Forgot Password before signing in.';
+
       default:
         return error || 'An unexpected error occurred. Please try again.';
     }
@@ -280,18 +222,14 @@ const SignIn: React.FC = () => {
       }
     });
 
-    const emailValue = String(formData.email ?? '');
-    const emailError = validateEmailInput(emailValue);
-    if (emailError) {
-      nextErrors.email = emailError;
+    const identifierValue = String(formData.identifier ?? '').trim();
+    if (identifierValue && !isEmail(identifierValue) && !isMobileNumber(identifierValue)) {
+      nextErrors.identifier = 'Enter a valid email address or 10-digit mobile number.';
     }
 
-    const mobileValue = String(formData.mobile_number ?? '');
-    const mobileError = validateMobileNumberInput(mobileValue, {
-      invalidMessage: AUTH_VALIDATION_MESSAGES.mobileInvalid
-    });
-    if (mobileError) {
-      nextErrors.mobile_number = mobileError;
+    const passwordValue = String(formData.password ?? '');
+    if (passwordValue && passwordValue.length < 6) {
+      nextErrors.password = 'Password must be at least 6 characters.';
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -320,9 +258,9 @@ const SignIn: React.FC = () => {
       setIsSubmitting(true);
 
       const userAgent = navigator.userAgent;
-      const result = await customAuth.signIn(
-        normalizeEmail(String(formData.email ?? '')),
-        normalizeMobileNumber(String(formData.mobile_number ?? '')),
+      const result = await customAuth.signInWithPassword(
+        String(formData.identifier ?? '').trim(),
+        String(formData.password ?? ''),
         undefined,
         userAgent
       );
@@ -363,10 +301,10 @@ const SignIn: React.FC = () => {
       error ? 'border-destructive' : 'border-border'
     }`;
 
-    const leadingIcon = field.field_key === 'email'
+    const leadingIcon = field.field_key === 'identifier'
       ? <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-      : field.field_key === 'mobile_number'
-        ? <Phone className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+      : field.field_key === 'password'
+        ? <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
         : null;
 
     if (field.field_type === 'textarea') {
@@ -423,7 +361,9 @@ const SignIn: React.FC = () => {
     }
 
     const inputType: React.HTMLInputTypeAttribute =
-      field.field_type === 'tel' || field.field_type === 'email' || field.field_type === 'url' || field.field_type === 'date' || field.field_type === 'number'
+      field.field_key === 'password'
+        ? 'password'
+        : field.field_type === 'tel' || field.field_type === 'email' || field.field_type === 'url' || field.field_type === 'date' || field.field_type === 'number'
         ? field.field_type
         : 'text';
 
@@ -500,8 +440,8 @@ const SignIn: React.FC = () => {
 
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-foreground">Portal Sign In</h2>
-          <p className="mt-2 text-muted-foreground">Sign in with your email address and mobile number</p>
+          <h2 className="text-xl font-semibold text-foreground">Sign In</h2>
+          <p className="mt-2 text-muted-foreground">Sign in with your email or mobile number and password</p>
         </div>
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6 sm:p-8">
@@ -540,6 +480,12 @@ const SignIn: React.FC = () => {
               )}
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <Link to="/forgot-password" className="inline-flex min-h-11 items-center px-2 -mx-2 text-sm text-primary hover:text-primary/80 font-medium">
+              Forgot Password?
+            </Link>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">

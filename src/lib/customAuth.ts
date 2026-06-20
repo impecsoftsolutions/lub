@@ -39,6 +39,78 @@ const mapAuthErrorCode = (value?: string): AuthErrorCode | undefined => {
 };
 
 export const customAuth = {
+  async signInWithPassword(
+    identifier: string,
+    password: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<AuthResult> {
+    try {
+      const normalizedIdentifier = isEmail(identifier)
+        ? normalizeEmail(identifier)
+        : normalizeMobileNumber(identifier);
+
+      console.log('[customAuth] Password sign in attempt');
+
+      if (!normalizedIdentifier || password.length < 1) {
+        return {
+          success: false,
+          error: 'Invalid credentials',
+          errorCode: AuthErrorCode.INVALID_CREDENTIALS,
+        };
+      }
+
+      const { data, error } = await supabase.rpc('sign_in_with_password', {
+        p_identifier: normalizedIdentifier,
+        p_password: password,
+        p_ip_address: ipAddress ?? null,
+        p_user_agent: userAgent ?? null,
+      });
+
+      if (error) {
+        console.error('[customAuth] Password sign in database error:', error);
+        return {
+          success: false,
+          error: 'An error occurred. Please try again.',
+          errorCode: AuthErrorCode.NETWORK_ERROR,
+        };
+      }
+
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!result?.success) {
+        return {
+          success: false,
+          error: result?.error || 'Invalid credentials',
+          errorCode: mapAuthErrorCode(result?.error_code) ?? AuthErrorCode.INVALID_CREDENTIALS,
+          accountStatus: result?.account_status as AuthResult['accountStatus'],
+          lockedUntil: result?.locked_until,
+        };
+      }
+
+      if (!result.sessionToken || !result.user) {
+        return {
+          success: false,
+          error: 'Authentication failed. Please try again.',
+          errorCode: AuthErrorCode.NETWORK_ERROR,
+        };
+      }
+
+      return {
+        success: true,
+        sessionToken: result.sessionToken as string,
+        user: result.user as User,
+      };
+    } catch (error) {
+      console.error('[customAuth] Password sign in error:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred. Please try again.',
+        errorCode: AuthErrorCode.NETWORK_ERROR,
+      };
+    }
+  },
+
   async signIn(
     email: string,
     mobileNumber: string,
