@@ -34,6 +34,13 @@ No active implementation slice.
 
 ## Recently Completed
 
+### COD-AUTH-RESET-PGCRYPTO-SEARCH-PATH-002
+- **Branch:** `feature/ux-sprint-1`
+- **Commit:** Hotfix commit (2026-06-20)
+- **What shipped:** Fixed reset-link validation for real 64-character password reset tokens on Supabase projects where `pgcrypto` functions live in the `extensions` schema. The password-auth RPCs now include `extensions` in their function search path, so `digest`, `crypt`, `gen_salt`, and `gen_random_bytes` resolve correctly.
+- **Files:** `supabase/migrations/20260620113000_fix_password_auth_pgcrypto_search_path.sql`
+- **Validation:** Migration applied to the linked DB. Browser-callable RPC probe with a 64-character dummy token now returns normal JSON `{ success: false, error_code: "token_invalid" }` instead of PostgREST error `function digest(text, unknown) does not exist`.
+
 ### COD-AUTH-UNIVERSAL-PASSWORD-001
 - **Branch:** `feature/ux-sprint-1`
 - **Commit:** `cdff1ef` (2026-06-20)

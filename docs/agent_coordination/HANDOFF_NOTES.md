@@ -8,6 +8,13 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### COD-AUTH-RESET-PGCRYPTO-SEARCH-PATH-002
+- **Status:** Closed
+- **Branch / Commit:** `feature/ux-sprint-1` / hotfix commit (2026-06-20)
+- **Summary:** Fixed reset-link validation after the live Set Password page showed `Unable to validate reset link.` The RPC failed only for real-length reset tokens because `validate_member_password_token` called `digest(...)` while its search path only included `public`; this Supabase project exposes `pgcrypto` from `extensions`.
+- **Validation:** Migration applied to the linked DB. A browser-callable RPC probe with a 64-character dummy token now returns normal JSON `{ success: false, error_code: "token_invalid" }` instead of PostgREST error `function digest(text, unknown) does not exist`.
+- **Files:** `supabase/migrations/20260620113000_fix_password_auth_pgcrypto_search_path.sql`
+
 ### COD-AUTH-UNIVERSAL-PASSWORD-001
 - **Status:** Closed
 - **Branch / Commit:** `feature/ux-sprint-1` / `cdff1ef` (2026-06-20)
