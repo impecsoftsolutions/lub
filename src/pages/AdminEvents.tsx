@@ -9,12 +9,16 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   RefreshCw,
   Search,
   Star,
   Trash2,
   Archive,
   Eye,
+  EyeOff,
   Users,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -42,20 +46,25 @@ import {
 const STATUS_LABELS: Record<EventStatus, string> = {
   draft: 'Draft',
   published: 'Published',
+  unpublished: 'Unpublished',
   archived: 'Archived',
 };
 
 const STATUS_BADGE_CLASS: Record<EventStatus, string> = {
   draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   published: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  unpublished: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   archived: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
 
 type FilterTab = 'all' | EventStatus;
+type SortDirection = 'asc' | 'desc';
+type SortKey = 'event' | 'schedule' | 'status' | 'visibility';
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'published', label: 'Published' },
+  { key: 'unpublished', label: 'Unpublished' },
   { key: 'draft', label: 'Drafts' },
   { key: 'archived', label: 'Archived' },
 ];
@@ -109,6 +118,10 @@ const AdminEvents: React.FC = () => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMemberOnly, setShowMemberOnly] = useState(false);
+  const [sortState, setSortState] = useState<{ key: SortKey; direction: SortDirection }>({
+    key: 'schedule',
+    direction: 'desc',
+  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -170,10 +183,10 @@ const AdminEvents: React.FC = () => {
       }
       const result = await eventsService.unpublish(token, id);
       if (!result.success) {
-        showToast('error', result.error ?? 'Failed to move event to draft.');
+        showToast('error', result.error ?? 'Failed to unpublish event.');
         return;
       }
-      showToast('success', 'Event moved to draft.');
+      showToast('success', 'Event unpublished.');
       void loadEvents();
     } finally {
       setActionLoading(null);
@@ -281,8 +294,30 @@ const AdminEvents: React.FC = () => {
     }
   }, [loadEvents, showToast]);
 
+  const handleSort = useCallback((key: SortKey) => {
+    setSortState((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: key === 'schedule' ? 'desc' : 'asc' };
+    });
+  }, []);
+
+  const getSortIcon = useCallback((key: SortKey) => {
+    if (sortState.key !== key) return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/70" />;
+    return sortState.direction === 'asc'
+      ? <ArrowUp className="h-3.5 w-3.5 text-foreground" />
+      : <ArrowDown className="h-3.5 w-3.5 text-foreground" />;
+  }, [sortState.direction, sortState.key]);
+
+  const ariaSortFor = useCallback((key: SortKey): 'ascending' | 'descending' | 'none' => {
+    if (sortState.key !== key) return 'none';
+    return sortState.direction === 'asc' ? 'ascending' : 'descending';
+  }, [sortState.direction, sortState.key]);
+
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const directionFactor = sortState.direction === 'asc' ? 1 : -1;
 
     const filtered = items.filter((item) => {
       const statusMatch = filterTab === 'all' || item.status === filterTab;
@@ -291,20 +326,45 @@ const AdminEvents: React.FC = () => {
       return statusMatch && visibilityMatch && searchMatch;
     });
 
+    const statusOrder: Record<EventStatus, number> = {
+      published: 0,
+      unpublished: 1,
+      draft: 2,
+      archived: 3,
+    };
+
     filtered.sort((a, b) => {
       if (q) {
         const diff = scoreEvent(b, q) - scoreEvent(a, q);
-        if (diff !== 0) return diff;
+        if (diff !== 0 && sortState.key === 'schedule' && sortState.direction === 'desc') return diff;
       }
-      if (a.status !== b.status) {
-        if (a.status === 'published') return -1;
-        if (b.status === 'published') return 1;
+
+      let base = 0;
+      switch (sortState.key) {
+        case 'event':
+          base = a.title.localeCompare(b.title);
+          break;
+        case 'schedule': {
+          const aTs = new Date(a.start_at ?? a.created_at).getTime();
+          const bTs = new Date(b.start_at ?? b.created_at).getTime();
+          base = aTs - bTs;
+          break;
+        }
+        case 'status':
+          base = statusOrder[a.status] - statusOrder[b.status];
+          break;
+        case 'visibility':
+          base = a.visibility.localeCompare(b.visibility);
+          break;
       }
-      return (b.start_at ?? b.created_at).localeCompare(a.start_at ?? a.created_at);
+
+      if (base !== 0) return base * directionFactor;
+
+      return (new Date(b.start_at ?? b.created_at).getTime() - new Date(a.start_at ?? a.created_at).getTime());
     });
 
     return filtered;
-  }, [filterTab, items, searchQuery, showMemberOnly]);
+  }, [filterTab, items, searchQuery, showMemberOnly, sortState.direction, sortState.key]);
 
   // Allow RSVP-only personas to reach this page so they can drill into
   // /admin/content/events/:id/registrations. Page-level gate is the union of
@@ -346,6 +406,7 @@ const AdminEvents: React.FC = () => {
             {[
               { label: 'Total', value: metrics.total },
               { label: 'Published', value: metrics.published },
+              { label: 'Unpublished', value: metrics.unpublished },
               { label: 'Drafts', value: metrics.drafts },
               { label: 'Archived', value: metrics.archived },
               { label: 'Featured', value: metrics.featured },
@@ -430,10 +491,46 @@ const AdminEvents: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30 text-left text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">Event</th>
-                    <th className="px-4 py-3 font-medium hidden md:table-cell">Schedule / Location</th>
-                    <th className="px-4 py-3 font-medium hidden lg:table-cell">Status</th>
-                    <th className="px-4 py-3 font-medium hidden lg:table-cell">Visibility</th>
+                    <th className="px-4 py-3 font-medium" aria-sort={ariaSortFor('event')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
+                        onClick={() => handleSort('event')}
+                      >
+                        Event
+                        {getSortIcon('event')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 font-medium hidden md:table-cell" aria-sort={ariaSortFor('schedule')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
+                        onClick={() => handleSort('schedule')}
+                      >
+                        Schedule / Location
+                        {getSortIcon('schedule')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 font-medium hidden lg:table-cell" aria-sort={ariaSortFor('status')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
+                        onClick={() => handleSort('status')}
+                      >
+                        Status
+                        {getSortIcon('status')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 font-medium hidden lg:table-cell" aria-sort={ariaSortFor('visibility')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
+                        onClick={() => handleSort('visibility')}
+                      >
+                        Visibility
+                        {getSortIcon('visibility')}
+                      </button>
+                    </th>
                     <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
@@ -543,7 +640,7 @@ const AdminEvents: React.FC = () => {
                                   </DropdownMenuItem>
                                 )}
 
-                                {canPublish && item.status === 'draft' && (
+                                {canPublish && (item.status === 'draft' || item.status === 'unpublished') && (
                                   <DropdownMenuItem onClick={() => void handlePublish(item.id)} className="flex items-center gap-2">
                                     <Globe className="h-4 w-4" />
                                     Publish
@@ -552,8 +649,8 @@ const AdminEvents: React.FC = () => {
 
                                 {canPublish && item.status === 'published' && (
                                   <DropdownMenuItem onClick={() => void handleUnpublish(item.id)} className="flex items-center gap-2">
-                                    <Pencil className="h-4 w-4" />
-                                    Move to Draft
+                                    <EyeOff className="h-4 w-4" />
+                                    Unpublish
                                   </DropdownMenuItem>
                                 )}
 

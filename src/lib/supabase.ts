@@ -121,6 +121,9 @@ export interface MemberLubRoleAssignment {
   level: 'national' | 'state' | 'district' | 'city';
   state?: string;
   district?: string;
+  committee_year?: string | null;
+  role_start_date?: string | null;
+  role_end_date?: string | null;
   created_at: string;
   updated_at: string;
   member_registrations?: {
@@ -160,6 +163,7 @@ export interface MemberRoleCandidate {
   alternate_contact_name: string | null;
   /** Non-null only when kind='alternate' and the member has an alternate_mobile. */
   alternate_mobile: string | null;
+  mobile_number: string | null;
   email: string;
   company_name: string;
   city: string;
@@ -3033,6 +3037,77 @@ export const memberLubRolesService = {
     }
   },
 
+  async updateCommitteeGroup(params: {
+    current: {
+      level: 'national' | 'state' | 'district' | 'city';
+      state?: string | null;
+      district?: string | null;
+      committee_year: string;
+    };
+    next: {
+      level: 'national' | 'state' | 'district' | 'city';
+      state?: string | null;
+      district?: string | null;
+      committee_year: string;
+      role_start_date?: string | null;
+      role_end_date?: string | null;
+    };
+  }): Promise<{ success: boolean; updatedCount?: number; error?: string }> {
+    try {
+      const sessionToken = sessionManager.getSessionToken();
+      if (!sessionToken) {
+        return { success: false, error: 'User session not found. Please log in again.' };
+      }
+
+      if (!params.current.committee_year || !/^\d{4}$/.test(params.current.committee_year)) {
+        return { success: false, error: 'Current committee year must be a 4-digit year.' };
+      }
+
+      if (!params.next.committee_year || !/^\d{4}$/.test(params.next.committee_year)) {
+        return { success: false, error: 'Committee year must be a 4-digit year (e.g., 2025).' };
+      }
+
+      if (params.next.role_start_date && params.next.role_end_date) {
+        if (new Date(params.next.role_end_date) < new Date(params.next.role_start_date)) {
+          return { success: false, error: 'Period To date cannot be before Period From date' };
+        }
+      }
+
+      const { data, error } = await supabase.rpc('admin_update_member_lub_role_committee_group_with_session', {
+        p_session_token: sessionToken,
+        p_current_level: params.current.level,
+        p_current_state: params.current.state || null,
+        p_current_district: params.current.district || null,
+        p_current_committee_year: params.current.committee_year,
+        p_new_level: params.next.level,
+        p_new_state: params.next.state || null,
+        p_new_district: params.next.district || null,
+        p_new_committee_year: params.next.committee_year,
+        p_new_role_start_date: params.next.role_start_date || null,
+        p_new_role_end_date: params.next.role_end_date || null,
+      });
+
+      if (error) {
+        console.error('[memberLubRolesService.updateCommitteeGroup] RPC error:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (!data || data.success !== true) {
+        const errorMsg = data?.error || 'Unknown error updating committee';
+        console.error('[memberLubRolesService.updateCommitteeGroup] RPC returned error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
+      return {
+        success: true,
+        updatedCount: (data.updated_count as number) ?? 0,
+      };
+    } catch (error) {
+      console.error('[memberLubRolesService.updateCommitteeGroup] Exception:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+
   async deleteAssignment(params: { assignmentId: string }): Promise<{ success: boolean; error?: string }> {
     try {
       const { assignmentId } = params;
@@ -3099,7 +3174,7 @@ export const memberLubRolesService = {
 
   /**
    * Search for member candidates (main + alternate) for the Add Assignment flow.
-   * Searches main member fields AND alternate_contact_name.
+   * Searches main member fields, member mobile, alternate contact name, and alternate mobile.
    * Returns up to 10 members, each optionally expanded into two candidate rows
    * (one 'main', one 'alternate' when the member has an alternate contact).
    */
@@ -3107,13 +3182,15 @@ export const memberLubRolesService = {
     try {
       const { data, error } = await supabase
         .from('member_registrations')
-        .select('id, full_name, company_name, email, city, district, alternate_contact_name, alternate_mobile')
+        .select('id, full_name, company_name, email, mobile_number, city, district, alternate_contact_name, alternate_mobile')
         .eq('status', 'approved')
         .or(
           `full_name.ilike.%${searchTerm}%,` +
           `email.ilike.%${searchTerm}%,` +
+          `mobile_number.ilike.%${searchTerm}%,` +
           `company_name.ilike.%${searchTerm}%,` +
-          `alternate_contact_name.ilike.%${searchTerm}%`
+          `alternate_contact_name.ilike.%${searchTerm}%,` +
+          `alternate_mobile.ilike.%${searchTerm}%`
         )
         .limit(10);
 
@@ -3126,6 +3203,7 @@ export const memberLubRolesService = {
         full_name: string;
         company_name: string;
         email: string;
+        mobile_number: string | null;
         city: string;
         district: string;
         alternate_contact_name: string | null;
@@ -3135,7 +3213,7 @@ export const memberLubRolesService = {
       const candidates: MemberRoleCandidate[] = [];
 
       for (const row of rows) {
-        const locationHint = [row.company_name, row.city, row.district].filter(Boolean).join(' • ');
+        const locationHint = [row.company_name, row.mobile_number, row.city, row.district].filter(Boolean).join(' • ');
 
         // Main candidate — always present
         candidates.push({
@@ -3146,6 +3224,7 @@ export const memberLubRolesService = {
           main_member_name: row.full_name,
           alternate_contact_name: null,
           alternate_mobile: null,
+          mobile_number: row.mobile_number?.trim() || null,
           email: row.email,
           company_name: row.company_name,
           city: row.city,
@@ -3158,10 +3237,15 @@ export const memberLubRolesService = {
             member_id: row.id,
             assignee_kind: 'alternate',
             display_name: row.alternate_contact_name.trim(),
-            secondary_text: `Alternate for ${row.full_name}`,
+            secondary_text: [
+              `Alternate for ${row.full_name}`,
+              row.alternate_mobile?.trim() || null,
+              row.company_name,
+            ].filter(Boolean).join(' • '),
             main_member_name: row.full_name,
             alternate_contact_name: row.alternate_contact_name.trim(),
             alternate_mobile: row.alternate_mobile?.trim() || null,
+            mobile_number: row.mobile_number?.trim() || null,
             email: row.email,
             company_name: row.company_name,
             city: row.city,
@@ -7174,7 +7258,7 @@ export const rolesService = {
 // Events CMS — types + service
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type EventStatus = 'draft' | 'published' | 'archived';
+export type EventStatus = 'draft' | 'published' | 'unpublished' | 'archived';
 export type EventVisibility = 'public' | 'member_only';
 export type EventType =
   | 'workshop'
@@ -7214,14 +7298,16 @@ export type EventRsvpGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
 export type EventRsvpMealPreference = 'veg' | 'non_veg';
 export type EventRsvpProfession = string;
 
-// Alphabetical display order matches the DB enum order.
+// Default public RSVP profession options for newly created events.
 export const EVENT_RSVP_PROFESSION_OPTIONS: Array<{ value: EventRsvpProfession; label: string }> = [
-  { value: 'company_owner', label: 'Company Owner' },
-  { value: 'director',      label: 'Director' },
+  { value: 'agriculture',   label: 'Agriculture' },
+  { value: 'consultancy',   label: 'Consultancy' },
+  { value: 'education',     label: 'Education' },
+  { value: 'manufacturing', label: 'Manufacturing' },
   { value: 'official',      label: 'Official' },
+  { value: 'trading',       label: 'Trading' },
+  { value: 'services',      label: 'Services' },
   { value: 'other',         label: 'Other' },
-  { value: 'partner',       label: 'Partner' },
-  { value: 'student',       label: 'Student' },
 ];
 
 export type EventRsvpOption = { value: string; label: string };
@@ -7613,6 +7699,7 @@ export interface EventSummaryMetrics {
   total: number;
   published: number;
   drafts: number;
+  unpublished: number;
   archived: number;
   featured: number;
   member_only: number;
@@ -8940,6 +9027,7 @@ export const eventsService = {
     const total = items.length;
     const published = items.filter((item) => item.status === 'published').length;
     const drafts = items.filter((item) => item.status === 'draft').length;
+    const unpublished = items.filter((item) => item.status === 'unpublished').length;
     const archived = items.filter((item) => item.status === 'archived').length;
     const featured = items.filter((item) => item.is_featured).length;
     const member_only = items.filter((item) => item.visibility === 'member_only').length;
@@ -8951,6 +9039,7 @@ export const eventsService = {
       total,
       published,
       drafts,
+      unpublished,
       archived,
       featured,
       member_only,

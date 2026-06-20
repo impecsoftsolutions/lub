@@ -11,6 +11,7 @@ import {
   FileText,
   Globe,
   GlobeLock,
+  EyeOff,
   ImageIcon,
   Link2,
   Loader2,
@@ -74,6 +75,13 @@ const EVENT_TYPE_OPTIONS: Array<{ value: EventType; label: string }> = [
 ];
 
 const DEFAULT_PROFESSION_LABELS = EVENT_RSVP_PROFESSION_OPTIONS.map((option) => option.label);
+const EVENT_RSVP_PROFESSION_DISPLAY_OPTIONS = [
+  ...EVENT_RSVP_PROFESSION_OPTIONS,
+  { value: 'company_owner', label: 'Company Owner' },
+  { value: 'director', label: 'Director' },
+  { value: 'partner', label: 'Partner' },
+  { value: 'student', label: 'Student' },
+];
 
 function normalizeProfessionOptionLines(raw: string): string[] {
   const seen = new Set<string>();
@@ -947,6 +955,29 @@ const AdminEventForm: React.FC = () => {
   };
 
   // ── RSVP roster loader ────────────────────────────────────────────────────
+  const handleUnpublish = async () => {
+    if (!id || original?.status !== 'published') return;
+    setIsSaving(true);
+    try {
+      const token = sessionManager.getSessionToken();
+      if (!token) {
+        showToast('error', 'Session expired.');
+        return;
+      }
+      const result = await eventsService.unpublish(token, id);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to unpublish event.');
+        return;
+      }
+      setOriginal((prev) => (
+        prev ? { ...prev, status: 'unpublished', updated_at: new Date().toISOString() } : prev
+      ));
+      showToast('success', 'Event unpublished. It is hidden from the public site until you publish it again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const loadRsvps = useCallback(async () => {
     if (!isEdit || !id) return;
     if (!canViewRsvp && !canManageRsvp) return;
@@ -1567,6 +1598,12 @@ const AdminEventForm: React.FC = () => {
                 <Button onClick={() => void handlePublish()} disabled={isSaving || !canEdit || slugBlocksSave}>
                   {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Globe className="h-4 w-4 mr-2" />}
                   {isEdit && original?.status === 'published' ? 'Republish' : 'Publish'}
+                </Button>
+              )}
+              {isEdit && canPublish && original?.status === 'published' && (
+                <Button variant="outline" onClick={() => void handleUnpublish()} disabled={isSaving}>
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  Unpublish
                 </Button>
               )}
               {isEdit && canArchive && (
@@ -2692,7 +2729,7 @@ const AdminEventForm: React.FC = () => {
                               {labelFromOptions<EventRsvpMealPreference>(row.meal_preference ?? null, EVENT_RSVP_MEAL_OPTIONS)}
                             </td>
                             <td className="px-2 py-1.5 text-muted-foreground">
-                              {labelFromOptions<EventRsvpProfession>(row.profession ?? null, EVENT_RSVP_PROFESSION_OPTIONS)}
+                              {labelFromOptions<EventRsvpProfession>(row.profession ?? null, EVENT_RSVP_PROFESSION_DISPLAY_OPTIONS)}
                             </td>
                             <td className="px-2 py-1.5">
                               <span

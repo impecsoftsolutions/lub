@@ -225,6 +225,7 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
         { label: 'Mobile Number', value: applicationData.mobile_number },
         { label: 'Gender', value: applicationData.gender ?? null },
         { label: 'Date of Birth', value: applicationData.date_of_birth ? formatDate(applicationData.date_of_birth) : null },
+        { label: 'Reference Name', value: applicationData.referred_by ?? null },
         { label: 'Member ID', value: applicationData.member_id ?? null },
       ]);
 
@@ -270,7 +271,6 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
       writeSection('Additional Information', [
         { label: 'Alternate Contact Name', value: applicationData.alternate_contact_name ?? null },
         { label: 'Alternate Mobile', value: applicationData.alternate_mobile ?? null },
-        { label: 'Referred By', value: applicationData.referred_by ?? null },
       ]);
 
       const totalPages = pdf.getNumberOfPages();
@@ -407,14 +407,19 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
   const personalSection: SectionData = {
     title: 'Personal Information',
     icon: <User className="w-5 h-5 text-primary" />,
-    fields: getFilledFields([
-      { label: 'Full Name', value: applicationData.full_name },
-      { label: 'Email', value: applicationData.email },
-      { label: 'Mobile Number', value: applicationData.mobile_number },
-      { label: 'Gender', value: applicationData.gender },
-      { label: 'Date of Birth', value: applicationData.date_of_birth, type: 'date' },
-      { label: 'Member ID', value: applicationData.member_id }
-    ])
+    fields: [
+      ...getFilledFields([
+        { label: 'Full Name', value: applicationData.full_name },
+        { label: 'Email', value: applicationData.email },
+        { label: 'Mobile Number', value: applicationData.mobile_number },
+        { label: 'Gender', value: applicationData.gender },
+        { label: 'Date of Birth', value: applicationData.date_of_birth, type: 'date' },
+      ]),
+      { label: 'Reference Name', value: applicationData.referred_by },
+      ...getFilledFields([
+        { label: 'Member ID', value: applicationData.member_id }
+      ])
+    ]
   };
 
   const companySection: SectionData = {
@@ -486,7 +491,6 @@ const ViewApplicationModal: React.FC<ViewApplicationModalProps> = ({
     fields: getFilledFields([
       { label: 'Alternate Contact Name', value: applicationData.alternate_contact_name },
       { label: 'Alternate Mobile', value: applicationData.alternate_mobile },
-      { label: 'Referred By', value: applicationData.referred_by }
     ])
   };
 

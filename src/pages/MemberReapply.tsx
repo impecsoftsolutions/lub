@@ -2,6 +2,14 @@ import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
 import { useMember } from '../contexts/useMember';
+import { Badge } from '@/components/ui/badge';
+
+function statusBadgeVariant(status?: string): 'success' | 'warning' | 'destructive' | 'secondary' {
+  if (status === 'approved') return 'success';
+  if (status === 'pending') return 'warning';
+  if (status === 'rejected') return 'destructive';
+  return 'secondary';
+}
 
 const MemberReapply: React.FC = () => {
   const navigate = useNavigate();
@@ -38,7 +46,7 @@ const MemberReapply: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
           <p className="text-foreground font-medium mb-2">Unable to load your profile</p>
           <p className="text-muted-foreground mb-4">Please try again or contact support</p>
           <Link
@@ -56,8 +64,10 @@ const MemberReapply: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <p className="text-foreground font-medium mb-2">Your application is {member.status}</p>
+          <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
+          <p className="text-foreground font-medium mb-2">
+            Your application is <Badge variant={statusBadgeVariant(member.status)}>{member.status}</Badge>
+          </p>
           <p className="text-muted-foreground mb-4">You can only re-apply if your application was rejected</p>
           <Link
             to="/dashboard"
@@ -93,12 +103,12 @@ const MemberReapply: React.FC = () => {
           </div>
 
           <div className="p-6 space-y-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
                 <div>
-                  <h3 className="text-sm font-semibold text-red-900 mb-1">Previous Application Rejected</h3>
-                  <p className="text-sm text-red-700">
+                  <h3 className="text-sm font-semibold text-destructive mb-1">Previous Application Rejected</h3>
+                  <p className="text-sm text-destructive">
                     {member.rejection_reason || 'Your previous application did not meet our membership criteria.'}
                   </p>
                 </div>
@@ -141,8 +151,8 @@ const MemberReapply: React.FC = () => {
               </div>
 
               {member.reapplication_count > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800">
+                <div className="bg-muted/40 border border-border rounded-lg p-4">
+                  <p className="text-sm text-foreground">
                     <strong>Note:</strong> This will be your {member.reapplication_count + 2}{getOrdinalSuffix(member.reapplication_count + 2)} application attempt.
                     Please carefully review all requirements before submitting.
                   </p>

@@ -26,28 +26,27 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const SYSTEM_ROLE_COLORS: Record<string, string> = {
-  super_admin: 'bg-red-100 text-red-800 border-red-200',
-  admin:       'bg-orange-100 text-orange-800 border-orange-200',
-  manager:     'bg-blue-100 text-blue-800 border-blue-200',
-  editor:      'bg-green-100 text-green-800 border-green-200',
-  viewer:      'bg-gray-100 text-gray-700 border-gray-200',
+const SYSTEM_ROLE_VARIANTS: Record<string, 'destructive' | 'warning' | 'info' | 'success' | 'secondary'> = {
+  super_admin: 'destructive',
+  admin: 'warning',
+  manager: 'info',
+  editor: 'success',
+  viewer: 'secondary',
 };
 
-const CUSTOM_ROLE_COLOR = 'bg-purple-100 text-purple-800 border-purple-200';
-
-const OVERRIDE_COLORS: Record<string, string> = {
-  grant:  'bg-green-100 text-green-800 border-green-200',
-  revoke: 'bg-red-100 text-red-800 border-red-200',
+const OVERRIDE_VARIANTS: Record<'grant' | 'revoke', 'success' | 'destructive'> = {
+  grant: 'success',
+  revoke: 'destructive',
 };
 
-function roleBadgeClass(role: RoleCatalog | { name: string; is_system?: boolean } | null | undefined): string {
-  if (!role) return 'bg-muted text-muted-foreground border-border';
-  if (role.is_system === false) return CUSTOM_ROLE_COLOR;
-  return SYSTEM_ROLE_COLORS[role.name] ?? CUSTOM_ROLE_COLOR;
+function roleBadgeVariant(role: RoleCatalog | { name: string; is_system?: boolean } | null | undefined): 'destructive' | 'warning' | 'info' | 'success' | 'secondary' {
+  if (!role) return 'secondary';
+  if (role.is_system === false) return 'info';
+  return SYSTEM_ROLE_VARIANTS[role.name] ?? 'info';
 }
 
 function groupByCategory<T extends { category: string }>(items: T[]): Record<string, T[]> {
@@ -624,21 +623,18 @@ const AdminRolesPrivileges: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-3 gap-2">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
-                      <span className={cn(
-                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border',
-                        roleBadgeClass(role)
-                      )}>
+                      <Badge variant={roleBadgeVariant(role)}>
                         {role.display_name}
-                      </span>
+                      </Badge>
                       {!role.is_system && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-purple-100 text-purple-700 border border-purple-200">
+                        <Badge variant="info" className="text-[10px] uppercase tracking-wide">
                           Custom
-                        </span>
+                        </Badge>
                       )}
                       {role.is_paused && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-200">
+                        <Badge variant="warning" className="gap-1 text-[10px] uppercase tracking-wide">
                           <Pause className="w-2.5 h-2.5" /> Paused
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     {canManage && role.name !== 'super_admin' && (
@@ -751,15 +747,15 @@ const AdminRolesPrivileges: React.FC = () => {
                         )}
                       </div>
                       {u.current_role ? (
-                        <span className={cn(
-                          'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0',
-                          roleBadgeClass(roles.find(r => r.name === u.current_role) ?? null)
-                        )}>
-                          {roles.find(r => r.name === u.current_role)?.display_name ?? u.current_role}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground shrink-0">No role</span>
-                      )}
+                          <Badge
+                            variant={roleBadgeVariant(roles.find(r => r.name === u.current_role) ?? null)}
+                            className="shrink-0"
+                          >
+                            {roles.find(r => r.name === u.current_role)?.display_name ?? u.current_role}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground shrink-0">No role</span>
+                        )}
                     </div>
                     {canManage && (
                       <div className="flex gap-2">
@@ -811,12 +807,9 @@ const AdminRolesPrivileges: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         {u.current_role ? (
-                          <span className={cn(
-                            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
-                            roleBadgeClass(roles.find(r => r.name === u.current_role) ?? null)
-                          )}>
+                          <Badge variant={roleBadgeVariant(roles.find(r => r.name === u.current_role) ?? null)}>
                             {roles.find(r => r.name === u.current_role)?.display_name ?? u.current_role}
-                          </span>
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs">No role</span>
                         )}
@@ -886,12 +879,9 @@ const AdminRolesPrivileges: React.FC = () => {
                       <td className="px-4 py-3 text-foreground font-medium">{user.email}</td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         {user.role ? (
-                          <span className={cn(
-                            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
-                            roleBadgeClass(roles.find(r => r.name === user.role) ?? null)
-                          )}>
+                          <Badge variant={roleBadgeVariant(roles.find(r => r.name === user.role) ?? null)}>
                             {roles.find(r => r.name === user.role)?.display_name ?? user.role}
-                          </span>
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs">None</span>
                         )}
@@ -935,12 +925,9 @@ const AdminRolesPrivileges: React.FC = () => {
             <SheetHeader className="p-6 border-b border-border shrink-0">
               <SheetTitle className="flex items-center gap-3">
                 {selectedRole && (
-                  <span className={cn(
-                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium border',
-                    roleBadgeClass(selectedRole)
-                  )}>
+                  <Badge variant={roleBadgeVariant(selectedRole)}>
                     {selectedRole.display_name}
-                  </span>
+                  </Badge>
                 )}
               </SheetTitle>
               <SheetDescription>
@@ -1367,17 +1354,14 @@ const AdminRolesPrivileges: React.FC = () => {
                             <div className="text-xs text-muted-foreground font-mono">{override.permission_code}</div>
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className={cn(
-                              'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
-                              OVERRIDE_COLORS[override.override_type]
-                            )}>
+                            <Badge variant={OVERRIDE_VARIANTS[override.override_type]}>
                               {override.override_type === 'grant' ? (
                                 <Check className="w-3 h-3 mr-1" />
                               ) : (
                                 <X className="w-3 h-3 mr-1" />
                               )}
                               {override.override_type}
-                            </span>
+                            </Badge>
                           </td>
                           <td className="px-3 py-2.5 hidden sm:table-cell text-muted-foreground text-xs">
                             {override.reason ?? '—'}

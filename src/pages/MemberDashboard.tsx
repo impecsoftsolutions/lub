@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import MemberNav from '../components/MemberNav';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useMember } from '../contexts/useMember';
@@ -15,26 +15,6 @@ interface RegistrationSummary {
   company_name?: string | null;
   status?: string | null;
 }
-
-type DashboardStatusTone = 'approved' | 'pending' | 'rejected';
-
-const DASHBOARD_STATUS_STYLES: Record<DashboardStatusTone, {
-  badge: string;
-  icon: string;
-}> = {
-  approved: {
-    badge: 'bg-primary/10 text-primary border border-primary/20',
-    icon: 'text-primary',
-  },
-  pending: {
-    badge: 'bg-secondary/15 text-foreground border border-secondary/30',
-    icon: 'text-secondary',
-  },
-  rejected: {
-    badge: 'bg-destructive/10 text-destructive border border-destructive/20',
-    icon: 'text-destructive',
-  },
-};
 
 const MemberDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -181,31 +161,29 @@ const MemberDashboard: React.FC = () => {
   const effectiveStatus = registrationStatus ?? member.status;
   const statusForDisplay = registrationStatus ?? member.status;
 
-  const getStatusBadge = () => {
+  const getStatusLabel = () => {
     switch (statusForDisplay) {
       case 'pending':
-        return (
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${DASHBOARD_STATUS_STYLES.pending.badge}`}>
-            <Clock className={`w-5 h-5 ${DASHBOARD_STATUS_STYLES.pending.icon}`} />
-            <span className="font-medium">Pending Review</span>
-          </div>
-        );
+        return 'Pending';
       case 'approved':
-        return (
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${DASHBOARD_STATUS_STYLES.approved.badge}`}>
-            <CheckCircle className={`w-5 h-5 ${DASHBOARD_STATUS_STYLES.approved.icon}`} />
-            <span className="font-medium">Approved</span>
-          </div>
-        );
+        return 'Approved';
       case 'rejected':
-        return (
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${DASHBOARD_STATUS_STYLES.rejected.badge}`}>
-            <AlertCircle className={`w-5 h-5 ${DASHBOARD_STATUS_STYLES.rejected.icon}`} />
-            <span className="font-medium">Rejected</span>
-          </div>
-        );
+        return 'Rejected';
       default:
-        return null;
+        return statusForDisplay ? statusForDisplay.charAt(0).toUpperCase() + statusForDisplay.slice(1) : null;
+    }
+  };
+
+  const getStatusTextClass = () => {
+    switch (statusForDisplay) {
+      case 'approved':
+        return 'text-green-700';
+      case 'pending':
+        return 'text-red-800';
+      case 'rejected':
+        return 'text-destructive';
+      default:
+        return 'text-muted-foreground';
     }
   };
 
@@ -214,21 +192,18 @@ const MemberDashboard: React.FC = () => {
       case 'pending':
         return {
           title: 'Your application is under review',
-          description: 'Our team is reviewing your membership application. You will receive an email once a decision has been made.',
-          icon: <Clock className={`w-12 h-12 ${DASHBOARD_STATUS_STYLES.pending.icon}`} />
+          description: 'Our team is reviewing your membership application. You will receive an email once a decision has been made.'
         };
       case 'approved':
         return {
           title: 'Welcome to LUB!',
           description: `Your membership has been approved. Your Member ID is ${member.member_id || 'being generated'}. You can now access all member benefits.`,
-          icon: <CheckCircle className={`w-12 h-12 ${DASHBOARD_STATUS_STYLES.approved.icon}`} />,
           approvalDate: member.approval_date
         };
       case 'rejected':
         return {
           title: 'Application Not Approved',
-          description: member.rejection_reason || 'Your application was not approved. Please review the requirements and re-apply.',
-          icon: <AlertCircle className={`w-12 h-12 ${DASHBOARD_STATUS_STYLES.rejected.icon}`} />
+          description: member.rejection_reason || 'Your application was not approved. Please review the requirements and re-apply.'
         };
       default:
         return null;
@@ -236,6 +211,7 @@ const MemberDashboard: React.FC = () => {
   };
 
   const statusInfo = getStatusMessage();
+  const statusLabel = getStatusLabel();
   const displayNameRaw = registrationRow?.full_name || member?.full_name || '';
   const displayName = getFirstTwoWords(displayNameRaw);
   const companyName = registrationRow?.company_name || member?.company_name || '';
@@ -267,8 +243,19 @@ const MemberDashboard: React.FC = () => {
         />
 
           <div className="bg-card rounded-lg border border-border shadow-sm p-5">
-            <h2 className="text-section font-semibold text-foreground mb-5">
-              {checkingRegistration || registrationLookupError || hasRegistrationRecord ? 'Application Status' : 'Complete Your LUB Membership'}
+            <h2 className="text-section font-semibold text-foreground mb-4">
+              {checkingRegistration || registrationLookupError || hasRegistrationRecord ? (
+                <>
+                  Application Status
+                  {statusLabel && !checkingRegistration && !registrationLookupError && (
+                    <>
+                      : <span className={`font-bold ${getStatusTextClass()}`}>{statusLabel}</span>
+                    </>
+                  )}
+                </>
+              ) : (
+                'Complete Your LUB Membership'
+              )}
             </h2>
 
             {checkingRegistration ? (
@@ -289,16 +276,9 @@ const MemberDashboard: React.FC = () => {
               </div>
             ) : hasRegistrationRecord ? (
               <>
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    {getStatusBadge()}
-                  </div>
-                </div>
-
                 {statusInfo && (
-                  <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
-                    <div className="flex-shrink-0">{statusInfo.icon}</div>
-                    <div className="flex-1">
+                  <div>
+                    <div>
                       <h3 className="text-section font-medium text-foreground mb-2">{statusInfo.title}</h3>
                       <p className="text-muted-foreground mb-3">{statusInfo.description}</p>
                       {statusInfo.approvalDate && (

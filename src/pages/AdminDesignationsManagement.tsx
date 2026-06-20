@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
-import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, MemberRoleAssignmentBulkSkip, MemberRoleCandidate, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
+import { companyDesignationsService, CompanyDesignation, lubRolesService, LubRole, memberLubRolesService, MemberLubRoleAssignment, MemberRoleCandidate, statesService, locationsService, StateMaster, DistrictOption } from '../lib/supabase';
 import { formatDateTimeValue } from '../lib/dateTimeManager';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -18,6 +18,43 @@ type MemberSearchResult = {
   city: string;
   district: string;
 };
+
+type CommitteeRow = {
+  id: string;
+  role_id: string;
+  candidate: MemberRoleCandidate | null;
+  searchTerm: string;
+  searchResults: MemberRoleCandidate[];
+  isSearching: boolean;
+};
+
+type CommitteeSkippedRow = {
+  rowId: string;
+  roleName: string;
+  memberName: string;
+  reason: string;
+};
+
+type CommitteeGroupSummary = {
+  key: string;
+  level: 'national' | 'state' | 'district' | 'city';
+  state: string;
+  district: string;
+  committee_year: string;
+  role_start_date: string;
+  role_end_date: string;
+  count: number;
+  hasMixedPeriod: boolean;
+};
+
+const createCommitteeRow = (roleId = ''): CommitteeRow => ({
+  id: `committee-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  role_id: roleId,
+  candidate: null,
+  searchTerm: '',
+  searchResults: [],
+  isSearching: false,
+});
 
 const AdminDesignationsManagement: React.FC = () => {
 
@@ -92,10 +129,9 @@ const AdminDesignationsManagement: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<MemberRoleCandidate | null>(null);
 
-  // Bulk Assignment State
+  // Committee builder state
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const [bulkForm, setBulkForm] = useState({
-    role_id: '',
     level: '' as 'national' | 'state' | 'district' | 'city' | '',
     state: '',
     district: '',
@@ -103,17 +139,28 @@ const AdminDesignationsManagement: React.FC = () => {
     role_start_date: '',
     role_end_date: ''
   });
-  const [bulkSelectedMembers, setBulkSelectedMembers] = useState<MemberSearchResult[]>([]);
-  const [bulkMemberSearchTerm, setBulkMemberSearchTerm] = useState('');
-  const [bulkMemberSearchResults, setBulkMemberSearchResults] = useState<MemberSearchResult[]>([]);
-  const [isBulkSearchingMembers, setIsBulkSearchingMembers] = useState(false);
+  const [committeeRows, setCommitteeRows] = useState<CommitteeRow[]>([createCommitteeRow()]);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
   const [bulkAvailableDistricts, setBulkAvailableDistricts] = useState<DistrictOption[]>([]);
   const [bulkResult, setBulkResult] = useState<{
     addedCount: number;
     skippedCount: number;
-    skipped: MemberRoleAssignmentBulkSkip[];
+    emptyCount: number;
+    skipped: CommitteeSkippedRow[];
   } | null>(null);
+  const [showEditCommitteeModal, setShowEditCommitteeModal] = useState(false);
+  const [editingCommitteeGroup, setEditingCommitteeGroup] = useState<CommitteeGroupSummary | null>(null);
+  const [committeeEditForm, setCommitteeEditForm] = useState({
+    level: '' as 'national' | 'state' | 'district' | 'city' | '',
+    state: '',
+    district: '',
+    committee_year: '',
+    role_start_date: '',
+    role_end_date: ''
+  });
+  const [editCommitteeDistricts, setEditCommitteeDistricts] = useState<DistrictOption[]>([]);
+  const [isLoadingEditCommitteeDistricts, setIsLoadingEditCommitteeDistricts] = useState(false);
+  const [isUpdatingCommittee, setIsUpdatingCommittee] = useState(false);
 
   // Geographic data
   const [allStates, setAllStates] = useState<StateMaster[]>([]);
@@ -185,6 +232,19 @@ const AdminDesignationsManagement: React.FC = () => {
       console.error('[AdminDesignationsManagement] Error loading assignment filter districts:', error);
     }
   }, []);
+
+  const loadEditCommitteeDistricts = useCallback(async (stateName: string) => {
+    try {
+      setIsLoadingEditCommitteeDistricts(true);
+      const districts = await locationsService.getActiveDistrictsByStateName(stateName);
+      setEditCommitteeDistricts(districts);
+    } catch (error) {
+      console.error('[AdminDesignationsManagement] Error loading edit committee districts:', error);
+      showToast('error', 'Failed to load districts');
+    } finally {
+      setIsLoadingEditCommitteeDistricts(false);
+    }
+  }, [showToast]);
 
   const loadCompanyDesignations = useCallback(async () => {
     try {
@@ -285,6 +345,20 @@ const AdminDesignationsManagement: React.FC = () => {
       }
     }
   }, [assignmentFilters.level, assignmentFilters.state, loadAssignmentDistricts]);
+
+  useEffect(() => {
+    if (
+      committeeEditForm.state
+      && (committeeEditForm.level === 'district' || committeeEditForm.level === 'city')
+    ) {
+      void loadEditCommitteeDistricts(committeeEditForm.state);
+    } else {
+      setEditCommitteeDistricts([]);
+      if (committeeEditForm.level !== 'district' && committeeEditForm.level !== 'city' && committeeEditForm.district) {
+        setCommitteeEditForm(prev => ({ ...prev, district: '' }));
+      }
+    }
+  }, [committeeEditForm.district, committeeEditForm.level, committeeEditForm.state, loadEditCommitteeDistricts]);
 
   // Company Designations Functions
   const handleAddCompanyDesignation = async () => {
@@ -656,12 +730,17 @@ const AdminDesignationsManagement: React.FC = () => {
       district: assignment.district || '',
       committee_year: assignment.committee_year || '',
       role_start_date: assignment.role_start_date || '',
-      role_end_date: assignment.role_end_date || ''
+      role_end_date: assignment.role_end_date || '',
+      assignee_kind: assignment.assignee_kind || 'main',
+      alternate_contact_name: assignment.alternate_contact_name_snapshot || ''
     });
     setSelectedMember({
       id: assignment.member_id,
       full_name: assignment.member_name,
-      email: assignment.member_email
+      company_name: assignment.member_registrations?.company_name || '',
+      email: assignment.member_email,
+      city: '',
+      district: assignment.district || ''
     });
     setShowEditAssignmentModal(true);
   };
@@ -760,45 +839,13 @@ const AdminDesignationsManagement: React.FC = () => {
       const districts = await locationsService.getActiveDistrictsByStateName(stateName);
       setBulkAvailableDistricts(districts);
     } catch (error) {
-      console.error('[AdminDesignationsManagement] Error loading bulk districts:', error);
+      console.error('[AdminDesignationsManagement] Error loading committee districts:', error);
       showToast('error', 'Failed to load districts');
     }
   }, [showToast]);
 
-  const searchBulkMembers = async (searchTerm: string, alreadySelected: MemberSearchResult[]) => {
-    if (!searchTerm.trim() || searchTerm.length < 2) {
-      setBulkMemberSearchResults([]);
-      return;
-    }
-    try {
-      setIsBulkSearchingMembers(true);
-      const results = await memberLubRolesService.searchMembers(searchTerm);
-      // Filter out already-selected members so the dropdown stays clean
-      setBulkMemberSearchResults(results.filter(r => !alreadySelected.some(s => s.id === r.id)));
-    } catch (error) {
-      console.error('[AdminDesignationsManagement] Error searching bulk members:', error);
-      showToast('error', 'Failed to search members');
-    } finally {
-      setIsBulkSearchingMembers(false);
-    }
-  };
-
-  const handleBulkMemberAdd = (member: MemberSearchResult) => {
-    setBulkSelectedMembers(prev => {
-      if (prev.some(s => s.id === member.id)) return prev;
-      return [...prev, member];
-    });
-    setBulkMemberSearchTerm('');
-    setBulkMemberSearchResults([]);
-  };
-
-  const handleBulkMemberRemove = (memberId: string) => {
-    setBulkSelectedMembers(prev => prev.filter(m => m.id !== memberId));
-  };
-
   const resetBulkForm = () => {
     setBulkForm({
-      role_id: '',
       level: '',
       state: '',
       district: '',
@@ -806,24 +853,127 @@ const AdminDesignationsManagement: React.FC = () => {
       role_start_date: '',
       role_end_date: ''
     });
-    setBulkSelectedMembers([]);
-    setBulkMemberSearchTerm('');
-    setBulkMemberSearchResults([]);
+    setCommitteeRows([createCommitteeRow()]);
     setBulkAvailableDistricts([]);
     setBulkResult(null);
   };
 
+  const resetCommitteeEditForm = () => {
+    setCommitteeEditForm({
+      level: '',
+      state: '',
+      district: '',
+      committee_year: '',
+      role_start_date: '',
+      role_end_date: ''
+    });
+    setEditingCommitteeGroup(null);
+    setEditCommitteeDistricts([]);
+  };
+
+  const openCommitteeBuilder = () => {
+    const activeRows = lubRoles
+      .filter(role => role.is_active)
+      .map(role => createCommitteeRow(role.id));
+    setCommitteeRows(activeRows.length > 0 ? activeRows : [createCommitteeRow()]);
+    setBulkResult(null);
+    setShowBulkAssignModal(true);
+  };
+
+  const openEditCommittee = () => {
+    if (!canEditCommitteeGroup || !editableCommitteeGroup) {
+      showToast('error', 'Narrow the list to one committee before editing committee details.');
+      return;
+    }
+
+    setEditingCommitteeGroup(editableCommitteeGroup);
+    setCommitteeEditForm({
+      level: editableCommitteeGroup.level,
+      state: editableCommitteeGroup.state,
+      district: editableCommitteeGroup.district,
+      committee_year: editableCommitteeGroup.committee_year,
+      role_start_date: editableCommitteeGroup.role_start_date,
+      role_end_date: editableCommitteeGroup.role_end_date
+    });
+    setEditCommitteeDistricts([]);
+    if (
+      editableCommitteeGroup.state
+      && (editableCommitteeGroup.level === 'district' || editableCommitteeGroup.level === 'city')
+    ) {
+      void loadEditCommitteeDistricts(editableCommitteeGroup.state);
+    }
+    setShowEditCommitteeModal(true);
+  };
+
+  const updateCommitteeRow = (rowId: string, patch: Partial<CommitteeRow>) => {
+    setCommitteeRows(prev => prev.map(row => row.id === rowId ? { ...row, ...patch } : row));
+  };
+
+  const addCommitteeRow = (roleId = '') => {
+    setCommitteeRows(prev => [...prev, createCommitteeRow(roleId)]);
+    setBulkResult(null);
+  };
+
+  const removeCommitteeRow = (rowId: string) => {
+    setCommitteeRows(prev => prev.length > 1 ? prev.filter(row => row.id !== rowId) : [createCommitteeRow()]);
+    setBulkResult(null);
+  };
+
+  const searchCommitteeMembers = async (rowId: string, searchTerm: string) => {
+    const currentRow = committeeRows.find(row => row.id === rowId);
+    const keepCandidate = currentRow?.candidate?.display_name === searchTerm ? currentRow.candidate : null;
+    updateCommitteeRow(rowId, {
+      searchTerm,
+      candidate: searchTerm.trim() ? keepCandidate : null,
+    });
+
+    if (!searchTerm.trim() || searchTerm.trim().length < 2) {
+      updateCommitteeRow(rowId, { searchResults: [], isSearching: false });
+      return;
+    }
+
+    updateCommitteeRow(rowId, { isSearching: true });
+    try {
+      const selectedKeys = new Set(
+        committeeRows
+          .filter(row => row.id !== rowId && row.candidate)
+          .map(row => `${row.candidate!.member_id}:${row.candidate!.assignee_kind}:${row.candidate!.alternate_contact_name ?? ''}`)
+      );
+      const results = await memberLubRolesService.searchMemberCandidates(searchTerm);
+      updateCommitteeRow(rowId, {
+        searchResults: results.filter(candidate => !selectedKeys.has(`${candidate.member_id}:${candidate.assignee_kind}:${candidate.alternate_contact_name ?? ''}`)),
+      });
+    } catch (error) {
+      console.error('[AdminDesignationsManagement] Error searching committee members:', error);
+      showToast('error', 'Failed to search members');
+    } finally {
+      updateCommitteeRow(rowId, { isSearching: false });
+    }
+  };
+
+  const selectCommitteeCandidate = (rowId: string, candidate: MemberRoleCandidate) => {
+    updateCommitteeRow(rowId, {
+      candidate,
+      searchTerm: candidate.display_name,
+      searchResults: [],
+      isSearching: false,
+    });
+    setBulkResult(null);
+  };
+
+  const clearCommitteeCandidate = (rowId: string) => {
+    updateCommitteeRow(rowId, {
+      candidate: null,
+      searchTerm: '',
+      searchResults: [],
+      isSearching: false,
+    });
+    setBulkResult(null);
+  };
+
   const handleBulkAssign = async () => {
-    if (bulkSelectedMembers.length === 0) {
-      showToast('error', 'Please select at least one member');
-      return;
-    }
-    if (bulkSelectedMembers.length > 50) {
-      showToast('error', 'Cannot assign more than 50 members at once');
-      return;
-    }
-    if (!bulkForm.role_id || !bulkForm.level) {
-      showToast('error', 'Please fill in LUB Role and Level');
+    if (!bulkForm.level) {
+      showToast('error', 'Level is required');
       return;
     }
     if ((bulkForm.level === 'state' || bulkForm.level === 'district' || bulkForm.level === 'city') && !bulkForm.state) {
@@ -849,53 +999,155 @@ const AdminDesignationsManagement: React.FC = () => {
       }
     }
 
+    const completeRows = committeeRows.filter(row => row.role_id && row.candidate);
+    const emptyCount = committeeRows.filter(row => row.role_id && !row.candidate).length;
+    const incompleteRows = committeeRows.filter(row => !row.role_id && row.candidate);
+
+    if (incompleteRows.length > 0) {
+      showToast('error', 'Select a LUB Role for every row that has a member.');
+      return;
+    }
+
+    if (completeRows.length === 0) {
+      showToast('error', 'Select at least one committee member before creating assignments.');
+      return;
+    }
+
     try {
       setIsBulkSubmitting(true);
       setBulkResult(null);
+      let addedCount = 0;
+      const skipped: CommitteeSkippedRow[] = [];
 
-      const result = await memberLubRolesService.createAssignmentsBulk({
-        member_ids:      bulkSelectedMembers.map(m => m.id),
-        role_id:         bulkForm.role_id,
-        level:           bulkForm.level as 'national' | 'state' | 'district' | 'city',
-        state:           bulkForm.state || undefined,
-        district:        bulkForm.district || undefined,
-        committee_year:  bulkForm.committee_year,
-        role_start_date: bulkForm.role_start_date || null,
-        role_end_date:   bulkForm.role_end_date || null,
-      });
+      for (const row of completeRows) {
+        const candidate = row.candidate!;
+        const roleName = lubRoles.find(role => role.id === row.role_id)?.role_name ?? 'Selected role';
+        const result = await memberLubRolesService.createAssignment({
+          member_id: candidate.member_id,
+          role_id: row.role_id,
+          level: bulkForm.level as 'national' | 'state' | 'district' | 'city',
+          state: bulkForm.state || undefined,
+          district: bulkForm.district || undefined,
+          committee_year: bulkForm.committee_year,
+          role_start_date: bulkForm.role_start_date || null,
+          role_end_date: bulkForm.role_end_date || null,
+          assignee_kind: candidate.assignee_kind,
+          alternate_contact_name: candidate.alternate_contact_name || null,
+          alternate_mobile: candidate.alternate_mobile || null,
+        });
 
-      if (!result.success) {
-        showToast('error', result.error || 'Bulk assignment failed');
-        return;
+        if (result.success) {
+          addedCount += 1;
+        } else {
+          skipped.push({
+            rowId: row.id,
+            roleName,
+            memberName: candidate.display_name,
+            reason: result.error ?? 'Assignment failed',
+          });
+        }
       }
 
       setBulkResult({
-        addedCount:   result.addedCount,
-        skippedCount: result.skippedCount,
-        skipped:      result.skipped,
+        addedCount,
+        skippedCount: skipped.length,
+        emptyCount,
+        skipped,
       });
 
-      if (result.addedCount > 0) {
+      if (addedCount > 0) {
         await loadMemberAssignments();
       }
 
-      if (result.skippedCount === 0) {
-        // Full success — close and reset
-        showToast('success', `${result.addedCount} member${result.addedCount !== 1 ? 's' : ''} assigned successfully`);
+      if (skipped.length === 0) {
+        showToast('success', `${addedCount} committee assignment${addedCount !== 1 ? 's' : ''} created successfully`);
         setShowBulkAssignModal(false);
         resetBulkForm();
       } else {
-        // Partial success — keep modal open so admin can review skipped reasons
         showToast(
-          result.addedCount > 0 ? 'success' : 'error',
-          `Added ${result.addedCount}, skipped ${result.skippedCount}`
+          addedCount > 0 ? 'success' : 'error',
+          `Added ${addedCount}, skipped ${skipped.length}`
         );
       }
     } catch (error) {
-      console.error('[AdminDesignationsManagement] Bulk assign error:', error);
-      showToast('error', 'An unexpected error occurred during bulk assignment');
+      console.error('[AdminDesignationsManagement] Create committee error:', error);
+      showToast('error', 'An unexpected error occurred while creating the committee');
     } finally {
       setIsBulkSubmitting(false);
+    }
+  };
+
+  const handleUpdateCommitteeGroup = async () => {
+    if (!editingCommitteeGroup) {
+      showToast('error', 'Select a committee to edit');
+      return;
+    }
+
+    if (!committeeEditForm.level) {
+      showToast('error', 'Level is required');
+      return;
+    }
+
+    if ((committeeEditForm.level === 'state' || committeeEditForm.level === 'district' || committeeEditForm.level === 'city') && !committeeEditForm.state) {
+      showToast('error', 'State is required for this level');
+      return;
+    }
+
+    if ((committeeEditForm.level === 'district' || committeeEditForm.level === 'city') && !committeeEditForm.district) {
+      showToast('error', 'District is required for this level');
+      return;
+    }
+
+    if (!committeeEditForm.committee_year || !/^\d{4}$/.test(committeeEditForm.committee_year)) {
+      showToast('error', 'Please enter a valid Committee Year (e.g., 2025)');
+      return;
+    }
+
+    if (committeeEditForm.role_start_date && committeeEditForm.role_end_date) {
+      if (new Date(committeeEditForm.role_end_date) < new Date(committeeEditForm.role_start_date)) {
+        showToast('error', 'Period To date cannot be before Period From date');
+        return;
+      }
+    }
+
+    try {
+      setIsUpdatingCommittee(true);
+      const result = await memberLubRolesService.updateCommitteeGroup({
+        current: {
+          level: editingCommitteeGroup.level,
+          state: editingCommitteeGroup.state || null,
+          district: editingCommitteeGroup.district || null,
+          committee_year: editingCommitteeGroup.committee_year,
+        },
+        next: {
+          level: committeeEditForm.level,
+          state: committeeEditForm.state || null,
+          district: committeeEditForm.district || null,
+          committee_year: committeeEditForm.committee_year,
+          role_start_date: committeeEditForm.role_start_date || null,
+          role_end_date: committeeEditForm.role_end_date || null,
+        },
+      });
+
+      if (result.success) {
+        showToast('success', `Committee updated successfully (${result.updatedCount ?? editingCommitteeGroup.count} assignments)`);
+        setShowEditCommitteeModal(false);
+        resetCommitteeEditForm();
+        setAssignmentFilters({
+          level: committeeEditForm.level,
+          state: committeeEditForm.level === 'national' ? '' : committeeEditForm.state,
+          district: (committeeEditForm.level === 'district' || committeeEditForm.level === 'city') ? committeeEditForm.district : '',
+          committeeYear: committeeEditForm.committee_year
+        });
+        await loadMemberAssignments();
+      } else {
+        showToast('error', result.error || 'Failed to update committee');
+      }
+    } catch (error) {
+      console.error('[AdminDesignationsManagement] Update committee error:', error);
+      showToast('error', 'An unexpected error occurred while updating the committee');
+    } finally {
+      setIsUpdatingCommittee(false);
     }
   };
 
@@ -1022,6 +1274,51 @@ const AdminDesignationsManagement: React.FC = () => {
       return (a.member_name || '').localeCompare(b.member_name || '');
     });
 
+  const visibleCommitteeGroups = useMemo(() => {
+    const groups = new Map<string, CommitteeGroupSummary>();
+
+    filteredMemberAssignments.forEach((assignment) => {
+      const level = assignment.level;
+      const state = (assignment.state || '').trim();
+      const district = (assignment.district || '').trim();
+      const committeeYear = (assignment.committee_year || '').trim();
+      const key = [level, state.toLowerCase(), district.toLowerCase(), committeeYear].join('|');
+      const existing = groups.get(key);
+      const roleStartDate = assignment.role_start_date || '';
+      const roleEndDate = assignment.role_end_date || '';
+
+      if (!existing) {
+        groups.set(key, {
+          key,
+          level,
+          state,
+          district,
+          committee_year: committeeYear,
+          role_start_date: roleStartDate,
+          role_end_date: roleEndDate,
+          count: 1,
+          hasMixedPeriod: false,
+        });
+        return;
+      }
+
+      existing.count += 1;
+      if (existing.role_start_date !== roleStartDate || existing.role_end_date !== roleEndDate) {
+        existing.hasMixedPeriod = true;
+        existing.role_start_date = '';
+        existing.role_end_date = '';
+      }
+    });
+
+    return Array.from(groups.values());
+  }, [filteredMemberAssignments]);
+
+  const editableCommitteeGroup = visibleCommitteeGroups.length === 1
+    ? visibleCommitteeGroups[0]
+    : null;
+
+  const canEditCommitteeGroup = !!editableCommitteeGroup && !searchTermAssignments.trim();
+
   const formatDate = (dateString: string) => {
     return formatDateTimeValue(dateString);
   };
@@ -1034,6 +1331,18 @@ const AdminDesignationsManagement: React.FC = () => {
       city: 'City'
     };
     return labels[level as keyof typeof labels] || level;
+  };
+
+  const getCommitteeDisplayName = (
+    level: string,
+    state?: string,
+    district?: string
+  ) => {
+    if (level === 'national') return 'National Committee';
+    if (level === 'state') return `${state || 'State'} State Committee`;
+    if (level === 'district') return `${district || 'District'} District Unit`;
+    if (level === 'city') return `${district || 'City'} City Unit`;
+    return 'Committee';
   };
 
   const getLevelColor = (level: string) => {
@@ -1487,11 +1796,26 @@ const AdminDesignationsManagement: React.FC = () => {
                     {canManageDesignations && (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setShowBulkAssignModal(true)}
+                          onClick={openEditCommittee}
+                          disabled={!canEditCommitteeGroup || isLoadingAssignments}
+                          title={
+                            searchTermAssignments.trim()
+                              ? 'Clear member search before editing a whole committee'
+                              : editableCommitteeGroup
+                              ? `Edit ${editableCommitteeGroup.count} assignment${editableCommitteeGroup.count !== 1 ? 's' : ''} in this committee`
+                              : 'Narrow the list to one committee group before editing'
+                          }
+                          className="inline-flex items-center px-4 py-2 border border-border bg-background text-foreground rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Edit3 className="w-4 h-4 mr-2" />
+                          Edit Committee
+                        </button>
+                        <button
+                          onClick={openCommitteeBuilder}
                           className="inline-flex items-center px-4 py-2 border border-border bg-background text-foreground rounded-lg hover:bg-muted transition-colors"
                         >
                           <ListChecks className="w-4 h-4 mr-2" />
-                          Bulk Assign
+                          Create Committee
                         </button>
                         <button
                           onClick={() => setShowAddAssignmentModal(true)}
@@ -1602,6 +1926,15 @@ const AdminDesignationsManagement: React.FC = () => {
                         </select>
                       </div>
                     </div>
+                    {filteredMemberAssignments.length > 0 && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {searchTermAssignments.trim()
+                          ? 'Clear member search before using Edit Committee.'
+                          : editableCommitteeGroup
+                          ? `Current list is one committee group with ${editableCommitteeGroup.count} assignment${editableCommitteeGroup.count !== 1 ? 's' : ''}.`
+                          : `Current list contains ${visibleCommitteeGroups.length} committee groups. Narrow the committee filters before using Edit Committee.`}
+                      </p>
+                    )}
                   </div>
 
                   {/* Member Assignments Table */}
@@ -2242,180 +2575,374 @@ const AdminDesignationsManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Member Assignment Modal */}
+      {/* Create Committee Modal */}
       {showBulkAssignModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-sm max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-section font-semibold text-foreground">Bulk Role Assignment</h3>
+          <div className="bg-card rounded-lg shadow-sm max-w-6xl w-full max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
+              <div>
+                <h3 className="text-section font-semibold text-foreground">Create Committee</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Build a complete committee for a level, place, and year. Empty member rows are allowed while editing and are ignored on submit.
+                </p>
+              </div>
               <button
                 onClick={() => { setShowBulkAssignModal(false); resetBulkForm(); }}
                 className="text-muted-foreground hover:text-foreground"
+                aria-label="Close create committee"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Result Panel (visible after submit with partial/full outcome) */}
-            {bulkResult && (
-              <div className={`mb-6 p-4 rounded-lg border ${
-                bulkResult.skippedCount > 0
-                  ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800'
-                  : 'bg-primary/5 border-border'
-              }`}>
-                <div className="font-medium text-foreground mb-1">
-                  Result: Added {bulkResult.addedCount}, Skipped {bulkResult.skippedCount}
-                </div>
-                {bulkResult.skippedCount > 0 && (
-                  <>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Review the skipped members below. Use "Remove Skipped" to clear them from your selection and retry with the remaining members.
-                    </p>
-                    <div className="space-y-2 mb-3">
-                      {bulkResult.skipped.map(skip => {
-                        const skippedMember = bulkSelectedMembers.find(m => m.id === skip.member_id);
-                        return (
-                          <div key={skip.member_id} className="flex items-start gap-2 text-sm">
-                            <span className="text-destructive font-semibold shrink-0 mt-0.5">✗</span>
-                            <div>
-                              <span className="font-medium">{skippedMember?.full_name ?? skip.member_id}</span>
-                              <span className="text-muted-foreground"> — {skip.reason}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const skippedIds = new Set(bulkResult.skipped.map(s => s.member_id));
-                        setBulkSelectedMembers(prev => prev.filter(m => !skippedIds.has(m.id)));
-                        setBulkResult(null);
-                      }}
-                      className="text-sm font-medium text-primary hover:text-primary/80 underline underline-offset-2"
-                    >
-                      Remove skipped members from selection
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-6">
-              {/* Multi-Member Selector */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Members <span className="text-destructive">*</span>
-                  <span className="ml-2 text-muted-foreground font-normal">(max 50)</span>
-                </label>
-
-                {/* Selected member chips */}
-                {bulkSelectedMembers.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {bulkSelectedMembers.map(m => (
-                      <span
-                        key={m.id}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                      >
-                        {m.full_name}
-                        <button
-                          type="button"
-                          onClick={() => handleBulkMemberRemove(m.id)}
-                          className="hover:text-primary/70 ml-0.5"
-                          aria-label={`Remove ${m.full_name}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
+            <div className="overflow-y-auto px-6 py-5">
+              {bulkResult && (
+                <div className={`mb-5 p-4 rounded-lg border ${
+                  bulkResult.skippedCount > 0
+                    ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800'
+                    : 'bg-primary/5 border-border'
+                }`}>
+                  <div className="font-medium text-foreground mb-1">
+                    Result: Added {bulkResult.addedCount}, Skipped {bulkResult.skippedCount}
+                    {bulkResult.emptyCount > 0 ? `, Empty rows ignored ${bulkResult.emptyCount}` : ''}
                   </div>
-                )}
+                  {bulkResult.skippedCount > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {bulkResult.skipped.map(skip => (
+                        <div key={skip.rowId} className="text-sm">
+                          <span className="font-medium text-foreground">{skip.roleName}</span>
+                          <span className="text-muted-foreground"> - {skip.memberName}: {skip.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {/* Search input — hidden when cap reached */}
-                {bulkSelectedMembers.length < 50 && (
-                  <div className="relative">
+              <div className="rounded-lg border border-border bg-muted/20 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Level <span className="text-destructive">*</span>
+                    </label>
+                    <select
+                      value={bulkForm.level}
+                      onChange={(e) => {
+                        const lv = e.target.value as 'national' | 'state' | 'district' | 'city' | '';
+                        setBulkForm(prev => ({
+                          ...prev,
+                          level: lv,
+                          state: lv === 'national' ? '' : prev.state,
+                          district: (lv === 'national' || lv === 'state') ? '' : prev.district,
+                        }));
+                        setBulkAvailableDistricts([]);
+                      }}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                    >
+                      <option value="">Select Level</option>
+                      <option value="national">National</option>
+                      <option value="state">State</option>
+                      <option value="district">District</option>
+                      <option value="city">City</option>
+                    </select>
+                  </div>
+
+                  {(bulkForm.level === 'state' || bulkForm.level === 'district' || bulkForm.level === 'city') && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        State <span className="text-destructive">*</span>
+                      </label>
+                      <select
+                        value={bulkForm.state}
+                        onChange={(e) => {
+                          const stateName = e.target.value;
+                          setBulkForm(prev => ({ ...prev, state: stateName, district: '' }));
+                          setBulkAvailableDistricts([]);
+                          if (stateName && (bulkForm.level === 'district' || bulkForm.level === 'city')) {
+                            void loadBulkDistricts(stateName);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                      >
+                        <option value="">Select State</option>
+                        {allStates.map(state => (
+                          <option key={state.id} value={state.state_name}>{state.state_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(bulkForm.level === 'district' || bulkForm.level === 'city') && bulkForm.state && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        District <span className="text-destructive">*</span>
+                      </label>
+                      <select
+                        value={bulkForm.district}
+                        onChange={(e) => setBulkForm(prev => ({ ...prev, district: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                      >
+                        <option value="">Select District</option>
+                        {bulkAvailableDistricts.map(district => (
+                          <option key={district.district_id} value={district.district_name}>
+                            {district.district_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Committee Year <span className="text-destructive">*</span>
+                    </label>
                     <input
                       type="text"
-                      value={bulkMemberSearchTerm}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setBulkMemberSearchTerm(val);
-                        void searchBulkMembers(val, bulkSelectedMembers);
-                      }}
-                      placeholder="Type name or email to search approved members…"
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      value={bulkForm.committee_year}
+                      onChange={(e) => setBulkForm(prev => ({ ...prev, committee_year: e.target.value }))}
+                      placeholder="2026"
+                      maxLength={4}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
                     />
-                    {isBulkSearchingMembers && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
-                      </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Period From <span className="text-muted-foreground">(optional)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkForm.role_start_date}
+                      onChange={(e) => setBulkForm(prev => ({ ...prev, role_start_date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Period To <span className="text-muted-foreground">(optional)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkForm.role_end_date}
+                      onChange={(e) => setBulkForm(prev => ({ ...prev, role_end_date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-lg border border-border overflow-visible">
+                <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Committee Roles</h4>
+                    <p className="text-xs text-muted-foreground">Roles are loaded from active LUB roles. Add duplicate rows when a role has multiple members.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addCommitteeRow()}
+                      className="inline-flex items-center px-3 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Role Row
+                    </button>
+                    {lubRoles.some(role => role.is_active && role.role_name.toLowerCase().includes('executive')) && (
+                      <button
+                        type="button"
+                        onClick={() => addCommitteeRow(lubRoles.find(role => role.is_active && role.role_name.toLowerCase().includes('executive'))?.id ?? '')}
+                        className="inline-flex items-center px-3 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Executive Member
+                      </button>
                     )}
                   </div>
-                )}
+                </div>
 
-                {/* Search results dropdown */}
-                {bulkMemberSearchResults.length > 0 && (
-                  <div className="mt-2 border border-border rounded-lg max-h-48 overflow-y-auto">
-                    {bulkMemberSearchResults.map(member => (
-                      <button
-                        key={member.id}
-                        type="button"
-                        onClick={() => handleBulkMemberAdd(member)}
-                        className="w-full text-left px-3 py-2.5 hover:bg-muted/30 border-b border-border last:border-b-0"
-                      >
-                        <div className="font-medium text-foreground text-sm">{member.full_name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {member.company_name} · {member.city}, {member.district} · {member.email}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[860px] text-sm">
+                    <thead className="bg-muted/20 text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium w-[32%]">Role</th>
+                        <th className="px-4 py-2 text-left font-medium">Member / Alternate Contact</th>
+                        <th className="px-4 py-2 text-right font-medium w-20">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {committeeRows.map((row, index) => (
+                        <tr key={row.id} className="border-t border-border align-top">
+                          <td className="px-4 py-3">
+                            <select
+                              value={row.role_id}
+                              onChange={(e) => {
+                                updateCommitteeRow(row.id, { role_id: e.target.value });
+                                setBulkResult(null);
+                              }}
+                              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                              aria-label={`Committee role ${index + 1}`}
+                            >
+                              <option value="">Select LUB Role</option>
+                              {lubRoles.filter(role => role.is_active).map(role => (
+                                <option key={role.id} value={role.id}>{role.role_name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            {row.candidate ? (
+                              <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
+                                <div className="min-w-0">
+                                  <div className="font-medium text-foreground">
+                                    {row.candidate.display_name}
+                                    {row.candidate.assignee_kind === 'alternate' && (
+                                      <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Alternate</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">{row.candidate.secondary_text}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => clearCommitteeCandidate(row.id)}
+                                  className="text-muted-foreground hover:text-destructive shrink-0"
+                                  aria-label={`Clear ${row.candidate.display_name}`}
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={row.searchTerm}
+                                  onChange={(e) => { void searchCommitteeMembers(row.id, e.target.value); }}
+                                  placeholder="Search name, email, member mobile, alternate name or alternate mobile"
+                                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                                />
+                                {row.isSearching && (
+                                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                                  </div>
+                                )}
+                                {row.searchResults.length > 0 && (
+                                  <div className="absolute left-0 right-0 z-[60] mt-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+                                    {row.searchResults.map(candidate => (
+                                      <button
+                                        key={`${candidate.member_id}-${candidate.assignee_kind}-${candidate.alternate_contact_name ?? 'main'}`}
+                                        type="button"
+                                        onClick={() => selectCommitteeCandidate(row.id, candidate)}
+                                        className="w-full text-left px-3 py-2.5 hover:bg-muted/50 border-b border-border last:border-b-0"
+                                      >
+                                        <div className="flex items-center gap-2 font-medium text-foreground text-sm">
+                                          {candidate.display_name}
+                                          {candidate.assignee_kind === 'alternate' && (
+                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Alternate</span>
+                                          )}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{candidate.secondary_text}</div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                <p className="mt-1 text-xs text-muted-foreground">Leave empty if this position is not finalized yet.</p>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => removeCommitteeRow(row.id)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
+                              aria-label={`Remove committee row ${index + 1}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
 
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {bulkSelectedMembers.length === 0
-                    ? 'Type at least 2 characters to search for approved members.'
-                    : `${bulkSelectedMembers.length} member${bulkSelectedMembers.length !== 1 ? 's' : ''} selected.`}
+            <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
+              <div className="text-xs text-muted-foreground">
+                {committeeRows.filter(row => row.role_id && row.candidate).length} ready to save, {committeeRows.filter(row => row.role_id && !row.candidate).length} empty role rows.
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowBulkAssignModal(false); resetBulkForm(); }}
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                >
+                  {bulkResult ? 'Close' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => { void handleBulkAssign(); }}
+                  disabled={isBulkSubmitting || !bulkForm.level || !bulkForm.committee_year}
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isBulkSubmitting ? 'Creating...' : 'Create Committee'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Committee Modal */}
+      {showEditCommitteeModal && editingCommitteeGroup && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg shadow-sm max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h3 className="text-section font-semibold text-foreground">Edit Committee Details</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Updating {editingCommitteeGroup.count} assignment{editingCommitteeGroup.count !== 1 ? 's' : ''}
                 </p>
               </div>
+              <button
+                onClick={() => {
+                  setShowEditCommitteeModal(false);
+                  resetCommitteeEditForm();
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Close edit committee"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {/* Shared Assignment Fields (mirrors single-add form) */}
-
-              {/* Role */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  LUB Role <span className="text-destructive">*</span>
-                </label>
-                <select
-                  value={bulkForm.role_id}
-                  onChange={(e) => setBulkForm(prev => ({ ...prev, role_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="">Select LUB Role</option>
-                  {lubRoles.filter(role => role.is_active).map(role => (
-                    <option key={role.id} value={role.id}>{role.role_name}</option>
-                  ))}
-                </select>
+            <div className="mb-5 rounded-lg border border-border bg-muted/30 p-4">
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Committee
+              </label>
+              <div className="text-sm text-muted-foreground">
+                {getCommitteeDisplayName(committeeEditForm.level, committeeEditForm.state, committeeEditForm.district)}
               </div>
+              {editingCommitteeGroup.hasMixedPeriod && (
+                <div className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                  Existing assignments have mixed period dates. Saving will set the same period on all assignments in this committee.
+                </div>
+              )}
+            </div>
 
-              {/* Level */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
                   Level <span className="text-destructive">*</span>
                 </label>
                 <select
-                  value={bulkForm.level}
+                  value={committeeEditForm.level}
                   onChange={(e) => {
-                    const lv = e.target.value as 'national' | 'state' | 'district' | 'city' | '';
-                    setBulkForm(prev => ({
+                    const level = e.target.value as 'national' | 'state' | 'district' | 'city' | '';
+                    setCommitteeEditForm(prev => ({
                       ...prev,
-                      level:    lv,
-                      state:    lv === 'national' ? '' : prev.state,
-                      district: (lv === 'national' || lv === 'state') ? '' : prev.district,
+                      level,
+                      state: level === 'national' ? '' : prev.state,
+                      district: (level === 'national' || level === 'state') ? '' : prev.district
                     }));
-                    setBulkAvailableDistricts([]);
                   }}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
                 >
                   <option value="">Select Level</option>
                   <option value="national">National</option>
@@ -2425,128 +2952,110 @@ const AdminDesignationsManagement: React.FC = () => {
                 </select>
               </div>
 
-              {/* State */}
-              {(bulkForm.level === 'state' || bulkForm.level === 'district' || bulkForm.level === 'city') && (
+              {(committeeEditForm.level === 'state' || committeeEditForm.level === 'district' || committeeEditForm.level === 'city') && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     State <span className="text-destructive">*</span>
                   </label>
-                  {isLoadingStates ? (
+                  <select
+                    value={committeeEditForm.state}
+                    onChange={(e) => setCommitteeEditForm(prev => ({ ...prev, state: e.target.value, district: '' }))}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
+                  >
+                    <option value="">Select State</option>
+                    {allStates.map(state => (
+                      <option key={state.id} value={state.state_name}>{state.state_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {(committeeEditForm.level === 'district' || committeeEditForm.level === 'city') && committeeEditForm.state && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    District <span className="text-destructive">*</span>
+                  </label>
+                  {isLoadingEditCommitteeDistricts ? (
                     <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/50 text-muted-foreground">
-                      Loading states…
+                      Loading districts...
                     </div>
                   ) : (
                     <select
-                      value={bulkForm.state}
-                      onChange={(e) => {
-                        const stateName = e.target.value;
-                        setBulkForm(prev => ({ ...prev, state: stateName, district: '' }));
-                        setBulkAvailableDistricts([]);
-                        if (stateName && (bulkForm.level === 'district' || bulkForm.level === 'city')) {
-                          void loadBulkDistricts(stateName);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                      value={committeeEditForm.district}
+                      onChange={(e) => setCommitteeEditForm(prev => ({ ...prev, district: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
                     >
-                      <option value="">Select State</option>
-                      {allStates.map(state => (
-                        <option key={state.id} value={state.state_name}>{state.state_name}</option>
+                      <option value="">Select District</option>
+                      {editCommitteeDistricts.map(district => (
+                        <option key={district.district_id} value={district.district_name}>
+                          {district.district_name}
+                        </option>
                       ))}
                     </select>
                   )}
                 </div>
               )}
 
-              {/* District */}
-              {(bulkForm.level === 'district' || bulkForm.level === 'city') && bulkForm.state && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    District <span className="text-destructive">*</span>
-                  </label>
-                  <select
-                    value={bulkForm.district}
-                    onChange={(e) => setBulkForm(prev => ({ ...prev, district: e.target.value }))}
-                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
-                  >
-                    <option value="">Select District</option>
-                    {bulkAvailableDistricts.map(district => (
-                      <option key={district.district_id} value={district.district_name}>
-                        {district.district_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Committee Year */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
                   Committee Year <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
-                  value={bulkForm.committee_year}
-                  onChange={(e) => setBulkForm(prev => ({ ...prev, committee_year: e.target.value }))}
+                  value={committeeEditForm.committee_year}
+                  onChange={(e) => setCommitteeEditForm(prev => ({ ...prev, committee_year: e.target.value }))}
                   placeholder="2025"
                   maxLength={4}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
                 />
               </div>
 
-              {/* Period From */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
                   Period From <span className="text-muted-foreground">(optional)</span>
                 </label>
                 <input
                   type="date"
-                  value={bulkForm.role_start_date}
-                  onChange={(e) => setBulkForm(prev => ({ ...prev, role_start_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                  value={committeeEditForm.role_start_date}
+                  onChange={(e) => setCommitteeEditForm(prev => ({ ...prev, role_start_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
                 />
               </div>
 
-              {/* Period To */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">
                   Period To <span className="text-muted-foreground">(optional)</span>
                 </label>
                 <input
                   type="date"
-                  value={bulkForm.role_end_date}
-                  onChange={(e) => setBulkForm(prev => ({ ...prev, role_end_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
+                  value={committeeEditForm.role_end_date}
+                  onChange={(e) => setCommitteeEditForm(prev => ({ ...prev, role_end_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background"
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 justify-between mt-8 pt-6 border-t border-border">
+            <div className="flex gap-3 justify-end mt-8 pt-6 border-t border-border">
               <button
-                onClick={() => { setShowBulkAssignModal(false); resetBulkForm(); }}
+                onClick={() => {
+                  setShowEditCommitteeModal(false);
+                  resetCommitteeEditForm();
+                }}
                 className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                {bulkResult ? 'Close' : 'Cancel'}
+                Cancel
               </button>
               <button
-                onClick={() => { void handleBulkAssign(); }}
-                disabled={
-                  isBulkSubmitting ||
-                  bulkSelectedMembers.length === 0 ||
-                  !bulkForm.role_id ||
-                  !bulkForm.level ||
-                  !bulkForm.committee_year
-                }
+                onClick={() => { void handleUpdateCommitteeGroup(); }}
+                disabled={isUpdatingCommittee || !committeeEditForm.level || !committeeEditForm.committee_year}
                 className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isBulkSubmitting
-                  ? 'Assigning…'
-                  : `Assign to ${bulkSelectedMembers.length} Member${bulkSelectedMembers.length !== 1 ? 's' : ''}`}
+                {isUpdatingCommittee ? 'Updating...' : 'Update Committee'}
               </button>
             </div>
           </div>
         </div>
       )}
-
       {/* Edit Member Assignment Modal */}
       {showEditAssignmentModal && editingAssignment && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-[1px] flex items-center justify-center p-4 z-50">

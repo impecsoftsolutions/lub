@@ -1,5 +1,7 @@
 # LUB Agent Ownership Rules
 
+Last reviewed: 2026-05-31 (no rule changes)
+
 ## Default Ownership
 
 ### Claude Code owns UI by default
