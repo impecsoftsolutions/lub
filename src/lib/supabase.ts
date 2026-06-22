@@ -9269,3 +9269,333 @@ export const reportsService = {
     }));
   },
 };
+
+// ============================================================
+// Showcase Service
+// ============================================================
+
+export type ShowcaseStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'archived';
+
+export interface ShowcaseListing {
+  id: string;
+  memberId?: string;
+  title: string;
+  productServiceName: string | null;
+  category: string | null;
+  shortDescription: string;
+  detailedDescription: string | null;
+  state: string | null;
+  district: string | null;
+  photoUrl: string | null;
+  contactPreference: string;
+  companyName: string | null;
+  memberName: string | null;
+  status: ShowcaseStatus;
+  adminNote: string | null;
+  submittedAt: string | null;
+  approvedAt?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShowcaseListingDraft {
+  title: string;
+  productServiceName: string;
+  category: string;
+  shortDescription: string;
+  detailedDescription: string;
+  state: string;
+  district: string;
+  photoUrl: string;
+  contactPreference: string;
+}
+
+function mapShowcaseRow(row: Record<string, unknown>): ShowcaseListing {
+  return {
+    id:                  String(row.id ?? ''),
+    memberId:            row.member_id ? String(row.member_id) : undefined,
+    title:               String(row.title ?? ''),
+    productServiceName:  row.product_service_name ? String(row.product_service_name) : null,
+    category:            row.category ? String(row.category) : null,
+    shortDescription:    String(row.short_description ?? ''),
+    detailedDescription: row.detailed_description ? String(row.detailed_description) : null,
+    state:               row.state ? String(row.state) : null,
+    district:            row.district ? String(row.district) : null,
+    photoUrl:            row.photo_url ? String(row.photo_url) : null,
+    contactPreference:   String(row.contact_preference ?? 'member_contact'),
+    companyName:         row.company_name ? String(row.company_name) : null,
+    memberName:          row.member_name ? String(row.member_name) : null,
+    status:              (row.status as ShowcaseStatus) ?? 'draft',
+    adminNote:           row.admin_note ? String(row.admin_note) : null,
+    submittedAt:         row.submitted_at ? String(row.submitted_at) : null,
+    approvedAt:          row.approved_at ? String(row.approved_at) : null,
+    reviewedAt:          row.reviewed_at ? String(row.reviewed_at) : null,
+    createdAt:           String(row.created_at ?? ''),
+    updatedAt:           String(row.updated_at ?? ''),
+  };
+}
+
+export const showcaseService = {
+  async getPublicListings(filters: {
+    state?: string;
+    category?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<ShowcaseListing[]> {
+    const { data, error } = await supabase.rpc('get_public_showcase_listings', {
+      p_state:    filters.state    ?? null,
+      p_category: filters.category ?? null,
+      p_search:   filters.search   ?? null,
+      p_limit:    filters.limit    ?? 50,
+      p_offset:   filters.offset   ?? 0,
+    });
+    if (error) throw error;
+    const rows = (data as Record<string, unknown>[] | null) ?? [];
+    return rows.map(mapShowcaseRow);
+  },
+
+  async getMemberListings(sessionToken: string): Promise<{ success: boolean; listings?: ShowcaseListing[]; error?: string }> {
+    const { data, error } = await supabase.rpc('get_member_showcase_listings_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; listings?: Record<string, unknown>[]; error?: string };
+    if (!result?.success) return { success: false, error: result?.error ?? 'Failed to load listings' };
+    return { success: true, listings: (result.listings ?? []).map(mapShowcaseRow) };
+  },
+
+  async createListing(sessionToken: string, draft: ShowcaseListingDraft): Promise<{ success: boolean; id?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('create_showcase_listing_with_session', {
+      p_session_token:        sessionToken,
+      p_title:                draft.title,
+      p_product_service_name: draft.productServiceName,
+      p_category:             draft.category,
+      p_short_description:    draft.shortDescription,
+      p_detailed_description: draft.detailedDescription,
+      p_state:                draft.state,
+      p_district:             draft.district,
+      p_photo_url:            draft.photoUrl,
+      p_contact_preference:   draft.contactPreference,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; id?: string; error?: string };
+    return result?.success ? { success: true, id: result.id } : { success: false, error: result?.error ?? 'Failed to create listing' };
+  },
+
+  async updateListing(sessionToken: string, listingId: string, draft: ShowcaseListingDraft): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('update_showcase_listing_with_session', {
+      p_session_token:        sessionToken,
+      p_listing_id:           listingId,
+      p_title:                draft.title,
+      p_product_service_name: draft.productServiceName,
+      p_category:             draft.category,
+      p_short_description:    draft.shortDescription,
+      p_detailed_description: draft.detailedDescription,
+      p_state:                draft.state,
+      p_district:             draft.district,
+      p_photo_url:            draft.photoUrl,
+      p_contact_preference:   draft.contactPreference,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to update listing' };
+  },
+
+  async submitListing(sessionToken: string, listingId: string): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('submit_showcase_listing_with_session', {
+      p_session_token: sessionToken,
+      p_listing_id:    listingId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to submit listing' };
+  },
+
+  async deleteListing(sessionToken: string, listingId: string): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('delete_showcase_listing_with_session', {
+      p_session_token: sessionToken,
+      p_listing_id:    listingId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to delete listing' };
+  },
+
+  async adminGetListings(sessionToken: string, filters: {
+    status?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ success: boolean; listings?: ShowcaseListing[]; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_get_showcase_listings_with_session', {
+      p_session_token: sessionToken,
+      p_status:        filters.status ?? null,
+      p_search:        filters.search ?? null,
+      p_limit:         filters.limit  ?? 100,
+      p_offset:        filters.offset ?? 0,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; listings?: Record<string, unknown>[]; error?: string };
+    if (!result?.success) return { success: false, error: result?.error ?? 'Failed to load listings' };
+    return { success: true, listings: (result.listings ?? []).map(mapShowcaseRow) };
+  },
+
+  async adminUpdateStatus(
+    sessionToken: string,
+    listingId: string,
+    newStatus: 'approved' | 'rejected' | 'archived',
+    adminNote?: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_update_showcase_listing_status_with_session', {
+      p_session_token: sessionToken,
+      p_listing_id:    listingId,
+      p_new_status:    newStatus,
+      p_admin_note:    adminNote ?? null,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to update status' };
+  },
+
+  async uploadPhoto(sessionToken: string, file: File): Promise<{ success: boolean; url?: string; error?: string }> {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const formData = new FormData();
+    formData.append('session_token', sessionToken);
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/showcase-photo-upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await res.json() as { success: boolean; url?: string; error?: string };
+      return result;
+    } catch {
+      return { success: false, error: 'Upload failed. Please try again.' };
+    }
+  },
+
+  async improveWithAI(sessionToken: string, listing: Partial<ShowcaseListingDraft>): Promise<{
+    success: boolean;
+    data?: { title: string; product_service_name: string; short_description: string; detailed_description: string };
+    error?: string;
+    error_code?: string;
+  }> {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/improve-showcase-listing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_token: sessionToken, listing }),
+      });
+      const result = await res.json() as {
+        success: boolean;
+        data?: { title: string; product_service_name: string; short_description: string; detailed_description: string };
+        error?: string;
+        error_code?: string;
+      };
+      return result;
+    } catch {
+      return { success: false, error: 'AI service unavailable. Please try again.' };
+    }
+  },
+};
+
+// ============================================================
+// Membership Plan Service
+// ============================================================
+
+export interface MembershipPlanSetting {
+  id: string;
+  planKey: 'free' | 'paid';
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export interface MembershipPlanFeature {
+  id: string;
+  featureLabel: string;
+  freeValue: string | null;
+  paidValue: string | null;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export const membershipPlanService = {
+  async getPublicPlanSettings(): Promise<MembershipPlanSetting[]> {
+    const { data, error } = await supabase
+      .from('membership_plan_settings')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
+    if (error) throw error;
+    return ((data as Record<string, unknown>[] | null) ?? []).map(row => ({
+      id:           String(row.id ?? ''),
+      planKey:      (row.plan_key as 'free' | 'paid'),
+      title:        String(row.title ?? ''),
+      subtitle:     row.subtitle ? String(row.subtitle) : null,
+      description:  row.description ? String(row.description) : null,
+      displayOrder: Number(row.display_order ?? 0),
+      isActive:     Boolean(row.is_active),
+    }));
+  },
+
+  async getPublicPlanFeatures(): Promise<MembershipPlanFeature[]> {
+    const { data, error } = await supabase
+      .from('membership_plan_features')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
+    if (error) throw error;
+    return ((data as Record<string, unknown>[] | null) ?? []).map(row => ({
+      id:           String(row.id ?? ''),
+      featureLabel: String(row.feature_label ?? ''),
+      freeValue:    row.free_value ? String(row.free_value) : null,
+      paidValue:    row.paid_value ? String(row.paid_value) : null,
+      displayOrder: Number(row.display_order ?? 0),
+      isActive:     Boolean(row.is_active),
+    }));
+  },
+
+  async adminUpdatePlanSettings(
+    sessionToken: string,
+    planKey: 'free' | 'paid',
+    title: string,
+    subtitle: string,
+    description: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_update_membership_plan_settings_with_session', {
+      p_session_token: sessionToken,
+      p_plan_key:      planKey,
+      p_title:         title,
+      p_subtitle:      subtitle,
+      p_description:   description,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to save' };
+  },
+
+  async adminUpsertFeature(
+    sessionToken: string,
+    feature: { id?: string; featureLabel: string; freeValue: string; paidValue: string; displayOrder: number; isActive: boolean },
+  ): Promise<{ success: boolean; id?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_upsert_membership_plan_feature_with_session', {
+      p_session_token: sessionToken,
+      p_feature_id:    feature.id ?? null,
+      p_feature_label: feature.featureLabel,
+      p_free_value:    feature.freeValue,
+      p_paid_value:    feature.paidValue,
+      p_display_order: feature.displayOrder,
+      p_is_active:     feature.isActive,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; id?: string; error?: string };
+    return result?.success ? { success: true, id: result.id } : { success: false, error: result?.error ?? 'Failed to save feature' };
+  },
+};

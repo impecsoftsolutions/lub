@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useMember } from '../contexts/useMember';
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Profile', path: '/dashboard/profile' },
   { label: 'Settings', path: '/dashboard/settings' },
@@ -11,6 +11,11 @@ const NAV_LINKS = [
 const MemberNav: React.FC = () => {
   const location = useLocation();
   const { member } = useMember();
+  const isMemberApproved = member?.status === 'approved';
+
+  const NAV_LINKS = isMemberApproved
+    ? [...BASE_NAV_LINKS, { label: 'Showcase', path: '/dashboard/showcase' }]
+    : BASE_NAV_LINKS;
 
   const displayName = (() => {
     const raw = member?.full_name ?? '';

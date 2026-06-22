@@ -245,11 +245,11 @@ const AdminUsers: React.FC = () => {
     });
 
     if (user.account_type === 'general_user') {
-      return 'General User';
+      return 'Free Member';
     }
 
     if (user.account_type === 'member') {
-      return 'Member';
+      return 'Paid Member';
     }
 
     if (user.account_type === 'admin' && user.roles && user.roles.length > 0) {
@@ -260,13 +260,13 @@ const AdminUsers: React.FC = () => {
 
     if (user.account_type === 'both' && user.roles && user.roles.length > 0) {
       const roleNames = user.roles.map(r => formatRoleName(r.role)).join(', ');
-      const display = `Member + ${roleNames}`;
+      const display = `Paid Member + ${roleNames}`;
       console.log(`[getAccountTypeDisplay] Both user ${user.email} display:`, display);
       return display;
     }
 
     console.log(`[getAccountTypeDisplay] Fallback for user ${user.email}`);
-    return user.account_type === 'admin' ? 'Admin' : user.account_type === 'both' ? 'Member + Admin' : 'Unknown';
+    return user.account_type === 'admin' ? 'Admin' : user.account_type === 'both' ? 'Paid Member + Admin' : 'Unknown';
   };
 
   const getAccountTypeBadge = (user: User) => {
@@ -367,8 +367,8 @@ const AdminUsers: React.FC = () => {
                     className="w-full pl-10 pr-4 py-2 border border-border rounded-md focus:ring-1 focus:ring-primary/30 focus:border-primary appearance-none bg-card"
                   >
                     <option value="all">All Types</option>
-                    <option value="general_user">General User</option>
-                    <option value="member">Member</option>
+                    <option value="general_user">Free Member</option>
+                    <option value="member">Paid Member</option>
                     <option value="admin">Admin</option>
                     <option value="both">Both</option>
                   </select>

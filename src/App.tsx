@@ -55,6 +55,11 @@ import AdminAppearanceSettings from './pages/admin/AdminAppearanceSettings';
 import AdminSettingsHub from './pages/AdminSettingsHub';
 import AdminAISettings from './pages/AdminAISettings';
 import AdminNormalizationSettings from './pages/AdminNormalizationSettings';
+import MembershipPlans from './pages/MembershipPlans';
+import BusinessShowcase from './pages/BusinessShowcase';
+import MemberShowcaseListings from './pages/MemberShowcaseListings';
+import AdminShowcaseModeration from './pages/AdminShowcaseModeration';
+import AdminMembershipPlanSettings from './pages/AdminMembershipPlanSettings';
 import AdminDateTimeSettings from './pages/AdminDateTimeSettings';
 import AdminFormBuilderV2 from './pages/AdminFormBuilderV2';
 import AdminFormEditorV2 from './pages/AdminFormEditorV2';
@@ -237,6 +242,22 @@ function getSeoMetaConfig(pathname: string): SeoMetaConfig {
     };
   }
 
+  if (normalizedPath === '/membership-plans') {
+    return {
+      ...baseConfig,
+      title: 'Membership Plans | Laghu Udyog Bharati',
+      description: 'Explore Free and Paid LUB membership plans, state-wise fees, and member benefits for MSMEs across India.',
+    };
+  }
+
+  if (normalizedPath === '/business-showcase') {
+    return {
+      ...baseConfig,
+      title: 'Business Showcase | Laghu Udyog Bharati',
+      description: 'Discover MSME products and services from Laghu Udyog Bharati paid members across India.',
+    };
+  }
+
   return baseConfig;
 }
 
@@ -388,6 +409,8 @@ function App() {
             <Route path="/membership-benefits" element={<MembershipBenefits />} />
             <Route path="/styleguide" element={<Styleguide />} />
             <Route path="/payment" element={<Payment />} />
+            <Route path="/membership-plans" element={<MembershipPlans />} />
+            <Route path="/business-showcase" element={<BusinessShowcase />} />
 
             {/* Auth-Free Routes - For unauthenticated users (signin, signup, password reset) */}
             <Route path="/signin" element={<SignIn />} />
@@ -403,6 +426,7 @@ function App() {
             <Route path="/dashboard/settings" element={<MemberSettings />} />
             <Route path="/dashboard/reapply" element={<MemberReapply />} />
             <Route path="/dashboard/change-password" element={<MemberChangePassword />} />
+            <Route path="/dashboard/showcase" element={<MemberShowcaseListings />} />
           </Route>
 
           {/* Admin Routes - Redirect old admin login to unified signin */}
@@ -468,6 +492,8 @@ function App() {
             <Route path="/admin/content/activities/new" element={<AdminActivityForm />} />
             <Route path="/admin/content/activities/:id/edit" element={<AdminActivityForm />} />
             <Route path="/admin/content/activities/settings" element={<AdminActivitySettings />} />
+            <Route path="/admin/content/showcase" element={<AdminShowcaseModeration />} />
+            <Route path="/admin/settings/membership-plans" element={<AdminMembershipPlanSettings />} />
           </Route>
           </Routes>
           </MemberContextProvider>

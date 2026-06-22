@@ -115,7 +115,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             pendingRegistrationsCount > 0 ? pendingRegistrationsCount.toString() : undefined
         },
         { label: "Directory Visibility", path: "/admin/members/visibility" },
-        { label: "Deleted Members", path: "/admin/members/deleted" }
+        { label: "Deleted Members", path: "/admin/members/deleted" },
+        { label: "Business Showcase", path: "/admin/content/showcase" }
       ]
     },
     {
@@ -153,7 +154,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         { label: "Normalization Rules", path: "/admin/settings/normalization" },
         { label: "Date & Time Settings", path: "/admin/settings/datetime" },
         { label: "Theme", path: "/admin/settings/appearance" },
-        { label: "AI Settings", path: "/admin/settings/ai" }
+        { label: "AI Settings", path: "/admin/settings/ai" },
+        { label: "Membership Plans", path: "/admin/settings/membership-plans" }
       ]
     },
     {

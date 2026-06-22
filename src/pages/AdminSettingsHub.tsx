@@ -13,6 +13,7 @@ import {
   Loader2,
   Wand2,
   CalendarClock,
+  BadgeCheck,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +27,7 @@ interface SettingsCardItem {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   canAccess: boolean;
-  section: 'Settings' | 'Members' | 'Locations';
+  section: 'Settings' | 'Members' | 'Locations' | 'Content';
 }
 
 const AdminSettingsHub: React.FC = () => {
@@ -111,6 +112,15 @@ const AdminSettingsHub: React.FC = () => {
       icon: CreditCard,
       canAccess: canViewPayment,
       section: 'Locations'
+    },
+    {
+      id: 'membership-plans',
+      title: 'Membership Plans',
+      description: 'Edit plan titles, subtitles, and the feature comparison table shown on the public Membership Plans page.',
+      path: '/admin/settings/membership-plans',
+      icon: BadgeCheck,
+      canAccess: canViewForms,
+      section: 'Content'
     }
   ];
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Phone, Loader2, CheckCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { sessionManager } from '../../../lib/sessionManager';
+import { accountTypeLabel } from '../../../lib/accountTypeLabel';
 
 interface DeleteUserModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
     }
 
     if (!isGeneralUser) {
-      setError('Only general user accounts can be deleted from this interface');
+      setError('Only Free Member accounts can be deleted from this interface');
       return;
     }
 
@@ -162,8 +163,8 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
                   <div>
                     <p className="text-sm font-medium text-destructive">Cannot Delete This User</p>
                     <p className="text-sm text-destructive/90 mt-1">
-                      This user has account type <span className="font-semibold">{user.account_type}</span>.
-                      Only general user accounts can be deleted from this interface.
+                      This user is a <span className="font-semibold">{accountTypeLabel(user.account_type)}</span>.
+                      Only Free Member accounts can be deleted from this interface.
                     </p>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-06-20  
-**Updated by:** Codex
+**Last updated:** 2026-06-21
+**Updated by:** Claude Code
 
 ---
 
@@ -17,12 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-06-20 (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-06-20 |
+| Lint (`npm run lint`) | PASS on 2026-06-21 (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-06-21 |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
 | Phase 1 readonly smoke | Last known PASS (3 passed / 12 skipped) |
-
-> Note: Phase 1 smoke was not run for COD-EVENTS-UNPUBLISH-001; this slice was verified with lint/build and a local route redirect smoke check.
 
 ---
 
@@ -34,6 +32,57 @@ No active implementation slice.
 
 ## Recently Completed
 
+### CLU-FREE-MEMBER-LABEL-001
+- **Branch:** `main`
+- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **What shipped:** Display-only relabel of the `general_user` account type to product language. Admin/user-facing UI now shows "Free Member" (was "General User") and "Paid Member" (was "Member"). Backend enum value `general_user` is UNCHANGED — all logic checks (`account_type === 'general_user'`, etc.) remain intact.
+- **New helper:** `src/lib/accountTypeLabel.ts` — `accountTypeLabel()` maps stored values to display labels (general_user → Free Member, member → Paid Member, both → Paid Member + Admin, admin → Admin). Display only.
+- **Label changes:**
+  - `src/pages/admin/AdminUsers.tsx` — account-type display: 'General User' → 'Free Member', 'Member' → 'Paid Member', 'Member + {roles}' → 'Paid Member + {roles}', 'Member + Admin' → 'Paid Member + Admin'; filter dropdown options 'General User' → 'Free Member', 'Member' → 'Paid Member'.
+  - `src/components/admin/modals/BlockUserModal.tsx` — badge now uses `accountTypeLabel()` (Free Member / Paid Member / Paid Member + Admin / Admin).
+  - `src/components/admin/modals/DeleteUserModal.tsx` — "Only general user accounts can be deleted" → "Only Free Member accounts…" (2 spots); raw enum display now uses `accountTypeLabel()`.
+  - `src/pages/Directory.tsx` — public notice "hidden for general users" → "hidden for Free Members".
+- **Business Showcase gates verified (no change needed):** Free Members cannot create listings (`create_showcase_listing_with_session` checks approved+active registration); photo-upload and AI-improve edge functions independently re-check approved status; public page shows approved listings only; admin moderation gated by `members.view`/`members.edit`. RLS deny-all on `showcase_listings`.
+- **Backend:** No DB migration, no RPC change, no edge function change, no enum rename. Codex anon-key RPC probes confirmed the suspected grant blocker does NOT exist — member/admin showcase RPCs return normal `session_invalid` from the browser anon role.
+- **No `membership_tier` / `membership_status` field added** — Free vs Paid remains derived from `account_type` + approved active registration.
+- **Validation:** `npm run lint` PASS (0 errors / 3 expected shadcn warnings), `npm run build` PASS (2026-06-21).
+
+### CLU-MEMBERSHIP-PLANS-SHOWCASE-001
+- **Branch:** `main`
+- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **What shipped:**
+  - Public `/membership-plans` page: hero, "Why LUB" cards, Free vs Paid plan cards (with copy guardrails — free card never mentions directory/showcase/committee), feature comparison table, `StateWiseFeePanel` embedded, bottom CTA section. SEO metadata added.
+  - `StateWiseFeePanel` shared component: state selector, male/female/validity fee cards, QR code, bank details, CTA buttons. Used by both `/membership-plans` and `/payment`.
+  - Public `/business-showcase` page: hero, search/state/category filters, approved listing grid with `ShowcaseCard`. SEO metadata added.
+  - Member dashboard `/dashboard/showcase` (`MemberShowcaseListings`): auth guard, non-approved gate with upgrade prompt, listing CRUD (create/edit/save-draft/submit/delete-archive), photo upload, AI improve button, status badges.
+  - Admin showcase moderation `/admin/content/showcase` (`AdminShowcaseModeration`): status filter tabs, search, detail modal, approve/reject/archive actions with admin note.
+  - Admin membership plan settings `/admin/settings/membership-plans` (`AdminMembershipPlanSettings`): plan title/subtitle/description editor, feature comparison row editor (inline save per row), add-new-row form.
+  - DB migration: `supabase/migrations/20260621100000_business_showcase.sql` — `showcase_listings`, `membership_plan_settings`, `membership_plan_features` tables, seed data, RLS deny-all on listings, 10 `_with_session` SECURITY DEFINER RPCs.
+  - Edge functions: `supabase/functions/showcase-photo-upload/index.ts`, `supabase/functions/improve-showcase-listing/index.ts`.
+  - `src/lib/supabase.ts`: added `showcaseService`, `membershipPlanService`, interfaces `ShowcaseListing`, `ShowcaseListingDraft`, `MembershipPlanSetting`, `MembershipPlanFeature`.
+  - Navigation: "Membership Plans" added to top-level desktop nav + mobile nav in `Header.tsx`. "Showcase" tab added to `MemberNav.tsx` for approved members. Footer: Membership Plans + Business Showcase added to Quick Links. Admin sidebar: "Business Showcase" under Members section, "Membership Plans" under Settings section. AdminSettingsHub: Membership Plans card added.
+  - Routes in `App.tsx`: `/membership-plans`, `/business-showcase`, `/dashboard/showcase`, `/admin/content/showcase`, `/admin/settings/membership-plans`.
+- **Files (new):**
+  - `supabase/migrations/20260621100000_business_showcase.sql`
+  - `supabase/functions/showcase-photo-upload/index.ts`
+  - `supabase/functions/improve-showcase-listing/index.ts`
+  - `src/components/StateWiseFeePanel.tsx`
+  - `src/pages/MembershipPlans.tsx`
+  - `src/pages/BusinessShowcase.tsx`
+  - `src/pages/MemberShowcaseListings.tsx`
+  - `src/pages/AdminShowcaseModeration.tsx`
+  - `src/pages/AdminMembershipPlanSettings.tsx`
+- **Files (modified):**
+  - `src/lib/supabase.ts`
+  - `src/App.tsx`
+  - `src/components/Header.tsx`
+  - `src/components/Footer.tsx`
+  - `src/components/MemberNav.tsx`
+  - `src/components/admin/AppSidebar.tsx`
+  - `src/pages/AdminSettingsHub.tsx`
+- **Validation:** `npm run lint` PASS (0 errors / 3 expected shadcn warnings), `npm run build` PASS (2026-06-21).
+- **Runtime deployment:** Codex applied migration `20260621100000_business_showcase.sql` to the linked Supabase DB on 2026-06-21, deployed edge functions `showcase-photo-upload` and `improve-showcase-listing`, created public Storage bucket `showcase-photos` with 5 MB image limit and JPEG/PNG/WebP MIME restrictions, and probed `get_public_showcase_listings` successfully (`200`, empty list expected before approved listings exist). `supabase functions list` shows both new functions ACTIVE. A follow-up migration audit could not complete because earlier failed direct `psql` attempts temporarily tripped the Supabase pooler auth circuit breaker; do not retry until the block clears.
+
 ### COD-MEMBER-CHANGE-PASSWORD-001
 - **Branch:** `feature/ux-sprint-1`
 - **Commit:** Pending local commit (2026-06-20)
@@ -41,122 +90,21 @@ No active implementation slice.
 - **Files:** `src/pages/MemberSettings.tsx`, `src/pages/MemberChangePassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/components/ChangePasswordModal.tsx`, `supabase/migrations/20260620123000_member_change_password_with_session.sql`
 - **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run db:migrations:audit` PASS. Migration `20260620123000` is applied to the linked DB. Invalid-session RPC probe returns normal JSON `{ success: false, error_code: "session_invalid" }`, confirming PostgREST can find the function.
 
-### COD-AUTH-RESET-PGCRYPTO-SEARCH-PATH-002
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** Hotfix commit (2026-06-20)
-- **What shipped:** Fixed reset-link validation for real 64-character password reset tokens on Supabase projects where `pgcrypto` functions live in the `extensions` schema. The password-auth RPCs now include `extensions` in their function search path, so `digest`, `crypt`, `gen_salt`, and `gen_random_bytes` resolve correctly.
-- **Files:** `supabase/migrations/20260620113000_fix_password_auth_pgcrypto_search_path.sql`
-- **Validation:** Migration applied to the linked DB. Browser-callable RPC probe with a 64-character dummy token now returns normal JSON `{ success: false, error_code: "token_invalid" }` instead of PostgREST error `function digest(text, unknown) does not exist`.
-
-### COD-AUTH-UNIVERSAL-PASSWORD-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `cdff1ef` (2026-06-20)
-- **What shipped:** Implemented universal password auth for the custom-session portal flow. Signup now collects a fixed Password auth field outside the dynamic signup payload, sign-in now uses Email or Mobile Number + Password, forgot/reset password pages are active, and a new reset-request Edge Function emails one-time reset links through the existing Resend sender. Backend migration adds `users.password_set_at`, a separate hashed-token `member_password_tokens` table, password-aware signup/login/reset RPCs, placeholder-hash protection before `verify_password`, and full current account/member login gates in the new password login RPC.
-- **Files:** `src/pages/SignIn.tsx`, `src/pages/SignUpV2.tsx`, `src/pages/ForgotPassword.tsx`, `src/pages/ResetPassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/lib/passwordReset.ts`, `supabase/functions/request-password-reset/index.ts`, `supabase/migrations/20260620103000_universal_password_auth.sql`
-- **Follow-up:** Forgot Password messaging now shows exact no-account guidance for email vs mobile, returns a masked email after a reset email is sent, and hides the instruction subtitle after success.
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS, `npm run db:migrations:audit` PASS. Migration `20260620103000` is applied to the linked DB and `request-password-reset` Edge Function is deployed.
-- **Deployment note:** The migration now keeps the existing 6-arg signup RPC and adds the new password-aware overload, so currently deployed signup callers remain compatible while the new frontend can pass `p_password`.
-
-### COD-MEMBER-DASHBOARD-STATUS-COMPACT-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `0fc5801` (2026-06-20)
-- **What shipped:** Compact member dashboard Application Status card on `/dashboard`. Status now renders inline as simple bold colored text beside `Application Status`; approved is green, pending is dark red, rejected uses destructive text, and unknown statuses fall back to muted text. Removed the previous badge/pill status display, removed the large status icon beside the status message, and cleared the leftover inner padding so the status message aligns with the heading while preserving the status data source and message text.
-- **Files:** `src/pages/MemberDashboard.tsx`
-- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected warnings). Local `/dashboard` opened on the existing dev server; unauthenticated browser session showed the expected profile-unavailable gate and no console errors, so approved/pending member states were verified by code path rather than an authenticated browser session.
-
-### COD-MEMBER-DOCUMENT-VERIFY-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** Committed on `feature/ux-sprint-1` (2026-06-15)
-- **What shipped:** Added a read-only `Verify` action to Admin Member Registrations after `Generate Welcome Message`. The action is available for every visible registration row, including pending and approved records, and opens a document verification report modal that fetches available GST, UDYAM, and payment proof documents, runs the existing `extractDocument()` pipeline, compares extracted values against registered values, masks sensitive identifiers, shows document fetch/read warnings, and reports field-level plus overall verification status.
-- **Files:** `src/pages/AdminRegistrations.tsx`, `src/components/VerifyDocumentModal.tsx`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS.
-
-### COD-MEMBER-WELCOME-MESSAGE-AI-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `d05e2a1` (2026-06-14)
-- **What shipped:** Added a `Generate Welcome Message` action in Admin Member Registrations. The action opens a popup, calls a new `generate-member-welcome-message` Supabase Edge Function, generates an AI-written WhatsApp welcome message from the selected member's registration fields, allows review/editing in a textarea, and copies the final message to clipboard. The edge function validates the custom admin session plus `members.view` permission and reads the OpenAI key from server-side `ai_runtime_settings`.
-- **Files:** `src/pages/AdminRegistrations.tsx`, `supabase/functions/generate-member-welcome-message/index.ts`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS. Supabase CLI is installed; standalone `deno` is not available locally, so edge-function type checking was not run outside Supabase.
-
-### COD-MEMBER-GOOGLE-CONTACT-CSV-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `d05e2a1` (2026-06-14)
-- **What shipped:** Added a row-level `Download Google Contact` action in Admin Member Registrations. The action generates a single-member Google Contacts CSV using the exact 30-column header order from the provided sample, intentionally preserves blank Google contact fields, and maps the convenience contact name, company, designation, birthday, notes, labels, email, phone, and address fields from the loaded registration row.
-- **Files:** `src/pages/AdminRegistrations.tsx`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS.
-
-### COD-APPLICATION-REVIEW-REFERENCE-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `0fc5801` (2026-06-20)
-- **What shipped:** Moved the member registration `referred_by` value into the expanded Personal Information section of the admin Application Review modal as `Reference Name`, so admins can see it immediately. This row is always visible and shows `Not provided` when the stored value is blank. The PDF export places populated reference values in Personal Information and no longer duplicates them under Additional Information.
-- **Files:** `src/components/ViewApplicationModal.tsx`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS.
-
-### COD-COMMITTEE-EDIT-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `0fc5801` (2026-06-20)
-- **What shipped:** Added committee-level editing for LUB member role assignments. When the current assignment list resolves to one committee group and member search is clear, admins can edit the shared level/state/district/year/period fields once and update all matching assignments together.
-- **Files:** `src/pages/AdminDesignationsManagement.tsx`, `src/lib/supabase.ts`, `supabase/migrations/20260609114000_admin_update_member_lub_role_committee_group.sql`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS.
-- **Deployment note:** Migration applied to linked DB on 2026-06-09; RPC probe now returns `Invalid session` for an invalid token, confirming PostgREST can find the function.
-
-### COD-COMMITTEE-BUILDER-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `0fc5801` (2026-06-20)
-- **What shipped:** Replaced the old one-role bulk assignment popup with a wide Create Committee modal. Committee context is set once (level/state/district/year/period), active LUB roles load as editable role rows, each row has a role dropdown and smart member/alternate-contact search, duplicate role rows are supported, and empty member rows are allowed while editing but ignored on submit.
-- **Files:** `src/pages/AdminDesignationsManagement.tsx`, `src/lib/supabase.ts`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS.
-- **Data note:** Current `member_lub_role_assignments` rows require a member. Empty positions are not persisted; saving vacant committee positions would require a separate committee planning table.
-
-### COD-EVENTS-UNPUBLISH-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `0fc5801` (2026-06-20)
-- **What shipped:** Added a distinct `unpublished` event status for postponed published events, exposed `Unpublish` on the event edit form, updated admin event list labels/filter/metrics/actions to handle unpublished events, and changed new-event RSVP profession defaults to Agriculture, Consultancy, Education, Manufacturing, Official, Trading, Services, Other.
-- **Files:** `src/lib/supabase.ts`, `src/pages/AdminEventForm.tsx`, `src/pages/AdminEvents.tsx`, `supabase/migrations/20260609103000_events_unpublished_status.sql`
-- **Validation:** `npm run lint` PASS (0 errors / 3 expected warnings), `npm run build` PASS. Browser route smoke redirected unauthenticated `/admin/content/events/new` to `/signin`, so admin form visual verification needs an authenticated session.
-- **Deployment note:** Migration applied to linked DB on 2026-06-09.
-
-### COD-UX-SPRINT-1-001
-- **Branch:** `feature/ux-sprint-1`
-- **Commit:** `6448fd9` (2026-05-31)
-- **What shipped:** UI/accessibility Sprint 1 updates across 9 frontend files only (Toast aria-live/roles and dark-mode colors; status Badge normalization in RecentActivityList; icon-button labels; member nav `aria-current`; directory toggle/filter aria attributes; persistent `aria-invalid` input styling; table `aria-sort` + retry CTA in AdminReportsPayments; `aria-sort` in AdminUsers).
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
-- **Product note:** Header/Footer brand colors were intentionally kept fixed (original hardcoded blue/orange brand styling) after visual review; no theme-token swap.
-
-## Recently Completed (Main Branch)
-
-### COD-REPORTS-PAYMENTS-001
-- **Commit:** `c1f7ff2` (2026-05-24)
-- **What shipped:** Admin Reports section with Payments sub-module, secured `_with_session` report RPC, permission wiring, payments table filters/sorting/actions, and hardened application PDF export flow.
-- **Files:** `src/pages/AdminReportsPayments.tsx`, `src/components/ViewApplicationModal.tsx`, `src/components/admin/AppSidebar.tsx`, `src/lib/supabase.ts`, `src/App.tsx`, migrations:
-  - `supabase/migrations/20260524103000_admin_reports_payments_with_session.sql`
-  - `supabase/migrations/20260524143000_fix_payments_report_amount_parsing_and_error_surface.sql`
-
-### COD-SEO-001
-- **Commit:** `a8b428c` (2026-05-24)
-- **What shipped:** Non-invasive SEO baseline for crawlability and indexing.
-- **Files:** `index.html`, `public/robots.txt`, `public/sitemap.xml`, `src/App.tsx`
-
-### COD-ACTIVITY-DETAIL-MEDIA-ORDER-001
-- **Commit:** `5cafe6f` (2026-05-26)
-- **What shipped:** Public activity detail content order updated so media appears before full description.
-- **Files:** `src/pages/ActivityDetail.tsx`
-
 ---
 
 ## In Progress / Dirty State
 
 - No active code slice.
-- Local source changes for `COD-MEMBER-CHANGE-PASSWORD-001` are present but not committed yet. Untracked local artifacts remain (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
+- Local source changes for `CLU-MEMBERSHIP-PLANS-SHOWCASE-001` and `CLU-FREE-MEMBER-LABEL-001` are present but not committed. Runtime deployment for the showcase feature is complete. Do not commit or push without explicit user instruction.
+- Untracked local artifacts remain (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
 
 ---
 
 ## Deferred / Next Candidate Work
 
-1. `COD-MSME-SHOWCASE-001`
-2. `COD-MSME-ISSUES-001`
-3. `COD-PUBLIC-001`
-4. `COD-MEMBERS-EXPORT-002`
+1. `COD-MSME-ISSUES-001`
+2. `COD-PUBLIC-001`
+3. `COD-MEMBERS-EXPORT-002`
 
 ---
 

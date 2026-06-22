@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Loader2, CheckCircle, AlertTriangle, Lock, Unlock } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { sessionManager } from '../../../lib/sessionManager';
+import { accountTypeLabel } from '../../../lib/accountTypeLabel';
 
 interface BlockUserModalProps {
   isOpen: boolean;
@@ -59,16 +60,9 @@ const BlockUserModal: React.FC<BlockUserModalProps> = ({
       general_user: 'bg-muted text-muted-foreground'
     };
 
-    const labels = {
-      admin: 'Admin',
-      member: 'Member',
-      both: 'Admin & Member',
-      general_user: 'General User'
-    };
-
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[user.account_type]}`}>
-        {labels[user.account_type]}
+        {accountTypeLabel(user.account_type)}
       </span>
     );
   };

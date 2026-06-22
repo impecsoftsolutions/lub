@@ -8,10 +8,48 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### CLU-FREE-MEMBER-LABEL-001
+- **Status:** Complete — source uncommitted (pending explicit user instruction)
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Display-only relabel of the `general_user` account type to LUB product language. Admin/user-facing UI now reads "Free Member" (was "General User") and "Paid Member" (was "Member"). Added `src/lib/accountTypeLabel.ts` helper mapping stored enum values → display labels (general_user → Free Member, member → Paid Member, both → Paid Member + Admin, admin → Admin).
+- **Backend unchanged:** enum value `general_user` is NOT renamed. All logic checks (`account_type === 'general_user'`, deletion gate, free-user gate) remain intact. NO DB migration, NO RPC change, NO edge function change. Codex's anon-key RPC probes confirmed the earlier-suspected showcase grant blocker does NOT exist (member/admin RPCs return normal `session_invalid` from the browser anon role), so no grant-fix migration was created.
+- **No tier field added:** Free vs Paid stays derived from `account_type` + approved active `member_registrations` row. No `membership_tier` / `membership_status` / new enum.
+- **Business Showcase gates verified (no change needed):** Free Members cannot create listings (`create_showcase_listing_with_session` checks approved+active registration → `not_approved_member`); `showcase-photo-upload` and `improve-showcase-listing` edge functions independently re-check approved status; public page shows approved-only via `get_public_showcase_listings`; admin moderation gated by `members.view` / `members.edit`; RLS deny-all on `showcase_listings`.
+- **Validation:** lint PASS (0 errors / 3 expected shadcn warnings), build PASS (2026-06-21).
+- **Files:** `src/lib/accountTypeLabel.ts` (new), `src/pages/admin/AdminUsers.tsx`, `src/components/admin/modals/BlockUserModal.tsx`, `src/components/admin/modals/DeleteUserModal.tsx`, `src/pages/Directory.tsx`
+
+### CLU-MEMBERSHIP-PLANS-SHOWCASE-001
+- **Status:** Runtime deployed; source commit/push still pending explicit user instruction
+- **Branch / Commit:** `main` / NOT YET COMMITTED (user will confirm before commit/push)
+- **Summary:** Implemented the full Membership Plans + Business Showcase feature. Public `/membership-plans` page with hero, plan cards (Free vs Paid with copy guardrails), feature comparison table, `StateWiseFeePanel` shared component, and bottom CTA. Public `/business-showcase` with filters and listing grid. Member dashboard `/dashboard/showcase` with listing CRUD, photo upload, AI improve. Admin moderation `/admin/content/showcase`. Admin settings `/admin/settings/membership-plans`. Nav wired across Header, Footer, MemberNav, AppSidebar, AdminSettingsHub. Routes wired in App.tsx. SEO metadata for both public pages.
+- **Validation:** lint PASS (0 errors / 3 expected shadcn warnings), build PASS (2026-06-21).
+- **Runtime deployment:** Codex applied migration `supabase/migrations/20260621100000_business_showcase.sql` to the linked Supabase DB on 2026-06-21, deployed edge functions `showcase-photo-upload` and `improve-showcase-listing`, and created public Supabase Storage bucket `showcase-photos` with 5 MB image limit and JPEG/PNG/WebP MIME restrictions.
+- **Runtime verification:** `get_public_showcase_listings` RPC probe returned HTTP 200 with `[]`, which is expected before approved listings exist. `supabase functions list` shows both new functions ACTIVE. A follow-up `npm run db:migrations:audit` retry was blocked by Supabase pooler `(ECIRCUITBREAKER) too many authentication failures` after earlier failed direct `psql` attempts; retry after the temporary pooler block clears.
+- **Free card copy guardrails (do NOT add these to Free card):** "approved LUB member", "full member", "full directory access", "directory listing", "business showcase posting", "committee eligibility", "leadership eligibility". The Free card only lists community/access benefits: portal account, LUB news/updates, public events, upgrade anytime.
+- **Security pattern used:** All privileged writes use `_with_session` RPCs; no direct `.from().insert/update/delete` browser writes on the `showcase_listings` table (RLS deny-all on the table).
+- **Files (new):**
+  - `supabase/migrations/20260621100000_business_showcase.sql`
+  - `supabase/functions/showcase-photo-upload/index.ts`
+  - `supabase/functions/improve-showcase-listing/index.ts`
+  - `src/components/StateWiseFeePanel.tsx`
+  - `src/pages/MembershipPlans.tsx`
+  - `src/pages/BusinessShowcase.tsx`
+  - `src/pages/MemberShowcaseListings.tsx`
+  - `src/pages/AdminShowcaseModeration.tsx`
+  - `src/pages/AdminMembershipPlanSettings.tsx`
+- **Files (modified):**
+  - `src/lib/supabase.ts`
+  - `src/App.tsx`
+  - `src/components/Header.tsx`
+  - `src/components/Footer.tsx`
+  - `src/components/MemberNav.tsx`
+  - `src/components/admin/AppSidebar.tsx`
+  - `src/pages/AdminSettingsHub.tsx`
+
 ### COD-MEMBER-CHANGE-PASSWORD-001
 - **Status:** Closed locally, pending commit
 - **Branch / Commit:** `feature/ux-sprint-1` / pending local commit (2026-06-20)
-- **Summary:** Added a logged-in member Change Password path from `/dashboard/settings` Privacy & Security to `/dashboard/change-password`. The page collects current password, new password, and confirmation; validates minimum length and matching confirmation client-side; calls the member auth service; and shows success after changing the password. Stale “password-based authentication is no longer supported” copy was removed from member settings and related auth/modal surfaces.
+- **Summary:** Added a logged-in member Change Password path from `/dashboard/settings` Privacy & Security to `/dashboard/change-password`. The page collects current password, new password, and confirmation; validates minimum length and matching confirmation client-side; calls the member auth service; and shows success after changing the password. Stale "password-based authentication is no longer supported" copy was removed from member settings and related auth/modal surfaces.
 - **Backend details:** New `change_member_password_with_session` RPC verifies the current custom session, checks inactive/suspended users, rejects placeholder/passwordless accounts with a Forgot Password instruction, verifies the current password with the existing password helpers, hashes the new password server-side, resets lockout counters, and deletes other sessions for the same user while keeping the current session.
 - **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS, migration audit PASS. Migration `20260620123000_member_change_password_with_session.sql` applied to the linked DB. Invalid-session RPC probe returns normal JSON `{ success: false, error_code: "session_invalid" }`.
 - **Files:** `src/pages/MemberSettings.tsx`, `src/pages/MemberChangePassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/components/ChangePasswordModal.tsx`, `supabase/migrations/20260620123000_member_change_password_with_session.sql`
@@ -27,93 +65,16 @@ No active implementation slice.
 - **Status:** Closed
 - **Branch / Commit:** `feature/ux-sprint-1` / `cdff1ef` (2026-06-20)
 - **Summary:** Reintroduced password auth on top of the existing custom-session model. New signup users provide a fixed Password field outside the dynamic signup payload. Sign-in now uses one Email or Mobile Number field plus Password. Forgot/reset password pages are active. A new `request-password-reset` Edge Function creates server-side reset tokens and emails reset links through the existing Resend `send-email` function.
-- **Backend details:** New migration adds `users.password_set_at`, backfills only bcrypt hashes (`$2%`), creates `member_password_tokens` with hashed tokens only, replaces `create_portal_user_with_session_v2` with a password-aware signature, adds `sign_in_with_password`, and adds token validation/completion RPCs. The login RPC short-circuits passwordless/placeholder hashes before calling `verify_password` and preserves locked/suspended/inactive/frozen/deactivated-member gates.
 - **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS, migration audit PASS. Migration `20260620103000` is applied to the linked DB and `request-password-reset` Edge Function is deployed.
-- **Deployment note:** The migration keeps the existing 6-arg signup RPC and adds the password-aware overload, so currently deployed signup callers remain compatible while the new frontend can pass `p_password`.
 - **Files:** `src/pages/SignIn.tsx`, `src/pages/SignUpV2.tsx`, `src/pages/ForgotPassword.tsx`, `src/pages/ResetPassword.tsx`, `src/lib/customAuth.ts`, `src/lib/memberAuth.ts`, `src/lib/passwordReset.ts`, `supabase/functions/request-password-reset/index.ts`, `supabase/migrations/20260620103000_universal_password_auth.sql`
-
-### COD-MEMBER-WELCOME-MESSAGE-AI-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `d05e2a1` (2026-06-14)
-- **Summary:** Admin Member Registrations now includes a `Generate Welcome Message` row action. It opens a popup, calls the new `generate-member-welcome-message` Supabase Edge Function, displays the AI-generated WhatsApp welcome note in an editable textarea, and provides a copy button. The edge function validates the custom admin session plus `members.view`, reads OpenAI configuration from server-side `ai_runtime_settings`, and returns only the generated plain-text message.
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS. Supabase CLI is installed; standalone `deno` is unavailable locally, so edge-function type checking was not run outside Supabase.
-- **Files:** `src/pages/AdminRegistrations.tsx`, `supabase/functions/generate-member-welcome-message/index.ts`
-
-### COD-MEMBER-GOOGLE-CONTACT-CSV-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `d05e2a1` (2026-06-14)
-- **Summary:** Admin Member Registrations now has a row-level `Download Google Contact` action. It generates a single-row Google Contacts CSV using the provided 30-column template, keeps intentionally blank contact fields blank, and maps contact display name, company, designation, birthday, notes, labels, email, mobile, and address fields from the registration row.
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS.
-- **Files:** `src/pages/AdminRegistrations.tsx`
-
-### COD-APPLICATION-REVIEW-REFERENCE-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `0fc5801` (2026-06-20)
-- **Summary:** Admin Application Review now shows the registration `referred_by` value in the expanded Personal Information section as `Reference Name`; the modal row is always visible and shows `Not provided` when blank. PDF export also places populated reference values in Personal Information and avoids a duplicate lower Additional Information entry.
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS.
-- **Files:** `src/components/ViewApplicationModal.tsx`
-
-### COD-COMMITTEE-EDIT-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `0fc5801` (2026-06-20)
-- **Summary:** Added committee-level editing to Designations Management. When the current member assignment list resolves to exactly one committee group and member search is clear, admins can update shared level/state/district/committee year/period fields for all matching assignments in one save.
-- **Safety details:** The UI disables Edit Committee when the list contains multiple committee groups or when member search is active. The backend RPC matches the original group exactly, validates session + `organization.designations.manage`, validates year/location/date inputs, checks target conflicts, updates matching rows, and writes audit history.
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS.
-- **Deployment note:** Migration applied to linked DB on 2026-06-09. Invalid-session RPC probe returns `{ success: false, error: "Invalid session" }`, confirming PostgREST can find the function.
-- **Files:** `src/pages/AdminDesignationsManagement.tsx`, `src/lib/supabase.ts`, `supabase/migrations/20260609114000_admin_update_member_lub_role_committee_group.sql`
-
-### COD-COMMITTEE-BUILDER-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `0fc5801` (2026-06-20)
-- **Summary:** Reworked LUB role bulk assignment into a Create Committee workflow with shared context, dynamic active-role rows, per-row role dropdown, smart member/alternate search, duplicate roles, and empty member rows while editing.
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS.
-- **Data note:** Empty member rows are ignored on submit because current assignment records require `member_id`; persistent vacant positions need a future committee planning table.
-- **Files:** `src/pages/AdminDesignationsManagement.tsx`, `src/lib/supabase.ts`
-
-### COD-EVENTS-UNPUBLISH-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `0fc5801` (2026-06-20)
-- **Summary:** Added a distinct `unpublished` event status for postponed published events; updated admin event edit/list flows so published events can be unpublished and later published again; updated new-event RSVP profession defaults to Agriculture, Consultancy, Education, Manufacturing, Official, Trading, Services, Other.
-- **Validation:** lint PASS (0 errors / 3 expected warnings), build PASS. Browser smoke reached `/signin` from unauthenticated `/admin/content/events/new`; authenticated visual verification still needed.
-- **Deployment note:** Migration applied to linked DB on 2026-06-09.
-- **Files:** `src/lib/supabase.ts`, `src/pages/AdminEventForm.tsx`, `src/pages/AdminEvents.tsx`, `supabase/migrations/20260609103000_events_unpublished_status.sql`
-
-### COD-UX-SPRINT-1-001
-- **Status:** Closed
-- **Branch / Commit:** `feature/ux-sprint-1` / `6448fd9` (2026-05-31)
-- **Summary:** Completed UI/accessibility Sprint 1 in 9 frontend files only (toast semantics, status badges, icon-labels, `aria-current`, directory toggle/filter aria states, persistent invalid input affordance, sortable-header `aria-sort`, and payments-report retry CTA).
-- **Validation baseline preserved:** lint PASS (0 errors / 3 expected warnings), build PASS, Phase 1 readonly smoke PASS (3 passed / 12 skipped).
-- **Product decision captured:** Header/Footer color tokenization attempt was reverted; original fixed brand colors remain intentional.
-- **Files:** `src/components/Toast.tsx`, `src/components/dashboard/RecentActivityList.tsx`, `src/components/admin/AdminLayout.tsx`, `src/pages/MemberDashboard.tsx`, `src/components/MemberNav.tsx`, `src/pages/Directory.tsx`, `src/components/ui/input.tsx`, `src/pages/AdminReportsPayments.tsx`, `src/pages/admin/AdminUsers.tsx`
-
-### COD-ACTIVITY-DETAIL-MEDIA-ORDER-001
-- **Status:** Closed
-- **Commit:** `5cafe6f` (2026-05-26)
-- **Summary:** Public activity detail now shows photos/videos before full description.
-- **Files:** `src/pages/ActivityDetail.tsx`
-
-### COD-SEO-001
-- **Status:** Closed
-- **Commit:** `a8b428c` (2026-05-24)
-- **Summary:** Added baseline SEO surface (`metadata`, `robots.txt`, `sitemap.xml`) without changing app flow.
-- **Files:** `index.html`, `public/robots.txt`, `public/sitemap.xml`, `src/App.tsx`
-
-### COD-REPORTS-PAYMENTS-001
-- **Status:** Closed
-- **Commit:** `c1f7ff2` (2026-05-24)
-- **Summary:** Admin Reports > Payments shipped with secured RPC, permission wiring, filters/sorting/actions, and PDF-export hardening path.
-- **Files:** `src/pages/AdminReportsPayments.tsx`, `src/lib/supabase.ts`, `src/components/admin/AppSidebar.tsx`, `src/App.tsx`, `src/components/ViewApplicationModal.tsx`, migrations:
-  - `supabase/migrations/20260524103000_admin_reports_payments_with_session.sql`
-  - `supabase/migrations/20260524143000_fix_payments_report_amount_parsing_and_error_surface.sql`
 
 ## Open Handoff
 
-None.
+None. Runtime deployment is complete; source files remain uncommitted pending explicit user instruction.
 
 ## Next Queue
 
 Track ready items only in `docs/agent_coordination/TASK_BOARD.md`:
-- `COD-MSME-SHOWCASE-001`
 - `COD-MSME-ISSUES-001`
 - `COD-PUBLIC-001`
 - `COD-MEMBERS-EXPORT-002`

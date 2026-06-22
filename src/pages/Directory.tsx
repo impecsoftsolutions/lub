@@ -1016,7 +1016,7 @@ const Directory: React.FC = () => {
                   <EyeOff className="w-5 h-5 mr-2 text-primary" />
                   <span className="text-sm text-foreground">
                     {userRole.isLoggedIn ? (
-                      <>Contact details are hidden for general users. Approved member login is required to view full details.</>
+                      <>Contact details are hidden for Free Members. Approved member login is required to view full details.</>
                     ) : (
                       <>Contact details are hidden. <button
                         onClick={() => navigate('/signin')}
