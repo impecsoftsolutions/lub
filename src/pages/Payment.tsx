@@ -32,8 +32,9 @@ const Payment: React.FC = () => {
         );
         setAllActiveStates(sortedStates);
 
+        const hasStateParam = searchParams.has('state');
         const stateParam = searchParams.get('state');
-        const preferredStateName = stateParam?.trim() || memberStateName;
+        const preferredStateName = hasStateParam ? (stateParam?.trim() || '') : memberStateName;
 
         if (preferredStateName) {
           const matchingState = sortedStates.find(
@@ -43,10 +44,13 @@ const Payment: React.FC = () => {
           if (matchingState) {
             setSelectedStateName(matchingState.state);
             setErrorMessage(null);
-          } else if (stateParam) {
+          } else if (hasStateParam) {
             setErrorMessage(`No payment settings found for '${preferredStateName}'. Please choose your state.`);
             setSelectedStateName('');
           }
+        } else if (hasStateParam) {
+          setSelectedStateName('');
+          setErrorMessage(null);
         }
       } catch (error) {
         console.error('Error loading active states:', error);
@@ -95,18 +99,17 @@ const Payment: React.FC = () => {
 
   const handleStateSelect = (stateName: string) => {
     setSelectedStateName(stateName);
-    
-    // Update URL parameter
-    if (stateName) {
-      const params = new URLSearchParams();
-      params.set('state', stateName);
-      if (membershipParam) {
-        params.set('membership', membershipParam);
-      }
-      navigate(`/payment?${params.toString()}`);
-    } else {
-      navigate(membershipParam ? `/payment?membership=${membershipParam}` : '/payment');
+
+    const params = new URLSearchParams();
+    if (membershipParam) {
+      params.set('membership', membershipParam);
     }
+    params.set('state', stateName);
+
+    navigate(`/payment?${params.toString()}`, {
+      replace: true,
+      state: location.state
+    });
   };
 
   const handleBack = () => {

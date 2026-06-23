@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Check, Loader2, Minus, Users, Factory, Globe, TrendingUp } from 'lucide-react';
+import { ArrowRight, Check, Loader2, X, Users, Factory, Globe, TrendingUp } from 'lucide-react';
 import StateWiseFeePanel from '../components/StateWiseFeePanel';
 import {
   membershipPlanService,
@@ -186,12 +186,12 @@ const MembershipPlans: React.FC = () => {
                       <td className="px-5 py-3 text-center">
                         {f.freeValue
                           ? <Check className="mx-auto h-4 w-4 text-green-600" />
-                          : <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />}
+                          : <X className="mx-auto h-4 w-4 text-red-600" />}
                       </td>
                       <td className="px-5 py-3 text-center">
                         {f.paidValue
                           ? <Check className="mx-auto h-4 w-4 text-primary" />
-                          : <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />}
+                          : <X className="mx-auto h-4 w-4 text-red-600" />}
                       </td>
                     </tr>
                   ))}
