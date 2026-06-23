@@ -192,6 +192,9 @@ const Directory: React.FC = () => {
         `)
         .eq('status', 'approved')
         .eq('is_active', true)
+        // Paid-member directory listing only: Free Members (membership_application_type='free')
+        // are confirmed members but are not listed as paid members in the directory.
+        .eq('membership_application_type', 'paid')
         .order('state', { ascending: true })
         .order('full_name', { ascending: true });
 

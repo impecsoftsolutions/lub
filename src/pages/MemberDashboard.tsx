@@ -306,6 +306,25 @@ const MemberDashboard: React.FC = () => {
                     </Link>
                   </div>
                 )}
+
+                {effectiveStatus === 'approved'
+                  && (member.account_type === 'general_user' || !member.account_type) && (
+                  <div className="mt-6 rounded-lg border border-primary/20 bg-primary/5 p-5">
+                    <h3 className="text-section font-semibold text-foreground mb-1">
+                      Upgrade to Paid Membership
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      You are a confirmed Free Member. Upgrade to Paid LUB Membership to unlock the member directory,
+                      Business Showcase, and full member benefits. Paid benefits start after admin approval.
+                    </p>
+                    <Link
+                      to="/dashboard/upgrade"
+                      className="inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
+                    >
+                      Upgrade to Paid
+                    </Link>
+                  </div>
+                )}
               </>
             ) : hasRegistrationRecord === false ? (
               <div className="space-y-6">

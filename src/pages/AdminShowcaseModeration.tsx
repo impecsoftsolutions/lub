@@ -3,13 +3,18 @@ import {
   Building2,
   CheckCircle2,
   Eye,
+  EyeOff,
   Filter,
+  Globe,
   Loader2,
   MapPin,
   MoreHorizontal,
+  Pencil,
+  Save,
   Search,
   Sparkles,
   Tag,
+  Trash2,
   X,
   XCircle,
 } from 'lucide-react';
@@ -27,6 +32,23 @@ import { sessionManager } from '../lib/sessionManager';
 import { showcaseService, ShowcaseListing } from '../lib/supabase';
 
 type StatusFilter = 'all' | ShowcaseListing['status'];
+
+interface AdminEditDraft {
+  title: string;
+  productServiceName: string;
+  category: string;
+  keywords: string;
+  shortDescription: string;
+  detailedDescription: string;
+  contactEmail: string;
+  contactPhone: string;
+  websiteUrl: string;
+}
+
+const EMPTY_EDIT_DRAFT: AdminEditDraft = {
+  title: '', productServiceName: '', category: '', keywords: '', shortDescription: '',
+  detailedDescription: '', contactEmail: '', contactPhone: '', websiteUrl: '',
+};
 
 const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all',            label: 'All' },
@@ -46,6 +68,12 @@ const AdminShowcaseModeration: React.FC = () => {
   const [viewingListing, setViewingListing]   = useState<ShowcaseListing | null>(null);
   const [noteInput, setNoteInput]   = useState('');
   const [isActing, setIsActing]     = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<ShowcaseListing | null>(null);
+
+  const [editingListing, setEditingListing] = useState<ShowcaseListing | null>(null);
+  const [editDraft, setEditDraft] = useState<AdminEditDraft>(EMPTY_EDIT_DRAFT);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string; isVisible: boolean }>({
     type: 'success', message: '', isVisible: false,
@@ -89,6 +117,72 @@ const AdminShowcaseModeration: React.FC = () => {
       await loadListings();
     } else {
       showToast('error', result.error ?? 'Action failed.');
+    }
+  };
+
+  const handleSetVisibility = async (listing: ShowcaseListing, isPublic: boolean) => {
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setIsActing(listing.id);
+    const result = await showcaseService.adminSetVisibility(token, listing.id, isPublic);
+    setIsActing(null);
+    if (result.success) {
+      showToast('success', isPublic ? 'Listing is now visible to the public.' : 'Listing is hidden from the public.');
+      await loadListings();
+    } else {
+      showToast('error', result.error ?? 'Failed to update visibility.');
+    }
+  };
+
+  const performDelete = async () => {
+    const listing = deleteConfirm;
+    if (!listing) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setIsActing(listing.id);
+    const result = await showcaseService.adminDeleteArchived(token, listing.id);
+    setIsActing(null);
+    setDeleteConfirm(null);
+    if (result.success) {
+      showToast('success', 'Listing permanently deleted.');
+      await loadListings();
+    } else {
+      showToast('error', result.error ?? 'Failed to delete listing.');
+    }
+  };
+
+  const openEdit = (listing: ShowcaseListing) => {
+    setEditingListing(listing);
+    setEditError(null);
+    setEditDraft({
+      title:               listing.title,
+      productServiceName:  listing.productServiceName ?? '',
+      category:            listing.category ?? '',
+      keywords:            listing.keywords ?? '',
+      shortDescription:    listing.shortDescription,
+      detailedDescription: listing.detailedDescription ?? '',
+      contactEmail:        listing.contactEmail ?? '',
+      contactPhone:        listing.contactPhone ?? '',
+      websiteUrl:          listing.websiteUrl ?? '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingListing) return;
+    if (!editDraft.title.trim()) { setEditError('Title is required.'); return; }
+    if (!editDraft.shortDescription.trim()) { setEditError('Short description is required.'); return; }
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setIsSavingEdit(true);
+    setEditError(null);
+    const result = await showcaseService.adminUpdateListing(token, editingListing.id, editDraft);
+    setIsSavingEdit(false);
+    if (result.success) {
+      showToast('success', 'Listing updated.');
+      setEditingListing(null);
+      await loadListings();
+    } else {
+      setEditError(result.error ?? 'Failed to update listing.');
     }
   };
 
@@ -210,7 +304,14 @@ const AdminShowcaseModeration: React.FC = () => {
                       ) : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusChip status={listing.status} />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <StatusChip status={listing.status} />
+                        {listing.status === 'approved' && !listing.isPublic && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            <EyeOff className="h-3 w-3" /> Hidden
+                          </span>
+                        )}
+                      </div>
                       {listing.submittedAt && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {new Date(listing.submittedAt).toLocaleDateString('en-IN')}
@@ -238,34 +339,96 @@ const AdminShowcaseModeration: React.FC = () => {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {listing.status !== 'approved' && (
-                              <DropdownMenuItem
-                                onClick={() => handleAction(listing, 'approved')}
-                                className="text-green-700 dark:text-green-400"
-                              >
-                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                Approve
-                              </DropdownMenuItem>
-                            )}
-                            {listing.status !== 'rejected' && (
-                              <DropdownMenuItem
-                                onClick={() => { setViewingListing(listing); setNoteInput(''); }}
-                                className="text-destructive"
-                              >
-                                <XCircle className="mr-2 h-4 w-4" />
-                                Reject with Note
-                              </DropdownMenuItem>
-                            )}
-                            {listing.status !== 'archived' && (
+                            {/* pending_review: Approve, Reject with Note, Archive */}
+                            {listing.status === 'pending_review' && (
                               <>
-                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() => handleAction(listing, 'archived')}
-                                  className="text-muted-foreground"
+                                  onClick={() => handleAction(listing, 'approved')}
+                                  className="text-green-700 dark:text-green-400"
                                 >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => { setViewingListing(listing); setNoteInput(''); }}
+                                  className="text-destructive"
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Reject with Note
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleAction(listing, 'archived')} className="text-muted-foreground">
                                   Archive
                                 </DropdownMenuItem>
                               </>
+                            )}
+
+                            {/* approved: Hide/Show, Edit, Archive */}
+                            {listing.status === 'approved' && (
+                              <>
+                                {listing.isPublic ? (
+                                  <DropdownMenuItem onClick={() => handleSetVisibility(listing, false)}>
+                                    <EyeOff className="mr-2 h-4 w-4" />
+                                    Hide from Public
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onClick={() => handleSetVisibility(listing, true)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Show Publicly
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => openEdit(listing)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit Listing
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleAction(listing, 'archived')} className="text-muted-foreground">
+                                  Archive
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {/* rejected: Edit, Approve, Archive */}
+                            {listing.status === 'rejected' && (
+                              <>
+                                <DropdownMenuItem onClick={() => openEdit(listing)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit Listing
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleAction(listing, 'approved')}
+                                  className="text-green-700 dark:text-green-400"
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleAction(listing, 'archived')} className="text-muted-foreground">
+                                  Archive
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {/* draft: Edit, Archive */}
+                            {listing.status === 'draft' && (
+                              <>
+                                <DropdownMenuItem onClick={() => openEdit(listing)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit Listing
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleAction(listing, 'archived')} className="text-muted-foreground">
+                                  Archive
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {/* archived: Delete only (permanent) */}
+                            {listing.status === 'archived' && (
+                              <DropdownMenuItem onClick={() => setDeleteConfirm(listing)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Permanently
+                              </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -294,12 +457,17 @@ const AdminShowcaseModeration: React.FC = () => {
               </div>
 
               <div className="space-y-4 px-6 py-5">
-                {viewingListing.photoUrl && (
-                  <img
-                    src={viewingListing.photoUrl}
-                    alt={viewingListing.title}
-                    className="w-full max-h-48 rounded-lg object-cover border border-border"
-                  />
+                {viewingListing.photos.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {viewingListing.photos.map((p, i) => (
+                      <img
+                        key={i}
+                        src={p}
+                        alt={`${viewingListing.title} photo ${i + 1}`}
+                        className={`h-32 w-32 shrink-0 rounded-lg object-cover border-2 ${i === 0 ? 'border-primary' : 'border-border'}`}
+                      />
+                    ))}
+                  </div>
                 )}
 
                 <div>
@@ -335,19 +503,58 @@ const AdminShowcaseModeration: React.FC = () => {
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Member</p>
                     <p className="text-foreground">{viewingListing.memberName ?? '—'}</p>
                   </div>
-                  {viewingListing.state && (
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">State</p>
-                      <p className="text-foreground">{viewingListing.state}</p>
+                  {(viewingListing.city || viewingListing.district || viewingListing.state) && (
+                    <div className="col-span-2">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Location</p>
+                      <p className="text-foreground">
+                        {[viewingListing.city, viewingListing.district, viewingListing.state].filter(Boolean).join(', ')}
+                      </p>
                     </div>
                   )}
-                  {viewingListing.district && (
+                  {viewingListing.category && (
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">District</p>
-                      <p className="text-foreground">{viewingListing.district}</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Category</p>
+                      <p className="text-foreground">{viewingListing.category}</p>
+                    </div>
+                  )}
+                  {viewingListing.keywords && (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Keywords</p>
+                      <p className="text-foreground">{viewingListing.keywords}</p>
                     </div>
                   )}
                 </div>
+
+                {/* Public contact fields */}
+                {(viewingListing.contactEmail || viewingListing.contactPhone || viewingListing.websiteUrl) && (
+                  <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Contact</p>
+                    {viewingListing.contactEmail && (
+                      <p className="flex items-center justify-between gap-2 text-foreground">
+                        <span>{viewingListing.contactEmail}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${viewingListing.showContactEmail ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                          {viewingListing.showContactEmail ? 'Public' : 'Hidden'}
+                        </span>
+                      </p>
+                    )}
+                    {viewingListing.contactPhone && (
+                      <p className="mt-1 flex items-center justify-between gap-2 text-foreground">
+                        <span>{viewingListing.contactPhone}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${viewingListing.showContactPhone ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                          {viewingListing.showContactPhone ? 'Public' : 'Hidden'}
+                        </span>
+                      </p>
+                    )}
+                    {viewingListing.websiteUrl && (
+                      <p className="mt-1 flex items-center gap-2 text-foreground">
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                        <a href={viewingListing.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          {viewingListing.websiteUrl}
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Admin note input */}
                 <div>
@@ -371,7 +578,7 @@ const AdminShowcaseModeration: React.FC = () => {
                 >
                   Close
                 </button>
-                {viewingListing.status !== 'approved' && (
+                {(viewingListing.status === 'pending_review' || viewingListing.status === 'rejected') && (
                   <button
                     onClick={() => handleAction(viewingListing, 'approved', noteInput || undefined)}
                     disabled={isActing === viewingListing.id}
@@ -380,7 +587,7 @@ const AdminShowcaseModeration: React.FC = () => {
                     {isActing === viewingListing.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Approve'}
                   </button>
                 )}
-                {viewingListing.status !== 'rejected' && (
+                {viewingListing.status === 'pending_review' && (
                   <button
                     onClick={() => handleAction(viewingListing, 'rejected', noteInput || undefined)}
                     disabled={isActing === viewingListing.id}
@@ -389,6 +596,183 @@ const AdminShowcaseModeration: React.FC = () => {
                     {isActing === viewingListing.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Reject'}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Edit Modal */}
+        {editingListing && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 py-8 px-4">
+            <div className="relative w-full max-w-lg rounded-xl bg-card shadow-lg">
+              <div className="flex items-center justify-between border-b border-border px-6 py-4">
+                <h2 className="text-base font-semibold text-foreground">Edit Listing</h2>
+                <button
+                  onClick={() => { if (!isSavingEdit) setEditingListing(null); }}
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-muted/50"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 px-6 py-5">
+                <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+                  Editing does not change the listing status. Photos and location are managed by the member and are not edited here.
+                </p>
+
+                {editError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                    {editError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">Title <span className="text-destructive">*</span></label>
+                  <input
+                    type="text"
+                    value={editDraft.title}
+                    onChange={e => setEditDraft(d => ({ ...d, title: e.target.value }))}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-foreground">Product / Service Name</label>
+                    <input
+                      type="text"
+                      value={editDraft.productServiceName}
+                      onChange={e => setEditDraft(d => ({ ...d, productServiceName: e.target.value }))}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-foreground">Category</label>
+                    <input
+                      type="text"
+                      value={editDraft.category}
+                      onChange={e => setEditDraft(d => ({ ...d, category: e.target.value }))}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">Keywords</label>
+                  <input
+                    type="text"
+                    value={editDraft.keywords}
+                    onChange={e => setEditDraft(d => ({ ...d, keywords: e.target.value }))}
+                    placeholder="Comma-separated search keywords"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">Short Description <span className="text-destructive">*</span></label>
+                  <textarea
+                    value={editDraft.shortDescription}
+                    onChange={e => setEditDraft(d => ({ ...d, shortDescription: e.target.value }))}
+                    rows={2}
+                    maxLength={300}
+                    className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">Detailed Description</label>
+                  <textarea
+                    value={editDraft.detailedDescription}
+                    onChange={e => setEditDraft(d => ({ ...d, detailedDescription: e.target.value }))}
+                    rows={4}
+                    className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-foreground">Contact Email</label>
+                    <input
+                      type="email"
+                      value={editDraft.contactEmail}
+                      onChange={e => setEditDraft(d => ({ ...d, contactEmail: e.target.value }))}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-foreground">Contact Number</label>
+                    <input
+                      type="tel"
+                      value={editDraft.contactPhone}
+                      onChange={e => setEditDraft(d => ({ ...d, contactPhone: e.target.value }))}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+                <p className="-mt-1 text-xs text-muted-foreground">
+                  A contact email or number that is filled in is shown publicly on the listing; leave blank to hide it.
+                </p>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">Website</label>
+                  <input
+                    type="url"
+                    value={editDraft.websiteUrl}
+                    onChange={e => setEditDraft(d => ({ ...d, websiteUrl: e.target.value }))}
+                    placeholder="https://example.com"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t border-border px-6 py-4">
+                <button
+                  onClick={() => { if (!isSavingEdit) setEditingListing(null); }}
+                  className="flex-1 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Permanent delete confirm (archived only) */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-lg">
+              <div className="mb-3 flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                <h2 className="text-base font-semibold text-foreground">Delete permanently?</h2>
+              </div>
+              <p className="mb-5 text-sm text-muted-foreground">
+                This permanently deletes the archived listing
+                {deleteConfirm.title ? <> "<span className="font-medium text-foreground">{deleteConfirm.title}</span>"</> : null}.
+                This cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={performDelete}
+                  disabled={isActing === deleteConfirm.id}
+                  className="flex-1 rounded-lg bg-destructive px-4 py-2.5 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+                >
+                  {isActing === deleteConfirm.id ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Delete'}
+                </button>
               </div>
             </div>
           </div>

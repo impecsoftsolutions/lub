@@ -95,6 +95,7 @@ const Header: React.FC = () => {
     { path: '/news', label: 'News' },
     { path: '/leadership', label: 'Leadership' },
     { path: '/membership-plans', label: 'Membership Plans' },
+    { path: '/business-showcase', label: 'Business Showcase' },
   ];
 
   const isActiveLink = (path: string) => {

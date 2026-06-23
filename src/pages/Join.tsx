@@ -464,7 +464,11 @@ const Join: React.FC = () => {
   const [showOtherCity, setShowOtherCity] = useState(false);
   const [otherCityText, setOtherCityText] = useState('');
   const [currentStatePaymentSettings, setCurrentStatePaymentSettings] = useState<PublicPaymentState | null>(null);
-  
+
+  // Free vs Paid membership application type. Default 'paid' preserves the
+  // existing payment-proof-required flow. 'free' makes payment proof optional.
+  const [membershipType, setMembershipType] = useState<'free' | 'paid'>('paid');
+
   // Loading states
   const [isLoadingStates, setIsLoadingStates] = useState(true);
   const [isLoadingDesignations, setIsLoadingDesignations] = useState(true);
@@ -2494,9 +2498,9 @@ const Join: React.FC = () => {
       }
     });
 
-    // Product requirement: payment proof must exist before final submit,
-    // even when users choose to fill the form manually first.
-    if (!isPreviewMode && !files.paymentProof && !hasGuidedDraftStoredDocument('payment_proof')) {
+    // Product requirement: payment proof must exist before final submit for
+    // PAID applications. Free Membership applications do not require it.
+    if (membershipType === 'paid' && !isPreviewMode && !files.paymentProof && !hasGuidedDraftStoredDocument('payment_proof')) {
       newErrors.payment_proof_url = 'Payment Proof is required';
     }
 
@@ -2778,6 +2782,9 @@ const Join: React.FC = () => {
         console.log('[Join] Submitting as unauthenticated user (no user_id link)');
       }
 
+      // Free vs Paid membership application type (backend enforces paid-needs-proof).
+      (sanitizedData as Record<string, unknown>).membership_application_type = membershipType;
+
       // Submit registration
       console.log('[Join.tsx] Submitting registration to backend...');
       const shouldAttachGstCertificate = isFieldApplicable('gst_certificate_url', sanitizedData);
@@ -2794,7 +2801,8 @@ const Join: React.FC = () => {
         ? (files.paymentProof ?? await hydrateDraftFileForSubmission('payment_proof'))
         : null;
 
-      if (shouldAttachPaymentProof && !resolvedPaymentProof) {
+      // Paid applications must carry payment proof; Free Membership does not.
+      if (membershipType === 'paid' && shouldAttachPaymentProof && !resolvedPaymentProof) {
         setErrors(prev => ({ ...prev, payment_proof_url: 'Payment Proof is required' }));
         setFormErrorMessage('Please upload Payment Proof to continue');
         showToast('error', 'Payment proof is missing. Please upload it again.');
@@ -3431,6 +3439,51 @@ const Join: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} onBlurCapture={handleFormBlurCapture} className="space-y-8">
+            {/* Membership type — Free vs Paid */}
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h3 className="text-base font-semibold text-foreground mb-1">Choose your membership type</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Paid Membership unlocks the member directory, Business Showcase, and full member benefits after approval.
+                Free Membership gives you a confirmed LUB account; you can upgrade to Paid anytime.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setMembershipType('paid')}
+                  className={`rounded-lg border-2 p-4 text-left transition-colors ${
+                    membershipType === 'paid'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-background hover:border-primary/40'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-foreground">Paid Membership</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    State-wise fee applies. Payment proof required. Full member benefits after approval.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMembershipType('free')}
+                  className={`rounded-lg border-2 p-4 text-left transition-colors ${
+                    membershipType === 'free'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-background hover:border-primary/40'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-foreground">Free Membership</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    No payment proof required. Confirmed free LUB account. Upgrade to Paid later.
+                  </span>
+                </button>
+              </div>
+              {membershipType === 'free' && (
+                <p className="mt-3 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+                  Payment fields and payment proof are optional for Free Membership. You can still upload other
+                  supporting documents below.
+                </p>
+              )}
+            </div>
+
             {/* Smart Upload — top-level shortcut for any registration document */}
             <SmartUploadDocument
               formFieldValues={{

@@ -58,8 +58,10 @@ import AdminNormalizationSettings from './pages/AdminNormalizationSettings';
 import MembershipPlans from './pages/MembershipPlans';
 import BusinessShowcase from './pages/BusinessShowcase';
 import MemberShowcaseListings from './pages/MemberShowcaseListings';
+import MemberMembershipUpgrade from './pages/MemberMembershipUpgrade';
 import AdminShowcaseModeration from './pages/AdminShowcaseModeration';
 import AdminMembershipPlanSettings from './pages/AdminMembershipPlanSettings';
+import AdminShowcaseCategories from './pages/AdminShowcaseCategories';
 import AdminDateTimeSettings from './pages/AdminDateTimeSettings';
 import AdminFormBuilderV2 from './pages/AdminFormBuilderV2';
 import AdminFormEditorV2 from './pages/AdminFormEditorV2';
@@ -427,6 +429,7 @@ function App() {
             <Route path="/dashboard/reapply" element={<MemberReapply />} />
             <Route path="/dashboard/change-password" element={<MemberChangePassword />} />
             <Route path="/dashboard/showcase" element={<MemberShowcaseListings />} />
+            <Route path="/dashboard/upgrade" element={<MemberMembershipUpgrade />} />
           </Route>
 
           {/* Admin Routes - Redirect old admin login to unified signin */}
@@ -494,6 +497,7 @@ function App() {
             <Route path="/admin/content/activities/settings" element={<AdminActivitySettings />} />
             <Route path="/admin/content/showcase" element={<AdminShowcaseModeration />} />
             <Route path="/admin/settings/membership-plans" element={<AdminMembershipPlanSettings />} />
+            <Route path="/admin/settings/showcase-categories" element={<AdminShowcaseCategories />} />
           </Route>
           </Routes>
           </MemberContextProvider>

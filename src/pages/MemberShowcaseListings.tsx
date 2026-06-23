@@ -5,10 +5,13 @@ import {
   CheckCircle2,
   Clock,
   Edit,
+  ImagePlus,
   Loader2,
+  MapPin,
   Plus,
   Send,
   Sparkles,
+  Star,
   Trash2,
   Wand2,
   X,
@@ -19,28 +22,27 @@ import { useMember } from '../contexts/useMember';
 import { sessionManager } from '../lib/sessionManager';
 import {
   showcaseService,
+  showcaseCategoryService,
   ShowcaseListing,
   ShowcaseListingDraft,
-  statesService,
 } from '../lib/supabase';
 
-const CATEGORIES = [
-  'Manufacturing', 'Agriculture', 'Food & Beverages', 'Textiles & Garments',
-  'Engineering & Fabrication', 'Chemicals & Pharma', 'Construction & Materials',
-  'IT & Technology', 'Trading', 'Consultancy & Services', 'Education & Training',
-  'Healthcare', 'Other',
-];
+const MAX_PHOTOS = 3;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const WEBSITE_PATTERN = /^(https?:\/\/)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(:[0-9]{1,5})?(\/[^\s]*)?$/i;
 
-const CONTACT_PREF_OPTIONS = [
-  { value: 'member_contact', label: 'Member Contact' },
-  { value: 'email',          label: 'Email' },
-  { value: 'phone',          label: 'Phone' },
-  { value: 'any',            label: 'Any' },
-];
+interface PhotoItem {
+  url?: string;   // already-uploaded URL (edit mode or after upload)
+  file?: File;    // pending local file to upload on save
+  preview: string;
+}
 
 const EMPTY_DRAFT: ShowcaseListingDraft = {
-  title: '', productServiceName: '', category: '', shortDescription: '',
-  detailedDescription: '', state: '', district: '', photoUrl: '', contactPreference: 'member_contact',
+  title: '', productServiceName: '', category: '', keywords: '', shortDescription: '',
+  detailedDescription: '', photos: [], contactEmail: '', contactPhone: '',
+  showContactEmail: false, showContactPhone: false, websiteUrl: '',
 };
 
 type ModalMode = 'create' | 'edit';
@@ -70,18 +72,18 @@ const MemberShowcaseListings: React.FC = () => {
 
   const [listings, setListings]   = useState<ShowcaseListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [states, setStates]       = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
 
   const [modalMode,      setModalMode]      = useState<ModalMode>('create');
   const [editingId,      setEditingId]      = useState<string | null>(null);
   const [isModalOpen,    setIsModalOpen]    = useState(false);
   const [draft,          setDraft]          = useState<ShowcaseListingDraft>(EMPTY_DRAFT);
+  const [photos,         setPhotos]         = useState<PhotoItem[]>([]);
   const [isSaving,       setIsSaving]       = useState(false);
   const [isSubmitting,   setIsSubmitting]   = useState(false);
   const [isDeleting,     setIsDeleting]     = useState<string | null>(null);
   const [isAILoading,    setIsAILoading]    = useState(false);
-  const [photoFile,      setPhotoFile]      = useState<File | null>(null);
-  const [photoPreview,   setPhotoPreview]   = useState<string | null>(null);
+  const [isKeywordLoading, setIsKeywordLoading] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [formError,      setFormError]      = useState<string | null>(null);
   const [deleteConfirm,  setDeleteConfirm]  = useState<string | null>(null);
@@ -97,8 +99,8 @@ const MemberShowcaseListings: React.FC = () => {
   }, [authLoading, isAuthenticated, navigate]);
 
   useEffect(() => {
-    statesService.getPublicPaymentStates()
-      .then(s => setStates(s.map(st => st.state).sort()))
+    showcaseCategoryService.getActiveCategories()
+      .then(cats => setCategories(cats.map(c => c.name)))
       .catch(() => {});
   }, []);
 
@@ -115,12 +117,24 @@ const MemberShowcaseListings: React.FC = () => {
     if (!authLoading && isAuthenticated) loadListings();
   }, [authLoading, isAuthenticated, loadListings]);
 
+  // When editing a listing whose stored category is now inactive, keep it as an option.
+  const categoryOptions = (() => {
+    const opts = [...categories];
+    if (draft.category && !opts.includes(draft.category)) opts.unshift(draft.category);
+    return opts.sort((a, b) => {
+      const aOther = a.trim().toLowerCase() === 'other';
+      const bOther = b.trim().toLowerCase() === 'other';
+      if (aOther && !bOther) return 1;
+      if (!aOther && bOther) return -1;
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
+  })();
+
   const openCreate = () => {
     setModalMode('create');
     setEditingId(null);
     setDraft(EMPTY_DRAFT);
-    setPhotoFile(null);
-    setPhotoPreview(null);
+    setPhotos([]);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -132,43 +146,67 @@ const MemberShowcaseListings: React.FC = () => {
       title:               listing.title,
       productServiceName:  listing.productServiceName ?? '',
       category:            listing.category ?? '',
+      keywords:            listing.keywords ?? '',
       shortDescription:    listing.shortDescription,
       detailedDescription: listing.detailedDescription ?? '',
-      state:               listing.state ?? '',
-      district:            listing.district ?? '',
-      photoUrl:            listing.photoUrl ?? '',
-      contactPreference:   listing.contactPreference,
+      photos:              listing.photos,
+      contactEmail:        listing.contactEmail ?? '',
+      contactPhone:        listing.contactPhone ?? '',
+      showContactEmail:    listing.showContactEmail,
+      showContactPhone:    listing.showContactPhone,
+      websiteUrl:          listing.websiteUrl ?? '',
     });
-    setPhotoFile(null);
-    setPhotoPreview(listing.photoUrl ?? null);
+    setPhotos(listing.photos.map(u => ({ url: u, preview: u })));
     setFormError(null);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
-    if (isSaving || isAILoading || isUploadingPhoto) return;
+    if (isSaving || isAILoading || isKeywordLoading || isUploadingPhoto) return;
     setIsModalOpen(false);
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
-      setFormError('Only JPEG, PNG, or WebP images are allowed.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setFormError('Image must be under 5 MB.');
-      return;
-    }
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+  const handleAddPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ''; // allow re-selecting the same file
+    if (files.length === 0) return;
     setFormError(null);
+
+    setPhotos(prev => {
+      const next = [...prev];
+      for (const file of files) {
+        if (next.length >= MAX_PHOTOS) { setFormError(`You can upload up to ${MAX_PHOTOS} photos.`); break; }
+        if (!ALLOWED_PHOTO_TYPES.includes(file.type)) { setFormError('Only JPEG, PNG, or WebP images are allowed.'); continue; }
+        if (file.size > MAX_PHOTO_BYTES) { setFormError('Each image must be under 10 MB.'); continue; }
+        next.push({ file, preview: URL.createObjectURL(file) });
+      }
+      return next;
+    });
   };
+
+  const removePhoto = (index: number) =>
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+
+  const setAsMain = (index: number) =>
+    setPhotos(prev => {
+      if (index <= 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [item] = next.splice(index, 1);
+      next.unshift(item);
+      return next;
+    });
 
   const handleSave = async (submit = false) => {
     if (!draft.title.trim()) { setFormError('Title is required.'); return; }
     if (!draft.shortDescription.trim()) { setFormError('Short description is required.'); return; }
+    if (draft.contactEmail.trim() && !EMAIL_PATTERN.test(draft.contactEmail.trim())) {
+      setFormError('Enter a valid contact email address.');
+      return;
+    }
+    if (draft.websiteUrl.trim() && !WEBSITE_PATTERN.test(draft.websiteUrl.trim())) {
+      setFormError('Enter a valid website address.');
+      return;
+    }
 
     const token = sessionManager.getSessionToken();
     if (!token) { showToast('error', 'Session expired. Please sign in again.'); return; }
@@ -176,22 +214,26 @@ const MemberShowcaseListings: React.FC = () => {
     setIsSaving(true);
     setFormError(null);
 
-    let finalPhotoUrl = draft.photoUrl;
-
-    // Upload photo if a new file was selected
-    if (photoFile) {
-      setIsUploadingPhoto(true);
-      const uploadResult = await showcaseService.uploadPhoto(token, photoFile);
-      setIsUploadingPhoto(false);
-      if (!uploadResult.success) {
-        setFormError(uploadResult.error ?? 'Photo upload failed. Please try again.');
-        setIsSaving(false);
-        return;
+    // Upload any pending files (preserving order); collect final ordered URLs.
+    const finalUrls: string[] = [];
+    if (photos.some(p => p.file)) setIsUploadingPhoto(true);
+    for (const item of photos) {
+      if (item.url) {
+        finalUrls.push(item.url);
+      } else if (item.file) {
+        const uploadResult = await showcaseService.uploadPhoto(token, item.file);
+        if (!uploadResult.success || !uploadResult.url) {
+          setIsUploadingPhoto(false);
+          setFormError(uploadResult.error ?? 'Photo upload failed. Please try again.');
+          setIsSaving(false);
+          return;
+        }
+        finalUrls.push(uploadResult.url);
       }
-      finalPhotoUrl = uploadResult.url ?? '';
     }
+    setIsUploadingPhoto(false);
 
-    const draftToSave: ShowcaseListingDraft = { ...draft, photoUrl: finalPhotoUrl };
+    const draftToSave: ShowcaseListingDraft = { ...draft, photos: finalUrls };
 
     let result: { success: boolean; id?: string; error?: string };
     if (modalMode === 'create') {
@@ -260,19 +302,52 @@ const MemberShowcaseListings: React.FC = () => {
     }
   };
 
+  const getAIPhotoUrls = async (token: string): Promise<string[] | null> => {
+    let workingPhotos = photos;
+    if (photos.some(p => p.file && !p.url)) {
+      setIsUploadingPhoto(true);
+      const uploaded: PhotoItem[] = [];
+      for (const item of photos) {
+        if (item.url) { uploaded.push(item); continue; }
+        if (!item.file) continue;
+        const r = await showcaseService.uploadPhoto(token, item.file);
+        if (!r.success || !r.url) {
+          setIsUploadingPhoto(false);
+          setFormError(r.error ?? 'Photo upload failed. Please try again.');
+          return null;
+        }
+        uploaded.push({ url: r.url, preview: r.url });
+      }
+      setIsUploadingPhoto(false);
+      workingPhotos = uploaded;
+      setPhotos(uploaded);
+    }
+
+    return workingPhotos.map(p => p.url).filter((u): u is string => !!u);
+  };
+
   const handleImproveWithAI = async () => {
     const token = sessionManager.getSessionToken();
     if (!token) return;
     setIsAILoading(true);
+    setFormError(null);
+
+    const photoUrls = await getAIPhotoUrls(token);
+    if (!photoUrls) {
+      setIsAILoading(false);
+      return;
+    }
+
     const result = await showcaseService.improveWithAI(token, {
       title:               draft.title,
       productServiceName:  draft.productServiceName,
       category:            draft.category,
+      keywords:            draft.keywords,
       shortDescription:    draft.shortDescription,
       detailedDescription: draft.detailedDescription,
-      state:               draft.state,
-    });
+    }, photoUrls);
     setIsAILoading(false);
+
     if (!result.success) {
       setFormError(
         result.error_code === 'ai_disabled'
@@ -286,10 +361,53 @@ const MemberShowcaseListings: React.FC = () => {
         ...prev,
         title:               result.data!.title || prev.title,
         productServiceName:  result.data!.product_service_name || prev.productServiceName,
+        keywords:            result.data!.keywords || prev.keywords,
         shortDescription:    result.data!.short_description || prev.shortDescription,
         detailedDescription: result.data!.detailed_description || prev.detailedDescription,
       }));
       setFormError(null);
+      if (photoUrls.length > 0 && result.usedImages === false) {
+        showToast('error', 'AI could not read your photos this time — suggestions are based on your text. Review before saving.');
+      } else {
+        showToast('success', 'AI suggestions added. Review and edit before saving.');
+      }
+    }
+  };
+
+  const handleGenerateKeywords = async () => {
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setIsKeywordLoading(true);
+    setFormError(null);
+
+    const photoUrls = await getAIPhotoUrls(token);
+    if (!photoUrls) {
+      setIsKeywordLoading(false);
+      return;
+    }
+
+    const result = await showcaseService.improveWithAI(token, {
+      title:               draft.title,
+      productServiceName:  draft.productServiceName,
+      category:            draft.category,
+      keywords:            draft.keywords,
+      shortDescription:    draft.shortDescription,
+      detailedDescription: draft.detailedDescription,
+    }, photoUrls);
+    setIsKeywordLoading(false);
+
+    if (!result.success) {
+      setFormError(result.error ?? 'AI keyword generation failed.');
+      return;
+    }
+
+    if (result.data?.keywords) {
+      setDraft(prev => ({ ...prev, keywords: result.data!.keywords ?? prev.keywords }));
+      if (photoUrls.length > 0 && result.usedImages === false) {
+        showToast('error', 'AI could not read your photos this time — keywords are based on your text. Review before saving.');
+      } else {
+        showToast('success', 'Keywords generated. Review before saving.');
+      }
     }
   };
 
@@ -322,10 +440,10 @@ const MemberShowcaseListings: React.FC = () => {
             </p>
           ) : (
             <a
-              href="/join"
+              href="/dashboard/upgrade"
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
-              Apply for Paid Membership
+              Upgrade to Paid Membership
               <Sparkles className="h-4 w-4" />
             </a>
           )}
@@ -379,12 +497,19 @@ const MemberShowcaseListings: React.FC = () => {
             {listings.map(listing => (
               <div key={listing.id} className="rounded-xl border border-border bg-card p-5">
                 <div className="mb-3 flex items-start gap-3">
-                  {listing.photoUrl && (
-                    <img
-                      src={listing.photoUrl}
-                      alt={listing.title}
-                      className="h-14 w-14 rounded-lg object-cover border border-border shrink-0"
-                    />
+                  {listing.photos.length > 0 && (
+                    <div className="relative shrink-0">
+                      <img
+                        src={listing.photos[0]}
+                        alt={listing.title}
+                        className="h-14 w-14 rounded-lg object-cover border border-border"
+                      />
+                      {listing.photos.length > 1 && (
+                        <span className="absolute -bottom-1.5 -right-1.5 rounded-full bg-foreground/80 px-1.5 py-0.5 text-[10px] font-medium text-background">
+                          +{listing.photos.length - 1}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -491,7 +616,7 @@ const MemberShowcaseListings: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
+            <div className="space-y-5 px-6 py-5">
               {formError && (
                 <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -499,168 +624,221 @@ const MemberShowcaseListings: React.FC = () => {
                 </div>
               )}
 
-              {/* Photo upload */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Photo
+              {/* Photos */}
+              <section>
+                <label className="mb-1.5 block text-sm font-semibold text-foreground">
+                  Photos <span className="font-normal text-muted-foreground">(up to {MAX_PHOTOS})</span>
                 </label>
-                {photoPreview && (
-                  <div className="mb-2 relative inline-block">
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      className="h-28 w-28 rounded-lg object-cover border border-border"
-                    />
-                    <button
-                      onClick={() => { setPhotoFile(null); setPhotoPreview(null); setDraft(d => ({ ...d, photoUrl: '' })); }}
-                      className="absolute -top-1.5 -right-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={handlePhotoChange}
-                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/20"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">JPEG, PNG, or WebP. Max 5 MB.</p>
-              </div>
-
-              {/* Title */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Title <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={draft.title}
-                  onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-                  placeholder="e.g. Precision CNC Machine Parts"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                  maxLength={150}
-                />
-              </div>
-
-              {/* Product/service name */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Product / Service Name
-                </label>
-                <input
-                  type="text"
-                  value={draft.productServiceName}
-                  onChange={e => setDraft(d => ({ ...d, productServiceName: e.target.value }))}
-                  placeholder="e.g. CNC Machining Services"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                  maxLength={150}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {/* Category */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">Category</label>
-                  <select
-                    value={draft.category}
-                    onChange={e => setDraft(d => ({ ...d, category: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">Select…</option>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  The first photo is your main public photo. JPEG, PNG, or WebP. Max 10 MB each.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {photos.map((p, i) => (
+                    <div key={i} className="relative">
+                      <img
+                        src={p.preview}
+                        alt={`Photo ${i + 1}`}
+                        className={`h-24 w-24 rounded-lg object-cover border-2 ${i === 0 ? 'border-primary' : 'border-border'}`}
+                      />
+                      {i === 0 && (
+                        <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                          <Star className="h-2.5 w-2.5" /> Main
+                        </span>
+                      )}
+                      <button
+                        onClick={() => removePhoto(i)}
+                        className="absolute -top-1.5 -right-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      {i !== 0 && (
+                        <button
+                          onClick={() => setAsMain(i)}
+                          className="absolute bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-foreground/80 px-1.5 py-0.5 text-[10px] font-medium text-background hover:bg-foreground"
+                        >
+                          Set main
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {photos.length < MAX_PHOTOS && (
+                    <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary">
+                      <ImagePlus className="h-5 w-5" />
+                      <span className="text-[10px]">Add photo</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        multiple
+                        onChange={handleAddPhotos}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
+              </section>
 
-                {/* Contact preference */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">Contact Via</label>
-                  <select
-                    value={draft.contactPreference}
-                    onChange={e => setDraft(d => ({ ...d, contactPreference: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    {CONTACT_PREF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
+              {/* Location (read-only, from registration) */}
+              <section className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Business location
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your listing uses the business location from your approved LUB registration
+                  {member?.state ? <> (State: <strong>{member.state}</strong>)</> : null}. No need to re-enter it.
+                </p>
+              </section>
 
-              <div className="grid grid-cols-2 gap-3">
-                {/* State */}
+              {/* Basic details */}
+              <section className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">State</label>
-                  <select
-                    value={draft.state}
-                    onChange={e => setDraft(d => ({ ...d, state: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">Select…</option>
-                    {states.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-
-                {/* District */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-foreground">District</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">
+                    Title <span className="text-destructive">*</span>
+                  </label>
                   <input
                     type="text"
-                    value={draft.district}
-                    onChange={e => setDraft(d => ({ ...d, district: e.target.value }))}
-                    placeholder="e.g. Visakhapatnam"
+                    value={draft.title}
+                    onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
+                    placeholder="e.g. Precision CNC Machine Parts"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                    maxLength={150}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Product / Service Name</label>
+                    <input
+                      type="text"
+                      value={draft.productServiceName}
+                      onChange={e => setDraft(d => ({ ...d, productServiceName: e.target.value }))}
+                      placeholder="e.g. CNC Machining Services"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                      maxLength={150}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Category</label>
+                    <select
+                      value={draft.category}
+                      onChange={e => setDraft(d => ({ ...d, category: e.target.value }))}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">Select…</option>
+                      {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <label className="block text-sm font-medium text-foreground">Keywords</label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateKeywords}
+                      disabled={isKeywordLoading || isAILoading || (!draft.title && !draft.productServiceName && !draft.keywords && !draft.shortDescription && !draft.detailedDescription && photos.length === 0)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isKeywordLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 text-primary" />}
+                      Generate keywords
+                    </button>
+                  </div>
+                  <textarea
+                    value={draft.keywords}
+                    onChange={e => setDraft(d => ({ ...d, keywords: e.target.value }))}
+                    placeholder="e.g. cashew processing, food packaging, industrial machinery"
+                    rows={2}
+                    maxLength={500}
+                    className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Keywords help visitors find your product or service in search.
+                  </p>
+                </div>
+              </section>
+
+              {/* Contact */}
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Contact</h3>
+                <p className="-mt-1 text-xs text-muted-foreground">
+                  Add only the contact details you want shown on this listing.
+                </p>
+                <div>
+                  <input
+                    type="email"
+                    value={draft.contactEmail}
+                    onChange={e => setDraft(d => ({ ...d, contactEmail: e.target.value }))}
+                    placeholder="Contact email"
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
-              </div>
+                <div>
+                  <input
+                    type="tel"
+                    value={draft.contactPhone}
+                    onChange={e => setDraft(d => ({ ...d, contactPhone: e.target.value }))}
+                    placeholder="Contact number"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    inputMode="url"
+                    value={draft.websiteUrl}
+                    onChange={e => setDraft(d => ({ ...d, websiteUrl: e.target.value }))}
+                    placeholder="Website"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </section>
 
-              {/* Short description */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Short Description <span className="text-destructive">*</span>
-                </label>
-                <textarea
-                  value={draft.shortDescription}
-                  onChange={e => setDraft(d => ({ ...d, shortDescription: e.target.value }))}
-                  rows={2}
-                  maxLength={300}
-                  placeholder="One-line summary of your product or service (max 300 chars)"
-                  className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <p className="mt-1 text-right text-xs text-muted-foreground">
-                  {draft.shortDescription.length}/300
+              {/* Description */}
+              <section className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">
+                    Short Description <span className="text-destructive">*</span>
+                  </label>
+                  <textarea
+                    value={draft.shortDescription}
+                    onChange={e => setDraft(d => ({ ...d, shortDescription: e.target.value }))}
+                    rows={2}
+                    maxLength={300}
+                    placeholder="One-line summary of your product or service (max 300 chars)"
+                    className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <p className="mt-1 text-right text-xs text-muted-foreground">
+                    {draft.shortDescription.length}/300
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Detailed Description</label>
+                  <textarea
+                    value={draft.detailedDescription}
+                    onChange={e => setDraft(d => ({ ...d, detailedDescription: e.target.value }))}
+                    rows={4}
+                    placeholder="Describe your product or service in detail — quality, use cases, differentiators…"
+                    className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                {/* AI generate / improve — works from photos and/or text */}
+                <button
+                  type="button"
+                  onClick={handleImproveWithAI}
+                  disabled={isAILoading || isKeywordLoading || (!draft.title && !draft.productServiceName && !draft.keywords && !draft.shortDescription && !draft.detailedDescription && photos.length === 0)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isAILoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4 text-primary" />}
+                  {isAILoading
+                    ? (isUploadingPhoto ? 'Preparing photos…' : 'Generating with AI…')
+                    : 'Generate / Improve with AI (optional)'}
+                </button>
+                <p className="text-center text-xs text-muted-foreground -mt-2">
+                  AI reads your photos and any text you entered, then suggests the four text fields — you review and accept before saving.
                 </p>
-              </div>
-
-              {/* Detailed description */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Detailed Description
-                </label>
-                <textarea
-                  value={draft.detailedDescription}
-                  onChange={e => setDraft(d => ({ ...d, detailedDescription: e.target.value }))}
-                  rows={4}
-                  placeholder="Describe your product or service in detail — quality, use cases, differentiators…"
-                  className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-
-              {/* AI improve button */}
-              <button
-                type="button"
-                onClick={handleImproveWithAI}
-                disabled={isAILoading || (!draft.title && !draft.shortDescription)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isAILoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Wand2 className="h-4 w-4 text-primary" />
-                )}
-                {isAILoading ? 'Improving with AI…' : 'Improve with AI (optional)'}
-              </button>
-              <p className="text-center text-xs text-muted-foreground -mt-2">
-                AI suggests improved copy — you review and accept before saving.
-              </p>
+              </section>
             </div>
 
             <div className="flex gap-3 border-t border-border px-6 py-4">
@@ -672,14 +850,14 @@ const MemberShowcaseListings: React.FC = () => {
               </button>
               <button
                 onClick={() => handleSave(false)}
-                disabled={isSaving || isUploadingPhoto}
+                disabled={isSaving || isUploadingPhoto || isKeywordLoading}
                 className="flex-1 rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isUploadingPhoto ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Save Draft'}
               </button>
               <button
                 onClick={() => handleSave(true)}
-                disabled={isSaving || isUploadingPhoto}
+                disabled={isSaving || isUploadingPhoto || isKeywordLoading}
                 className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSaving && !isUploadingPhoto ? (

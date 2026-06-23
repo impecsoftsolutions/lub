@@ -8,6 +8,65 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### CLU-SHOWCASE-MODERATION-001
+- **Status:** Frontend complete; migration applied and runtime verified. Source uncommitted (pending explicit user instruction).
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Business Showcase moderation actions.
+  - `is_public boolean NOT NULL DEFAULT true` on `showcase_listings`; public listing requires `status='approved' AND is_public=true`; get_public/get_member/admin_get surface `is_public`.
+  - New admin `_with_session` RPCs (all `has_permission(members.edit)`): set-public-visibility (Hide/Show), admin-update (edit; preserves status; no photo/location change; contact visibility follows the member model — non-empty value is public), archived-only permanent delete (server-enforced). The member delete RPC is NOT reused.
+  - AdminShowcaseModeration: explicit per-status action sets — pending = Approve/Reject-with-Note/Archive; approved+public = Hide/Edit/Archive; approved+hidden = Show/Edit/Archive; rejected = Edit/Approve/Archive; draft = Edit/Archive; archived = Delete (confirm modal). Hidden badge on hidden approved listings. New admin edit modal + delete-confirm modal.
+  - Restore/Unarchive deferred (ambiguous restore status).
+- **Validation:** lint PASS (0 errors / 3 expected shadcn warnings), build PASS (2026-06-24).
+- **Codex runtime (CLU-SHOWCASE-MODERATION-001-RUNTIME):** Applied `supabase/migrations/20260624100000_showcase_moderation_visibility.sql` to the linked DB on 2026-06-23. `npm run db:migrations:audit` PASS: local 267 / remote 267 / local_only 0 / remote_only 0. Anon-key RPC probes for `admin_set_showcase_listing_public_visibility_with_session`, `admin_update_showcase_listing_with_session`, and `admin_delete_archived_showcase_listing_with_session` returned normal `session_invalid` JSON. DB checks confirmed `is_public` is `NOT NULL DEFAULT true`; existing approved listings remain public (`approved_total=1`, `approved_public=1`). A rollback-only valid-admin probe confirmed archived-only delete enforcement: delete on an approved listing returns `invalid_status` with "Archive it first."
+- **Notes:** No edge function, storage, or bucket change. Member create/edit and public layout unchanged except hidden listings drop out of the public list.
+
+### CLU-SHOWCASE-AI-VISION-001
+- **Status:** Frontend + edge function complete; edge function redeployed. Source uncommitted (pending explicit user instruction).
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Photo-aware AI for Business Showcase (one slice, no DB migration).
+  - `improve-showcase-listing`: accepts `photo_urls` (validated against `${SUPABASE_URL}/storage/v1/object/public/showcase-photos/`, max 3 — SSRF guard); adds `input_image` items to the single OpenAI Responses call; image-aware no-invention prompt; returns `usedImages`; retries text-only if the model rejects images; clear error if there is neither usable text nor a successful image read. Paid gate + settings load unchanged.
+  - `src/lib/supabase.ts`: `improveWithAI(token, listing, photoUrls?)` sends `photo_urls`, returns `usedImages`.
+  - `MemberShowcaseListings.tsx`: AI button relabeled "Generate / Improve with AI", enabled when there is text OR ≥1 photo; uploads pending photos first (reusing `showcase-photo-upload`) and writes returned URLs back into photo state so Save does not re-upload; sends ordered URLs; toasts a fallback note when `usedImages=false`; suggestions stay review-only (never auto-saved/submitted).
+- **Contact cleanup:** `MemberShowcaseListings.tsx` now shows `Contact email`, `Contact number`, and `Website` fields only. The old optional wording and public-display checkboxes were removed. Non-empty email/number/website values are public; blank values are hidden. Email and website are validated client-side and server-side; contact number is intentionally free-form for mobile or landline.
+- **Keywords + categories:** Active showcase categories now sort A-Z with `Other` pinned last. Listings now have a searchable `keywords` field. Members can type keywords manually, generate only keywords with a separate button, or use the main AI generation to fill keywords along with title/product/description. Keywords remain internal/search-only on the public Business Showcase UI and are not shown as public chips.
+- **Validation:** lint PASS (0 errors / 3 expected shadcn warnings), build PASS (2026-06-23). Contact/website follow-up revalidated with lint PASS (0 errors / 3 expected warnings) and build PASS on 2026-06-23.
+- **Codex runtime (CLU-SHOWCASE-AI-VISION-001-RUNTIME):**
+  - Redeployed `improve-showcase-listing` to linked Supabase project `qskziirjtzomrtckpzas` on 2026-06-23. Function list shows ACTIVE version 3 updated at 2026-06-23 09:34:50 UTC.
+  - Live anon-key probes for text-only, foreign photo URL, and allowed `showcase-photos` URL payloads returned normal `session_invalid` JSON, confirming the deployed function is reachable and session-gated.
+  - Full photo-to-suggestion smoke requires a valid signed-in paid-member session token and was not completed from the local runtime environment. An anon REST read of `ai_runtime_settings` returned no public rows, so the `business_showcase_drafting` model row could not be directly inspected without privileged DB access; the deployed source still defaults to `gpt-4o-mini` if the function does not receive a model override from runtime settings.
+- **Contact/website runtime:** Applied `supabase/migrations/20260623110000_showcase_website_contact_validation.sql` to linked DB on 2026-06-23. It adds `showcase_listings.website_url`, validates optional email/website in create/update RPCs, returns `website_url` from public/member/admin reads, and treats filled email/phone/website as public. RPC probes with the new `p_website_url` param returned normal JSON for public/create/update/admin reads. Migration audit PASS: local 265 / remote 265.
+- **Keywords runtime:** Applied `supabase/migrations/20260623113000_showcase_keywords.sql` to linked DB on 2026-06-23. It adds `showcase_listings.keywords`, returns keywords from public/member/admin reads, accepts `p_keywords` in create/update RPCs, and includes keywords in public/admin search. Redeployed `improve-showcase-listing` to ACTIVE version 4 (updated 2026-06-23 10:09:02 UTC). RPC probes with `p_keywords` returned normal JSON and migration audit PASS: local 266 / remote 266.
+- **Notes:** Draft photos are already public (existing behavior) so passing public URLs to OpenAI adds no new exposure.
+
+### CLU-SHOWCASE-V2-001
+- **Status:** Frontend complete; migration applied and runtime verified. Source uncommitted (pending explicit user instruction).
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Business Showcase v2.
+  - Multi-photo: ordered `photo_urls jsonb` (up to 3, [0] = main), 10 MB each. Legacy `photo_url` kept + dual-written; read RPCs emit a unified `photos` array (photo_urls → [photo_url] → []). Existing single-photo rows backfilled. Helper `normalize_showcase_photos` clamps to 3.
+  - Contact: nullable `contact_email`/`contact_phone` + `show_contact_email`/`show_contact_phone` (default false). Public RPC returns a contact value only when its show flag is true. Member form has explicit "Show publicly" toggles, default off.
+  - Location: create/update snapshot state/district/city from the latest approved registration (member form shows it read-only). Added `city` column.
+  - Categories: new `showcase_categories` table + seed (Packaging; Manufacturing split; Other); public RLS read (active) + `admin_get_showcase_categories_with_session` + `admin_upsert_showcase_category_with_session`; admin page `/admin/settings/showcase-categories` + Settings Hub card + sidebar link; member/public/admin dropdowns load from backend; member edit keeps a now-inactive stored category as an option.
+  - create/update RPCs changed signature (DROP + CREATE) to take `p_photo_urls jsonb` + contact params; paid `account_type` gate preserved; latent member_id/user_id snapshot bug fixed.
+- **Validation:** lint PASS (0 errors / 3 expected shadcn warnings), build PASS (2026-06-23).
+- **Codex runtime:** Applied `supabase/migrations/20260623100000_business_showcase_v2.sql` to the linked DB on 2026-06-23, raised `showcase-photos` bucket limit from 5 MB to 10 MB, and redeployed `showcase-photo-upload`.
+- **Runtime verification:** RPC probes returned normal JSON (not PostgREST "function not found") for `get_public_showcase_listings`, `create_showcase_listing_with_session`, `update_showcase_listing_with_session`, `admin_get_showcase_listings_with_session`, `admin_get_showcase_categories_with_session`, and `admin_upsert_showcase_category_with_session`. Schema checks confirmed `photo_urls`, contact fields, show flags, and `city` exist; `showcase_categories` exists with 19 seeded categories, including Packaging and no bare Manufacturing. Bucket verification: public, `file_size_limit=10485760`, JPEG/JPG/PNG/WebP MIME restrictions. Live upload-function invalid-session probe returned normal `session_invalid` JSON. `npm run db:migrations:audit` PASS: local 264 / remote 264 / local_only 0 / remote_only 0. There are currently no existing single-photo showcase rows to sample for photo fallback; the legacy fallback is present in the applied read RPCs.
+- **Notes:**
+  - The `showcase-photo-upload` and `improve-showcase-listing` edge functions already gate on paid `account_type` (Codex hardened them in the previous slice).
+  - Backward compatibility: existing approved single-photo listings continue to display via the unified `photos` fallback; `photo_url` and `contact_preference` retained (deprecation deferred).
+
+### CLU-FREE-PAID-MEMBERSHIP-001
+- **Status:** Frontend complete; migration applied and verified. Source uncommitted (pending explicit user instruction).
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Implements the Free vs Paid membership process and Free→Paid upgrade per the Codex-approved plan.
+  - DB: explicit `membership_application_type` ('free'|'paid', default 'paid'); `submit_member_registration` stores it and enforces paid-needs-proof; `update_member_registration_status` promotes `account_type` to 'member' only for approved PAID rows (Free approvals stay general_user); `create_showcase_listing_with_session` now gates on paid `account_type` (and fixes a latent member_id/user_id lookup bug); new `get_member_registration_types_with_session`; new `membership_upgrade_requests` table + 4 RPCs with atomic approval (promote account_type + stamp existing registration paid; approved-Free row untouched until approval).
+  - Frontend: Join Free/Paid selector + conditional payment proof; Directory list gated on paid; dashboard Upgrade CTA; `/dashboard/upgrade` page; admin Free/Paid filter + badge + Upgrade Requests tab.
+- **Validation:** lint PASS (0 errors / 3 expected shadcn warnings), build PASS (2026-06-22).
+- **Codex runtime:** Applied `supabase/migrations/20260622100000_free_paid_membership.sql` to the linked DB on 2026-06-22. RPC probes returned normal JSON (not PostgREST "function not found") for invalid/input sessions: `submit_member_registration`, `create_showcase_listing_with_session`, `get_member_registration_types_with_session`, `submit_membership_upgrade_with_session`, `admin_list_membership_upgrade_requests_with_session`, `admin_review_membership_upgrade_with_session`. Schema/data checks confirmed `member_registrations.membership_application_type` exists, is `NOT NULL`, defaults to `'paid'::text`, has CHECK (`free`,`paid`), and all 174 existing rows are `paid`. `npm run db:migrations:audit` PASS: local 263 / remote 263 / local_only 0 / remote_only 0.
+- **Notes / decisions:**
+  - The migration adds a 7th param to `submit_member_registration` via DROP + CREATE (no overload ambiguity); only the frontend calls it.
+  - Codex updated and deployed the two showcase EDGE FUNCTIONS (showcase-photo-upload, improve-showcase-listing) so both gate on paid users.account_type in ('member','both'), mirroring the RPC fix and removing the stale member_registrations.member_id = <uuid> lookup. Live invalid-session probes returned normal session_invalid JSON for both functions.
+  - No `membership_tier`/`membership_status` field; Free vs Paid stays derived from `account_type` + approved active registration. Backend enum unchanged.
+
 ### CLU-FREE-MEMBER-LABEL-001
 - **Status:** Complete — source uncommitted (pending explicit user instruction)
 - **Branch / Commit:** `main` / NOT YET COMMITTED
@@ -70,7 +129,7 @@ No active implementation slice.
 
 ## Open Handoff
 
-None. Runtime deployment is complete; source files remain uncommitted pending explicit user instruction.
+No active handoff. Source files remain uncommitted pending explicit user instruction.
 
 ## Next Queue
 

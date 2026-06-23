@@ -155,7 +155,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         { label: "Date & Time Settings", path: "/admin/settings/datetime" },
         { label: "Theme", path: "/admin/settings/appearance" },
         { label: "AI Settings", path: "/admin/settings/ai" },
-        { label: "Membership Plans", path: "/admin/settings/membership-plans" }
+        { label: "Membership Plans", path: "/admin/settings/membership-plans" },
+        { label: "Showcase Categories", path: "/admin/settings/showcase-categories" }
       ]
     },
     {

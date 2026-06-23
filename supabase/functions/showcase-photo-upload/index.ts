@@ -19,7 +19,7 @@ const corsHeaders = {
 };
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB (Business Showcase v2)
 const BUCKET = 'showcase-photos';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -70,9 +70,8 @@ async function rpcCall<T>(
   }
 }
 
-interface ApprovedCheckRow {
-  status: string;
-  is_active: boolean;
+interface UserAccountRow {
+  account_type: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -112,7 +111,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, error: 'Only JPEG, PNG, and WebP images are allowed.' }, 400);
   }
   if (file.size <= 0 || file.size > MAX_BYTES) {
-    return jsonResponse({ success: false, error: 'File must be between 1 byte and 5 MB.' }, 400);
+    return jsonResponse({ success: false, error: 'File must be between 1 byte and 10 MB.' }, 400);
   }
 
   // Validate session
@@ -125,10 +124,11 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, error: 'Session invalid or expired.', error_code: 'session_invalid' });
   }
 
-  // Check member is approved
-  const registrationRows = await (async () => {
+  // Check member is paid. This mirrors the canonical paid gate used by
+  // create_showcase_listing_with_session.
+  const userRows = await (async () => {
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/member_registrations?member_id=eq.${encodeURIComponent(userId)}&select=status,is_active&order=created_at.desc&limit=1`,
+      `${supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=account_type&limit=1`,
       {
         headers: {
           apikey: serviceRoleKey,
@@ -138,15 +138,14 @@ Deno.serve(async (req: Request) => {
       },
     );
     if (!res.ok) return null;
-    return (await res.json()) as ApprovedCheckRow[];
+    return (await res.json()) as UserAccountRow[];
   })();
 
-  const isApproved = Array.isArray(registrationRows)
-    && registrationRows.length > 0
-    && registrationRows[0].status === 'approved'
-    && registrationRows[0].is_active === true;
+  const isPaidMember = Array.isArray(userRows)
+    && userRows.length > 0
+    && ['member', 'both'].includes(userRows[0].account_type ?? '');
 
-  if (!isApproved) {
+  if (!isPaidMember) {
     return jsonResponse({
       success: false,
       error: 'Only approved paid LUB members can upload showcase photos.',

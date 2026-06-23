@@ -35,9 +35,13 @@ interface AIRuntimeSettingsRow {
 interface ListingInput {
   title?: string;
   product_service_name?: string;
+  productServiceName?: string;
   category?: string;
+  keywords?: string;
   short_description?: string;
+  shortDescription?: string;
   detailed_description?: string;
+  detailedDescription?: string;
   state?: string;
   district?: string;
 }
@@ -45,11 +49,11 @@ interface ListingInput {
 interface RequestBody {
   session_token?: string;
   listing?: ListingInput;
+  photo_urls?: unknown;
 }
 
-interface ApprovedRow {
-  status: string;
-  is_active: boolean;
+interface UserAccountRow {
+  account_type: string | null;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -66,6 +70,21 @@ function failClosed(error: string, error_code: ErrorCode): Response {
 function toStr(v: unknown, max = 500): string {
   const s = String(v ?? '').replace(/\s+/g, ' ').trim();
   return s.length > max ? s.slice(0, max).trim() : s;
+}
+
+// SSRF guard: only allow public URLs from this project's showcase-photos bucket
+// to be handed to OpenAI as image inputs. Caps at 3.
+function validatePhotoUrls(value: unknown, supabaseUrl: string): string[] {
+  if (!Array.isArray(value)) return [];
+  const allowedPrefix = `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/showcase-photos/`;
+  const out: string[] = [];
+  for (const item of value) {
+    const url = String(item ?? '').trim();
+    if (url && url.startsWith(allowedPrefix) && out.length < 3) {
+      out.push(url);
+    }
+  }
+  return out;
 }
 
 function sanitize(s: string): string {
@@ -137,19 +156,28 @@ async function loadAISettings(
   return null;
 }
 
-function buildSystemPrompt(): string {
-  return [
+function buildSystemPrompt(hasImages: boolean): string {
+  const lines = [
     'You help MSME entrepreneurs on the LUB (Laghu Udyog Bharati) portal improve their business showcase listings.',
     'LUB is India\'s leading MSME organization focused on manufacturing and Make-in-India.',
-    'Your output must be strict JSON: { "title": string, "product_service_name": string, "short_description": string, "detailed_description": string }.',
-    'Rules: improve clarity and appeal; keep text professional and factual; do not invent products, certifications, awards, or claims not in the input.',
+    'Your output must be strict JSON: { "title": string, "product_service_name": string, "keywords": string, "short_description": string, "detailed_description": string }.',
+    'Rules: improve clarity and appeal; keep text professional and factual; do not invent products, certifications, awards, clients, materials, dimensions, capacities, standards, or technical specs that are not provided or clearly visible.',
     'short_description: max 200 characters; single sentence suitable for a listing card.',
     'detailed_description: 3-5 sentences; highlight product quality, use case, and business differentiator.',
     'title: concise and descriptive; max 80 characters.',
     'product_service_name: clean product or service name; max 100 characters.',
+    'keywords: 8-15 comma-separated search keywords or phrases relevant to the product/service, including common buyer search terms. Do not include unrelated or invented claims.',
     'Do not use emojis, markdown, or bullet points in the JSON values.',
-    'Return only the JSON object with those four keys.',
-  ].join(' ');
+    'Return only the JSON object with those five keys.',
+  ];
+  if (hasImages) {
+    lines.push(
+      'The attached photos show the member\'s product or service. Base your descriptions only on attributes clearly visible in the photos and on the text the member provided.',
+      'Do not guess brand names, certifications, materials, or specifications that are not clearly visible. If unsure, stay general and factual.',
+      'If the member left fields blank, generate sensible draft text from what the photos show.',
+    );
+  }
+  return lines.join(' ');
 }
 
 function buildUserPrompt(listing: ListingInput): string {
@@ -158,10 +186,11 @@ function buildUserPrompt(listing: ListingInput): string {
     organization: 'Laghu Udyog Bharati (LUB) - MSME Portal',
     listing_details: {
       title:                 toStr(listing.title, 120),
-      product_service_name:  toStr(listing.product_service_name, 150),
+      product_service_name:  toStr(listing.product_service_name || listing.productServiceName, 150),
       category:              toStr(listing.category, 80),
-      short_description:     toStr(listing.short_description, 300),
-      detailed_description:  toStr(listing.detailed_description, 1000),
+      keywords:              toStr(listing.keywords, 500),
+      short_description:     toStr(listing.short_description || listing.shortDescription, 300),
+      detailed_description:  toStr(listing.detailed_description || listing.detailedDescription, 1000),
       state:                 toStr(listing.state, 80),
       district:              toStr(listing.district, 80),
     },
@@ -180,13 +209,18 @@ async function callOpenAI(
   reasoningEffort: string | null,
   systemPrompt: string,
   userPrompt: string,
-): Promise<{ title: string; product_service_name: string; short_description: string; detailed_description: string }> {
+  imageUrls: string[] = [],
+): Promise<{ title: string; product_service_name: string; keywords: string; short_description: string; detailed_description: string }> {
+  const content: Array<Record<string, unknown>> = [
+    { type: 'input_text', text: `${systemPrompt}\n\n${userPrompt}` },
+  ];
+  for (const url of imageUrls) {
+    content.push({ type: 'input_image', image_url: url });
+  }
+
   const body: Record<string, unknown> = {
     model,
-    input: [{
-      role: 'user',
-      content: [{ type: 'input_text', text: `${systemPrompt}\n\n${userPrompt}` }],
-    }],
+    input: [{ role: 'user', content }],
   };
 
   if (reasoningEffort && model.toLowerCase().startsWith('gpt-5')) {
@@ -231,6 +265,7 @@ async function callOpenAI(
   return {
     title:                toStr(parsed.title, 120),
     product_service_name: toStr(parsed.product_service_name, 150),
+    keywords:             toStr(parsed.keywords, 500),
     short_description:    toStr(parsed.short_description, 300),
     detailed_description: toStr(parsed.detailed_description, 1500),
   };
@@ -264,6 +299,9 @@ Deno.serve(async (req: Request) => {
     return failClosed('Service not configured. Please contact an administrator.', 'ai_disabled');
   }
 
+  // Only this project's public showcase-photos URLs are accepted as image inputs.
+  const photoUrls = validatePhotoUrls(payload.photo_urls, supabaseUrl);
+
   // Validate session
   const userId = await rpcCall<string | null>(
     supabaseUrl, serviceRoleKey,
@@ -274,10 +312,11 @@ Deno.serve(async (req: Request) => {
     return failClosed('Session invalid or expired. Please sign in again.', 'session_invalid');
   }
 
-  // Check approved member
-  const regRows = await (async () => {
+  // Check paid member. This mirrors the canonical paid gate used by
+  // create_showcase_listing_with_session.
+  const userRows = await (async () => {
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/member_registrations?member_id=eq.${encodeURIComponent(userId)}&select=status,is_active&order=created_at.desc&limit=1`,
+      `${supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=account_type&limit=1`,
       {
         headers: {
           apikey: serviceRoleKey,
@@ -287,15 +326,14 @@ Deno.serve(async (req: Request) => {
       },
     );
     if (!res.ok) return null;
-    return (await res.json()) as ApprovedRow[];
+    return (await res.json()) as UserAccountRow[];
   })();
 
-  const isApproved = Array.isArray(regRows)
-    && regRows.length > 0
-    && regRows[0].status === 'approved'
-    && regRows[0].is_active === true;
+  const isPaidMember = Array.isArray(userRows)
+    && userRows.length > 0
+    && ['member', 'both'].includes(userRows[0].account_type ?? '');
 
-  if (!isApproved) {
+  if (!isPaidMember) {
     return failClosed(
       'Only approved paid LUB members can use the AI showcase helper.',
       'not_approved_member',
@@ -327,15 +365,50 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const improved = await callOpenAI(
-      apiKey, model, reasoningEffort,
-      buildSystemPrompt(),
-      buildUserPrompt(listing),
-    );
+    let usedImages = photoUrls.length > 0;
+    let improved;
+
+    if (usedImages) {
+      try {
+        improved = await callOpenAI(
+          apiKey, model, reasoningEffort,
+          buildSystemPrompt(true),
+          buildUserPrompt(listing),
+          photoUrls,
+        );
+      } catch (imgErr) {
+        // Graceful fallback: the configured model may not accept images.
+        // Retry text-only so the member still gets suggestions.
+        console.warn('[improve-showcase] image call failed, retrying text-only:', imgErr);
+        usedImages = false;
+      }
+    }
+
+    if (!improved) {
+      // Text-only requires at least some text to work from.
+      const hasText = !!(
+        toStr(listing.title) || toStr(listing.product_service_name || listing.productServiceName) ||
+        toStr(listing.keywords) ||
+        toStr(listing.short_description || listing.shortDescription) ||
+        toStr(listing.detailed_description || listing.detailedDescription)
+      );
+      if (!hasText && photoUrls.length > 0) {
+        return failClosed(
+          'The AI could not read your photos. Please add a short description and try again.',
+          'generation_failed',
+        );
+      }
+      improved = await callOpenAI(
+        apiKey, model, reasoningEffort,
+        buildSystemPrompt(false),
+        buildUserPrompt(listing),
+      );
+    }
 
     return jsonResponse({
       success: true,
       data: improved,
+      usedImages,
       ai: { model, generated_at: new Date().toISOString() },
     });
   } catch (err) {

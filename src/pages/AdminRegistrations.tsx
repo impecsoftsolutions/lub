@@ -4,7 +4,8 @@ import { Users, Search, Filter, CheckCircle, XCircle, Clock, ExternalLink, Alert
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useHasPermission } from '../hooks/usePermissions';
-import { supabase, memberRegistrationService, type ApprovedMemberExportRow } from '../lib/supabase';
+import { supabase, memberRegistrationService, membershipUpgradeService, type ApprovedMemberExportRow, type MembershipApplicationType } from '../lib/supabase';
+import AdminUpgradeRequests from './AdminUpgradeRequests';
 import { sessionManager } from '../lib/sessionManager';
 import { emailService, WelcomeEmailData } from '../lib/emailService';
 import Toast from '../components/Toast';
@@ -318,6 +319,9 @@ const AdminRegistrations: React.FC = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [membershipFilter, setMembershipFilter] = useState<'all' | 'free' | 'paid'>('all');
+  const [membershipTypeMap, setMembershipTypeMap] = useState<Record<string, MembershipApplicationType>>({});
+  const [activeTab, setActiveTab] = useState<'applications' | 'upgrades'>('applications');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -424,6 +428,14 @@ const AdminRegistrations: React.FC = () => {
 
       setRegistrations(transformedData);
       refreshCounts();
+
+      // Load the Free/Paid type map (used for the membership filter + per-row badge).
+      try {
+        const typeMap = await membershipUpgradeService.adminGetRegistrationTypes(sessionToken);
+        setMembershipTypeMap(typeMap);
+      } catch (typeErr) {
+        console.warn('[AdminRegistrations] Failed to load membership type map:', typeErr);
+      }
     } catch (error) {
       console.error('[AdminRegistrations] Error loading registrations:', error);
       showToast('error', 'Failed to load registrations');
@@ -438,6 +450,12 @@ const AdminRegistrations: React.FC = () => {
     // Status filter is always applied immediately (no debounce)
     if (statusFilter !== 'all') {
       filtered = filtered.filter(reg => reg.status === statusFilter);
+    }
+
+    // Membership type filter (Free vs Paid) — defaults to 'paid' when unknown,
+    // matching the backend column default for legacy rows.
+    if (membershipFilter !== 'all') {
+      filtered = filtered.filter(reg => (membershipTypeMap[reg.id] ?? 'paid') === membershipFilter);
     }
 
     // Smart AND-token search across all available fields.
@@ -476,7 +494,7 @@ const AdminRegistrations: React.FC = () => {
     }
 
     setFilteredRegistrations(filtered);
-  }, [registrations, debouncedSearchTerm, statusFilter]);
+  }, [registrations, debouncedSearchTerm, statusFilter, membershipFilter, membershipTypeMap]);
 
   useEffect(() => {
     void loadRegistrations();
@@ -912,6 +930,38 @@ const AdminRegistrations: React.FC = () => {
         }
       />
 
+      {/* Tabs: Applications vs Free->Paid Upgrade Requests */}
+      <div className="flex items-center gap-1 mb-4 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab('applications')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'applications'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          Applications
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('upgrades')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'upgrades'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          Upgrade Requests
+        </button>
+      </div>
+
+      {activeTab === 'upgrades' && <AdminUpgradeRequests />}
+
+      {activeTab === 'applications' && (
+      <>
       {/* Filter bar */}
       <div className="bg-card rounded-lg border shadow-sm p-4 mb-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -941,6 +991,18 @@ const AdminRegistrations: React.FC = () => {
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div className="sm:w-44 relative">
+            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <select
+              value={membershipFilter}
+              onChange={(e) => setMembershipFilter(e.target.value as 'all' | 'free' | 'paid')}
+              className="w-full pl-9 pr-3 py-1.5 border border-input rounded-md text-sm bg-transparent focus:ring-1 focus:ring-ring appearance-none"
+            >
+              <option value="all">All Types</option>
+              <option value="free">Free Membership</option>
+              <option value="paid">Paid Membership</option>
             </select>
           </div>
         </div>
@@ -1017,12 +1079,17 @@ const AdminRegistrations: React.FC = () => {
                     </td>
                     {/* Status */}
                     <td className="align-top">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {getStatusBadge(registration.status)}
                         {registration.is_active === false && registration.status === 'approved' && (
                           <Badge variant="warning">
                             <EyeOff className="w-3 h-3" />Hidden
                           </Badge>
+                        )}
+                        {(membershipTypeMap[registration.id] ?? 'paid') === 'free' ? (
+                          <Badge variant="secondary">Free</Badge>
+                        ) : (
+                          <Badge variant="info">Paid</Badge>
                         )}
                       </div>
                       <p className="text-muted-foreground mt-1">{formatDate(registration.created_at)}</p>
@@ -1151,6 +1218,8 @@ const AdminRegistrations: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Confirmation Dialog */}

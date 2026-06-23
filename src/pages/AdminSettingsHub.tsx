@@ -14,6 +14,7 @@ import {
   Wand2,
   CalendarClock,
   BadgeCheck,
+  Tag,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -119,6 +120,15 @@ const AdminSettingsHub: React.FC = () => {
       description: 'Edit plan titles, subtitles, and the feature comparison table shown on the public Membership Plans page.',
       path: '/admin/settings/membership-plans',
       icon: BadgeCheck,
+      canAccess: canViewForms,
+      section: 'Content'
+    },
+    {
+      id: 'showcase-categories',
+      title: 'Showcase Categories',
+      description: 'Manage the categories members choose from when creating Business Showcase listings.',
+      path: '/admin/settings/showcase-categories',
+      icon: Tag,
       canAccess: canViewForms,
       section: 'Content'
     }

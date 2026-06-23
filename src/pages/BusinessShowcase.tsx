@@ -3,31 +3,23 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Building2,
+  Globe,
   Loader2,
+  Mail,
   MapPin,
+  Phone,
   Search,
   Sparkles,
   Tag,
   X,
 } from 'lucide-react';
-import { showcaseService, ShowcaseListing, statesService } from '../lib/supabase';
+import {
+  showcaseService,
+  showcaseCategoryService,
+  ShowcaseListing,
+  statesService,
+} from '../lib/supabase';
 import { useMember } from '../contexts/useMember';
-
-const CATEGORIES = [
-  'Manufacturing',
-  'Agriculture',
-  'Food & Beverages',
-  'Textiles & Garments',
-  'Engineering & Fabrication',
-  'Chemicals & Pharma',
-  'Construction & Materials',
-  'IT & Technology',
-  'Trading',
-  'Consultancy & Services',
-  'Education & Training',
-  'Healthcare',
-  'Other',
-];
 
 const BusinessShowcase: React.FC = () => {
   const { member, isAuthenticated } = useMember();
@@ -35,24 +27,27 @@ const BusinessShowcase: React.FC = () => {
 
   const [listings, setListings]   = useState<ShowcaseListing[]>([]);
   const [states, setStates]       = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState<string | null>(null);
+  const [selected, setSelected]   = useState<ShowcaseListing | null>(null);
 
   const [filterState,    setFilterState]    = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSearch,   setFilterSearch]   = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filterSearch), 350);
     return () => clearTimeout(t);
   }, [filterSearch]);
 
-  // Load states for filter
   useEffect(() => {
     statesService.getPublicPaymentStates()
       .then(s => setStates(s.map(st => st.state).sort()))
+      .catch(() => {});
+    showcaseCategoryService.getActiveCategories()
+      .then(c => setCategories(c.map(cat => cat.name)))
       .catch(() => {});
   }, []);
 
@@ -145,7 +140,7 @@ const BusinessShowcase: React.FC = () => {
             className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="">All Categories</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
           {hasFilters && (
@@ -182,10 +177,7 @@ const BusinessShowcase: React.FC = () => {
                 : 'LUB paid members can submit their business listings here.'}
             </p>
             {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="mt-4 text-sm text-primary underline"
-              >
+              <button onClick={clearFilters} className="mt-4 text-sm text-primary underline">
                 Clear filters
               </button>
             )}
@@ -198,12 +190,15 @@ const BusinessShowcase: React.FC = () => {
             </p>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {listings.map(listing => (
-                <ShowcaseCard key={listing.id} listing={listing} />
+                <ShowcaseCard key={listing.id} listing={listing} onOpen={() => setSelected(listing)} />
               ))}
             </div>
           </>
         )}
       </div>
+
+      {/* Detail modal */}
+      {selected && <ShowcaseDetailModal listing={selected} onClose={() => setSelected(null)} />}
 
       {/* Not a member CTA */}
       {!isMemberApproved && (
@@ -236,17 +231,29 @@ const BusinessShowcase: React.FC = () => {
   );
 };
 
-const ShowcaseCard: React.FC<{ listing: ShowcaseListing }> = ({ listing }) => {
+const locationText = (listing: ShowcaseListing) =>
+  [listing.city, listing.district, listing.state].filter(Boolean).join(', ');
+
+const ShowcaseCard: React.FC<{ listing: ShowcaseListing; onOpen: () => void }> = ({ listing, onOpen }) => {
+  const main = listing.photos[0] ?? null;
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
-      {listing.photoUrl ? (
-        <div className="aspect-video overflow-hidden rounded-t-xl bg-muted">
+    <button
+      onClick={onOpen}
+      className="flex flex-col rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+    >
+      {main ? (
+        <div className="relative aspect-video overflow-hidden rounded-t-xl bg-muted">
           <img
-            src={listing.photoUrl}
+            src={main}
             alt={listing.title}
             className="h-full w-full object-cover"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
+          {listing.photos.length > 1 && (
+            <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+              {listing.photos.length} photos
+            </span>
+          )}
         </div>
       ) : (
         <div className="flex aspect-video items-center justify-center rounded-t-xl bg-muted/40">
@@ -255,23 +262,19 @@ const ShowcaseCard: React.FC<{ listing: ShowcaseListing }> = ({ listing }) => {
       )}
 
       <div className="flex flex-1 flex-col p-4">
-        <div className="mb-2 flex items-start gap-2">
-          {listing.category && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-              <Tag className="h-3 w-3" />
-              {listing.category}
-            </span>
-          )}
-        </div>
+        {listing.category && (
+          <span className="mb-2 inline-flex w-fit items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            <Tag className="h-3 w-3" />
+            {listing.category}
+          </span>
+        )}
 
         <h3 className="mb-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
           {listing.title}
         </h3>
 
         {listing.productServiceName && (
-          <p className="mb-2 text-xs font-medium text-muted-foreground">
-            {listing.productServiceName}
-          </p>
+          <p className="mb-2 text-xs font-medium text-muted-foreground">{listing.productServiceName}</p>
         )}
 
         <p className="mb-3 flex-1 text-xs text-muted-foreground leading-relaxed line-clamp-3">
@@ -285,12 +288,111 @@ const ShowcaseCard: React.FC<{ listing: ShowcaseListing }> = ({ listing }) => {
               {listing.companyName}
             </p>
           )}
-          {(listing.state || listing.district) && (
+          {locationText(listing) && (
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3 w-3 shrink-0" />
-              {[listing.district, listing.state].filter(Boolean).join(', ')}
+              {locationText(listing)}
             </p>
           )}
+        </div>
+      </div>
+    </button>
+  );
+};
+
+const ShowcaseDetailModal: React.FC<{ listing: ShowcaseListing; onClose: () => void }> = ({ listing, onClose }) => {
+  const [activePhoto, setActivePhoto] = useState(0);
+  const photos = listing.photos;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 py-8 px-4" onClick={onClose}>
+      <div className="relative w-full max-w-2xl rounded-xl bg-card shadow-lg" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 className="text-base font-semibold text-foreground truncate pr-4">{listing.title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted/50" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          {/* Photo gallery */}
+          {photos.length > 0 ? (
+            <div>
+              <div className="aspect-video overflow-hidden rounded-lg bg-muted">
+                <img src={photos[activePhoto]} alt={listing.title} className="h-full w-full object-cover" />
+              </div>
+              {photos.length > 1 && (
+                <div className="mt-2 flex gap-2">
+                  {photos.map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActivePhoto(i)}
+                      className={`h-14 w-14 overflow-hidden rounded-md border-2 ${i === activePhoto ? 'border-primary' : 'border-border'}`}
+                    >
+                      <img src={p} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex aspect-video items-center justify-center rounded-lg bg-muted/40">
+              <Building2 className="h-10 w-10 text-muted-foreground/30" />
+            </div>
+          )}
+
+          {listing.category && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <Tag className="h-3 w-3" />
+              {listing.category}
+            </span>
+          )}
+
+          {listing.productServiceName && (
+            <p className="text-sm font-medium text-foreground">{listing.productServiceName}</p>
+          )}
+
+          <p className="text-sm text-foreground">{listing.shortDescription}</p>
+
+          {listing.detailedDescription && (
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">{listing.detailedDescription}</p>
+          )}
+
+          <div className="space-y-1.5 border-t border-border pt-4 text-sm">
+            {listing.companyName && (
+              <p className="flex items-center gap-2 text-foreground">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                {listing.companyName}
+              </p>
+            )}
+            {locationText(listing) && (
+              <p className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                {locationText(listing)}
+              </p>
+            )}
+            {/* Public RPC only returns these when the member opted in. */}
+            {listing.contactEmail && (
+              <p className="flex items-center gap-2 text-foreground">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <a href={`mailto:${listing.contactEmail}`} className="text-primary hover:underline">{listing.contactEmail}</a>
+              </p>
+            )}
+            {listing.contactPhone && (
+              <p className="flex items-center gap-2 text-foreground">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <a href={`tel:${listing.contactPhone}`} className="text-primary hover:underline">{listing.contactPhone}</a>
+              </p>
+            )}
+            {listing.websiteUrl && (
+              <p className="flex items-center gap-2 text-foreground">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <a href={listing.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  {listing.websiteUrl.replace(/^https?:\/\//i, '')}
+                </a>
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

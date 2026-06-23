@@ -546,6 +546,7 @@ const mapApprovedMemberExportRow = (value: unknown): ApprovedMemberExportRow => 
 interface SubmitRegistrationPayload extends JsonRecord {
   user_id?: string | null;
   is_custom_city?: boolean;
+  membership_application_type?: 'free' | 'paid';
 }
 
 interface SignupPrefillPayloadRpcResult extends JsonRecord {
@@ -1976,6 +1977,10 @@ export const memberRegistrationService = {
       delete registrationDataForRpc.status;
       delete registrationDataForRpc.is_legacy_member;
       delete registrationDataForRpc.user_id;
+      delete registrationDataForRpc.membership_application_type;
+
+      const membershipApplicationType =
+        registrationData.membership_application_type === 'free' ? 'free' : 'paid';
 
       // Ensure is_custom_city has a value
       registrationDataForRpc.is_custom_city = registrationData.is_custom_city ?? false;
@@ -1999,7 +2004,8 @@ export const memberRegistrationService = {
         p_gst_certificate_url: gstCertificateUrl || null,
         p_udyam_certificate_url: udyamCertificateUrl || null,
         p_payment_proof_url: paymentProofUrl || null,
-        p_profile_photo_url: profilePhotoUrl || null
+        p_profile_photo_url: profilePhotoUrl || null,
+        p_membership_application_type: membershipApplicationType
       });
 
       if (error) {
@@ -9282,11 +9288,21 @@ export interface ShowcaseListing {
   title: string;
   productServiceName: string | null;
   category: string | null;
+  keywords: string | null;
   shortDescription: string;
   detailedDescription: string | null;
   state: string | null;
   district: string | null;
+  city: string | null;
+  /** Ordered photo URLs; photos[0] is the main photo. Includes legacy photoUrl fallback. */
+  photos: string[];
   photoUrl: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  showContactEmail: boolean;
+  showContactPhone: boolean;
+  websiteUrl: string | null;
+  isPublic: boolean;
   contactPreference: string;
   companyName: string | null;
   memberName: string | null;
@@ -9303,26 +9319,50 @@ export interface ShowcaseListingDraft {
   title: string;
   productServiceName: string;
   category: string;
+  keywords: string;
   shortDescription: string;
   detailedDescription: string;
-  state: string;
-  district: string;
-  photoUrl: string;
-  contactPreference: string;
+  /** Ordered photo URLs (already uploaded); index 0 is the main photo. Max 3. */
+  photos: string[];
+  contactEmail: string;
+  contactPhone: string;
+  showContactEmail: boolean;
+  showContactPhone: boolean;
+  websiteUrl: string;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(v => String(v)).filter(v => v.trim().length > 0);
+  }
+  return [];
 }
 
 function mapShowcaseRow(row: Record<string, unknown>): ShowcaseListing {
+  const photos = toStringArray(row.photos);
+  const photoUrl = row.photo_url ? String(row.photo_url) : null;
+  // Backward compatibility: if no photos array but a legacy single photo exists.
+  const resolvedPhotos = photos.length > 0 ? photos : (photoUrl ? [photoUrl] : []);
   return {
     id:                  String(row.id ?? ''),
     memberId:            row.member_id ? String(row.member_id) : undefined,
     title:               String(row.title ?? ''),
     productServiceName:  row.product_service_name ? String(row.product_service_name) : null,
     category:            row.category ? String(row.category) : null,
+    keywords:            row.keywords ? String(row.keywords) : null,
     shortDescription:    String(row.short_description ?? ''),
     detailedDescription: row.detailed_description ? String(row.detailed_description) : null,
     state:               row.state ? String(row.state) : null,
     district:            row.district ? String(row.district) : null,
-    photoUrl:            row.photo_url ? String(row.photo_url) : null,
+    city:                row.city ? String(row.city) : null,
+    photos:              resolvedPhotos,
+    photoUrl:            photoUrl ?? (resolvedPhotos[0] ?? null),
+    contactEmail:        row.contact_email ? String(row.contact_email) : null,
+    contactPhone:        row.contact_phone ? String(row.contact_phone) : null,
+    showContactEmail:    Boolean(row.show_contact_email),
+    showContactPhone:    Boolean(row.show_contact_phone),
+    websiteUrl:          row.website_url ? String(row.website_url) : null,
+    isPublic:            row.is_public === undefined ? true : Boolean(row.is_public),
     contactPreference:   String(row.contact_preference ?? 'member_contact'),
     companyName:         row.company_name ? String(row.company_name) : null,
     memberName:          row.member_name ? String(row.member_name) : null,
@@ -9372,12 +9412,15 @@ export const showcaseService = {
       p_title:                draft.title,
       p_product_service_name: draft.productServiceName,
       p_category:             draft.category,
+      p_keywords:             draft.keywords,
       p_short_description:    draft.shortDescription,
       p_detailed_description: draft.detailedDescription,
-      p_state:                draft.state,
-      p_district:             draft.district,
-      p_photo_url:            draft.photoUrl,
-      p_contact_preference:   draft.contactPreference,
+      p_photo_urls:           draft.photos.slice(0, 3),
+      p_contact_email:        draft.contactEmail || null,
+      p_contact_phone:        draft.contactPhone || null,
+      p_show_contact_email:   draft.contactEmail.trim().length > 0,
+      p_show_contact_phone:   draft.contactPhone.trim().length > 0,
+      p_website_url:          draft.websiteUrl || null,
     });
     if (error) return { success: false, error: error.message };
     const result = data as { success: boolean; id?: string; error?: string };
@@ -9391,12 +9434,15 @@ export const showcaseService = {
       p_title:                draft.title,
       p_product_service_name: draft.productServiceName,
       p_category:             draft.category,
+      p_keywords:             draft.keywords,
       p_short_description:    draft.shortDescription,
       p_detailed_description: draft.detailedDescription,
-      p_state:                draft.state,
-      p_district:             draft.district,
-      p_photo_url:            draft.photoUrl,
-      p_contact_preference:   draft.contactPreference,
+      p_photo_urls:           draft.photos.slice(0, 3),
+      p_contact_email:        draft.contactEmail || null,
+      p_contact_phone:        draft.contactPhone || null,
+      p_show_contact_email:   draft.contactEmail.trim().length > 0,
+      p_show_contact_phone:   draft.contactPhone.trim().length > 0,
+      p_website_url:          draft.websiteUrl || null,
     });
     if (error) return { success: false, error: error.message };
     const result = data as { success: boolean; error?: string };
@@ -9459,8 +9505,76 @@ export const showcaseService = {
     return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to update status' };
   },
 
+  /** Admin: hide/show an approved listing publicly (does not change status). */
+  async adminSetVisibility(
+    sessionToken: string,
+    listingId: string,
+    isPublic: boolean,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_set_showcase_listing_public_visibility_with_session', {
+      p_session_token: sessionToken,
+      p_listing_id:    listingId,
+      p_is_public:     isPublic,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to update visibility' };
+  },
+
+  /**
+   * Admin: edit listing text/category/keywords/contact (status preserved; no photo changes).
+   * Contact visibility follows the member model: a non-empty value is public, blank is hidden.
+   */
+  async adminUpdateListing(
+    sessionToken: string,
+    listingId: string,
+    fields: {
+      title: string;
+      productServiceName: string;
+      category: string;
+      keywords: string;
+      shortDescription: string;
+      detailedDescription: string;
+      contactEmail: string;
+      contactPhone: string;
+      websiteUrl: string;
+    },
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_update_showcase_listing_with_session', {
+      p_session_token:        sessionToken,
+      p_listing_id:           listingId,
+      p_title:                fields.title,
+      p_product_service_name: fields.productServiceName,
+      p_category:             fields.category,
+      p_keywords:             fields.keywords,
+      p_short_description:    fields.shortDescription,
+      p_detailed_description: fields.detailedDescription,
+      p_contact_email:        fields.contactEmail || null,
+      p_contact_phone:        fields.contactPhone || null,
+      p_website_url:          fields.websiteUrl || null,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to update listing' };
+  },
+
+  /** Admin: permanently delete — server-enforced as archived-only. */
+  async adminDeleteArchived(
+    sessionToken: string,
+    listingId: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_delete_archived_showcase_listing_with_session', {
+      p_session_token: sessionToken,
+      p_listing_id:    listingId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to delete listing' };
+  },
+
   async uploadPhoto(sessionToken: string, file: File): Promise<{ success: boolean; url?: string; error?: string }> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
     const formData = new FormData();
     formData.append('session_token', sessionToken);
     formData.append('file', file);
@@ -9468,6 +9582,10 @@ export const showcaseService = {
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/showcase-photo-upload`, {
         method: 'POST',
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
         body: formData,
       });
       const result = await res.json() as { success: boolean; url?: string; error?: string };
@@ -9477,22 +9595,33 @@ export const showcaseService = {
     }
   },
 
-  async improveWithAI(sessionToken: string, listing: Partial<ShowcaseListingDraft>): Promise<{
+  async improveWithAI(
+    sessionToken: string,
+    listing: Partial<ShowcaseListingDraft>,
+    photoUrls: string[] = [],
+  ): Promise<{
     success: boolean;
-    data?: { title: string; product_service_name: string; short_description: string; detailed_description: string };
+    data?: { title: string; product_service_name: string; keywords?: string; short_description: string; detailed_description: string };
+    usedImages?: boolean;
     error?: string;
     error_code?: string;
   }> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/improve-showcase-listing`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_token: sessionToken, listing }),
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ session_token: sessionToken, listing, photo_urls: photoUrls.slice(0, 3) }),
       });
       const result = await res.json() as {
         success: boolean;
-        data?: { title: string; product_service_name: string; short_description: string; detailed_description: string };
+        data?: { title: string; product_service_name: string; keywords?: string; short_description: string; detailed_description: string };
+        usedImages?: boolean;
         error?: string;
         error_code?: string;
       };
@@ -9500,6 +9629,78 @@ export const showcaseService = {
     } catch {
       return { success: false, error: 'AI service unavailable. Please try again.' };
     }
+  },
+};
+
+// ============================================================
+// Showcase categories (admin-managed)
+// ============================================================
+
+export interface ShowcaseCategory {
+  id: string;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+function mapShowcaseCategoryRow(row: Record<string, unknown>): ShowcaseCategory {
+  return {
+    id:           String(row.id ?? ''),
+    name:         String(row.name ?? ''),
+    displayOrder: Number(row.display_order ?? 0),
+    isActive:     Boolean(row.is_active),
+  };
+}
+
+function sortShowcaseCategories(categories: ShowcaseCategory[]): ShowcaseCategory[] {
+  return [...categories].sort((a, b) => {
+    const aIsOther = a.name.trim().toLowerCase() === 'other';
+    const bIsOther = b.name.trim().toLowerCase() === 'other';
+    if (aIsOther && !bIsOther) return 1;
+    if (!aIsOther && bIsOther) return -1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+}
+
+export const showcaseCategoryService = {
+  /** Public/member: active categories only, ordered. Direct RLS-protected read. */
+  async getActiveCategories(): Promise<ShowcaseCategory[]> {
+    const { data, error } = await supabase
+      .from('showcase_categories')
+      .select('id, name, display_order, is_active')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return sortShowcaseCategories(((data as Record<string, unknown>[] | null) ?? []).map(mapShowcaseCategoryRow));
+  },
+
+  /** Admin: all categories including inactive. */
+  async adminGetCategories(sessionToken: string): Promise<ShowcaseCategory[]> {
+    const { data, error } = await supabase.rpc('admin_get_showcase_categories_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; categories?: Record<string, unknown>[]; error?: string };
+    if (!result?.success) throw new Error(result?.error ?? 'Failed to load categories.');
+    return sortShowcaseCategories((result.categories ?? []).map(mapShowcaseCategoryRow));
+  },
+
+  /** Admin: create (id null) or update a category. */
+  async adminUpsertCategory(
+    sessionToken: string,
+    category: { id?: string | null; name: string; displayOrder: number; isActive: boolean },
+  ): Promise<{ success: boolean; id?: string; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_upsert_showcase_category_with_session', {
+      p_session_token: sessionToken,
+      p_category_id:   category.id ?? null,
+      p_name:          category.name,
+      p_display_order: category.displayOrder,
+      p_is_active:     category.isActive,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; id?: string; error?: string };
+    return result?.success ? { success: true, id: result.id } : { success: false, error: result?.error ?? 'Failed to save category.' };
   },
 };
 
@@ -9597,5 +9798,156 @@ export const membershipPlanService = {
     if (error) return { success: false, error: error.message };
     const result = data as { success: boolean; id?: string; error?: string };
     return result?.success ? { success: true, id: result.id } : { success: false, error: result?.error ?? 'Failed to save feature' };
+  },
+};
+
+// ============================================================================
+// Free vs Paid membership — application type + Free-to-Paid upgrade
+// ============================================================================
+
+export type MembershipApplicationType = 'free' | 'paid';
+
+export interface MembershipUpgradeRequest {
+  id: string;
+  userId: string;
+  registrationId: string | null;
+  state: string | null;
+  amount: string | null;
+  paymentMode: string | null;
+  paymentDate: string | null;
+  paymentProofUrl: string;
+  transactionId: string | null;
+  bankReference: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface MembershipUpgradeRequestAdmin extends MembershipUpgradeRequest {
+  fullName: string | null;
+  companyName: string | null;
+  email: string | null;
+  mobileNumber: string | null;
+  memberAccountType: string | null;
+}
+
+function mapUpgradeRow(row: Record<string, unknown>): MembershipUpgradeRequestAdmin {
+  return {
+    id:               String(row.id ?? ''),
+    userId:           String(row.user_id ?? ''),
+    registrationId:   row.registration_id ? String(row.registration_id) : null,
+    state:            row.state ? String(row.state) : null,
+    amount:           row.amount ? String(row.amount) : null,
+    paymentMode:      row.payment_mode ? String(row.payment_mode) : null,
+    paymentDate:      row.payment_date ? String(row.payment_date) : null,
+    paymentProofUrl:  String(row.payment_proof_url ?? ''),
+    transactionId:    row.transaction_id ? String(row.transaction_id) : null,
+    bankReference:    row.bank_reference ? String(row.bank_reference) : null,
+    status:           (String(row.status ?? 'pending') as 'pending' | 'approved' | 'rejected'),
+    adminNote:        row.admin_note ? String(row.admin_note) : null,
+    reviewedAt:       row.reviewed_at ? String(row.reviewed_at) : null,
+    createdAt:        String(row.created_at ?? ''),
+    fullName:         row.full_name ? String(row.full_name) : null,
+    companyName:      row.company_name ? String(row.company_name) : null,
+    email:            row.email ? String(row.email) : null,
+    mobileNumber:     row.mobile_number ? String(row.mobile_number) : null,
+    memberAccountType: row.member_account_type ? String(row.member_account_type) : null,
+  };
+}
+
+export const membershipUpgradeService = {
+  /** Admin: map of registration id -> membership_application_type (filter + badge). */
+  async adminGetRegistrationTypes(sessionToken: string): Promise<Record<string, MembershipApplicationType>> {
+    const { data, error } = await supabase.rpc('get_member_registration_types_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; items?: Array<{ id: string; type: string }> };
+    const map: Record<string, MembershipApplicationType> = {};
+    (result?.items ?? []).forEach(item => {
+      map[item.id] = item.type === 'free' ? 'free' : 'paid';
+    });
+    return map;
+  },
+
+  /** Member: submit a Free -> Paid upgrade request (uploads proof, then records request). */
+  async submitUpgrade(
+    sessionToken: string,
+    payload: {
+      state: string;
+      amount: string;
+      paymentMode: string;
+      paymentDate: string;
+      transactionId?: string;
+      bankReference?: string;
+    },
+    paymentProof: File,
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const fileName = `upgrade_${Date.now()}_${paymentProof.name}`;
+      const proofUrl = await fileUploadService.uploadFile(paymentProof, fileName, 'registrations');
+      if (!proofUrl) return { success: false, error: 'Failed to upload payment proof. Please try again.' };
+
+      const { data, error } = await supabase.rpc('submit_membership_upgrade_with_session', {
+        p_session_token:     sessionToken,
+        p_state:             payload.state || null,
+        p_amount:            payload.amount || null,
+        p_payment_mode:      payload.paymentMode || null,
+        p_payment_date:      payload.paymentDate || null,
+        p_payment_proof_url: proofUrl,
+        p_transaction_id:    payload.transactionId || null,
+        p_bank_reference:    payload.bankReference || null,
+      });
+      if (error) return { success: false, error: error.message };
+      const result = data as { success: boolean; error?: string };
+      return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to submit upgrade request.' };
+    } catch {
+      return { success: false, error: 'Failed to submit upgrade request. Please try again.' };
+    }
+  },
+
+  /** Member: read own latest upgrade request (or null). */
+  async getMyUpgradeRequest(sessionToken: string): Promise<MembershipUpgradeRequest | null> {
+    const { data, error } = await supabase.rpc('get_my_membership_upgrade_request_with_session', {
+      p_session_token: sessionToken,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; request?: Record<string, unknown> | null };
+    if (!result?.request) return null;
+    return mapUpgradeRow(result.request);
+  },
+
+  /** Admin: list upgrade requests, optionally filtered by status. */
+  async adminListUpgradeRequests(
+    sessionToken: string,
+    status?: 'pending' | 'approved' | 'rejected',
+  ): Promise<MembershipUpgradeRequestAdmin[]> {
+    const { data, error } = await supabase.rpc('admin_list_membership_upgrade_requests_with_session', {
+      p_session_token: sessionToken,
+      p_status_filter: status ?? null,
+    });
+    if (error) throw error;
+    const result = data as { success: boolean; items?: Record<string, unknown>[]; error?: string };
+    if (!result?.success) throw new Error(result?.error ?? 'Failed to load upgrade requests.');
+    return (result.items ?? []).map(mapUpgradeRow);
+  },
+
+  /** Admin: approve or reject an upgrade request (atomic promotion on approve). */
+  async adminReviewUpgrade(
+    sessionToken: string,
+    requestId: string,
+    action: 'approve' | 'reject',
+    adminNote?: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('admin_review_membership_upgrade_with_session', {
+      p_session_token: sessionToken,
+      p_request_id:    requestId,
+      p_action:        action,
+      p_admin_note:    adminNote ?? null,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Action failed.' };
   },
 };
