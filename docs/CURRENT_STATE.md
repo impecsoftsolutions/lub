@@ -34,12 +34,12 @@ No active implementation slice.
 
 ### COD-AUTH-FORM-BUILDER-PASSWORD-001
 - **Branch:** `main`
-- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **Commit:** `c950af7` (`main`)
 - **What shipped:** Corrected the password login UI to use the Form Builder V2 contract instead of page-only hardcoded fields. Added a migration that introduces `password` as a form-builder field type, seeds locked system auth fields (`password` on signup; `identifier` + `password` on sign-in), retires old sign-in email/mobile fields from the sign-in form, updates the live snapshots, and replaces the publish guard so auth fields cannot be hidden or made optional. Refactored `/signup` to render password from signup config and exclude it from dynamic payload storage; refactored `/signin` to load `signinFormConfigV2Service` again. Follow-up review fix: the migration now sets the live-snapshot write context before touching `form_config_v2_live_fields`, and `/signup` + `/signin` include compatibility auth-field fallbacks so the new source can run briefly against the old DB before the migration is applied.
 - **Files (new):** `supabase/migrations/20260624113000_form_builder_password_auth_fields.sql`
 - **Files (modified):** `src/pages/SignUpV2.tsx`, `src/pages/SignIn.tsx`, `src/lib/supabase.ts`, `src/pages/AdminFieldLibrary.tsx`, `src/pages/AdminFormStudio.tsx`
 - **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
-- **Runtime:** Migration is written but not applied to the linked DB yet. Safe release order remains frontend source first, wait for Railway deploy, then immediately apply `20260624113000_form_builder_password_auth_fields.sql`. Do not apply the migration before the matching source is live.
+- **Runtime:** Migration `20260624113000_form_builder_password_auth_fields.sql` applied to the linked DB on 2026-06-23 after pushing source to `main`. Migration audit PASS (local 268 / remote 268 / local_only 0 / remote_only 0). Public RPC verification PASS: signup live config includes visible required `password:password`; sign-in live config includes visible required `identifier:text` + `password:password` and no old sign-in `email`/`mobile_number` fields.
 
 ### COD-JOIN-SMART-UPLOAD-SKIP-001
 - **Branch:** `main`
@@ -182,7 +182,7 @@ No active implementation slice.
 ## In Progress / Dirty State
 
 - No active code slice.
-- Local source changes for `COD-AUTH-FORM-BUILDER-PASSWORD-001`, `COD-JOIN-SMART-UPLOAD-SKIP-001`, `CLU-FREE-PAID-MEMBERSHIP-001`, `CLU-SHOWCASE-V2-001`, `CLU-SHOWCASE-AI-VISION-001`, and `CLU-SHOWCASE-MODERATION-001` are present but not committed. The new auth form-builder migration `20260624113000` is not yet applied. The Free/Paid migration `20260622100000`, Showcase v2 migration `20260623100000`, website/contact migration `20260623110000`, keywords migration `20260623113000`, and moderation/visibility migration `20260624100000` are applied and verified. The `showcase-photos` bucket is at 10 MB; `showcase-photo-upload` and `improve-showcase-listing` are redeployed. Do not commit or push without explicit user instruction.
+- Local source changes for `COD-AUTH-FORM-BUILDER-PASSWORD-001` and `COD-JOIN-SMART-UPLOAD-SKIP-001` were committed in `c950af7` and pushed to `main`. Migration `20260624113000` is applied and verified. The Free/Paid migration `20260622100000`, Showcase v2 migration `20260623100000`, website/contact migration `20260623110000`, keywords migration `20260623113000`, and moderation/visibility migration `20260624100000` are applied and verified. The `showcase-photos` bucket is at 10 MB; `showcase-photo-upload` and `improve-showcase-listing` are redeployed.
 - Untracked local artifacts remain (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
 
 ---

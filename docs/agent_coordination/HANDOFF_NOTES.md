@@ -137,14 +137,14 @@ No active implementation slice.
 ## Open Handoff
 
 ### COD-AUTH-FORM-BUILDER-PASSWORD-001
-- **Status:** Complete locally; source uncommitted; migration not yet applied.
-- **Branch / Commit:** `main` / NOT YET COMMITTED.
+- **Status:** Source committed/pushed; migration applied and verified.
+- **Branch / Commit:** `main` / `c950af7`.
 - **Summary:** Corrected the recent password-login UI architecture so password and sign-in auth fields are represented by Form Builder V2 instead of hardcoded page-only fields. The migration `20260624113000_form_builder_password_auth_fields.sql` allows `password` in form-builder storage constraints, seeds locked system field-library entries for `identifier` and `password`, adds signup `password`, replaces sign-in email/mobile fields with `identifier` + `password`, updates live snapshots, and replaces the publish guard so signup requires email/mobile/password and sign-in requires identifier/password. Follow-up review fix: the migration sets `lub.form_builder_live_write_context='publish_rpc'` before live snapshot writes, avoiding the live-fields guard trigger failure. `SignUpV2` now reads password from configured form data, still excludes it from dynamic payload storage, and falls back to one password field if the DB is still on the old signup config. `SignIn` loads `signinFormConfigV2Service` and falls back to `identifier` + `password` fields if the DB is still on the old sign-in config.
 - **Security:** Password continues to be passed only as a dedicated auth RPC parameter. It is not stored in `dynamicPayload` or form submissions. Existing hashing/reset/session RPCs are unchanged.
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
-- **Runtime TODO:** Apply `supabase/migrations/20260624113000_form_builder_password_auth_fields.sql` after this source is deployed, not before. Release sequence: deploy source first, wait for Railway success, then immediately apply the migration. After applying, verify `/signin`, `/signup`, `/signin?preview=1`, and `/signup?preview=1` load configured auth fields.
+- **Runtime:** Migration `supabase/migrations/20260624113000_form_builder_password_auth_fields.sql` applied to the linked DB on 2026-06-23 after pushing source to `main`. `npm run db:migrations:audit` PASS (local 268 / remote 268 / local_only 0 / remote_only 0). Public RPC verification PASS: `get_signup_form_configuration_v2` returns visible required `password:password`; `get_signin_form_configuration_v2` returns visible required `identifier:text` + `password:password` and no old sign-in `email`/`mobile_number` fields.
 
-Source files remain uncommitted pending explicit user instruction.
+Source and runtime are released. Untracked local artifacts remain intentionally unstaged.
 
 ## Next Queue
 
