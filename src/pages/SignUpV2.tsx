@@ -30,7 +30,33 @@ type FormValue = string | boolean;
 
 type FormDataMap = Record<string, FormValue>;
 
-const CORE_SIGNUP_FIELDS = new Set(['email', 'mobile_number', 'state']);
+const CORE_SIGNUP_FIELDS = new Set(['email', 'mobile_number', 'state', 'password']);
+
+const FALLBACK_SIGNUP_PASSWORD_FIELD: SignupFormFieldV2 = {
+  id: 'fallback-signup-password',
+  form_key: 'signup',
+  field_key: 'password',
+  label: 'Password',
+  field_type: 'password',
+  section_name: 'Core Details',
+  placeholder: 'Create a password',
+  help_text: 'Minimum 6 characters',
+  option_items: null,
+  default_value: '',
+  is_visible: true,
+  is_required: true,
+  is_locked: true,
+  is_system_field: true,
+  display_order: 45,
+  min_length: 6,
+  max_length: null,
+  validation_rule_id: null
+};
+
+const ensureSignupPasswordField = (loadedFields: SignupFormFieldV2[]): SignupFormFieldV2[] => {
+  const hasPassword = loadedFields.some(field => field.field_key === 'password' && field.is_visible);
+  return hasPassword ? loadedFields : [...loadedFields, FALLBACK_SIGNUP_PASSWORD_FIELD];
+};
 
 const SignUpV2: React.FC = () => {
   const navigate = useNavigate();
@@ -51,7 +77,6 @@ const SignUpV2: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormDataMap>({});
-  const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -74,11 +99,6 @@ const SignUpV2: React.FC = () => {
   const visibleFields = useMemo(
     () => fields.filter(field => field.is_visible).sort((a, b) => a.display_order - b.display_order),
     [fields]
-  );
-
-  const hasVisibleGenderField = useMemo(
-    () => visibleFields.some(field => field.field_key === 'gender'),
-    [visibleFields]
   );
 
   const isFieldEffectivelyRequired = useCallback(
@@ -143,7 +163,8 @@ const SignUpV2: React.FC = () => {
             loadActiveValidationRules()
           ]);
 
-          setFields(draftResult.data);
+          const normalizedFields = ensureSignupPasswordField(draftResult.data);
+          setFields(normalizedFields);
           setAvailableStates(states);
           setAvailableDesignations(designations);
           setActiveValidationRules(rules);
@@ -151,7 +172,7 @@ const SignUpV2: React.FC = () => {
           setAvailableCities([]);
 
           const initialState: FormDataMap = {};
-          draftResult.data
+          normalizedFields
             .filter(field => field.is_visible)
             .forEach(field => {
               initialState[field.field_key] = field.field_type === 'checkbox'
@@ -183,7 +204,8 @@ const SignUpV2: React.FC = () => {
           loadActiveValidationRules()
         ]);
 
-        setFields(configResult.data);
+        const normalizedFields = ensureSignupPasswordField(configResult.data);
+        setFields(normalizedFields);
         setAvailableStates(states);
         setAvailableDesignations(designations);
         setActiveValidationRules(rules);
@@ -191,7 +213,7 @@ const SignUpV2: React.FC = () => {
         setAvailableCities([]);
 
         const initialState: FormDataMap = {};
-        configResult.data
+        normalizedFields
           .filter(field => field.is_visible)
           .forEach(field => {
             initialState[field.field_key] = field.field_type === 'checkbox'
@@ -375,8 +397,11 @@ const SignUpV2: React.FC = () => {
       nextErrors.mobile_number = mobileError;
     }
 
-    if (password.length < 6) {
-      nextErrors.password = 'Password must be at least 6 characters.';
+    const passwordField = visibleFields.find(field => field.field_key === 'password');
+    const passwordValue = String(formData.password ?? '');
+    const minPasswordLength = passwordField?.min_length ?? 6;
+    if (passwordValue.length < minPasswordLength) {
+      nextErrors.password = `Password must be at least ${minPasswordLength} characters.`;
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -400,6 +425,7 @@ const SignUpV2: React.FC = () => {
 
       const email = String(formData.email ?? '');
       const mobile = String(formData.mobile_number ?? '');
+      const password = String(formData.password ?? '');
       const stateValue = formData.state;
       const state = typeof stateValue === 'string' ? stateValue : '';
 
@@ -529,7 +555,9 @@ const SignUpV2: React.FC = () => {
     }
 
     const inputType: React.HTMLInputTypeAttribute =
-      field.field_type === 'tel' || field.field_type === 'email' || field.field_type === 'url' || field.field_type === 'date' || field.field_type === 'number'
+      field.field_type === 'password' || field.field_key === 'password'
+        ? 'password'
+        : field.field_type === 'tel' || field.field_type === 'email' || field.field_type === 'url' || field.field_type === 'date' || field.field_type === 'number'
         ? field.field_type
         : 'text';
 
@@ -548,45 +576,6 @@ const SignUpV2: React.FC = () => {
       </div>
     );
   };
-
-  const renderPasswordField = () => (
-    <div>
-      <label htmlFor="signup-password" className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
-        Password <span className="text-destructive">*</span>
-      </label>
-      <div className="relative">
-        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-          <Lock className="w-5 h-5 text-muted-foreground" />
-        </div>
-        <input
-          id="signup-password"
-          name="password"
-          type="password"
-          value={password}
-          onChange={e => {
-            setPassword(e.target.value);
-            if (errors.password) {
-              setErrors(prev => {
-                const cloned = { ...prev };
-                delete cloned.password;
-                return cloned;
-              });
-            }
-          }}
-          placeholder="Minimum 6 characters"
-          className={`w-full py-3 pl-10 pr-4 border rounded-lg bg-background text-foreground focus:ring-1 focus:ring-ring focus:border-ring ${
-            errors.password ? 'border-destructive' : 'border-border'
-          }`}
-        />
-      </div>
-      {errors.password && (
-        <p className="mt-1 text-sm text-destructive flex items-center">
-          <AlertCircle className="w-4 h-4 mr-1" />
-          {errors.password}
-        </p>
-      )}
-    </div>
-  );
 
   // ── preview access-denied static screens ──────────────────────────────────
   if (previewBlockReason) {
@@ -642,24 +631,19 @@ const SignUpV2: React.FC = () => {
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit}>
               {visibleFields.map(field => (
-                <React.Fragment key={field.field_key}>
-                  <div>
-                    <label htmlFor={field.field_key} className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                      {field.label} {isFieldEffectivelyRequired(field) && <span className="text-destructive">*</span>}
-                    </label>
-                    {renderFieldInput(field)}
-                    {errors[field.field_key] && (
-                      <p className="mt-1 text-sm text-destructive flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors[field.field_key]}
-                      </p>
-                    )}
-                  </div>
-                  {field.field_key === 'gender' && renderPasswordField()}
-                </React.Fragment>
+                <div key={field.field_key}>
+                  <label htmlFor={field.field_key} className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                    {field.label} {isFieldEffectivelyRequired(field) && <span className="text-destructive">*</span>}
+                  </label>
+                  {renderFieldInput(field)}
+                  {errors[field.field_key] && (
+                    <p className="mt-1 text-sm text-destructive flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {errors[field.field_key]}
+                    </p>
+                  )}
+                </div>
               ))}
-
-              {!hasVisibleGenderField && renderPasswordField()}
 
               <button
                 type="submit"

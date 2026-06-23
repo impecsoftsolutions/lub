@@ -64,6 +64,7 @@ const TYPE_BADGE: Record<string, string> = {
   url: 'bg-muted text-foreground',
   email: 'bg-success/10 text-success',
   tel: 'bg-primary/10 text-primary',
+  password: 'bg-destructive/10 text-destructive',
 };
 
 const FORM_NAME_OVERRIDES: Record<string, string> = {

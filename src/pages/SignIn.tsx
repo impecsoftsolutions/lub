@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Loader2, Lock, Mail } from 'lucide-react';
 import { customAuth } from '../lib/customAuth';
 import {
@@ -13,7 +13,11 @@ import { AuthErrorCode } from '../types/auth.types';
 import Toast from '../components/Toast';
 import { useOrganisationProfile } from '../hooks/useOrganisationProfile';
 import { useMember } from '../contexts/useMember';
-import { SigninFormFieldV2 } from '../lib/supabase';
+import {
+  FormDraftConfigurationErrorCode,
+  signinFormConfigV2Service,
+  SigninFormFieldV2
+} from '../lib/supabase';
 
 type FormValue = string | boolean;
 type FormDataMap = Record<string, FormValue>;
@@ -21,7 +25,7 @@ const LAST_NON_SIGNIN_ROUTE_KEY = 'lub:last_non_signin_route';
 
 const DEFAULT_SIGNIN_FIELDS: SigninFormFieldV2[] = [
   {
-    id: 'signin-default-identifier',
+    id: 'fallback-signin-identifier',
     form_key: 'signin',
     field_key: 'identifier',
     label: 'Email or Mobile Number',
@@ -36,17 +40,19 @@ const DEFAULT_SIGNIN_FIELDS: SigninFormFieldV2[] = [
     is_locked: true,
     is_system_field: true,
     display_order: 1,
+    min_length: null,
+    max_length: null,
     validation_rule_id: null
   },
   {
-    id: 'signin-default-password',
+    id: 'fallback-signin-password',
     form_key: 'signin',
     field_key: 'password',
     label: 'Password',
-    field_type: 'text',
+    field_type: 'password',
     section_name: 'Core Details',
     placeholder: 'Enter your password',
-    help_text: null,
+    help_text: 'Minimum 6 characters',
     option_items: null,
     default_value: '',
     is_visible: true,
@@ -54,23 +60,38 @@ const DEFAULT_SIGNIN_FIELDS: SigninFormFieldV2[] = [
     is_locked: true,
     is_system_field: true,
     display_order: 2,
+    min_length: 6,
+    max_length: null,
     validation_rule_id: null
   }
 ];
 
+const ensureSigninAuthFields = (loadedFields: SigninFormFieldV2[]): SigninFormFieldV2[] => {
+  const visibleKeys = new Set(
+    loadedFields
+      .filter(field => field.is_visible)
+      .map(field => field.field_key)
+  );
+
+  return visibleKeys.has('identifier') && visibleKeys.has('password')
+    ? loadedFields
+    : DEFAULT_SIGNIN_FIELDS;
+};
+
 const SignIn: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isPreviewMode = searchParams.get('preview') === '1';
 
   const { profile } = useOrganisationProfile();
   const { isAuthenticated: isMemberAuthenticated, isLoading: isMemberLoading } = useMember();
 
-  const [fields, setFields] = useState<SigninFormFieldV2[]>(DEFAULT_SIGNIN_FIELDS);
-  const [formData, setFormData] = useState<FormDataMap>({ identifier: '', password: '' });
+  const [fields, setFields] = useState<SigninFormFieldV2[]>([]);
+  const [formData, setFormData] = useState<FormDataMap>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewBlockReason, setPreviewBlockReason] = useState<string | null>(null);
+  const [previewBlockReason, setPreviewBlockReason] = useState<FormDraftConfigurationErrorCode | null>(null);
   const [formUnavailable, setFormUnavailable] = useState(false);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -143,16 +164,59 @@ const SignIn: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      setIsLoading(true);
-      setPreviewBlockReason(null);
-      setFormUnavailable(false);
-      setFields(DEFAULT_SIGNIN_FIELDS);
-      setFormData({ identifier: '', password: '' });
-      setIsLoading(false);
+      try {
+        setIsLoading(true);
+        setPreviewBlockReason(null);
+        setFormUnavailable(false);
+
+        const configResult = isPreviewMode
+          ? await signinFormConfigV2Service.getDraftConfiguration()
+          : await signinFormConfigV2Service.getConfiguration();
+
+        if (!configResult.success || !configResult.data) {
+          if (isPreviewMode) {
+            const code = configResult.errorCode ?? 'load_failed';
+            if (code === 'no_session') {
+              navigate(`/signin?next=${encodeURIComponent('/signin?preview=1')}`, { replace: true });
+              return;
+            }
+            setPreviewBlockReason(code);
+            return;
+          }
+
+          showToast('error', configResult.error || 'Failed to load sign-in configuration');
+          setFields([]);
+          return;
+        }
+
+        if (!isPreviewMode && configResult.data.length === 0) {
+          setFormUnavailable(true);
+          setFields([]);
+          return;
+        }
+
+        const normalizedFields = ensureSigninAuthFields(configResult.data);
+        setFields(normalizedFields);
+
+        const initialState: FormDataMap = {};
+        normalizedFields
+          .filter(field => field.is_visible)
+          .forEach(field => {
+            initialState[field.field_key] = field.field_type === 'checkbox'
+              ? field.default_value === 'true'
+              : (field.default_value ?? '');
+          });
+        setFormData(initialState);
+      } catch (error) {
+        console.error('Failed to initialize signin form:', error);
+        showToast('error', 'Failed to load sign-in form. Please refresh and try again.');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     void load();
-  }, []);
+  }, [isPreviewMode, navigate, showToast]);
 
   const handleInputChange = (field: SigninFormFieldV2, rawValue: FormValue) => {
     let processedValue: FormValue = rawValue;
@@ -227,9 +291,11 @@ const SignIn: React.FC = () => {
       nextErrors.identifier = 'Enter a valid email address or 10-digit mobile number.';
     }
 
+    const passwordField = visibleFields.find(field => field.field_key === 'password');
     const passwordValue = String(formData.password ?? '');
-    if (passwordValue && passwordValue.length < 6) {
-      nextErrors.password = 'Password must be at least 6 characters.';
+    const minPasswordLength = passwordField?.min_length ?? 6;
+    if (passwordValue && passwordValue.length < minPasswordLength) {
+      nextErrors.password = `Password must be at least ${minPasswordLength} characters.`;
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -361,7 +427,7 @@ const SignIn: React.FC = () => {
     }
 
     const inputType: React.HTMLInputTypeAttribute =
-      field.field_key === 'password'
+      field.field_type === 'password' || field.field_key === 'password'
         ? 'password'
         : field.field_type === 'tel' || field.field_type === 'email' || field.field_type === 'url' || field.field_type === 'date' || field.field_type === 'number'
         ? field.field_type

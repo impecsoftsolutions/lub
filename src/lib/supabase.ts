@@ -196,7 +196,8 @@ export type SignupV2FieldType =
   | 'date'
   | 'url'
   | 'email'
-  | 'tel';
+  | 'tel'
+  | 'password';
 
 export interface SignupFormFieldV2 {
   id: string;

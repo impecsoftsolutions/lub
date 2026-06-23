@@ -51,7 +51,7 @@ const EMPTY_FORM: FieldLibraryItemV2UpsertInput = {
   is_locked: false
 };
 
-const LENGTH_SUPPORTED_TYPES: SignupV2FieldType[] = ['text', 'textarea', 'email', 'tel', 'number', 'url'];
+const LENGTH_SUPPORTED_TYPES: SignupV2FieldType[] = ['text', 'textarea', 'email', 'tel', 'number', 'url', 'password'];
 
 function ItemForm({
   value,
@@ -133,6 +133,9 @@ function ItemForm({
             onChange={e => set('field_type', e.target.value as SignupV2FieldType)}
             className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring bg-background text-foreground text-sm"
           >
+            {value.field_type === 'password' && (
+              <option value="password" disabled>password</option>
+            )}
             {FIELD_TYPE_OPTIONS.map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
