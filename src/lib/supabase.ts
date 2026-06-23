@@ -9470,6 +9470,21 @@ export const showcaseService = {
     return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to delete listing' };
   },
 
+  async setVisibility(
+    sessionToken: string,
+    listingId: string,
+    isPublic: boolean,
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('member_set_showcase_listing_public_visibility_with_session', {
+      p_session_token: sessionToken,
+      p_listing_id:    listingId,
+      p_is_public:     isPublic,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as { success: boolean; error?: string };
+    return result?.success ? { success: true } : { success: false, error: result?.error ?? 'Failed to update visibility' };
+  },
+
   async adminGetListings(sessionToken: string, filters: {
     status?: string;
     search?: string;

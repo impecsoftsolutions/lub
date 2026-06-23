@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
-  CheckCircle2,
   Clock,
   Edit,
+  Eye,
+  EyeOff,
   ImagePlus,
   Loader2,
   MapPin,
+  MoreHorizontal,
   Plus,
   Send,
   Sparkles,
@@ -26,6 +28,13 @@ import {
   ShowcaseListing,
   ShowcaseListingDraft,
 } from '../lib/supabase';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 
 const MAX_PHOTOS = 3;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -47,12 +56,15 @@ const EMPTY_DRAFT: ShowcaseListingDraft = {
 
 type ModalMode = 'create' | 'edit';
 
-interface StatusBadgeProps { status: ShowcaseListing['status'] }
-const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+interface StatusBadgeProps {
+  status: ShowcaseListing['status'];
+  isPublic?: boolean;
+}
+const StatusBadge: React.FC<StatusBadgeProps> = ({ status, isPublic = true }) => {
   const map: Record<string, { label: string; className: string }> = {
     draft:          { label: 'Draft',          className: 'bg-muted text-muted-foreground' },
     pending_review: { label: 'Pending Review', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
-    approved:       { label: 'Approved',       className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+    approved:       { label: isPublic ? 'Live' : 'Hidden', className: isPublic ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground' },
     rejected:       { label: 'Rejected',       className: 'bg-destructive/10 text-destructive' },
     archived:       { label: 'Archived',       className: 'bg-muted text-muted-foreground' },
   };
@@ -76,12 +88,14 @@ const MemberShowcaseListings: React.FC = () => {
 
   const [modalMode,      setModalMode]      = useState<ModalMode>('create');
   const [editingId,      setEditingId]      = useState<string | null>(null);
+  const [editingStatus,  setEditingStatus]  = useState<ShowcaseListing['status'] | null>(null);
   const [isModalOpen,    setIsModalOpen]    = useState(false);
   const [draft,          setDraft]          = useState<ShowcaseListingDraft>(EMPTY_DRAFT);
   const [photos,         setPhotos]         = useState<PhotoItem[]>([]);
   const [isSaving,       setIsSaving]       = useState(false);
   const [isSubmitting,   setIsSubmitting]   = useState(false);
   const [isDeleting,     setIsDeleting]     = useState<string | null>(null);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState<string | null>(null);
   const [isAILoading,    setIsAILoading]    = useState(false);
   const [isKeywordLoading, setIsKeywordLoading] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -133,6 +147,7 @@ const MemberShowcaseListings: React.FC = () => {
   const openCreate = () => {
     setModalMode('create');
     setEditingId(null);
+    setEditingStatus(null);
     setDraft(EMPTY_DRAFT);
     setPhotos([]);
     setFormError(null);
@@ -142,6 +157,7 @@ const MemberShowcaseListings: React.FC = () => {
   const openEdit = (listing: ShowcaseListing) => {
     setModalMode('edit');
     setEditingId(listing.id);
+    setEditingStatus(listing.status);
     setDraft({
       title:               listing.title,
       productServiceName:  listing.productServiceName ?? '',
@@ -295,10 +311,25 @@ const MemberShowcaseListings: React.FC = () => {
     setIsDeleting(null);
     setDeleteConfirm(null);
     if (result.success) {
-      showToast('success', listing.status === 'approved' ? 'Listing archived.' : 'Listing deleted.');
+      showToast('success', 'Listing deleted.');
       await loadListings();
     } else {
       showToast('error', result.error ?? 'Failed to delete listing.');
+    }
+  };
+
+  const handleToggleVisibility = async (listing: ShowcaseListing) => {
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setIsTogglingVisibility(listing.id);
+    const nextIsPublic = !listing.isPublic;
+    const result = await showcaseService.setVisibility(token, listing.id, nextIsPublic);
+    setIsTogglingVisibility(null);
+    if (result.success) {
+      showToast('success', nextIsPublic ? 'Listing is visible publicly.' : 'Listing hidden from public view.');
+      await loadListings();
+    } else {
+      showToast('error', result.error ?? 'Failed to update visibility.');
     }
   };
 
@@ -411,6 +442,8 @@ const MemberShowcaseListings: React.FC = () => {
     }
   };
 
+  const canSubmitAfterEdit = modalMode === 'create' || editingStatus === 'draft' || editingStatus === 'rejected';
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -512,14 +545,63 @@ const MemberShowcaseListings: React.FC = () => {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground truncate">{listing.title}</h3>
-                      <StatusBadge status={listing.status} />
-                    </div>
+                    <h3 className="text-sm font-semibold text-foreground truncate">{listing.title}</h3>
                     {listing.productServiceName && (
                       <p className="mt-0.5 text-xs text-muted-foreground">{listing.productServiceName}</p>
                     )}
                     <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{listing.shortDescription}</p>
+                  </div>
+                  <div className="flex shrink-0 items-start gap-2">
+                    <StatusBadge status={listing.status} isPublic={listing.isPublic} />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                          aria-label={`Open actions for ${listing.title}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onClick={() => openEdit(listing)}>
+                          <Edit className="h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleToggleVisibility(listing)}
+                          disabled={isTogglingVisibility === listing.id}
+                        >
+                          {isTogglingVisibility === listing.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : listing.isPublic ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                          {listing.isPublic ? 'Hide' : 'Unhide'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => handleDelete(listing)}
+                          disabled={isDeleting === listing.id}
+                        >
+                          {isDeleting === listing.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                          {deleteConfirm === listing.id ? 'Confirm Delete' : 'Delete'}
+                        </DropdownMenuItem>
+                        {deleteConfirm === listing.id && (
+                          <DropdownMenuItem onClick={() => setDeleteConfirm(null)}>
+                            <X className="h-4 w-4" />
+                            Cancel Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 
@@ -530,31 +612,23 @@ const MemberShowcaseListings: React.FC = () => {
                   </div>
                 )}
 
-                {listing.status === 'approved' && (
-                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 dark:border-green-900/30 dark:bg-green-900/10 p-3 text-xs text-green-700 dark:text-green-400">
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                    Your listing is live on the Business Showcase.
+                {listing.status === 'approved' && !listing.isPublic && (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    <EyeOff className="h-3.5 w-3.5 shrink-0" />
+                    Your listing is hidden from the public Business Showcase.
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
                   {(listing.status === 'draft' || listing.status === 'rejected') && (
-                    <>
-                      <button
-                        onClick={() => openEdit(listing)}
-                        className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/50"
-                      >
-                        <Edit className="h-3 w-3" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleSubmitForReview(listing)}
-                        className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                      >
-                        <Send className="h-3 w-3" />
-                        Submit for Review
-                      </button>
-                    </>
+                    <button
+                      onClick={() => handleSubmitForReview(listing)}
+                      className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <Send className="h-3 w-3" />
+                      Submit for Review
+                    </button>
                   )}
 
                   {listing.status === 'pending_review' && (
@@ -563,36 +637,29 @@ const MemberShowcaseListings: React.FC = () => {
                       Awaiting admin review
                     </div>
                   )}
+                  </div>
+                </div>
 
-                  <button
-                    onClick={() => handleDelete(listing)}
-                    disabled={isDeleting === listing.id}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                      deleteConfirm === listing.id
-                        ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                        : 'border border-border bg-card text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                    }`}
-                  >
-                    {isDeleting === listing.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3 w-3" />
-                    )}
-                    {deleteConfirm === listing.id
-                      ? (listing.status === 'approved' ? 'Confirm Archive' : 'Confirm Delete')
-                      : (listing.status === 'approved' ? 'Archive' : 'Delete')}
-                  </button>
-
-                  {deleteConfirm === listing.id && (
+                {deleteConfirm === listing.id && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                    <span className="font-medium">Delete this listing permanently?</span>
                     <button
-                      onClick={() => setDeleteConfirm(null)}
-                      className="flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50"
+                      type="button"
+                      onClick={() => handleDelete(listing)}
+                      disabled={isDeleting === listing.id}
+                      className="rounded-md bg-destructive px-2.5 py-1 font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
                     >
-                      <X className="h-3 w-3" />
+                      {isDeleting === listing.id ? 'Deleting...' : 'Confirm Delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirm(null)}
+                      className="rounded-md border border-border bg-card px-2.5 py-1 font-medium text-foreground hover:bg-muted/50"
+                    >
                       Cancel
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -848,6 +915,8 @@ const MemberShowcaseListings: React.FC = () => {
               >
                 Cancel
               </button>
+              {canSubmitAfterEdit ? (
+                <>
               <button
                 onClick={() => handleSave(false)}
                 disabled={isSaving || isUploadingPhoto || isKeywordLoading}
@@ -867,6 +936,21 @@ const MemberShowcaseListings: React.FC = () => {
                   </span>
                 ) : 'Save & Submit'}
               </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => handleSave(false)}
+                  disabled={isSaving || isUploadingPhoto || isKeywordLoading}
+                  className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSaving || isUploadingPhoto ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {isUploadingPhoto ? 'Uploading...' : 'Saving...'}
+                    </span>
+                  ) : 'Save Changes'}
+                </button>
+              )}
             </div>
           </div>
         </div>

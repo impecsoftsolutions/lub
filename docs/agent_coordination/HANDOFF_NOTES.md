@@ -8,17 +8,32 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
-### COD-MEMBERSHIP-PLANS-COMPARISON-UPDATE-001
+### COD-MEMBER-SHOWCASE-ACTIONS-001
 - **Status:** Complete locally; migration applied; source uncommitted (pending explicit user instruction).
 - **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Member dashboard Showcase listing cards now use a top-right three-dot action menu with Edit, Hide/Unhide, and Delete. Hide/Unhide toggles `is_public` without changing status. Delete permanently deletes the member's own listing instead of archiving it. Members can edit their own non-archived listings; the current status is preserved. Approved public listings show `Live` status with no separate live notice card; approved hidden listings show `Hidden` status plus the hidden notice.
+- **Files:** `src/pages/MemberShowcaseListings.tsx`, `src/lib/supabase.ts`, `supabase/migrations/20260624170000_member_showcase_actions.sql`
+- **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings); `npm run db:migrations:audit` PASS (local 271 / remote 271 / local_only 0 / remote_only 0) on 2026-06-23.
+- **Runtime:** Migration applied to the linked DB on 2026-06-23. Invalid-session RPC probes for `member_set_showcase_listing_public_visibility_with_session`, `delete_showcase_listing_with_session`, and `update_showcase_listing_with_session` returned normal `session_invalid` JSON.
+
+### COD-BUSINESS-SHOWCASE-CTA-DASHBOARD-001
+- **Status:** Complete locally; source uncommitted (pending explicit user instruction).
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Updated the bottom public Business Showcase CTA. “Apply for Membership” now links to `/dashboard` instead of `/join`, so the existing dashboard authentication and member-registration status checks decide the next step. This prevents bypassing the dashboard Free/Paid membership choice flow.
+- **Files:** `src/pages/BusinessShowcase.tsx`
+- **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
+
+### COD-MEMBERSHIP-PLANS-COMPARISON-UPDATE-001
+- **Status:** Complete; migration applied; source committed/pushed.
+- **Branch / Commit:** `main` / `30ac296`
 - **Summary:** Updated the public Membership Plans feature comparison. `LUB portal account` is now `LUB state account`; added `LUB national account` and `Member registration certificate`; shifted the remaining rows down. The public comparison table now renders unavailable values as a red cross instead of a grey dash.
 - **Files:** `src/pages/MembershipPlans.tsx`, `supabase/migrations/20260624160000_update_membership_plan_feature_labels.sql`
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings); `npm run db:migrations:audit` PASS (local 270 / remote 270 / local_only 0 / remote_only 0) on 2026-06-23.
 - **Runtime:** Migration `20260624160000_update_membership_plan_feature_labels.sql` applied to the linked DB on 2026-06-23.
 
 ### COD-MEMBER-DASHBOARD-FREE-PAID-FLOW-001
-- **Status:** Main slice committed/pushed; follow-up payment-page bugfix is local/uncommitted (pending explicit user instruction).
-- **Branch / Commit:** `main` / `8d5dec5` pushed; local follow-up not committed.
+- **Status:** Complete; source committed/pushed.
+- **Branch / Commit:** `main` / `8d5dec5` main slice, `30ac296` payment-page follow-up.
 - **Summary:** Updated the dashboard flow for logged-in users with no member registration record. The old "View Payment Details / Submit Registration Form" two-step flow is replaced by Free Membership and Paid Membership choice cards. Free Membership opens a confirmation/persuasion modal before navigating to `/join?membership=free`; Paid Membership navigates to `/payment?membership=paid` with the user's signed-up state in the URL when available. `/payment` also falls back to the signed-in member state when no state query is present, preselects that state, loads payment details automatically, replaces the old Home button with Back, and preserves `membership=paid` when continuing to registration. Follow-up local fix: selecting the blank state option writes an explicit blank `state=` and clears payment details instead of falling back to the member state; state dropdown changes use `replace` and preserve route state so the Back button returns to the originating page instead of stepping through same-page state changes. `/join` reads `membership=free|paid` and preselects the correct registration type; Free hides the payment section, skips payment-field validation, and submits no payment proof. Membership Plans paid CTAs preserve `membership=paid`.
 - **Backend:** Added `supabase/migrations/20260624143000_harden_free_membership_payment_placeholders.sql`, replacing `submit_member_registration` so Free applications always store `amount_paid='0'`, `payment_mode='Not applicable'`, `payment_date=current_date`, blank transaction/bank reference, and blank payment proof, regardless of accidental client values. Paid applications still require payment proof server-side.
 - **Files:** `src/pages/MemberDashboard.tsx`, `src/pages/Join.tsx`, `src/pages/Payment.tsx`, `src/components/StateWiseFeePanel.tsx`, `src/pages/MembershipPlans.tsx`, `supabase/migrations/20260624143000_harden_free_membership_payment_placeholders.sql`
