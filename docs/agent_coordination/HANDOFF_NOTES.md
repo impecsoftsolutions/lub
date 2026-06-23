@@ -8,6 +8,15 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### COD-MEMBER-DASHBOARD-FREE-PAID-FLOW-001
+- **Status:** Complete locally; migration applied; source uncommitted (pending explicit user instruction).
+- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Summary:** Updated the dashboard flow for logged-in users with no member registration record. The old "View Payment Details / Submit Registration Form" two-step flow is replaced by Free Membership and Paid Membership choice cards. Free Membership opens a confirmation/persuasion modal before navigating to `/join?membership=free`; Paid Membership navigates to `/payment?membership=paid` with the user's signed-up state in the URL when available. `/payment` also falls back to the signed-in member state when no state query is present, preselects that state, loads payment details automatically, replaces the old Home button with Back, and preserves `membership=paid` when continuing to registration. `/join` reads `membership=free|paid` and preselects the correct registration type; Free hides the payment section, skips payment-field validation, and submits no payment proof. Membership Plans paid CTAs preserve `membership=paid`.
+- **Backend:** Added `supabase/migrations/20260624143000_harden_free_membership_payment_placeholders.sql`, replacing `submit_member_registration` so Free applications always store `amount_paid='0'`, `payment_mode='Not applicable'`, `payment_date=current_date`, blank transaction/bank reference, and blank payment proof, regardless of accidental client values. Paid applications still require payment proof server-side.
+- **Files:** `src/pages/MemberDashboard.tsx`, `src/pages/Join.tsx`, `src/pages/Payment.tsx`, `src/components/StateWiseFeePanel.tsx`, `src/pages/MembershipPlans.tsx`, `supabase/migrations/20260624143000_harden_free_membership_payment_placeholders.sql`
+- **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
+- **Runtime:** Migration applied to linked DB on 2026-06-23. `npm run db:migrations:audit` PASS (local 269 / remote 269 / local_only 0 / remote_only 0). Invalid-input RPC probe returned normal JSON (`User ID is required`), confirming PostgREST sees `submit_member_registration`.
+
 ### COD-JOIN-SMART-UPLOAD-SKIP-001
 - **Status:** Complete; source uncommitted (pending explicit user instruction).
 - **Branch / Commit:** `main` / NOT YET COMMITTED

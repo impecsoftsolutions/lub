@@ -71,8 +71,15 @@ const StateWiseFeePanel: React.FC<StateWiseFeePanelProps> = ({
   };
 
   const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
-  const ctaHref = (base: string) =>
-    selectedState ? `${base}?state=${encodeURIComponent(selectedState)}` : base;
+  const ctaHref = (base: string) => {
+    const [path, query = ''] = base.split('?');
+    const params = new URLSearchParams(query);
+    if (selectedState) {
+      params.set('state', selectedState);
+    }
+    const queryString = params.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
 
   return (
     <div className="space-y-6">
@@ -207,7 +214,7 @@ const StateWiseFeePanel: React.FC<StateWiseFeePanelProps> = ({
             </Link>
             {ctaBasePath !== '/payment' && (
               <Link
-                to={ctaHref('/payment')}
+                to={ctaHref('/payment?membership=paid')}
                 className="flex-1 rounded-lg border border-border bg-card px-4 py-2.5 text-center text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
               >
                 View Full Payment Details

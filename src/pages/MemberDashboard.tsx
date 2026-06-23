@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CreditCard, Gift, Loader2, RefreshCw, X } from 'lucide-react';
 import MemberNav from '../components/MemberNav';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useMember } from '../contexts/useMember';
@@ -34,6 +34,7 @@ const MemberDashboard: React.FC = () => {
   const [registrationLookupError, setRegistrationLookupError] = useState<string | null>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [registrationRetryCounter, setRegistrationRetryCounter] = useState(0);
+  const [showFreeMembershipConfirm, setShowFreeMembershipConfirm] = useState(false);
 
   useEffect(() => {
     // Only redirect if loading is complete AND not authenticated
@@ -122,6 +123,20 @@ const MemberDashboard: React.FC = () => {
       console.error('[MemberDashboard] Error during logout:', error);
       // logoutService handles redirect even on error
     }
+  };
+
+  const handleChoosePaidMembership = () => {
+    setShowFreeMembershipConfirm(false);
+    const params = new URLSearchParams({ membership: 'paid' });
+    if (member?.state?.trim()) {
+      params.set('state', member.state.trim());
+    }
+    navigate(`/payment?${params.toString()}`, { state: { from: '/dashboard' } });
+  };
+
+  const handleChooseFreeMembership = () => {
+    setShowFreeMembershipConfirm(false);
+    navigate('/join?membership=free');
   };
 
   const formatDate = (dateString: string | null) => {
@@ -225,6 +240,51 @@ const MemberDashboard: React.FC = () => {
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
+      {showFreeMembershipConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-card shadow-lg">
+            <div className="flex items-start justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-section font-semibold text-foreground">Before you continue with Free Membership</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Paid Membership gives you the full LUB member experience.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFreeMembershipConfirm(false)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close Free Membership confirmation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 px-5 py-5">
+              <p className="text-sm text-muted-foreground">
+                Free Membership lets you register without payment proof, but Paid Membership unlocks the member directory,
+                Business Showcase, and future leadership opportunities after admin approval.
+              </p>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <p className="text-sm font-medium text-foreground">Recommended: continue with Paid Membership if you want full benefits.</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleChooseFreeMembership}
+                  className="inline-flex justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
+                >
+                  Proceed with Free Membership
+                </button>
+                <button
+                  type="button"
+                  onClick={handleChoosePaidMembership}
+                  className="inline-flex justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Continue with Paid Membership
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
         <PageHeader
@@ -329,56 +389,49 @@ const MemberDashboard: React.FC = () => {
             ) : hasRegistrationRecord === false ? (
               <div className="space-y-6">
                 <p className="text-muted-foreground mb-6">
-                  Complete these two simple steps to become a LUB member:
+                  Choose the membership path that fits you now. You can start with Free Membership and upgrade to Paid later.
                 </p>
 
-                <div className="flex items-start gap-4 p-5 border-2 border-border rounded-lg hover:border-primary/40 transition-colors">
-                  <div className="flex-shrink-0 mt-1">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
-                      <span className="text-primary font-semibold">1</span>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFreeMembershipConfirm(true)}
+                    className="rounded-lg border-2 border-border bg-card p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Gift className="h-5 w-5" />
                     </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-section font-semibold text-foreground mb-2">
-                      Step 1: View Payment Details
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      Review the membership fee and payment methods available.
+                    <h3 className="text-section font-semibold text-foreground mb-2">Free Membership</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Submit your member details without payment proof. Best when you want to join now and upgrade later.
                     </p>
-                    <Link
-                      to="/payment"
-                      className="inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
-                    >
+                    <span className="inline-flex items-center text-sm font-medium text-primary">
+                      Start Free Registration
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleChoosePaidMembership}
+                    className="rounded-lg border-2 border-primary bg-primary/5 p-5 text-left transition-colors hover:bg-primary/10"
+                  >
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-section font-semibold text-foreground mb-2">Paid Membership</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Review state-wise payment details first, then submit your registration with payment proof.
+                    </p>
+                    <span className="inline-flex items-center text-sm font-medium text-primary">
                       View Payment Details
-                    </Link>
-                  </div>
+                    </span>
+                  </button>
                 </div>
 
-                <div className="flex items-start gap-4 p-5 border-2 border-border rounded-lg hover:border-primary/40 transition-colors">
-                  <div className="flex-shrink-0 mt-1">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
-                      <span className="text-primary font-semibold">2</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-section font-semibold text-foreground mb-2">
-                      Step 2: Submit Registration Form
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      Fill out your complete business details and submit supporting documents along with payment proof.
-                    </p>
-                    <Link
-                      to="/join"
-                      className="inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
-                    >
-                      Complete Registration
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="mt-4 p-4 bg-primary/5 border border-border rounded-lg">
-                  <p className="text-sm text-foreground">
-                    <strong>Note:</strong> Make your payment first, then submit the registration form with payment proof.
+                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    Admin approval is required for both Free and Paid Membership applications. Paid benefits start only after Paid Membership approval.
                   </p>
                 </div>
               </div>

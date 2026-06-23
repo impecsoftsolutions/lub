@@ -65,6 +65,15 @@ const JOIN_LIVE_VALIDATION_EXCLUDED_FIELDS = new Set<string>([
   'payment_proof_url'
 ]);
 
+const PAYMENT_FIELD_KEYS = new Set<string>([
+  'amount_paid',
+  'payment_date',
+  'payment_mode',
+  'payment_proof_url',
+  'transaction_id',
+  'bank_reference'
+]);
+
 const EMPTY_JOIN_FORM_DATA = {
   full_name: '',
   gender: '',
@@ -833,16 +842,16 @@ const Join: React.FC = () => {
   // Load initial data and handle URL parameters
   // Auto-fill amount paid based on state payment settings and gender
   useEffect(() => {
-    if (currentStatePaymentSettings && formData.gender) {
+    if (membershipType === 'paid' && currentStatePaymentSettings && formData.gender) {
       if (formData.gender === 'male') {
         setFormData(prev => ({ ...prev, amount_paid: currentStatePaymentSettings.male_fee.toString() }));
       } else if (formData.gender === 'female') {
         setFormData(prev => ({ ...prev, amount_paid: currentStatePaymentSettings.female_fee.toString() }));
       }
-    } else {
+    } else if (membershipType === 'paid') {
       setFormData(prev => ({ ...prev, amount_paid: '' }));
     }
-  }, [formData.gender, currentStatePaymentSettings]);
+  }, [formData.gender, currentStatePaymentSettings, membershipType]);
 
   const loadStates = useCallback(async () => {
     try {
@@ -940,6 +949,11 @@ const Join: React.FC = () => {
       console.log('[Join.tsx] State parameter from URL:', stateParam);
       setFormData(prev => ({ ...prev, state: stateParam }));
       setInitialFormSnapshot(prev => ({ ...prev, state: stateParam }));
+    }
+
+    const membershipParam = searchParams.get('membership');
+    if (membershipParam === 'free' || membershipParam === 'paid') {
+      setMembershipType(membershipParam);
     }
   }, [loadDesignations, loadStates, searchParams]);
 
@@ -2478,6 +2492,8 @@ const Join: React.FC = () => {
     // Check required fields based on configuration
     // Skip 'city' field here as it requires conditional validation based on is_custom_city
     allFields.forEach(({ field, label }) => {
+      if (membershipType === 'free' && PAYMENT_FIELD_KEYS.has(field)) return;
+
       // Skip city field - handle it separately below due to conditional logic
       if (field === 'city') return;
 
@@ -2540,6 +2556,10 @@ const Join: React.FC = () => {
     console.log('[Join.tsx] Starting dynamic field validation based on database mappings');
 
     for (const fieldName of Object.keys(dataToValidate)) {
+      if (membershipType === 'free' && PAYMENT_FIELD_KEYS.has(fieldName)) {
+        continue;
+      }
+
       // Skip internal implementation fields that are not configured in form_field_configurations
       // other_city_name is validated indirectly through the city conditional validation block above
       // is_custom_city is a boolean flag, not a field requiring validation
@@ -2785,11 +2805,19 @@ const Join: React.FC = () => {
       // Free vs Paid membership application type (backend enforces paid-needs-proof).
       (sanitizedData as Record<string, unknown>).membership_application_type = membershipType;
 
+      if (membershipType === 'free') {
+        sanitizedData.amount_paid = '0';
+        sanitizedData.payment_date = null;
+        sanitizedData.payment_mode = 'Not applicable';
+        sanitizedData.transaction_id = '';
+        sanitizedData.bank_reference = '';
+      }
+
       // Submit registration
       console.log('[Join.tsx] Submitting registration to backend...');
       const shouldAttachGstCertificate = isFieldApplicable('gst_certificate_url', sanitizedData);
       const shouldAttachUdyamCertificate = isFieldApplicable('udyam_certificate_url', sanitizedData);
-      const shouldAttachPaymentProof = isFieldApplicable('payment_proof_url', sanitizedData);
+      const shouldAttachPaymentProof = membershipType === 'paid' && isFieldApplicable('payment_proof_url', sanitizedData);
 
       const resolvedGstCertificate = shouldAttachGstCertificate
         ? (files.gstCertificate ?? await hydrateDraftFileForSubmission('gst_certificate'))
@@ -2814,7 +2842,7 @@ const Join: React.FC = () => {
         profilePhoto,
         gstCertificate: resolvedGstCertificate,
         udyamCertificate: resolvedUdyamCertificate,
-        paymentProof: resolvedPaymentProof
+        paymentProof: membershipType === 'paid' ? resolvedPaymentProof : null
       };
 
       const result = await memberRegistrationService.submitRegistration(
@@ -3472,7 +3500,15 @@ const Join: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMembershipType('free')}
+                  onClick={() => {
+                    setMembershipType('free');
+                    setErrors(prev => {
+                      const next = { ...prev };
+                      PAYMENT_FIELD_KEYS.forEach(key => { delete next[key]; });
+                      return next;
+                    });
+                    setFormErrorMessage('');
+                  }}
                   className={`rounded-lg border-2 p-4 text-left transition-colors ${
                     membershipType === 'free'
                       ? 'border-primary bg-primary/5'
@@ -3524,6 +3560,7 @@ const Join: React.FC = () => {
             />
 
             {/* Payment Information */}
+            {membershipType === 'paid' && (
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                 <Phone className="w-5 h-5 mr-2 text-primary" />
@@ -3672,6 +3709,7 @@ const Join: React.FC = () => {
                 )}
               </div>
             </section>
+            )}
 
             {/* Personal Information */}
             <section>

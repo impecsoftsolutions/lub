@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Building2, Banknote, QrCode, AlertCircle, MapPin } from 'lucide-react';
 import { statesService, PublicPaymentState } from '../lib/supabase';
+import { useMember } from '../contexts/useMember';
 
 const Payment: React.FC = () => {
   const [allActiveStates, setAllActiveStates] = useState<PublicPaymentState[]>([]);
@@ -13,8 +14,12 @@ const Payment: React.FC = () => {
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { member } = useMember();
+  const membershipParam = searchParams.get('membership') === 'paid' ? 'paid' : null;
+  const memberStateName = member?.state?.trim() || '';
 
-  // Load all active states and handle URL parameter
+  // Load all active states and use the URL state first, then the signed-in user's saved state.
   useEffect(() => {
     const loadActiveStates = async () => {
       try {
@@ -27,19 +32,19 @@ const Payment: React.FC = () => {
         );
         setAllActiveStates(sortedStates);
 
-        // Check for state parameter in URL
         const stateParam = searchParams.get('state');
-        if (stateParam) {
-          const trimmedParam = stateParam.trim();
+        const preferredStateName = stateParam?.trim() || memberStateName;
+
+        if (preferredStateName) {
           const matchingState = sortedStates.find(
-            state => state.state.toLowerCase() === trimmedParam.toLowerCase()
+            state => state.state.toLowerCase() === preferredStateName.toLowerCase()
           );
 
           if (matchingState) {
             setSelectedStateName(matchingState.state);
             setErrorMessage(null);
-          } else {
-            setErrorMessage(`No payment settings found for '${trimmedParam}'. Please choose your state.`);
+          } else if (stateParam) {
+            setErrorMessage(`No payment settings found for '${preferredStateName}'. Please choose your state.`);
             setSelectedStateName('');
           }
         }
@@ -52,7 +57,7 @@ const Payment: React.FC = () => {
     };
 
     loadActiveStates();
-  }, [searchParams]);
+  }, [searchParams, memberStateName]);
 
   // Load payment details when selectedStateName changes
   useEffect(() => {
@@ -93,10 +98,30 @@ const Payment: React.FC = () => {
     
     // Update URL parameter
     if (stateName) {
-      navigate(`/payment?state=${encodeURIComponent(stateName)}`);
+      const params = new URLSearchParams();
+      params.set('state', stateName);
+      if (membershipParam) {
+        params.set('membership', membershipParam);
+      }
+      navigate(`/payment?${params.toString()}`);
     } else {
-      navigate('/payment');
+      navigate(membershipParam ? `/payment?membership=${membershipParam}` : '/payment');
     }
+  };
+
+  const handleBack = () => {
+    const routeState = location.state as { from?: string } | null;
+    if (routeState?.from) {
+      navigate(routeState.from);
+      return;
+    }
+
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(member ? '/dashboard' : '/membership-plans');
   };
 
   const formatCurrency = (amount: number) => {
@@ -268,15 +293,20 @@ const Payment: React.FC = () => {
 
           {/* Navigation Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between pt-8 border-t border-border">
-            <Link
-              to="/"
+            <button
+              type="button"
+              onClick={handleBack}
               className="inline-flex items-center justify-center px-6 py-3 border border-border text-base font-medium rounded-lg text-foreground bg-card hover:bg-muted/50 transition-colors duration-200 sm:order-1"
             >
               <ArrowLeft className="mr-2 h-5 w-5" />
-              Home
-            </Link>
+              Back
+            </button>
             <Link
-              to={selectedStateName ? `/join?state=${encodeURIComponent(selectedStateName)}` : '/join'}
+              to={
+                selectedStateName
+                  ? `/join?membership=paid&state=${encodeURIComponent(selectedStateName)}`
+                  : '/join?membership=paid'
+              }
               className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-primary-foreground bg-primary hover:bg-primary/90 transition-colors duration-200 sm:order-2"
             >
               Registration Form

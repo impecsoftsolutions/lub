@@ -151,7 +151,7 @@ const MembershipPlans: React.FC = () => {
                     ))}
                   </ul>
                   <Link
-                    to="/join"
+                    to="/join?membership=paid"
                     className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     Apply for Paid Membership
@@ -211,7 +211,7 @@ const MembershipPlans: React.FC = () => {
             <StateWiseFeePanel
               initialState={initialState}
               ctaLabel="Apply for Paid Membership"
-              ctaBasePath="/join"
+              ctaBasePath="/join?membership=paid"
               showNavigation={false}
             />
           </div>
@@ -231,7 +231,7 @@ const MembershipPlans: React.FC = () => {
               Start Free
             </Link>
             <Link
-              to="/join"
+              to="/join?membership=paid"
               className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-50"
             >
               Apply for Paid Membership

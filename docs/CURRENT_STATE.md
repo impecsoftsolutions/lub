@@ -32,6 +32,15 @@ No active implementation slice.
 
 ## Recently Completed
 
+### COD-MEMBER-DASHBOARD-FREE-PAID-FLOW-001
+- **Branch:** `main`
+- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **What shipped:** Updated the new/unregistered member dashboard flow to choose Free Membership or Paid Membership first. Free opens a persuasion/confirmation modal before going to `/join?membership=free`; Paid goes to `/payment?membership=paid` with the signed-up state included when available, so the payment page preselects the user's state and loads payment details automatically. The payment page also falls back to the signed-in member state when no `state` URL param is present, replaces the old Home button with a Back button, and preserves `membership=paid` when continuing to registration. Payment and Membership Plans CTAs now preserve `membership=paid`, and `/join` reads `membership=free|paid` to preselect the correct registration type. Free Membership hides the payment section, skips payment-field validation, and submits no payment proof. Backend hardening forces Free applications to store clean payment placeholders regardless of accidental client values.
+- **Files (new):** `supabase/migrations/20260624143000_harden_free_membership_payment_placeholders.sql`
+- **Files (modified):** `src/pages/MemberDashboard.tsx`, `src/pages/Join.tsx`, `src/pages/Payment.tsx`, `src/components/StateWiseFeePanel.tsx`, `src/pages/MembershipPlans.tsx`
+- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
+- **Runtime:** Migration `20260624143000_harden_free_membership_payment_placeholders.sql` applied to the linked DB on 2026-06-23. Migration audit PASS (local 269 / remote 269 / local_only 0 / remote_only 0). Invalid-input RPC probe returned normal JSON (`User ID is required`), confirming PostgREST sees `submit_member_registration`.
+
 ### COD-AUTH-FORM-BUILDER-PASSWORD-001
 - **Branch:** `main`
 - **Commit:** `c950af7` (`main`)
@@ -182,7 +191,7 @@ No active implementation slice.
 ## In Progress / Dirty State
 
 - No active code slice.
-- Local source changes for `COD-AUTH-FORM-BUILDER-PASSWORD-001` and `COD-JOIN-SMART-UPLOAD-SKIP-001` were committed in `c950af7` and pushed to `main`. Migration `20260624113000` is applied and verified. The Free/Paid migration `20260622100000`, Showcase v2 migration `20260623100000`, website/contact migration `20260623110000`, keywords migration `20260623113000`, and moderation/visibility migration `20260624100000` are applied and verified. The `showcase-photos` bucket is at 10 MB; `showcase-photo-upload` and `improve-showcase-listing` are redeployed.
+- Local source changes for `COD-MEMBER-DASHBOARD-FREE-PAID-FLOW-001` are present but not committed. Migration `20260624143000` is applied and verified. Local source changes for `COD-AUTH-FORM-BUILDER-PASSWORD-001` and `COD-JOIN-SMART-UPLOAD-SKIP-001` were committed in `c950af7` and pushed to `main`. Migration `20260624113000` is applied and verified. The Free/Paid migration `20260622100000`, Showcase v2 migration `20260623100000`, website/contact migration `20260623110000`, keywords migration `20260623113000`, and moderation/visibility migration `20260624100000` are applied and verified. The `showcase-photos` bucket is at 10 MB; `showcase-photo-upload` and `improve-showcase-listing` are redeployed.
 - Untracked local artifacts remain (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
 
 ---
