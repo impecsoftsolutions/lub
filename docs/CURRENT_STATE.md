@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-06-23
+**Last updated:** 2026-07-21
 **Updated by:** Codex
 
 ---
@@ -17,8 +17,8 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-06-23 (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-06-23 |
+| Lint (`npm run lint`) | PASS on 2026-07-21 (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-07-21 |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
 | Phase 1 readonly smoke | Last known PASS (3 passed / 12 skipped) |
 
@@ -32,9 +32,16 @@ No active implementation slice.
 
 ## Recently Completed
 
+### COD-MEMBER-DASHBOARD-PAID-FIRST-001
+- **Branch:** `main`
+- **Commit:** Pending current push
+- **What shipped:** Reordered the logged-in new-user membership choice cards so Paid Membership appears before Free Membership. Updated the intro copy to lead with Paid Membership benefits and gave the Paid Membership card a light emerald highlight while leaving Free Membership visually quieter.
+- **Files (modified):** `src/pages/MemberDashboard.tsx`
+- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-07-21.
+
 ### COD-MEMBER-SHOWCASE-ACTIONS-001
 - **Branch:** `main`
-- **Commit:** Local/uncommitted
+- **Commit:** `ea0bc53`
 - **What shipped:** Replaced member showcase listing inline actions with a top-right three-dot action menu containing Edit, Hide/Unhide, and Delete. Approved public listings now show `Live` status instead of `Approved` and no longer render a separate "Your listing is live" notice card; approved hidden listings show `Hidden` status plus the hidden notice. Delete is now permanent for the member's own listing rather than archiving. Members can hide/show their own non-archived listings, and edit their own non-archived listings while preserving the current status.
 - **Files (new):** `supabase/migrations/20260624170000_member_showcase_actions.sql`
 - **Files (modified):** `src/pages/MemberShowcaseListings.tsx`, `src/lib/supabase.ts`
@@ -43,7 +50,7 @@ No active implementation slice.
 
 ### COD-BUSINESS-SHOWCASE-CTA-DASHBOARD-001
 - **Branch:** `main`
-- **Commit:** Local/uncommitted
+- **Commit:** `ea0bc53`
 - **What shipped:** Updated the bottom Business Showcase “Apply for Membership” CTA to route to `/dashboard` instead of `/join`, so logged-in users go through the dashboard registration/status flow and unauthenticated users are redirected by the existing dashboard auth guard.
 - **Files (modified):** `src/pages/BusinessShowcase.tsx`
 - **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
@@ -216,7 +223,7 @@ No active implementation slice.
 ## In Progress / Dirty State
 
 - No active code slice.
-- Local source changes for `COD-BUSINESS-SHOWCASE-CTA-DASHBOARD-001` and `COD-MEMBER-SHOWCASE-ACTIONS-001` are present but not committed. Migrations `20260624143000`, `20260624160000`, and `20260624170000` are applied and verified. Local source changes for `COD-AUTH-FORM-BUILDER-PASSWORD-001` and `COD-JOIN-SMART-UPLOAD-SKIP-001` were committed in `c950af7` and pushed to `main`. Migration `20260624113000` is applied and verified. The Free/Paid migration `20260622100000`, Showcase v2 migration `20260623100000`, website/contact migration `20260623110000`, keywords migration `20260623113000`, and moderation/visibility migration `20260624100000` are applied and verified. The `showcase-photos` bucket is at 10 MB; `showcase-photo-upload` and `improve-showcase-listing` are redeployed.
+- No active code slice. Migrations `20260624143000`, `20260624160000`, and `20260624170000` are applied and verified. Local source changes for `COD-AUTH-FORM-BUILDER-PASSWORD-001` and `COD-JOIN-SMART-UPLOAD-SKIP-001` were committed in `c950af7` and pushed to `main`. Migration `20260624113000` is applied and verified. The Free/Paid migration `20260622100000`, Showcase v2 migration `20260623100000`, website/contact migration `20260623110000`, keywords migration `20260623113000`, and moderation/visibility migration `20260624100000` are applied and verified. The `showcase-photos` bucket is at 10 MB; `showcase-photo-upload` and `improve-showcase-listing` are redeployed.
 - Untracked local artifacts remain (`artifacts/`, `LUB_Users_Export.xlsx`, `supabase/.temp/`). Do not stage artifacts.
 
 ---

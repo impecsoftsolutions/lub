@@ -389,10 +389,27 @@ const MemberDashboard: React.FC = () => {
             ) : hasRegistrationRecord === false ? (
               <div className="space-y-6">
                 <p className="text-muted-foreground mb-6">
-                  Choose the membership path that fits you now. You can start with Free Membership and upgrade to Paid later.
+                  Choose the membership path that fits you now. Paid Membership gives full benefits, or you can start with Free Membership and upgrade later.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={handleChoosePaidMembership}
+                    className="rounded-lg border-2 border-emerald-500 bg-emerald-50 p-5 text-left transition-colors hover:border-emerald-600 hover:bg-emerald-100 dark:border-emerald-500/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
+                  >
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-section font-semibold text-foreground mb-2">Paid Membership</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Review state-wise payment details first, then submit your registration with payment proof.
+                    </p>
+                    <span className="inline-flex items-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                      View Payment Details
+                    </span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setShowFreeMembershipConfirm(true)}
@@ -407,23 +424,6 @@ const MemberDashboard: React.FC = () => {
                     </p>
                     <span className="inline-flex items-center text-sm font-medium text-primary">
                       Start Free Registration
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleChoosePaidMembership}
-                    className="rounded-lg border-2 border-primary bg-primary/5 p-5 text-left transition-colors hover:bg-primary/10"
-                  >
-                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <h3 className="text-section font-semibold text-foreground mb-2">Paid Membership</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Review state-wise payment details first, then submit your registration with payment proof.
-                    </p>
-                    <span className="inline-flex items-center text-sm font-medium text-primary">
-                      View Payment Details
                     </span>
                   </button>
                 </div>

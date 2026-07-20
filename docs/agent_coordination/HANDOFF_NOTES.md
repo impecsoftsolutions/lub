@@ -8,17 +8,24 @@ No active implementation slice.
 
 ## Latest Closed Slices
 
+### COD-MEMBER-DASHBOARD-PAID-FIRST-001
+- **Status:** Complete; source pending current push.
+- **Branch / Commit:** `main` / pending current push
+- **Summary:** Reordered the new-user dashboard membership choice cards so Paid Membership appears first, updated the intro copy to lead with Paid benefits, and styled the Paid Membership card with a light emerald highlight. Free Membership remains available as the second, quieter option.
+- **Files:** `src/pages/MemberDashboard.tsx`
+- **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-07-21.
+
 ### COD-MEMBER-SHOWCASE-ACTIONS-001
-- **Status:** Complete locally; migration applied; source uncommitted (pending explicit user instruction).
-- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Status:** Complete; migration applied; source committed.
+- **Branch / Commit:** `main` / `ea0bc53`
 - **Summary:** Member dashboard Showcase listing cards now use a top-right three-dot action menu with Edit, Hide/Unhide, and Delete. Hide/Unhide toggles `is_public` without changing status. Delete permanently deletes the member's own listing instead of archiving it. Members can edit their own non-archived listings; the current status is preserved. Approved public listings show `Live` status with no separate live notice card; approved hidden listings show `Hidden` status plus the hidden notice.
 - **Files:** `src/pages/MemberShowcaseListings.tsx`, `src/lib/supabase.ts`, `supabase/migrations/20260624170000_member_showcase_actions.sql`
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings); `npm run db:migrations:audit` PASS (local 271 / remote 271 / local_only 0 / remote_only 0) on 2026-06-23.
 - **Runtime:** Migration applied to the linked DB on 2026-06-23. Invalid-session RPC probes for `member_set_showcase_listing_public_visibility_with_session`, `delete_showcase_listing_with_session`, and `update_showcase_listing_with_session` returned normal `session_invalid` JSON.
 
 ### COD-BUSINESS-SHOWCASE-CTA-DASHBOARD-001
-- **Status:** Complete locally; source uncommitted (pending explicit user instruction).
-- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Status:** Complete; source committed.
+- **Branch / Commit:** `main` / `ea0bc53`
 - **Summary:** Updated the bottom public Business Showcase CTA. “Apply for Membership” now links to `/dashboard` instead of `/join`, so the existing dashboard authentication and member-registration status checks decide the next step. This prevents bypassing the dashboard Free/Paid membership choice flow.
 - **Files:** `src/pages/BusinessShowcase.tsx`
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-06-23.
