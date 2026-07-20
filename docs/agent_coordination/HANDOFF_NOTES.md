@@ -9,22 +9,22 @@ No active implementation slice.
 ## Latest Closed Slices
 
 ### COD-PAYMENT-DETAILS-LAYOUT-001
-- **Status:** Complete locally; source uncommitted (pending explicit user instruction).
-- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Status:** Complete; source committed for production push.
+- **Branch / Commit:** `main` / `9eda134`
 - **Summary:** Flattened the membership payment page by removing the outer border, state-detail wrapper, and nested fee/QR/bank cards. The same content now uses one light fee panel and open payment-method sections with simple dividers. State selection, payment data loading, warnings, Back behavior, and registration navigation are unchanged.
 - **Files:** `src/pages/Payment.tsx`
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-07-21. Per user instruction, no browser verification was performed.
 
 ### COD-MEMBERSHIP-PLANS-PREMIUM-CARD-001
-- **Status:** Complete locally; source uncommitted (pending explicit user instruction).
-- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Status:** Complete; source committed for production push.
+- **Branch / Commit:** `main` / `9eda134`
 - **Summary:** Updated the public Membership Plans paid card with a subtle royal-green presentation and changed its legacy displayed title to `LUB Premium Membership`. The configurable title path, feature content, fee text, and application route remain intact.
 - **Files:** `src/pages/MembershipPlans.tsx`
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings); public `/membership-plans` mobile-width visual verification PASS on 2026-07-21.
 
 ### COD-MEMBER-DASHBOARD-PREMIUM-CARD-001
-- **Status:** Complete locally; source uncommitted (pending explicit user instruction).
-- **Branch / Commit:** `main` / NOT YET COMMITTED
+- **Status:** Complete; source committed for production push.
+- **Branch / Commit:** `main` / `9eda134`
 - **Summary:** Claude Fable 5 redesigned the new-user Premium Membership choice as a royal metal-style emerald card with orange/gold bezel details, a subtle faceted texture, prominent `LUB Premium Membership` typography, and a refined crown seal. Codex reviewed the resulting component and retained the existing payment routing and membership logic unchanged.
 - **Files:** `src/pages/MemberDashboard.tsx`
 - **Validation:** `npm run build` PASS; `npm run lint` PASS (0 errors / 3 expected shadcn warnings); signed-in `/dashboard` mobile-width visual verification PASS on 2026-07-21.
