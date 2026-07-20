@@ -32,9 +32,30 @@ No active implementation slice.
 
 ## Recently Completed
 
+### COD-PAYMENT-DETAILS-LAYOUT-001
+- **Branch:** `main`
+- **Commit:** Local/uncommitted
+- **What shipped:** Simplified the public membership payment-details page by removing nested card borders and excess padding. Fees now use one light section with a single divider, while QR and bank-transfer details use open sections separated by restrained horizontal rules. All state selection, payment data, warnings, and navigation behavior remain unchanged.
+- **Files (modified):** `src/pages/Payment.tsx`
+- **Validation:** `npm run build` PASS and `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-07-21. Browser verification intentionally deferred to the user for this UI-only change.
+
+### COD-MEMBERSHIP-PLANS-PREMIUM-CARD-001
+- **Branch:** `main`
+- **Commit:** Local/uncommitted
+- **What shipped:** Updated only the paid-plan card on the public Membership Plans page with a restrained royal-green treatment and the display title `LUB Premium Membership`. The configurable title architecture is preserved: the legacy configured title is normalized for public display, while custom admin-authored titles still pass through. Features, fee copy, and application routing are unchanged.
+- **Files (modified):** `src/pages/MembershipPlans.tsx`
+- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings), and public mobile-width visual verification PASS on 2026-07-21.
+
+### COD-MEMBER-DASHBOARD-PREMIUM-CARD-001
+- **Branch:** `main`
+- **Commit:** Local/uncommitted
+- **What shipped:** Redesigned the logged-in new-user dashboard Premium Membership choice as a royal metal-style card with a deep emerald face, restrained orange/gold bezel, subtle faceted texture, prominent `LUB Premium Membership` typography, and a crown seal. Replaced dashboard-facing Paid Membership wording with Premium Membership while keeping the existing payment/registration routing unchanged. Claude Fable 5 implemented the focused UI slice; Codex reviewed the diff and mobile rendering.
+- **Files (modified):** `src/pages/MemberDashboard.tsx`
+- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings), and signed-in mobile-width visual verification PASS on 2026-07-21.
+
 ### COD-MEMBER-DASHBOARD-PAID-FIRST-001
 - **Branch:** `main`
-- **Commit:** Pending current push
+- **Commit:** `0d68031`
 - **What shipped:** Reordered the logged-in new-user membership choice cards so Paid Membership appears before Free Membership. Updated the intro copy to lead with Paid Membership benefits and gave the Paid Membership card a light emerald highlight while leaving Free Membership visually quieter.
 - **Files (modified):** `src/pages/MemberDashboard.tsx`
 - **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-07-21.

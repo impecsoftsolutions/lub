@@ -132,11 +132,11 @@ const Payment: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background py-8">
+    <div className="min-h-screen bg-background py-6 sm:py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-card rounded-lg shadow-sm border border-border p-8">
+        <div className="bg-card px-1 py-4 sm:rounded-lg sm:px-6 sm:py-6 lg:px-8">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="mb-6 text-center">
             <h1 className="text-xl font-semibold text-foreground mb-2">LUB Membership Payment</h1>
             <p className="text-muted-foreground">Select your state to view payment details and fees.</p>
           </div>
@@ -152,7 +152,7 @@ const Payment: React.FC = () => {
           )}
 
           {/* State Selection Dropdown */}
-          <div className="mb-8">
+          <div className="mb-6">
             <label htmlFor="state-select" className="block text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">
               Select your state <span className="text-red-500">*</span>
             </label>
@@ -185,7 +185,7 @@ const Payment: React.FC = () => {
 
           {/* Payment Details Panel */}
           {(isLoadingDetails || displayedPaymentDetails) && (
-            <div className="space-y-8">
+            <div>
               {isLoadingDetails ? (
                 <div className="animate-pulse space-y-6">
                   <div className="h-8 bg-muted rounded w-1/3"></div>
@@ -202,9 +202,9 @@ const Payment: React.FC = () => {
                   </div>
                 </div>
               ) : displayedPaymentDetails && (
-                <div className="space-y-8">
-                  <div className="bg-muted/30 rounded-lg shadow-sm border border-border p-6">
-                    <div className="mb-6">
+                <div>
+                  <div>
+                    <div className="mb-5">
                       <h2 className="text-section font-semibold text-foreground flex items-center">
                         <MapPin className="w-6 h-6 mr-2 text-primary" />
                         {displayedPaymentDetails.state}
@@ -212,17 +212,17 @@ const Payment: React.FC = () => {
                     </div>
 
                     {/* Fees */}
-                    <section className="bg-muted/50 border border-border rounded-lg p-6 mb-6">
+                    <section className="mb-2 rounded-lg bg-muted/35 p-4 sm:p-5">
                       <h3 className="text-section font-semibold text-foreground mb-4 flex items-center">
                         <Banknote className="w-5 h-5 mr-2 text-primary" />
                         Fees
                       </h3>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="bg-card rounded-lg p-4 border border-border">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="min-w-0 pr-2">
                           <h4 className="text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">Male Entrepreneur</h4>
                           <p className="text-xl font-semibold text-foreground">{formatCurrency(displayedPaymentDetails.male_fee)}</p>
                         </div>
-                        <div className="bg-card rounded-lg p-4 border border-border">
+                        <div className="min-w-0 border-l border-border pl-4">
                           <h4 className="text-label font-medium text-muted-foreground uppercase tracking-wider mb-2">Female Entrepreneur</h4>
                           <p className="text-xl font-semibold text-foreground">{formatCurrency(displayedPaymentDetails.female_fee)}</p>
                         </div>
@@ -233,30 +233,30 @@ const Payment: React.FC = () => {
                     </section>
 
                     {/* Method 1: QR Code */}
-                    <section className="bg-muted/50 border border-border rounded-lg p-6 mb-6">
+                    <section className="border-t border-border py-6">
                       <h3 className="text-section font-semibold text-foreground mb-4 flex items-center">
                         <QrCode className="w-5 h-5 mr-2 text-primary" />
                         Method 1: Scan QR Code
                       </h3>
                       <div className="text-center">
                         <p className="text-muted-foreground mb-4">Scan QR Code directly using your mobile</p>
-                        <div className="mx-auto w-full max-w-xs sm:max-w-sm bg-card rounded-lg p-3 shadow-sm border border-border">
+                        <div className="mx-auto w-full max-w-xs sm:max-w-sm">
                           <img
                             src={displayedPaymentDetails.qr_code_image_url}
                             alt={`QR Code for ${displayedPaymentDetails.state} payment`}
-                            className="block w-full h-auto object-contain rounded-md"
+                            className="block h-auto w-full object-contain"
                           />
                         </div>
                       </div>
                     </section>
 
                     {/* Method 2: Bank Details */}
-                    <section className="bg-muted/50 border border-border rounded-lg p-6">
+                    <section className="border-t border-border py-6">
                       <h3 className="text-section font-semibold text-foreground mb-4 flex items-center">
                         <Building2 className="w-5 h-5 mr-2 text-primary" />
                         Method 2: Bank Transfer / Cheque
                       </h3>
-                      <div className="bg-card rounded-lg p-4 border border-border">
+                      <div>
                         <p className="text-muted-foreground mb-4">Please make payments in favor of:</p>
                         <div className="space-y-2 text-foreground">
                           <p className="text-section font-semibold text-foreground">{displayedPaymentDetails.account_holder_name}</p>
@@ -283,8 +283,8 @@ const Payment: React.FC = () => {
                     </section>
 
                     {/* Important Notice */}
-                    <section className="bg-destructive/10 border border-destructive/20 rounded-lg p-6">
-                      <p className="text-destructive font-semibold text-center">
+                    <section className="rounded-md bg-destructive/10 px-4 py-3">
+                      <p className="text-center font-medium text-destructive">
                         Please do not pay in the form of cash.
                       </p>
                     </section>
@@ -295,7 +295,7 @@ const Payment: React.FC = () => {
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-between pt-8 border-t border-border">
+          <div className="mt-6 flex flex-col justify-between gap-4 border-t border-border pt-6 sm:flex-row">
             <button
               type="button"
               onClick={handleBack}

@@ -31,7 +31,10 @@ const MembershipPlans: React.FC = () => {
 
   const freeTitle    = freePlan?.title    ?? 'Free Membership';
   const freeSubtitle = freePlan?.subtitle ?? 'Start free — join the LUB digital community at no cost.';
-  const paidTitle    = paidPlan?.title    ?? 'Paid LUB Membership';
+  const configuredPaidTitle = paidPlan?.title?.trim();
+  const paidTitle = !configuredPaidTitle || configuredPaidTitle === 'Paid LUB Membership'
+    ? 'LUB Premium Membership'
+    : configuredPaidTitle;
   const paidSubtitle = paidPlan?.subtitle ?? 'Become a full LUB member — state-wise fees apply.';
 
   const freeIncludes = [
@@ -129,30 +132,30 @@ const MembershipPlans: React.FC = () => {
                 </div>
               </div>
 
-              {/* Paid LUB Membership */}
-              <div className="flex flex-col rounded-xl border-2 border-primary bg-card shadow-md">
-                <div className="rounded-t-xl bg-primary/5 px-6 py-5 border-b border-primary/20">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-1">
+              {/* LUB Premium Membership */}
+              <div className="flex flex-col overflow-hidden rounded-lg border border-emerald-600/70 bg-gradient-to-b from-emerald-50/70 via-card to-card shadow-md dark:border-emerald-500/50 dark:from-emerald-950/35">
+                <div className="border-b border-emerald-600/20 bg-gradient-to-br from-emerald-100/90 via-emerald-50/80 to-amber-50/70 px-6 py-5 dark:from-emerald-900/60 dark:via-emerald-950/45 dark:to-amber-950/20">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-emerald-800 dark:text-emerald-300">
                     Full LUB Member
                   </p>
-                  <h3 className="text-xl font-bold text-foreground">{paidTitle}</h3>
+                  <h3 className="text-xl font-bold text-emerald-950 dark:text-emerald-100">{paidTitle}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{paidSubtitle}</p>
-                  <p className="mt-3 text-sm font-medium text-foreground">
+                  <p className="mt-3 text-sm font-medium text-emerald-900 dark:text-emerald-200">
                     State-wise fees — see the fee selector below
                   </p>
                 </div>
-                <div className="flex flex-1 flex-col px-6 py-5">
+                <div className="flex flex-1 flex-col bg-card/90 px-6 py-5">
                   <ul className="space-y-3 flex-1">
                     {paidIncludes.map(item => (
                       <li key={item} className="flex items-start gap-2 text-sm text-foreground">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                         {item}
                       </li>
                     ))}
                   </ul>
                   <Link
                     to="/join?membership=paid"
-                    className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   >
                     Apply for Paid Membership
                     <ArrowRight className="h-4 w-4" />

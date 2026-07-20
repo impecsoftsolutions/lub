@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, CreditCard, Gift, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, Crown, Gift, Hexagon, Loader2, RefreshCw, X } from 'lucide-react';
 import MemberNav from '../components/MemberNav';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useMember } from '../contexts/useMember';
@@ -246,7 +246,7 @@ const MemberDashboard: React.FC = () => {
             <div className="flex items-start justify-between border-b border-border px-5 py-4">
               <div>
                 <h2 className="text-section font-semibold text-foreground">Before you continue with Free Membership</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Paid Membership gives you the full LUB member experience.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Premium Membership gives you the full LUB member experience.</p>
               </div>
               <button
                 type="button"
@@ -259,11 +259,11 @@ const MemberDashboard: React.FC = () => {
             </div>
             <div className="space-y-4 px-5 py-5">
               <p className="text-sm text-muted-foreground">
-                Free Membership lets you register without payment proof, but Paid Membership unlocks the member directory,
+                Free Membership lets you register without payment proof, but Premium Membership unlocks the member directory,
                 Business Showcase, and future leadership opportunities after admin approval.
               </p>
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                <p className="text-sm font-medium text-foreground">Recommended: continue with Paid Membership if you want full benefits.</p>
+                <p className="text-sm font-medium text-foreground">Recommended: continue with Premium Membership if you want full benefits.</p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
@@ -278,7 +278,7 @@ const MemberDashboard: React.FC = () => {
                   onClick={handleChoosePaidMembership}
                   className="inline-flex justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
-                  Continue with Paid Membership
+                  Continue with Premium Membership
                 </button>
               </div>
             </div>
@@ -371,11 +371,11 @@ const MemberDashboard: React.FC = () => {
                   && (member.account_type === 'general_user' || !member.account_type) && (
                   <div className="mt-6 rounded-lg border border-primary/20 bg-primary/5 p-5">
                     <h3 className="text-section font-semibold text-foreground mb-1">
-                      Upgrade to Paid Membership
+                      Upgrade to Premium Membership
                     </h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      You are a confirmed Free Member. Upgrade to Paid LUB Membership to unlock the member directory,
-                      Business Showcase, and full member benefits. Paid benefits start after admin approval.
+                      You are a confirmed Free Member. Upgrade to Premium LUB Membership to unlock the member directory,
+                      Business Showcase, and full member benefits. Premium benefits start after admin approval.
                     </p>
                     <Link
                       to="/dashboard/upgrade"
@@ -389,24 +389,63 @@ const MemberDashboard: React.FC = () => {
             ) : hasRegistrationRecord === false ? (
               <div className="space-y-6">
                 <p className="text-muted-foreground mb-6">
-                  Choose the membership path that fits you now. Paid Membership gives full benefits, or you can start with Free Membership and upgrade later.
+                  Choose the membership path that fits you now. Premium Membership gives full benefits, or you can start with Free Membership and upgrade later.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <button
                     type="button"
                     onClick={handleChoosePaidMembership}
-                    className="rounded-lg border-2 border-emerald-500 bg-emerald-50 p-5 text-left transition-colors hover:border-emerald-600 hover:bg-emerald-100 dark:border-emerald-500/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
+                    className="group relative overflow-hidden rounded-lg border border-amber-500/60 bg-gradient-to-br from-emerald-800 via-emerald-900 to-emerald-950 p-5 text-left shadow-md transition-[border-color,box-shadow] duration-200 hover:border-amber-300/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-amber-500/40 dark:hover:border-amber-300/70 sm:p-6"
                   >
-                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white">
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <h3 className="text-section font-semibold text-foreground mb-2">Paid Membership</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Review state-wise payment details first, then submit your registration with payment proof.
-                    </p>
-                    <span className="inline-flex items-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                      View Payment Details
+                    {/* Faceted diamond texture + top-corner sheen, kept faint so text stays legible */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        backgroundImage:
+                          'radial-gradient(120% 90% at 15% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 55%), repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0) 1px, rgba(255,255,255,0) 18px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0) 1px, rgba(255,255,255,0) 18px), repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 9px, rgba(255,255,255,0) 9px, rgba(255,255,255,0) 18px)'
+                      }}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-orange-400/70 via-amber-300/80 to-amber-300/10"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-amber-300/5 via-amber-300/30 to-orange-400/40"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-[3px] rounded-[9px] ring-1 ring-inset ring-amber-200/20"
+                    />
+                    <span className="relative block">
+                      <span className="flex items-start justify-between gap-4">
+                        <span className="block min-w-0">
+                          <span className="flex items-center gap-2">
+                            <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-orange-300">LUB</span>
+                            <span aria-hidden="true" className="h-px w-8 bg-gradient-to-r from-amber-300/70 to-amber-300/0" />
+                          </span>
+                          <h3 className="mt-1.5 text-2xl font-bold leading-tight text-white sm:text-[1.7rem]">Premium Membership</h3>
+                        </span>
+                        <span aria-hidden="true" className="relative flex h-16 w-16 shrink-0 items-center justify-center sm:h-[4.25rem] sm:w-[4.25rem]">
+                          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-200 via-amber-500 to-amber-700 shadow-sm" />
+                          <span className="absolute inset-[3px] rounded-full bg-gradient-to-br from-emerald-900 to-emerald-950" />
+                          <span className="absolute inset-[6px] rounded-full border border-amber-300/50" />
+                          <span className="absolute inset-[9px] rounded-full border border-amber-200/15" />
+                          <Hexagon className="absolute h-9 w-9 text-amber-400/80" strokeWidth={1} />
+                          <Crown className="relative h-5 w-5 text-amber-300" strokeWidth={1.75} />
+                        </span>
+                      </span>
+                      <p className="mt-3 text-sm leading-relaxed text-emerald-100/90">
+                        Review state-wise payment details first, then submit your registration with payment proof.
+                      </p>
+                      <span className="mt-4 block border-t border-amber-300/25 pt-3">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-300 underline-offset-4 transition-colors group-hover:text-amber-200 group-hover:underline">
+                          View Payment Details
+                          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                      </span>
                     </span>
                   </button>
 
@@ -431,7 +470,7 @@ const MemberDashboard: React.FC = () => {
                 <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
                   <p className="flex items-start gap-2 text-sm text-muted-foreground">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    Admin approval is required for both Free and Paid Membership applications. Paid benefits start only after Paid Membership approval.
+                    Admin approval is required for both Free and Premium Membership applications. Premium benefits start only after Premium Membership approval.
                   </p>
                 </div>
               </div>
