@@ -7314,6 +7314,7 @@ export const EVENT_RSVP_PROFESSION_OPTIONS: Array<{ value: EventRsvpProfession; 
   { value: 'official',      label: 'Official' },
   { value: 'trading',       label: 'Trading' },
   { value: 'services',      label: 'Services' },
+  { value: 'student',       label: 'Student' },
   { value: 'other',         label: 'Other' },
 ];
 

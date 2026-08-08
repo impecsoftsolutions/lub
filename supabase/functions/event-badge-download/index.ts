@@ -26,6 +26,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+  'Access-Control-Expose-Headers': 'Content-Disposition, X-Badge-Code, X-Attendee-Name',
 };
 
 function jsonError(status: number, error_code: string, error: string): Response {
@@ -921,6 +922,9 @@ Deno.serve(async (req: Request) => {
       'Pragma': 'no-cache',
       'ETag': `"${[resolved.badge.badge_code, design.etagSeed].join(':')}"`,
       'X-Badge-Code': resolved.badge.badge_code,
+      'X-Attendee-Name': encodeURIComponent(
+        composeBadgeName(snapshotFields(resolved.badge), badgeNameOptions(resolved.event)),
+      ),
     },
   });
 });

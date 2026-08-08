@@ -14,6 +14,16 @@ function parseBadgeCodeFromHeaders(headers: Headers): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
+function parseAttendeeNameFromHeaders(headers: Headers): string {
+  const encodedName = (headers.get('x-attendee-name') ?? '').trim();
+  if (!encodedName) return '';
+  try {
+    return decodeURIComponent(encodedName).trim();
+  } catch {
+    return encodedName;
+  }
+}
+
 async function convertImageBlobToJpegBlob(input: Blob): Promise<Blob> {
   const objectUrl = URL.createObjectURL(input);
   try {
@@ -66,6 +76,7 @@ const EventBadgeDownload: React.FC = () => {
   const email = useMemo(() => (searchParams.get('email') || '').trim(), [searchParams]);
 
   const [resolvedBadgeCode, setResolvedBadgeCode] = useState<string>('');
+  const [attendeeName, setAttendeeName] = useState<string>('');
   const [jpgObjectUrl, setJpgObjectUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +89,7 @@ const EventBadgeDownload: React.FC = () => {
       setIsLoading(true);
       setError(null);
       setResolvedBadgeCode('');
+      setAttendeeName('');
       setJpgObjectUrl((old) => {
         if (old) URL.revokeObjectURL(old);
         return null;
@@ -111,6 +123,7 @@ const EventBadgeDownload: React.FC = () => {
 
         const discoveredCode = hasCode ? badgeCode : parseBadgeCodeFromHeaders(response.headers);
         setResolvedBadgeCode(discoveredCode ?? '');
+        setAttendeeName(parseAttendeeNameFromHeaders(response.headers));
 
         const jpgBlob = await badgeResponseToJpegBlob(response);
         nextJpgUrl = URL.createObjectURL(jpgBlob);
@@ -155,7 +168,9 @@ const EventBadgeDownload: React.FC = () => {
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">Event Badge</h1>
+              <h1 className="text-xl font-semibold tracking-tight">
+                {attendeeName ? `${attendeeName} — Event Badge` : 'Event Badge'}
+              </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Badge No. <span className="font-mono text-foreground">{resolvedBadgeCode || badgeCode || '-'}</span>
               </p>

@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-07-21
+**Last updated:** 2026-08-08
 **Updated by:** Codex
 
 ---
@@ -17,8 +17,8 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-07-21 (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-07-21 |
+| Lint (`npm run lint`) | PASS on 2026-08-08 (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-08-08 |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
 | Phase 1 readonly smoke | Last known PASS (3 passed / 12 skipped) |
 
@@ -31,6 +31,21 @@ No active implementation slice.
 ---
 
 ## Recently Completed
+
+### COD-EVENT-PROFESSION-STUDENT-001
+- **Branch:** `main`
+- **Commit:** Included in the 2026-08-08 event fixes commit on `main`
+- **What shipped:** Added `Student` to the default Event RSVP Profession dropdown options for new events and backfilled all existing events with saved profession lists that did not already include it. Public RSVP server-side profession validation now accepts Student for those events through their updated configuration.
+- **Files (new):** `supabase/migrations/20260808130000_add_student_to_event_profession_options.sql`
+- **Files (modified):** `src/lib/supabase.ts`
+- **Validation:** `npm run build` PASS, `npm run lint` PASS (0 errors / 3 expected warnings), and migration audit PASS (local 272 / remote 272 / local_only 0 / remote_only 0) on 2026-08-08. Migration applied to the linked DB; live REST verification confirmed `Student` in the saved profession options for the Bhimavaram Vendor Development Programme and the other matching Vendor events.
+
+### COD-EVENT-BADGE-HEADING-001
+- **Branch:** `main`
+- **Commit:** Included in the 2026-08-08 event fixes commit on `main`
+- **What shipped:** Updated the public event badge page heading to show the attendee display name and badge number. The badge-download Edge Function now exposes the badge code and encoded attendee display name through CORS-readable response headers, fixing the prior `Badge No. -` fallback for contact-based badge links.
+- **Files (modified):** `src/pages/EventBadgeDownload.tsx`, `supabase/functions/event-badge-download/index.ts`
+- **Validation:** `npm run build` PASS and `npm run lint` PASS (0 errors / 3 expected shadcn warnings) on 2026-08-08. Edge Function deployed to the linked Supabase project; live badge probe returned `200` with exposed `X-Badge-Code` and `X-Attendee-Name` headers.
 
 ### COD-PAYMENT-DETAILS-LAYOUT-001
 - **Branch:** `main`
