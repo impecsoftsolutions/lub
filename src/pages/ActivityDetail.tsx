@@ -376,19 +376,6 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
     }
   }, [eventDetail.id, rsvpAadhaar, rsvpSurname, rsvpGivenName]);
 
-  const [whatsappCopied, setWhatsappCopied] = useState(false);
-
-  const onCopyWhatsapp = async () => {
-    if (!whatsappMessage) return;
-    try {
-      await navigator.clipboard.writeText(whatsappMessage);
-      setWhatsappCopied(true);
-      window.setTimeout(() => setWhatsappCopied(false), 2500);
-    } catch {
-      // best-effort: leave the textarea selectable below
-    }
-  };
-
   const onShareWhatsapp = () => {
     if (!whatsappMessage) return;
     const encoded = encodeURIComponent(whatsappMessage);
@@ -613,28 +600,14 @@ const EventView: React.FC<EventViewProps> = ({ eventDetail, onRefresh }) => {
                 </a>
               )}
               {whatsappMessage && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void onCopyWhatsapp()}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
-                  >
-                    {whatsappCopied ? (
-                      <Check className="h-3.5 w-3.5 text-green-700 dark:text-green-400" />
-                    ) : (
-                      <MessageCircle className="h-3.5 w-3.5" />
-                    )}
-                    {whatsappCopied ? 'Copied' : 'Copy WhatsApp invite'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onShareWhatsapp}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-[#25D366] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1da851]"
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Share on WhatsApp
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={onShareWhatsapp}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[#25D366] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1da851]"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  Share on WhatsApp
+                </button>
               )}
             </div>
           )}

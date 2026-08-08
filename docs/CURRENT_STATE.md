@@ -32,6 +32,13 @@ No active implementation slice.
 
 ## Recently Completed
 
+### COD-PUBLIC-EVENT-WHATSAPP-COPY-REMOVE-001
+- **Branch:** `main`
+- **Commit:** Included in the 2026-08-08 public event WhatsApp cleanup commit on `main`
+- **What shipped:** Removed the redundant `Copy WhatsApp invite` button and its clipboard state/handler from the public event detail header. The green `Share on WhatsApp` button remains wired to the configured WhatsApp invitation message, and admin message generation/editing remains unchanged.
+- **Files (modified):** `src/pages/ActivityDetail.tsx`
+- **Validation:** `npm run build` PASS and `npm run lint` PASS (0 errors / 3 expected warnings) on 2026-08-08. Repository search confirms no remaining public `Copy WhatsApp invite` wiring.
+
 ### COD-EVENT-PROFESSION-STUDENT-001
 - **Branch:** `main`
 - **Commit:** Included in the 2026-08-08 event fixes commit on `main`
