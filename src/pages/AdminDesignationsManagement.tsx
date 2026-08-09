@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Plus, Search, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, ArrowUp, ArrowDown, GripVertical, Lock, MoreHorizontal, Edit3, Trash2, ListChecks } from 'lucide-react';
+import { Building2, Plus, Search, ToggleLeft, ToggleRight, X, Users, Shield, MapPin, GripVertical, Lock, MoreHorizontal, Edit3, Trash2, ListChecks } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { SortableTableHeader } from '@/components/ui/sortable-table-header';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { PermissionGate } from '../components/permissions/PermissionGate';
@@ -1649,19 +1650,13 @@ const AdminDesignationsManagement: React.FC = () => {
                             <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-12">
                               {/* Drag handle column */}
                             </th>
-                            <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
-                              <button
-                                onClick={handleToggleLubRolesSort}
-                                className="inline-flex items-center space-x-1 hover:text-foreground transition-colors"
-                              >
-                                <span>Role Name</span>
-                                {lubRolesSortOrder === 'asc' && <ArrowUp className="w-4 h-4" />}
-                                {lubRolesSortOrder === 'desc' && <ArrowDown className="w-4 h-4" />}
-                                {lubRolesSortOrder === 'custom' && (
-                                  <span className="text-xs text-muted-foreground">(Custom)</span>
-                                )}
-                              </button>
-                            </th>
+                            <SortableTableHeader
+                              label={lubRolesSortOrder === 'custom' ? 'Role Name (Custom)' : 'Role Name'}
+                              direction={lubRolesSortOrder === 'custom' ? null : lubRolesSortOrder}
+                              onSort={handleToggleLubRolesSort}
+                              className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider"
+                              buttonClassName="hover:text-foreground transition-colors"
+                            />
                             <th className="text-left text-label font-medium text-muted-foreground uppercase tracking-wider">
                               Status
                             </th>

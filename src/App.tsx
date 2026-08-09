@@ -9,6 +9,7 @@ import ActivityDetail from './pages/ActivityDetail';
 import EventBadgeDownload from './pages/EventBadgeDownload';
 import EventMaterialPreview from './pages/EventMaterialPreview';
 import EventShortRedirect from './pages/EventShortRedirect';
+import EventPublicReport from './pages/EventPublicReport';
 import ActivityShortRedirect from './pages/ActivityShortRedirect';
 import AdminActivities from './pages/AdminActivities';
 import AdminActivityForm from './pages/AdminActivityForm';
@@ -314,6 +315,20 @@ function ActivitySlugRedirect() {
   return <Navigate to={`/events/${slug ?? ''}`} replace />;
 }
 
+// `/r/:code` serves two unambiguous shapes: 7-character event short codes (no
+// ambiguous 0/1/i/l/o) and 32-hex public registration report tokens.
+const PUBLIC_REPORT_TOKEN_REGEX = /^[0-9a-f]{32}$/;
+
+function EventShortOrReportRoute() {
+  const { code = '' } = useParams<{ code: string }>();
+  const normalized = code.trim().toLowerCase();
+  return PUBLIC_REPORT_TOKEN_REGEX.test(normalized) ? (
+    <EventPublicReport token={normalized} />
+  ) : (
+    <EventShortRedirect />
+  );
+}
+
 function RouteHistoryTracker() {
   const location = useLocation();
 
@@ -397,7 +412,7 @@ function App() {
             <Route path="/members" element={<Directory />} />
             <Route path="/member/:id/:companySlug/:nameSlug" element={<MemberProfile />} />
             <Route path="/events" element={<Events />} />
-            <Route path="/r/:code" element={<EventShortRedirect />} />
+            <Route path="/r/:code" element={<EventShortOrReportRoute />} />
             <Route path="/a/:code" element={<ActivityShortRedirect />} />
             <Route path="/events/badge" element={<EventBadgeDownload />} />
             <Route path="/events/badge/:code" element={<EventBadgeDownload />} />

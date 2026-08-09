@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, Filter, Mail, Phone, Shield, Lock, ChevronUp, ChevronDown, MoreHorizontal, Edit3, Ban, Trash2, ShieldCheck } from 'lucide-react';
+import { Users, Search, Filter, Mail, Phone, Shield, Lock, MoreHorizontal, Edit3, Ban, Trash2, ShieldCheck } from 'lucide-react';
 import { PermissionGate } from '../../components/permissions/PermissionGate';
 import { rolesService, supabase, type RoleCatalog } from '../../lib/supabase';
 import { sessionManager } from '../../lib/sessionManager';
@@ -12,6 +12,7 @@ import DeleteUserModal from '../../components/admin/modals/DeleteUserModal';
 import BlockUserModal from '../../components/admin/modals/BlockUserModal';
 import AssignRoleModal from '../../components/admin/modals/AssignRoleModal';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { SortableTableHeader } from '@/components/ui/sortable-table-header';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 
@@ -402,37 +403,21 @@ const AdminUsers: React.FC = () => {
                 <table className="w-full divide-y divide-border">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th
-                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[35%]"
-                        onClick={() => handleSort('email')}
-                        aria-sort={sortField === 'email' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>Email</span>
-                          {sortField === 'email' && (
-                            sortDirection === 'asc' ?
-                              <ChevronUp className="w-4 h-4" /> :
-                              <ChevronDown className="w-4 h-4" />
-                          )}
-                        </div>
-                      </th>
+                      <SortableTableHeader
+                        label="Email"
+                        direction={sortField === 'email' ? sortDirection : null}
+                        onSort={() => handleSort('email')}
+                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider hover:bg-muted transition-colors w-[35%]"
+                      />
                       <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[16%]">
                         Mobile Number
                       </th>
-                      <th
-                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-colors w-[20%]"
-                        onClick={() => handleSort('account_type')}
-                        aria-sort={sortField === 'account_type' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>Account Type</span>
-                          {sortField === 'account_type' && (
-                            sortDirection === 'asc' ?
-                              <ChevronUp className="w-4 h-4" /> :
-                              <ChevronDown className="w-4 h-4" />
-                          )}
-                        </div>
-                      </th>
+                      <SortableTableHeader
+                        label="Account Type"
+                        direction={sortField === 'account_type' ? sortDirection : null}
+                        onSort={() => handleSort('account_type')}
+                        className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider hover:bg-muted transition-colors w-[20%]"
+                      />
                       <th className="px-4 py-3 text-left text-label font-medium text-muted-foreground uppercase tracking-wider w-[20%]">
                         Role
                       </th>

@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  AlertTriangle,
   Archive,
   ArrowLeft,
   Calendar,
   Check,
+  ClipboardList,
   Clock3,
   Copy,
   ExternalLink,
@@ -39,8 +41,10 @@ import {
   EVENT_RSVP_MEAL_OPTIONS,
   EVENT_RSVP_PROFESSION_OPTIONS,
   type AdminEventDetail,
+  type AdminEventPublicReportSettings,
   type EventAIDraftSourceFile,
   type EventAgendaItem,
+  type EventPublicReportFieldKey,
   type EventRsvpGender,
   type EventRsvpMealPreference,
   type EventRsvpProfession,
@@ -113,6 +117,26 @@ function professionOptionsTextFrom(value: unknown): string {
     if (labels.length > 0) return labels.join('\n');
   }
   return DEFAULT_PROFESSION_LABELS.join('\n');
+}
+
+// Public report password: transcribable over WhatsApp, so no ambiguous 0/O/1/I/l.
+const REPORT_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const REPORT_PASSWORD_LENGTH = 10;
+
+function humanizeReportFieldKey(key: string): string {
+  const words = key.split('_').filter(Boolean).join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function generateReportPassword(): string {
+  const alphabet = REPORT_PASSWORD_ALPHABET;
+  const bytes = new Uint32Array(REPORT_PASSWORD_LENGTH);
+  crypto.getRandomValues(bytes);
+  let password = '';
+  for (let index = 0; index < REPORT_PASSWORD_LENGTH; index += 1) {
+    password += alphabet[bytes[index] % alphabet.length];
+  }
+  return password;
 }
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,79})$/;
@@ -336,6 +360,22 @@ const AdminEventForm: React.FC = () => {
   const [shortShareLoading, setShortShareLoading] = useState(false);
   const [shortUrlEnabled, setShortUrlEnabled] = useState(true);
   const [shortUrlToggling, setShortUrlToggling] = useState(false);
+
+  // Public registration report (COD-EVENT-PUBLIC-REPORT-001)
+  const [reportSettings, setReportSettings] = useState<AdminEventPublicReportSettings | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportLoadError, setReportLoadError] = useState<string | null>(null);
+  const [reportSaving, setReportSaving] = useState(false);
+  const [reportRegenerating, setReportRegenerating] = useState(false);
+  const [showReportRegenerateConfirm, setShowReportRegenerateConfirm] = useState(false);
+  // Draft password: blank on an existing event means "keep the current password".
+  const [reportPasswordDraft, setReportPasswordDraft] = useState('');
+  const [reportEnabledDraft, setReportEnabledDraft] = useState(false);
+  const [reportSelectedDraft, setReportSelectedDraft] = useState<EventPublicReportFieldKey[]>([]);
+  // New events generate their password up front so it can be copied before saving.
+  const [newEventReportPassword, setNewEventReportPassword] = useState(() =>
+    isEdit ? '' : generateReportPassword(),
+  );
 
   const [original, setOriginal] = useState<AdminEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
@@ -885,7 +925,19 @@ const AdminEventForm: React.FC = () => {
       return id;
     }
 
-    const result = await eventsService.create(token, payload);
+    // A blank report password rolls back the whole atomic create server-side,
+    // so catch it here rather than losing the event with it.
+    const reportPassword = newEventReportPassword.trim();
+    if (!reportPassword) {
+      showToast('error', 'Set or generate a public report password before creating the event.');
+      return null;
+    }
+
+    // Atomic create: the event and its public report password/fields land in one transaction.
+    const result = await eventsService.create(token, payload, {
+      password: reportPassword,
+      selectedFields: initialReportFields,
+    });
     if (!result.success || !result.event_id) {
       if (result.error_code === 'slug_conflict') {
         setSlugStatus({ kind: 'taken', normalized: result.conflict_slug ?? slug });
@@ -1474,6 +1526,142 @@ const AdminEventForm: React.FC = () => {
       showToast('error', 'Could not copy. Select and copy manually.');
     }
   }, [showToast]);
+
+  // ── Public registration report ────────────────────────────────────────────
+
+  /** Conservative initial selection for a brand new event: identity fields only. */
+  const initialReportFields = useMemo<EventPublicReportFieldKey[]>(() => {
+    const keys: EventPublicReportFieldKey[] = ['full_name'];
+    if (rsvpCollectCompany) keys.push('company');
+    if (rsvpCollectDesignation) keys.push('designation');
+    keys.push('badge_code');
+    return keys;
+  }, [rsvpCollectCompany, rsvpCollectDesignation]);
+
+  const loadReportSettings = useCallback(async () => {
+    if (!isEdit || !id) return;
+    // Server enforces this too; skipping the call keeps read-only viewers quiet.
+    if (!canEditAny && !canEditOwn) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) return;
+    setReportLoading(true);
+    setReportLoadError(null);
+    try {
+      const result = await eventsService.getPublicReportSettings(token, id);
+      if (!result.success || !result.data) {
+        setReportSettings(null);
+        setReportLoadError(result.error ?? 'Could not load the public report settings.');
+        return;
+      }
+      const availableKeys = new Set(
+        result.data.availableFields.filter((field) => field.isAvailable !== false).map((field) => field.key),
+      );
+      setReportSettings(result.data);
+      setReportEnabledDraft(result.data.isEnabled);
+      // The update RPC rejects keys that are no longer collected, so the draft
+      // carries only available keys; orphans stay visible in the list instead.
+      setReportSelectedDraft(result.data.selectedFields.filter((key) => availableKeys.has(key)));
+      setReportPasswordDraft('');
+    } catch {
+      setReportSettings(null);
+      setReportLoadError('Could not load the public report settings.');
+    } finally {
+      setReportLoading(false);
+    }
+  }, [isEdit, id, canEditAny, canEditOwn]);
+
+  useEffect(() => {
+    void loadReportSettings();
+  }, [loadReportSettings]);
+
+  const reportUrl = useMemo(() => {
+    const token = reportSettings?.token ?? '';
+    if (!token) return '';
+    if (typeof window === 'undefined') return `/r/${token}`;
+    return `${window.location.origin}/r/${token}`;
+  }, [reportSettings?.token]);
+
+  /** Available fields plus any stored selection that is no longer collected. */
+  const reportFieldChoices = useMemo(() => {
+    if (!reportSettings) return [];
+    const known = new Set(reportSettings.availableFields.map((field) => field.key));
+    const orphaned = reportSettings.selectedFields
+      .filter((key) => !known.has(key))
+      .map((key) => ({ key, label: humanizeReportFieldKey(key), isSensitive: false, isAvailable: false }));
+    return [...reportSettings.availableFields, ...orphaned];
+  }, [reportSettings]);
+
+  const toggleReportField = useCallback((key: EventPublicReportFieldKey) => {
+    setReportSelectedDraft((previous) =>
+      previous.includes(key) ? previous.filter((item) => item !== key) : [...previous, key],
+    );
+  }, []);
+
+  const handleSaveReportSettings = useCallback(async () => {
+    if (!isEdit || !id) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    if (reportSelectedDraft.length === 0) {
+      showToast('error', 'Select at least one column for the public report.');
+      return;
+    }
+    const password = reportPasswordDraft.trim();
+    if (reportEnabledDraft && !password && !reportSettings?.passwordConfigured) {
+      showToast('error', 'Set a password before enabling the public report.');
+      return;
+    }
+
+    setReportSaving(true);
+    try {
+      const result = await eventsService.updatePublicReportSettings(token, id, {
+        password: password ? password : null,
+        selectedFields: reportSelectedDraft,
+        isEnabled: reportEnabledDraft,
+      });
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to save the public report settings.');
+        return;
+      }
+      showToast('success', 'Public report settings saved.');
+      await loadReportSettings();
+    } finally {
+      setReportSaving(false);
+    }
+  }, [
+    isEdit,
+    id,
+    reportSelectedDraft,
+    reportPasswordDraft,
+    reportEnabledDraft,
+    reportSettings?.passwordConfigured,
+    showToast,
+    loadReportSettings,
+  ]);
+
+  const handleRegenerateReportToken = useCallback(async () => {
+    if (!isEdit || !id) return;
+    const token = sessionManager.getSessionToken();
+    if (!token) {
+      showToast('error', 'Session expired.');
+      return;
+    }
+    setReportRegenerating(true);
+    try {
+      const result = await eventsService.regeneratePublicReportToken(token, id);
+      if (!result.success) {
+        showToast('error', result.error ?? 'Failed to regenerate the public report link.');
+        return;
+      }
+      showToast('success', 'New report link generated. Older links no longer work.');
+      setShowReportRegenerateConfirm(false);
+      await loadReportSettings();
+    } finally {
+      setReportRegenerating(false);
+    }
+  }, [isEdit, id, showToast, loadReportSettings]);
 
   const openWhatsappShare = useCallback(() => {
     if (!shareMessage) return;
@@ -3266,6 +3454,295 @@ const AdminEventForm: React.FC = () => {
               </div>
             )}
 
+            {/* Public registration report (COD-EVENT-PUBLIC-REPORT-001) */}
+            {canEdit && (
+              <div className="md:col-span-2 rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Public registration report
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    A password-protected page showing this event&apos;s registrations. Share the link and password
+                    with organisers who need the list but do not have admin access.
+                  </p>
+                </div>
+
+                {!isEdit ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label htmlFor="new-report-password" className="text-xs font-medium text-foreground">
+                        Report password
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <Input
+                          id="new-report-password"
+                          value={newEventReportPassword}
+                          onChange={(event) => setNewEventReportPassword(event.target.value.trim())}
+                          className="font-mono text-sm sm:max-w-xs"
+                          autoComplete="off"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setNewEventReportPassword(generateReportPassword())}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                          Generate
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void copyTextSafely(newEventReportPassword, 'Report password copied to clipboard.')
+                          }
+                          disabled={!newEventReportPassword}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy password
+                        </Button>
+                      </div>
+                    </div>
+
+                    <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] text-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                      <span>
+                        Copy this password now. It is stored securely and cannot be shown again after you save —
+                        you can always set a new one later.
+                      </span>
+                    </p>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-foreground">Columns shared initially</p>
+                      <p className="text-xs text-muted-foreground">
+                        {initialReportFields.map(humanizeReportFieldKey).join(', ')}. Contact and personal details
+                        stay off by default — add them from this page after the event is created.
+                      </p>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground">
+                      The shareable report link is created together with the event and appears here after you save.
+                    </p>
+                  </div>
+                ) : reportLoading ? (
+                  <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading report settings...
+                  </p>
+                ) : reportLoadError ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-destructive">{reportLoadError}</p>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void loadReportSettings()}>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      Retry
+                    </Button>
+                  </div>
+                ) : reportSettings ? (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Report link</label>
+                      <div className="flex flex-wrap gap-2">
+                        <Input value={reportUrl} readOnly className="font-mono text-xs sm:flex-1 sm:min-w-[18rem]" />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void copyTextSafely(reportUrl, 'Report link copied to clipboard.')}
+                          disabled={!reportUrl}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy link
+                        </Button>
+                        {reportUrl && (
+                          <a
+                            href={reportUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 text-sm text-foreground hover:bg-muted/50"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            Open
+                          </a>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowReportRegenerateConfirm(true)}
+                          disabled={reportRegenerating}
+                        >
+                          {reportRegenerating ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          Regenerate link
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background p-3">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-medium text-foreground">Report access</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {reportSettings.passwordConfigured
+                            ? 'Turn off to close the link without changing the password.'
+                            : 'Set a password to activate this report.'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {reportEnabledDraft ? 'Enabled' : 'Disabled'}
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={reportEnabledDraft}
+                          aria-label="Enable public registration report"
+                          onClick={() => setReportEnabledDraft((value) => !value)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+                            reportEnabledDraft ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              reportEnabledDraft ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label htmlFor="report-password" className="text-xs font-medium text-foreground">
+                          Password
+                        </label>
+                        <span className="text-[11px] text-muted-foreground">
+                          {reportSettings.passwordConfigured ? 'Password set' : 'No password set'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Input
+                          id="report-password"
+                          value={reportPasswordDraft}
+                          onChange={(event) => setReportPasswordDraft(event.target.value.trim())}
+                          placeholder={
+                            reportSettings.passwordConfigured
+                              ? 'Leave blank to keep the current password'
+                              : 'Set a password to activate the report'
+                          }
+                          className="font-mono text-sm sm:max-w-xs"
+                          autoComplete="off"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setReportPasswordDraft(generateReportPassword())}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                          Generate
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void copyTextSafely(reportPasswordDraft, 'Report password copied to clipboard.')
+                          }
+                          disabled={!reportPasswordDraft}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy password
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Copy a new password before saving — it cannot be shown again afterwards.
+                      </p>
+                    </div>
+
+                    {reportSettings.lockedUntil && new Date(reportSettings.lockedUntil) > new Date() && (
+                      <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] text-foreground">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                        <span>
+                          Too many incorrect password attempts, so the report is temporarily locked. It unlocks on
+                          its own shortly — saving these settings or regenerating the link clears the lock
+                          immediately.
+                        </span>
+                      </p>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-medium text-foreground">Columns shown on the report</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Anyone with the link and password can see every ticked column. Viewers can hide columns
+                          for themselves, but cannot reveal ones you leave unticked.
+                        </p>
+                      </div>
+                      <div className="grid gap-1.5 sm:grid-cols-2">
+                        {reportFieldChoices.map((field) => {
+                          const unavailable = field.isAvailable === false;
+                          const checked = reportSelectedDraft.includes(field.key as EventPublicReportFieldKey);
+                          return (
+                            <label
+                              key={field.key}
+                              className={`flex items-start gap-2 rounded-md border border-border bg-background p-2 text-xs ${
+                                unavailable ? 'opacity-60' : 'cursor-pointer hover:bg-muted/40'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 mt-0.5 rounded border-border"
+                                checked={unavailable ? true : checked}
+                                disabled={unavailable}
+                                onChange={() => toggleReportField(field.key as EventPublicReportFieldKey)}
+                              />
+                              <span className="space-y-0.5">
+                                <span className="block text-foreground">{field.label}</span>
+                                {unavailable ? (
+                                  <span className="block text-[11px] text-muted-foreground">
+                                    No longer collected &mdash; removed when you save
+                                  </span>
+                                ) : field.isSensitive ? (
+                                  <span className="block text-[11px] text-amber-600">Sensitive</span>
+                                ) : null}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {reportSelectedDraft.length === 0 && (
+                        <p className="text-[11px] text-destructive">Select at least one column.</p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void handleSaveReportSettings()}
+                        disabled={reportSaving || reportSelectedDraft.length === 0}
+                      >
+                        {reportSaving ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Save report settings
+                      </Button>
+                      <p className="text-[11px] text-muted-foreground">
+                        Report settings save on their own, separately from the event.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             <div className="md:col-span-2 pt-2 flex flex-wrap gap-2">
               {canEdit && (
                 <Button type="button" onClick={() => void handleSave()} disabled={isSaving || slugBlocksSave}>
@@ -3343,6 +3820,52 @@ const AdminEventForm: React.FC = () => {
                 <Button type="button" size="sm" onClick={confirmOverwriteAndGenerate}>
                   <Sparkles className="h-3.5 w-3.5 mr-1.5" />
                   Generate &amp; overwrite
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Public report link regeneration confirm */}
+        {showReportRegenerateConfirm && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+            onClick={() => setShowReportRegenerateConfirm(false)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-foreground">Generate a new report link?</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                The current link stops working immediately, and anyone currently viewing the report is signed out.
+                You will need to share the new link with everyone who still needs it. The password and selected
+                columns stay as they are.
+              </p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReportRegenerateConfirm(false)}
+                  disabled={reportRegenerating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleRegenerateReportToken()}
+                  disabled={reportRegenerating}
+                >
+                  {reportRegenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Generate new link
                 </Button>
               </div>
             </div>

@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   ExternalLink,
   Eye,
   FileX,
@@ -17,6 +14,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { SortableTableHeader } from '@/components/ui/sortable-table-header';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import {
@@ -248,21 +246,8 @@ const AdminReportsPayments: React.FC = () => {
     });
   };
 
-  const ariaSortFor = (key: SortKey): 'ascending' | 'descending' | 'none' => {
-    if (sortState.key !== key) return 'none';
-    return sortState.direction === 'asc' ? 'ascending' : 'descending';
-  };
-
-  const getSortIcon = (key: SortKey) => {
-    if (sortState.key !== key) {
-      return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/70" />;
-    }
-    return sortState.direction === 'asc' ? (
-      <ArrowUp className="h-3.5 w-3.5 text-foreground" />
-    ) : (
-      <ArrowDown className="h-3.5 w-3.5 text-foreground" />
-    );
-  };
+  const sortDirectionFor = (key: SortKey): SortDirection | null =>
+    sortState.key === key ? sortState.direction : null;
 
   const getStatusVariant = (status: string) => {
     if (status === 'approved') return 'success';
@@ -476,48 +461,55 @@ const AdminReportsPayments: React.FC = () => {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('paymentDate')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('paymentDate')}>
-                      Payment Date
-                      {getSortIcon('paymentDate')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('member')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('member')}>
-                      Member
-                      {getSortIcon('member')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('location')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('location')}>
-                      Location
-                      {getSortIcon('location')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('status')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('status')}>
-                      Status
-                      {getSortIcon('status')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('amount')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('amount')}>
-                      Amount
-                      {getSortIcon('amount')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('modeRef')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('modeRef')}>
-                      Mode / Ref
-                      {getSortIcon('modeRef')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground" aria-sort={ariaSortFor('submitted')}>
-                    <button type="button" className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('submitted')}>
-                      Submitted
-                      {getSortIcon('submitted')}
-                    </button>
-                  </th>
+                  <SortableTableHeader
+                    label="Payment Date"
+                    direction={sortDirectionFor('paymentDate')}
+                    onSort={() => handleSort('paymentDate')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
+                  <SortableTableHeader
+                    label="Member"
+                    direction={sortDirectionFor('member')}
+                    onSort={() => handleSort('member')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
+                  <SortableTableHeader
+                    label="Location"
+                    direction={sortDirectionFor('location')}
+                    onSort={() => handleSort('location')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
+                  <SortableTableHeader
+                    label="Status"
+                    direction={sortDirectionFor('status')}
+                    onSort={() => handleSort('status')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
+                  <SortableTableHeader
+                    label="Amount"
+                    direction={sortDirectionFor('amount')}
+                    onSort={() => handleSort('amount')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
+                  <SortableTableHeader
+                    label="Mode / Ref"
+                    direction={sortDirectionFor('modeRef')}
+                    onSort={() => handleSort('modeRef')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
+                  <SortableTableHeader
+                    label="Submitted"
+                    direction={sortDirectionFor('submitted')}
+                    onSort={() => handleSort('submitted')}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    buttonClassName="hover:text-foreground transition-colors"
+                  />
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions</th>
                 </tr>
               </thead>

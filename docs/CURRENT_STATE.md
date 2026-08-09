@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-10
 **Updated by:** Codex
 
 ---
@@ -8,7 +8,7 @@
 ## Project
 
 - **Repo:** `C:\webprojects\lub`
-- **Latest deep handover:** `docs/session_documents/session_78_smart_upload_batch_005.md`
+- **Latest deep handover:** `docs/session_documents/session_79_event_public_registration_reports.md`
 - **Project guide:** `docs/lub_web_portal_project_guide_for_claude_code.md`
 
 ---
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-08-08 (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-08-08 |
+| Lint (`npm run lint`) | PASS on 2026-08-10 after global sortable-header follow-up (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-08-10 after global sortable-header follow-up |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
-| Phase 1 readonly smoke | Last known PASS (3 passed / 12 skipped) |
+| Phase 1 readonly smoke | 2026-08-09 run reached a pre-existing stale sign-in helper mismatch (3 failed / 12 skipped); no event-report route was reached |
 
 ---
 
@@ -31,6 +31,34 @@ No active implementation slice.
 ---
 
 ## Recently Completed
+
+### COD-GLOBAL-SORTABLE-HEADER-001
+- **Branch:** `main`
+- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **What shipped:** Added one centralized `SortableTableHeader` component for every existing sortable table header across the public site and admin app. It owns the semantic header/button markup, `aria-sort`, focus treatment, pointer cursor, spacing, and a restrained 10px sort symbol: subtle double chevrons when inactive and a single up/down chevron when active. Applied to Public Event Registration Report, Admin Event Registrations, Events, Payments Report, Users, and LUB Roles. Existing sort keys, default directions, responsive classes, CSV ordering, and the LUB Roles Custom/ascending/descending cycle remain intact. Sort dropdowns, accordions, and row-reordering arrows were deliberately excluded.
+- **Files (new):** `src/components/ui/sortable-table-header.tsx`, `docs/agent_coordination/GLOBAL_SORTABLE_HEADER_CONTRACT.md`
+- **Files (modified):** `src/pages/EventPublicReport.tsx`, `src/pages/AdminEventRegistrations.tsx`, `src/pages/AdminEvents.tsx`, `src/pages/AdminReportsPayments.tsx`, `src/pages/admin/AdminUsers.tsx`, `src/pages/AdminDesignationsManagement.tsx`, `tests/e2e/event-public-report.spec.ts`, coordination/handover docs.
+- **Validation:** Focused public-report Playwright PASS, including computed 10px icon dimensions and sort behavior. Signed-in browser verification PASS for Admin Users (`none -> ascending -> descending`) and LUB Roles (`Custom -> ascending -> descending -> Custom`), both with 10px icons. Lint PASS (0 errors / 3 established warnings); build PASS. Phase 1 readonly remains blocked before admin routes by the stale email/mobile sign-in helper (3 failed / 12 skipped). Claude Code CLI (`claude-opus-5`, high effort) agreed the plan, implemented the UI slice, identified and corrected centralized cursor ownership, then returned `NO REMAINING DEVIATIONS`.
+- **Migration:** None required.
+
+### COD-EVENT-PUBLIC-REPORT-SORT-002
+- **Branch:** `main`
+- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **What shipped:** Made every visible public registration report header sortable across the complete event result set, with ascending/descending icons and accessible `aria-sort` state. Sorting resets pagination to page one, persists into CSV downloads, clears safely when a sorted field is hidden or removed by the admin, and falls back once if stale sort state is rejected. All body data cells now stay on one line without truncation; the table uses horizontal scrolling for wide values.
+- **Files (new):** `supabase/migrations/20260809110000_sort_public_event_report_rows.sql`
+- **Files (modified):** `src/lib/supabase.ts`, `src/pages/EventPublicReport.tsx`, `tests/e2e/event-public-report.spec.ts`, coordination/handover docs.
+- **Runtime:** Migration applied to the linked database; audit PASS (local 274 / remote 274). Live REST probes confirmed both the new six-argument sorted RPC call and default-argument compatibility resolve normally with no ambiguous PostgREST overload.
+- **Validation:** Focused Playwright PASS (1 test), lint PASS (0 errors / 3 established warnings), and build PASS. Repository-wide `tsc --noEmit` remains red on many established unrelated errors, with no reported error in `EventPublicReport.tsx` or the new service arguments. Claude Code CLI (`claude-opus-5`, high effort) agreed the follow-up plan, implemented the UI-owned slice, and completed an independent final review with `NO REMAINING DEVIATIONS`.
+
+### COD-EVENT-PUBLIC-REPORT-001
+- **Branch:** `main`
+- **Commit:** Pending user instruction (do not commit/push without explicit request)
+- **What shipped:** Added an automatically provisioned, password-protected public registration report for every event. New events are created atomically with an enabled report/password; existing events were backfilled with disabled report links and can be enabled after setting a password. Admins can copy/regenerate the link, set or replace the password, enable/disable the report, and select from the event's actual collected fields plus badge number. The public report shows scoped event details and only the admin-allowed registration fields, with 25/50/100/All page sizes (50 default), viewer-side field hiding, pagination, and exact-visible-column CSV download.
+- **Security:** Report passwords are bcrypt-hashed in a private RLS/no-policy table. Anonymous access uses a password-minted two-hour view token, rate limiting/temporary lockout, current-enable/current-allowlist checks on every fetch, active-registration filtering, explicit JSON construction, cross-event scoping, and a hard exclusion for Aadhaar. Privileged writes use `_with_session` RPCs only.
+- **Files (new):** `supabase/migrations/20260809100000_event_public_registration_reports.sql`, `src/pages/EventPublicReport.tsx`, `tests/e2e/event-public-report.spec.ts`, `docs/agent_coordination/EVENT_PUBLIC_REPORT_CONTRACT.md`, `docs/session_documents/session_79_event_public_registration_reports.md`
+- **Files (modified):** `src/lib/supabase.ts`, `src/pages/AdminEventForm.tsx`, `src/App.tsx`, coordination docs.
+- **Runtime:** Migration applied to the linked database; audit PASS (local 273 / remote 273). Live probes verified atomic create/rollback, password denial/success, selected-field-only responses, badge output, changed-field rejection, disable invalidation, private-table denial, and cleanup of the temporary event/session.
+- **Validation:** Focused Playwright PASS (1 test), `npm run lint` PASS (0 errors / 3 expected warnings), and `npm run build` PASS on 2026-08-09. Phase 1 readonly smoke stopped at its stale email/mobile sign-in helper versus the current identifier/password page (3 failed / 12 skipped), before this feature's admin route. Claude Code CLI (`claude-opus-5`, high effort) agreed the frozen contract before coding, implemented the UI slice, and completed an independent final review with `NO REMAINING DEVIATIONS`.
 
 ### COD-PUBLIC-EVENT-WHATSAPP-COPY-REMOVE-001
 - **Branch:** `main`

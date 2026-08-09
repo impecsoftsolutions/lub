@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, ChevronsUpDown, Download, Loader2, Mail, QrCode, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, Loader2, Mail, QrCode, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
 import JSZip from 'jszip';
 import { PermissionGate } from '../components/permissions/PermissionGate';
 import { useHasPermission } from '../hooks/usePermissions';
@@ -24,6 +24,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import Toast from '../components/Toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SortableTableHeader } from '@/components/ui/sortable-table-header';
 import { downloadSingleSheetXlsx } from '../lib/xlsxExport';
 import { renderPdfFirstPageAsJpegBlob } from '../lib/pdfImageRender';
 
@@ -399,12 +400,10 @@ const AdminEventRegistrations: React.FC = () => {
     setSortDirection('asc');
   }, [sortKey]);
 
-  const sortIcon = useCallback((key: RegistrationSortKey) => {
-    if (sortKey !== key) return <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />;
-    return sortDirection === 'asc'
-      ? <ArrowUp className="h-3.5 w-3.5" />
-      : <ArrowDown className="h-3.5 w-3.5" />;
-  }, [sortDirection, sortKey]);
+  const sortDirectionFor = useCallback(
+    (key: RegistrationSortKey): SortDirection | null => (sortKey === key ? sortDirection : null),
+    [sortDirection, sortKey],
+  );
 
   // Event-end gate: download blocked once now > end_at + 12h grace.
   const downloadDeadline = useMemo(() => {
@@ -822,89 +821,121 @@ const AdminEventRegistrations: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('full_name')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Name {sortIcon('full_name')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('email')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Email {sortIcon('email')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('phone')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Mobile {sortIcon('phone')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('company')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Company / Organization {sortIcon('company')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('visit_date')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Day of Visit {sortIcon('visit_date')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('gender')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Gender {sortIcon('gender')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('meal_preference')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Meal {sortIcon('meal_preference')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('profession')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Profession {sortIcon('profession')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('designation')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Designation {sortIcon('designation')}
-                    </button>
-                  </th>
+                  <SortableTableHeader
+                    label="Name"
+                    direction={sortDirectionFor('full_name')}
+                    onSort={() => handleSort('full_name')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Email"
+                    direction={sortDirectionFor('email')}
+                    onSort={() => handleSort('email')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Mobile"
+                    direction={sortDirectionFor('phone')}
+                    onSort={() => handleSort('phone')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Company / Organization"
+                    direction={sortDirectionFor('company')}
+                    onSort={() => handleSort('company')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Day of Visit"
+                    direction={sortDirectionFor('visit_date')}
+                    onSort={() => handleSort('visit_date')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Gender"
+                    direction={sortDirectionFor('gender')}
+                    onSort={() => handleSort('gender')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Meal"
+                    direction={sortDirectionFor('meal_preference')}
+                    onSort={() => handleSort('meal_preference')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Profession"
+                    direction={sortDirectionFor('profession')}
+                    onSort={() => handleSort('profession')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Designation"
+                    direction={sortDirectionFor('designation')}
+                    onSort={() => handleSort('designation')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
                   {showAadhaar && (
-                    <th className="px-3 py-2 font-medium">
-                      <button type="button" onClick={() => handleSort('aadhaar_number')} className="inline-flex items-center gap-1 hover:text-foreground">
-                        Aadhaar Card {sortIcon('aadhaar_number')}
-                      </button>
-                    </th>
+                    <SortableTableHeader
+                      label="Aadhaar Card"
+                      direction={sortDirectionFor('aadhaar_number')}
+                      onSort={() => handleSort('aadhaar_number')}
+                      className="px-3 py-2 font-medium"
+                      buttonClassName="hover:text-foreground"
+                    />
                   )}
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('status')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Status {sortIcon('status')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('checked_in')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Checked In {sortIcon('checked_in')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('checked_in_at')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Checked In At {sortIcon('checked_in_at')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('check_in_source')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Source {sortIcon('check_in_source')}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('badge_code')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Badge No. {sortIcon('badge_code')}
-                    </button>
-                  </th>
+                  <SortableTableHeader
+                    label="Status"
+                    direction={sortDirectionFor('status')}
+                    onSort={() => handleSort('status')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Checked In"
+                    direction={sortDirectionFor('checked_in')}
+                    onSort={() => handleSort('checked_in')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Checked In At"
+                    direction={sortDirectionFor('checked_in_at')}
+                    onSort={() => handleSort('checked_in_at')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Source"
+                    direction={sortDirectionFor('check_in_source')}
+                    onSort={() => handleSort('check_in_source')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
+                  <SortableTableHeader
+                    label="Badge No."
+                    direction={sortDirectionFor('badge_code')}
+                    onSort={() => handleSort('badge_code')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
                   <th className="px-3 py-2 font-medium">Badge</th>
-                  <th className="px-3 py-2 font-medium">
-                    <button type="button" onClick={() => handleSort('delivery_status')} className="inline-flex items-center gap-1 hover:text-foreground">
-                      Email delivery {sortIcon('delivery_status')}
-                    </button>
-                  </th>
+                  <SortableTableHeader
+                    label="Email delivery"
+                    direction={sortDirectionFor('delivery_status')}
+                    onSort={() => handleSort('delivery_status')}
+                    className="px-3 py-2 font-medium"
+                    buttonClassName="hover:text-foreground"
+                  />
                   {canManage && <th className="px-3 py-2 font-medium text-right">Action</th>}
                 </tr>
               </thead>

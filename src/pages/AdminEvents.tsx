@@ -9,9 +9,6 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   RefreshCw,
   Search,
   Star,
@@ -34,6 +31,7 @@ import { sessionManager } from '../lib/sessionManager';
 import Toast from '../components/Toast';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SortableTableHeader } from '@/components/ui/sortable-table-header';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -303,17 +301,10 @@ const AdminEvents: React.FC = () => {
     });
   }, []);
 
-  const getSortIcon = useCallback((key: SortKey) => {
-    if (sortState.key !== key) return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/70" />;
-    return sortState.direction === 'asc'
-      ? <ArrowUp className="h-3.5 w-3.5 text-foreground" />
-      : <ArrowDown className="h-3.5 w-3.5 text-foreground" />;
-  }, [sortState.direction, sortState.key]);
-
-  const ariaSortFor = useCallback((key: SortKey): 'ascending' | 'descending' | 'none' => {
-    if (sortState.key !== key) return 'none';
-    return sortState.direction === 'asc' ? 'ascending' : 'descending';
-  }, [sortState.direction, sortState.key]);
+  const sortDirectionFor = useCallback(
+    (key: SortKey): SortDirection | null => (sortState.key === key ? sortState.direction : null),
+    [sortState.direction, sortState.key],
+  );
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -491,46 +482,34 @@ const AdminEvents: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30 text-left text-muted-foreground">
-                    <th className="px-4 py-3 font-medium" aria-sort={ariaSortFor('event')}>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort('event')}
-                      >
-                        Event
-                        {getSortIcon('event')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 font-medium hidden md:table-cell" aria-sort={ariaSortFor('schedule')}>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort('schedule')}
-                      >
-                        Schedule / Location
-                        {getSortIcon('schedule')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 font-medium hidden lg:table-cell" aria-sort={ariaSortFor('status')}>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort('status')}
-                      >
-                        Status
-                        {getSortIcon('status')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 font-medium hidden lg:table-cell" aria-sort={ariaSortFor('visibility')}>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort('visibility')}
-                      >
-                        Visibility
-                        {getSortIcon('visibility')}
-                      </button>
-                    </th>
+                    <SortableTableHeader
+                      label="Event"
+                      direction={sortDirectionFor('event')}
+                      onSort={() => handleSort('event')}
+                      className="px-4 py-3 font-medium"
+                      buttonClassName="hover:text-foreground transition-colors"
+                    />
+                    <SortableTableHeader
+                      label="Schedule / Location"
+                      direction={sortDirectionFor('schedule')}
+                      onSort={() => handleSort('schedule')}
+                      className="px-4 py-3 font-medium hidden md:table-cell"
+                      buttonClassName="hover:text-foreground transition-colors"
+                    />
+                    <SortableTableHeader
+                      label="Status"
+                      direction={sortDirectionFor('status')}
+                      onSort={() => handleSort('status')}
+                      className="px-4 py-3 font-medium hidden lg:table-cell"
+                      buttonClassName="hover:text-foreground transition-colors"
+                    />
+                    <SortableTableHeader
+                      label="Visibility"
+                      direction={sortDirectionFor('visibility')}
+                      onSort={() => handleSort('visibility')}
+                      className="px-4 py-3 font-medium hidden lg:table-cell"
+                      buttonClassName="hover:text-foreground transition-colors"
+                    />
                     <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>

@@ -7505,6 +7505,64 @@ export interface AdminEventDetail {
   updated_at: string;
 }
 
+export type EventPublicReportFieldKey =
+  | 'full_name'
+  | 'email'
+  | 'phone'
+  | 'company'
+  | 'gender'
+  | 'meal_preference'
+  | 'profession'
+  | 'designation'
+  | 'notes'
+  | 'visit_date'
+  | 'badge_code';
+
+export interface EventPublicReportField {
+  key: EventPublicReportFieldKey;
+  label: string;
+  isSensitive?: boolean;
+  isAvailable?: boolean;
+}
+
+export interface AdminEventPublicReportSettings {
+  token: string;
+  isEnabled: boolean;
+  passwordConfigured: boolean;
+  selectedFields: EventPublicReportFieldKey[];
+  availableFields: EventPublicReportField[];
+  lockedUntil: string | null;
+}
+
+export interface PublicEventReportAccess {
+  viewToken: string;
+  expiresAt: string;
+  event: {
+    title: string;
+    location: string | null;
+    startAt: string | null;
+    endAt: string | null;
+  };
+  fields: EventPublicReportField[];
+  total: number;
+}
+
+export interface PublicEventReportRows {
+  fields: EventPublicReportField[];
+  rows: Array<Record<string, string | null>>;
+  total: number;
+  limit: 25 | 50 | 100 | null;
+  offset: number;
+  truncated: boolean;
+}
+
+export interface EventPublicReportResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  errorCode?: string;
+}
+
 // COD-EVENTS-RSVP-BRIDGE-MAPS-WHATSAPP-039
 export type EventRsvpStatus = 'confirmed' | 'cancelled' | 'pending' | 'waitlisted';
 
@@ -8030,7 +8088,11 @@ export const eventsService = {
 
   async create(
     sessionToken: string,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
+    publicReport?: {
+      password: string;
+      selectedFields: EventPublicReportFieldKey[];
+    },
   ): Promise<{
     success: boolean;
     event_id?: string;
@@ -8039,10 +8101,17 @@ export const eventsService = {
     error_code?: string;
     conflict_slug?: string;
   }> {
-    const { data, error } = await supabase.rpc('create_event_with_session', {
-      p_session_token: sessionToken,
-      p_payload: payload,
-    });
+    const { data, error } = publicReport
+      ? await supabase.rpc('create_event_with_public_report_with_session', {
+          p_session_token: sessionToken,
+          p_payload: payload,
+          p_report_password: publicReport.password,
+          p_selected_fields: publicReport.selectedFields,
+        })
+      : await supabase.rpc('create_event_with_session', {
+          p_session_token: sessionToken,
+          p_payload: payload,
+        });
     if (error) return { success: false, error: error.message };
     const result = data as {
       success: boolean;
@@ -8056,6 +8125,243 @@ export const eventsService = {
     return result?.success
       ? { success: true, event_id: result.event_id ?? result.id, slug: result.slug }
       : (result ?? { success: false, error: 'Unknown error' });
+  },
+
+  async getPublicReportSettings(
+    sessionToken: string,
+    eventId: string,
+  ): Promise<EventPublicReportResult<AdminEventPublicReportSettings>> {
+    const { data, error } = await supabase.rpc('get_event_public_report_settings_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: {
+        token?: string;
+        is_enabled?: boolean;
+        password_configured?: boolean;
+        selected_fields?: EventPublicReportFieldKey[];
+        available_fields?: Array<{
+          key?: EventPublicReportFieldKey;
+          label?: string;
+          is_sensitive?: boolean;
+          is_available?: boolean;
+        }>;
+        locked_until?: string | null;
+      };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success || !result.data) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to load public report settings.',
+        errorCode: result?.error_code,
+      };
+    }
+    return {
+      success: true,
+      data: {
+        token: result.data.token ?? '',
+        isEnabled: Boolean(result.data.is_enabled),
+        passwordConfigured: Boolean(result.data.password_configured),
+        selectedFields: result.data.selected_fields ?? [],
+        availableFields: (result.data.available_fields ?? [])
+          .filter((field): field is Required<Pick<typeof field, 'key' | 'label'>> & typeof field => Boolean(field.key && field.label))
+          .map(field => ({
+            key: field.key,
+            label: field.label,
+            isSensitive: Boolean(field.is_sensitive),
+            isAvailable: field.is_available !== false,
+          })),
+        lockedUntil: result.data.locked_until ?? null,
+      },
+    };
+  },
+
+  async updatePublicReportSettings(
+    sessionToken: string,
+    eventId: string,
+    args: {
+      password?: string | null;
+      selectedFields: EventPublicReportFieldKey[];
+      isEnabled: boolean;
+    },
+  ): Promise<EventPublicReportResult<{
+    eventId: string;
+    isEnabled: boolean;
+    passwordConfigured: boolean;
+    selectedFields: EventPublicReportFieldKey[];
+  }>> {
+    const { data, error } = await supabase.rpc('update_event_public_report_settings_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+      p_password: args.password ?? null,
+      p_selected_fields: args.selectedFields,
+      p_is_enabled: args.isEnabled,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: {
+        event_id?: string;
+        is_enabled?: boolean;
+        password_configured?: boolean;
+        selected_fields?: EventPublicReportFieldKey[];
+      };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success || !result.data) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to save public report settings.',
+        errorCode: result?.error_code,
+      };
+    }
+    return {
+      success: true,
+      data: {
+        eventId: result.data.event_id ?? eventId,
+        isEnabled: Boolean(result.data.is_enabled),
+        passwordConfigured: Boolean(result.data.password_configured),
+        selectedFields: result.data.selected_fields ?? [],
+      },
+    };
+  },
+
+  async regeneratePublicReportToken(
+    sessionToken: string,
+    eventId: string,
+  ): Promise<EventPublicReportResult<{ token: string }>> {
+    const { data, error } = await supabase.rpc('regenerate_event_public_report_token_with_session', {
+      p_session_token: sessionToken,
+      p_event_id: eventId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: { token?: string };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success || !result.data?.token) {
+      return {
+        success: false,
+        error: result?.error ?? 'Failed to regenerate the public report link.',
+        errorCode: result?.error_code,
+      };
+    }
+    return { success: true, data: { token: result.data.token } };
+  },
+
+  async openPublicReport(
+    token: string,
+    password: string,
+  ): Promise<EventPublicReportResult<PublicEventReportAccess>> {
+    const { data, error } = await supabase.rpc('open_public_event_report', {
+      p_token: token,
+      p_password: password,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: {
+        view_token?: string;
+        expires_at?: string;
+        event?: { title?: string; location?: string | null; start_at?: string | null; end_at?: string | null };
+        fields?: EventPublicReportField[];
+        total?: number;
+      };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success || !result.data?.view_token || !result.data.expires_at || !result.data.event) {
+      return {
+        success: false,
+        error: result?.error ?? 'Unable to open this report.',
+        errorCode: result?.error_code,
+      };
+    }
+    return {
+      success: true,
+      data: {
+        viewToken: result.data.view_token,
+        expiresAt: result.data.expires_at,
+        event: {
+          title: result.data.event.title ?? '',
+          location: result.data.event.location ?? null,
+          startAt: result.data.event.start_at ?? null,
+          endAt: result.data.event.end_at ?? null,
+        },
+        fields: result.data.fields ?? [],
+        total: Number(result.data.total ?? 0),
+      },
+    };
+  },
+
+  async getPublicReportRows(
+    viewToken: string,
+    args: {
+      fieldKeys?: EventPublicReportFieldKey[] | null;
+      limit: 25 | 50 | 100 | null;
+      offset: number;
+      sortKey?: EventPublicReportFieldKey | null;
+      sortDirection?: 'asc' | 'desc';
+    },
+  ): Promise<EventPublicReportResult<PublicEventReportRows>> {
+    const { data, error } = await supabase.rpc('get_public_event_report_rows', {
+      p_view_token: viewToken,
+      p_field_keys: args.fieldKeys ?? null,
+      p_limit: args.limit,
+      p_offset: args.offset,
+      p_sort_key: args.sortKey ?? null,
+      p_sort_direction: args.sortDirection ?? 'asc',
+    });
+    if (error) return { success: false, error: error.message };
+    const result = data as {
+      success?: boolean;
+      data?: {
+        fields?: EventPublicReportField[];
+        rows?: Array<Record<string, string | null>>;
+        total?: number;
+        limit?: 25 | 50 | 100 | null;
+        offset?: number;
+        truncated?: boolean;
+      };
+      error?: string;
+      error_code?: string;
+    } | null;
+    if (!result?.success || !result.data) {
+      return {
+        success: false,
+        data: result?.data
+          ? {
+              fields: result.data.fields ?? [],
+              rows: [],
+              total: Number(result.data.total ?? 0),
+              limit: result.data.limit ?? args.limit,
+              offset: Number(result.data.offset ?? args.offset),
+              truncated: Boolean(result.data.truncated),
+            }
+          : undefined,
+        error: result?.error ?? 'Failed to load report rows.',
+        errorCode: result?.error_code,
+      };
+    }
+    return {
+      success: true,
+      data: {
+        fields: result.data.fields ?? [],
+        rows: result.data.rows ?? [],
+        total: Number(result.data.total ?? 0),
+        limit: result.data.limit ?? args.limit,
+        offset: Number(result.data.offset ?? args.offset),
+        truncated: Boolean(result.data.truncated),
+      },
+    };
   },
 
   async update(
