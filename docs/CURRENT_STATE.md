@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-08-10
+**Last updated:** 2026-08-12
 **Updated by:** Codex
 
 ---
@@ -17,10 +17,10 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-08-10 after global sortable-header follow-up (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-08-10 after global sortable-header follow-up |
+| Lint (`npm run lint`) | PASS on 2026-08-12 after public-report summary follow-up (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-08-12 after public-report summary follow-up |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
-| Phase 1 readonly smoke | 2026-08-09 run reached a pre-existing stale sign-in helper mismatch (3 failed / 12 skipped); no event-report route was reached |
+| Phase 1 readonly smoke | 2026-08-12 before/after runs reached the pre-existing stale sign-in helper mismatch (3 failed / 12 skipped); no event-report route was reached |
 
 ---
 
@@ -31,6 +31,14 @@ No active implementation slice.
 ---
 
 ## Recently Completed
+
+### COD-EVENT-PUBLIC-REPORT-SUMMARY-003
+- **Branch:** `main`
+- **What shipped:** Added compact whole-event Gender and Meal Preference summaries to the password-protected public registration report. Counts refresh with normal row requests, normalize case/spacing variants, include `Not specified` for blank answers, and appear only when the corresponding field is currently available and admin-allowed. Named values remain ahead of `Not specified` regardless of count. Viewer column hiding continues to affect only the table/download, not the authorized summary.
+- **Files (new):** `supabase/migrations/20260812100000_public_event_report_registration_summaries.sql`, `supabase/migrations/20260812103000_public_event_report_summary_null_bucket_order.sql`
+- **Files (modified):** `src/lib/supabase.ts`, `src/pages/EventPublicReport.tsx`, `tests/e2e/event-public-report.spec.ts`, report coordination/handover docs.
+- **Runtime:** Both migrations applied to the linked database; audit PASS (local 276 / remote 276 / no drift). Live REST probe confirms the six-argument RPC resolves and enforces the view-token gate.
+- **Validation:** Focused Playwright PASS (3 tests), lint PASS (0 errors / 3 established warnings), and production build PASS. Phase 1 readonly before/after continues to stop at the established stale sign-in helper (3 failed / 12 skipped), before the report route. Claude Code CLI (`claude-opus-5`, high effort) agreed the plan, implemented the UI-owned page slice, found the first-pass null-ordering issue, and returned `NO REMAINING DEVIATIONS` after correction.
 
 ### COD-GLOBAL-SORTABLE-HEADER-001
 - **Branch:** `main`

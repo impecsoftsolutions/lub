@@ -170,3 +170,17 @@ Codex and Claude Code CLI (`claude-opus-5`, high effort) agreed this follow-up c
 - Sorting clears safely if the viewer hides the sorted field, the admin allowlist changes, or the server rejects stale sort state.
 - All body data cells use `white-space: nowrap`; the existing horizontal scroll container preserves complete untruncated values, including notes.
 - Focused Playwright verifies exact sort request parameters, direction changes, pagination reset, download order parameters, stale-sort recovery, and computed no-wrap styling.
+
+## Follow-up: Gender and Meal Preference summaries (2026-08-12)
+
+Codex and Claude Code CLI (`claude-opus-5`, high effort) agreed this follow-up contract before implementation:
+
+- Every successful `get_public_event_report_rows` response adds a fresh `summaries` array calculated across the complete event result set, never only the current page.
+- A summary is returned only when its field is currently available and included in the event's admin-selected report fields. The only summary keys are `gender` and `meal_preference`.
+- Counts use the same event scope and active RSVP statuses (`confirmed`, `pending`, `waitlisted`) as the report total.
+- Values are grouped by `NULLIF(lower(btrim(value)), '')`, merging case/spacing variants and combining null/blank responses into one null bucket.
+- The response shape is `{ key, label, items: [{ value, count }] }`. The UI derives human-readable item labels with the same formatter as table cells; null renders as `Not specified`.
+- Items are ordered by count descending and normalized value ascending, with the null bucket last.
+- An authorized field with no active registrations is present with `items: []`; an unauthorized or unavailable field is absent. The UI shows `No responses` for the former and hides the entire summary section only when the array is empty.
+- Summaries update from normal report-row fetches and remain independent of viewer column visibility. Hiding a column narrows the table/download but does not remove an admin-authorized summary.
+- The existing six-argument RPC signature, defaults, security-definer behavior, grants, view-token checks, field allowlist, pagination, sorting, and explicit row JSON are unchanged.

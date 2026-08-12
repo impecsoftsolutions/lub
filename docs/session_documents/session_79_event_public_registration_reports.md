@@ -264,3 +264,39 @@ Validation:
 - final Claude Opus 5/high review after centralizing pointer-cursor ownership: `NO REMAINING DEVIATIONS`
 
 No database migration was required.
+
+## Follow-up - Gender and Meal Preference summaries
+
+Completed `COD-EVENT-PUBLIC-REPORT-SUMMARY-003` on 2026-08-12.
+
+The public report now shows compact, responsive Gender and Meal Preference summaries when those fields are currently collected and included in the admin's public-report allowlist. Counts cover the complete active registration set and refresh with each normal report-row request, so they stay aligned with the current total rather than becoming stale after password entry.
+
+Backend and security behavior:
+
+- migration `20260812100000_public_event_report_registration_summaries.sql` replaces the existing six-argument rows RPC without changing its signature or grants
+- corrective migration `20260812103000_public_event_report_summary_null_bucket_order.sql` pins the null/blank bucket after named values regardless of count, resolving the first independent review finding
+- summaries are scoped to the view token's event and active RSVP statuses
+- only current admin-allowed Gender/Meal Preference fields are aggregated
+- case and surrounding whitespace are normalized before grouping
+- null and blank answers share a `Not specified` bucket
+- unauthorized fields are absent; authorized fields with zero active registrations return an empty item list
+
+UI behavior:
+
+- a `Registration summary` section appears between the event header and report controls
+- each allowed field has a restrained summary group with humanized labels and counts
+- an empty allowed group shows `No responses`
+- viewer column hiding does not remove the corresponding admin-authorized summary
+- no summary section renders when neither summary field is allowed
+
+Ownership followed the agreed split: Codex implemented migration, service mapping, tests, runtime, and docs; Claude Code Opus 5/high implemented only the public report UI after the backend contract landed.
+
+Validation:
+
+- both migrations applied to the linked database; audit PASS at 276 local / 276 remote / no drift
+- focused Playwright PASS: 3 tests, including a high-count null-bucket ordering contract check
+- lint PASS: 0 errors / 3 established warnings
+- production build PASS
+- Phase 1 readonly before/after continues to stop at the pre-existing stale sign-in helper (3 failed / 12 skipped), before the report route
+
+The first independent Claude review found that `NULLS LAST` only handled equal-count ties. Codex added and applied the corrective migration, strengthened the fixture with a highest-count null bucket, and aligned task-state documentation. Final Claude Code Opus 5/high re-review returned `NO REMAINING DEVIATIONS`.

@@ -7547,9 +7547,21 @@ export interface PublicEventReportAccess {
   total: number;
 }
 
+export interface EventPublicReportSummaryItem {
+  value: string | null;
+  count: number;
+}
+
+export interface EventPublicReportSummary {
+  key: 'gender' | 'meal_preference';
+  label: string;
+  items: EventPublicReportSummaryItem[];
+}
+
 export interface PublicEventReportRows {
   fields: EventPublicReportField[];
   rows: Array<Record<string, string | null>>;
+  summaries: EventPublicReportSummary[];
   total: number;
   limit: 25 | 50 | 100 | null;
   offset: number;
@@ -8326,6 +8338,11 @@ export const eventsService = {
       data?: {
         fields?: EventPublicReportField[];
         rows?: Array<Record<string, string | null>>;
+        summaries?: Array<{
+          key?: string;
+          label?: string;
+          items?: Array<{ value?: string | null; count?: number }>;
+        }>;
         total?: number;
         limit?: 25 | 50 | 100 | null;
         offset?: number;
@@ -8341,6 +8358,7 @@ export const eventsService = {
           ? {
               fields: result.data.fields ?? [],
               rows: [],
+              summaries: [],
               total: Number(result.data.total ?? 0),
               limit: result.data.limit ?? args.limit,
               offset: Number(result.data.offset ?? args.offset),
@@ -8356,6 +8374,27 @@ export const eventsService = {
       data: {
         fields: result.data.fields ?? [],
         rows: result.data.rows ?? [],
+        summaries: (result.data.summaries ?? [])
+          .filter(
+            (summary) =>
+              (summary.key === 'gender' || summary.key === 'meal_preference') &&
+              typeof summary.label === 'string',
+          )
+          .map((summary) => ({
+            key: summary.key as 'gender' | 'meal_preference',
+            label: summary.label as string,
+            items: (summary.items ?? [])
+              .filter(
+                (item) =>
+                  (item.value === null || typeof item.value === 'string') &&
+                  Number.isFinite(Number(item.count)) &&
+                  Number(item.count) >= 0,
+              )
+              .map((item) => ({
+                value: item.value ?? null,
+                count: Number(item.count),
+              })),
+          })),
         total: Number(result.data.total ?? 0),
         limit: result.data.limit ?? args.limit,
         offset: Number(result.data.offset ?? args.offset),

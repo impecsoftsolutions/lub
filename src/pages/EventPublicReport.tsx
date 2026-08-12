@@ -14,6 +14,7 @@ import {
   eventsService,
   type EventPublicReportField,
   type EventPublicReportFieldKey,
+  type EventPublicReportSummary,
 } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -132,6 +133,11 @@ function cellText(key: string, raw: string | null | undefined): string {
   return value;
 }
 
+/** Summary buckets reuse the table's humanizing; a null bucket is a real answer group. */
+function summaryValueLabel(key: string, value: string | null): string {
+  return cellText(key, value) || 'Not specified';
+}
+
 // ── CSV helpers ─────────────────────────────────────────────────────────────
 
 /** RFC 4180 escaping plus a spreadsheet formula-injection guard. */
@@ -225,6 +231,9 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
 
   // Rows state.
   const [rows, setRows] = useState<Array<Record<string, string | null>>>([]);
+  // Server-authorized aggregates. Independent of hiddenKeys - hiding a column
+  // is a view preference and must not remove its summary.
+  const [summaries, setSummaries] = useState<EventPublicReportSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
   const [offset, setOffset] = useState(0);
@@ -257,6 +266,7 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
       setFields([]);
       setHiddenKeys(new Set());
       setRows([]);
+      setSummaries([]);
       setTotal(0);
       setOffset(0);
       setSort(null);
@@ -356,6 +366,7 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
         }
 
         setRows(result.data?.rows ?? []);
+        setSummaries(result.data?.summaries ?? []);
         setTotal(result.data?.total ?? 0);
         setTruncated(Boolean(result.data?.truncated));
         if (result.data?.fields?.length) setFields(result.data.fields);
@@ -594,6 +605,42 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
           )}
         </div>
       </header>
+
+      {summaries.length > 0 && (
+        <section aria-labelledby="report-summary-heading" className="space-y-2">
+          <h2 id="report-summary-heading" className="text-sm font-semibold text-foreground">
+            Registration summary
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {summaries.map((summary) => (
+              <div key={summary.key} className="rounded-lg border border-border bg-card p-3">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {summary.label}
+                </h3>
+                {summary.items.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">No responses</p>
+                ) : (
+                  <dl className="mt-2 space-y-1">
+                    {summary.items.map((item) => (
+                      <div
+                        key={item.value ?? '__null__'}
+                        className="flex items-baseline justify-between gap-3 text-sm"
+                      >
+                        <dt className="text-muted-foreground">
+                          {summaryValueLabel(summary.key, item.value)}
+                        </dt>
+                        <dd className="font-semibold text-foreground tabular-nums">
+                          {item.count.toLocaleString('en-IN')}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
         <p className="text-sm text-foreground" aria-live="polite">
