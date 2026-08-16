@@ -40,6 +40,12 @@ const SESSION_KEY_PREFIX = 'lub:event_report_view:';
 const BADGE_WINDOW_MS = 12 * 60 * 60 * 1000;
 const BADGE_CONCURRENCY = 3;
 const BADGE_CLOSED_NOTICE = 'Badge downloads are closed for this event.';
+/** Said whenever badge_code leaves the admin allowlist while the viewer is here. */
+const BADGE_ALLOWLIST_REMOVED_NOTICE =
+  'The organiser changed this report while you were viewing it. Badge downloads are no longer ' +
+  'available for this report.';
+/** Appended to the completion notice; the save link itself stays outside the live region. */
+const BADGE_SAVE_HINT = "Use the Save badge ZIP link below, or look for it in your browser's downloads.";
 /** setTimeout overflows past ~24.8 days, so a far-off deadline is waited for in chunks. */
 const BADGE_DEADLINE_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
 
@@ -236,6 +242,27 @@ function badgeZipFileName(title: string): string {
   return `event-badges-${base}-${istCalendarDate(new Date().toISOString())}.zip`;
 }
 
+/** A generated ZIP the viewer can still save. The URL outlives the automatic attempt. */
+interface ReadyBadgeZip {
+  url: string;
+  fileName: string;
+}
+
+/**
+ * Best-effort automatic save of an object URL the caller owns. Deliberately does
+ * not revoke: a bulk ZIP is created long after the click that started it, and
+ * Chrome can decline that late synthetic download. The retained URL is what the
+ * explicit save link then hands to the browser from a fresh user gesture.
+ */
+function attemptObjectUrlSave(objectUrl: string, fileName: string) {
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 // ── Session storage helpers ─────────────────────────────────────────────────
 
 function readStoredAccess(token: string): StoredAccess | null {
@@ -319,7 +346,32 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
   const [badgeServerClosed, setBadgeServerClosed] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  // The last completed bulk ZIP, kept alive so the viewer can save it explicitly
+  // when the browser declines the automatic attempt. The ref owns the object URL
+  // so release never depends on a render; the state only mirrors it for display.
+  const [readyZip, setReadyZip] = useState<ReadyBadgeZip | null>(null);
+  const readyZipRef = useRef<ReadyBadgeZip | null>(null);
+  const readyZipUnmountTimerRef = useRef(0);
+  // Monotonic, owned by the same lifecycle as readyZip: every release bumps it,
+  // so a bulk run that started before an invalidation can recognise that its
+  // result is no longer the one this page is entitled to hold.
+  const badgeRunGenerationRef = useRef(0);
+
   const fieldPanelRef = useRef<HTMLDivElement | null>(null);
+
+  // The single release path. Idempotent: clearing the ref first means a second
+  // call, a call for a run that never produced a ZIP, and a call after unmount
+  // are all no-ops rather than a double revoke. Bumping the generation here -
+  // synchronously, before any state update lands - is what makes every caller
+  // (reset, access change, new run, allowlist removal, window closure) an
+  // invalidation for whatever run is still in flight.
+  const releaseReadyZip = useCallback(() => {
+    badgeRunGenerationRef.current += 1;
+    const current = readyZipRef.current;
+    readyZipRef.current = null;
+    if (current) URL.revokeObjectURL(current.url);
+    setReadyZip(null);
+  }, []);
 
   const visibleFields = useMemo(
     () => fields.filter((field) => !hiddenKeys.has(field.key)),
@@ -343,6 +395,22 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
   const badgeWindowClosed =
     badgeServerClosed || (badgeDeadlineMs !== null && nowMs > badgeDeadlineMs);
 
+  // The current authorization facts, readable from an async run that began many
+  // renders ago. Written during render so a completing run sees what the page is
+  // actually showing rather than the values it closed over at the click.
+  const authorizationRef = useRef<{
+    viewToken: string | null;
+    badgeDownloadsAllowed: boolean;
+    badgeWindowClosed: boolean;
+    badgeDeadlineMs: number | null;
+  }>({
+    viewToken: null,
+    badgeDownloadsAllowed: false,
+    badgeWindowClosed: false,
+    badgeDeadlineMs: null,
+  });
+  authorizationRef.current = { viewToken, badgeDownloadsAllowed, badgeWindowClosed, badgeDeadlineMs };
+
   const allFieldKeys = useMemo(
     () => fields.map((field) => field.key as EventPublicReportFieldKey),
     [fields],
@@ -351,6 +419,7 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
   const resetToGate = useCallback(
     (message: string) => {
       clearStoredAccess(token);
+      releaseReadyZip();
       setViewToken(null);
       setEventInfo(null);
       setFields([]);
@@ -369,10 +438,11 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
       setBadgeServerClosed(false);
       setGateError(message);
     },
-    [token],
+    [token, releaseReadyZip],
   );
 
   const applyAccess = useCallback((access: StoredAccess) => {
+    releaseReadyZip();
     setViewToken(access.viewToken);
     setEventInfo(access.event);
     setFields(access.fields);
@@ -383,7 +453,7 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
     setBadgeNotice(null);
     setBadgeServerClosed(false);
     setBadgeProgress({ done: 0, total: 0 });
-  }, []);
+  }, [releaseReadyZip]);
 
   // Restore a same-tab session so a reload does not force the password again.
   useEffect(() => {
@@ -432,6 +502,24 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
     }
     return () => window.clearTimeout(timer);
   }, [viewToken, badgeDeadlineMs]);
+
+  // A held ZIP is only offered while the viewer is still authorized to have it:
+  // the organiser removing badge_code from the allowlist, or the 12-hour window
+  // shutting, both end that authorization and drop the file.
+  useEffect(() => {
+    if (!badgeDownloadsAllowed || badgeWindowClosed) releaseReadyZip();
+  }, [badgeDownloadsAllowed, badgeWindowClosed, releaseReadyZip]);
+
+  // Release on a real unmount only. StrictMode mounts, unmounts and remounts in
+  // development while keeping state, so revoking synchronously in the cleanup
+  // would kill a ZIP the page still shows. Deferring by a task lets the remount
+  // cancel it; a genuine unmount never re-runs this effect, so the release lands.
+  useEffect(() => {
+    window.clearTimeout(readyZipUnmountTimerRef.current);
+    return () => {
+      readyZipUnmountTimerRef.current = window.setTimeout(releaseReadyZip, 0);
+    };
+  }, [releaseReadyZip]);
 
   const fetchRows = useCallback(
     async (
@@ -691,6 +779,12 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
     setBadgeBulkBusy(true);
     setBadgeNotice(null);
     setBadgeProgress({ done: 0, total: 0 });
+    // A new run replaces any held ZIP up front, so a stale file is never offered
+    // beside the progress of the run that is about to supersede it. The
+    // generation is captured immediately after, so it belongs to this run alone.
+    releaseReadyZip();
+    const runGeneration = badgeRunGenerationRef.current;
+    const runViewToken = viewToken;
     try {
       // Badge enumeration is its own request: only badge_code, every row, and a
       // stable badge-code order so ZIP entry numbering is reproducible.
@@ -725,8 +819,7 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
             nextFields.some((field) => field.key === 'badge_code')
               ? 'The organiser changed this report while you were viewing it, so no badges were downloaded. ' +
                   'The columns have been refreshed - please start the badge download again.'
-              : 'The organiser changed this report while you were viewing it. Badge downloads are no longer ' +
-                  'available for this report.',
+              : BADGE_ALLOWLIST_REMOVED_NOTICE,
           );
           return;
         }
@@ -815,15 +908,77 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
         compression: 'DEFLATE',
         compressionOptions: { level: 6 },
       });
-      triggerBlobDownload(zipBlob, badgeZipFileName(eventInfo?.title ?? 'event'));
+
+      // The name is settled here, at completion, and reused verbatim by the save
+      // link: a later date rollover or an event refresh must not rename the file
+      // the viewer was already told about.
+      const fileName = badgeZipFileName(eventInfo?.title ?? 'event');
+      const objectUrl = URL.createObjectURL(zipBlob);
+
+      // Authorization is decided here, at delivery, not at the click. Anything
+      // that released the previous ZIP while these badges were in flight - a
+      // reset, a re-open, a newer run, badge_code leaving the allowlist, the
+      // window shutting - has already moved the generation on, and this file
+      // must not be held, auto-saved or announced. Date.now() is compared to the
+      // deadline directly so a boundary crossed between renders cannot slip
+      // through on a stale rendered clock.
+      const authorization = authorizationRef.current;
+      const stillAuthorized =
+        badgeRunGenerationRef.current === runGeneration &&
+        authorization.viewToken !== null &&
+        authorization.viewToken === runViewToken &&
+        authorization.badgeDownloadsAllowed &&
+        !authorization.badgeWindowClosed &&
+        (authorization.badgeDeadlineMs === null || Date.now() <= authorization.badgeDeadlineMs);
+
+      if (!stillAuthorized) {
+        // Revoke the URL that was just created: it is the only reference, and
+        // nothing downstream will ever be given a chance to release it.
+        URL.revokeObjectURL(objectUrl);
+        // Staying silent is right for a reset, a re-open or a newer run: the
+        // page has already moved on and says so elsewhere. Losing the badges
+        // because badge_code left the allowlist mid-run is different - this
+        // view is still the one the viewer is looking at, and the run would
+        // otherwise end with nothing to explain where the ZIP went. A shut
+        // window has its own standing message and must not be overwritten.
+        const windowStillOpen =
+          !authorization.badgeWindowClosed &&
+          (authorization.badgeDeadlineMs === null || Date.now() <= authorization.badgeDeadlineMs);
+        if (
+          authorization.viewToken !== null &&
+          authorization.viewToken === runViewToken &&
+          !authorization.badgeDownloadsAllowed &&
+          windowStillOpen
+        ) {
+          setBadgeNotice(BADGE_ALLOWLIST_REMOVED_NOTICE);
+        }
+        return;
+      }
+
+      readyZipRef.current = { url: objectUrl, fileName };
+      setReadyZip({ url: objectUrl, fileName });
 
       const failed = codes.length - succeeded;
+      // The honest outcome is stated before the automatic attempt is made, so
+      // the message never depends on whether the browser accepts it.
       setBadgeNotice(
-        failed === 0
-          ? `Downloaded all ${succeeded.toLocaleString('en-IN')} badges.`
-          : `Downloaded ${succeeded.toLocaleString('en-IN')} of ${codes.length.toLocaleString('en-IN')} badges; ` +
-              `${failed.toLocaleString('en-IN')} could not be downloaded.`,
+        `${
+          failed === 0
+            ? `Badge ZIP ready with all ${succeeded.toLocaleString('en-IN')} badges.`
+            : `Badge ZIP ready with ${succeeded.toLocaleString('en-IN')} of ${codes.length.toLocaleString('en-IN')} ` +
+              `badges; ${failed.toLocaleString('en-IN')} could not be fetched.`
+        } ${BADGE_SAVE_HINT}`,
       );
+
+      // One URL, two chances: an automatic attempt the browser may refuse this
+      // long after the original click, and the same URL behind the save link.
+      // Isolated, because the ZIP is already ready and already offered - a throw
+      // from the synthetic click is not a failed preparation.
+      try {
+        attemptObjectUrlSave(objectUrl, fileName);
+      } catch {
+        // The save link below is the fallback this exists for.
+      }
     } catch {
       setBadgeNotice('Could not prepare the badge downloads. Check your connection and try again.');
     } finally {
@@ -1100,6 +1255,22 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
           >
             <span>{badgeStatusText}</span>
           </p>
+          {/* Outside the live region on purpose: the announcement stays one
+              sentence, and the save action is a plain link the viewer reaches
+              when they choose to. No autofocus - focus stays where they left it. */}
+          {badgeDownloadsAllowed && !badgeWindowClosed && readyZip && (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground">
+              <a
+                href={readyZip.url}
+                download={readyZip.fileName}
+                className="inline-flex items-center gap-1.5 font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+              >
+                <FileArchive className="h-3.5 w-3.5" aria-hidden="true" />
+                Save badge ZIP
+              </a>
+              <span className="text-muted-foreground">Saves {readyZip.fileName}.</span>
+            </p>
+          )}
         </div>
       )}
 

@@ -32,6 +32,9 @@ const DEFAULT_SUMMARIES = [
   },
 ];
 
+/** Mirrors BADGE_SAVE_HINT in src/pages/EventPublicReport.tsx. */
+const BADGE_SAVE_HINT = "Use the Save badge ZIP link below, or look for it in your browser's downloads.";
+
 const DEFAULT_ROWS: Array<Record<string, string | null>> = [
   {
     full_name: '=2+2',
@@ -72,6 +75,8 @@ async function mockReportRpc(
     eventEndAt?: string | null;
     bulkRowsMode?: BulkRowsMode;
     badgeStatuses?: Record<string, number[]>;
+    /** Holds every badge response in flight for this long before answering. */
+    badgeDelayMs?: number;
     rows?: Array<Record<string, string | null>>;
   } = {},
 ) {
@@ -79,6 +84,8 @@ async function mockReportRpc(
   const badgeRequests: string[] = [];
   const badgeAttempts = new Map<string, number>();
   let rejectNextSortedRequest = false;
+  let invalidateNextRowsRequest = false;
+  let removeBadgeOnNextRowsRequest = false;
   const allowedFields = options.allowedFields ?? ALLOWED_FIELDS;
   const summaries = options.summaries ?? DEFAULT_SUMMARIES;
   const total = options.total ?? 60;
@@ -90,6 +97,10 @@ async function mockReportRpc(
     badgeAttempts.set(code, attempt + 1);
     const statuses = options.badgeStatuses?.[code] ?? [200];
     const status = statuses[Math.min(attempt, statuses.length - 1)] ?? 200;
+
+    if (options.badgeDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.badgeDelayMs));
+    }
 
     if (status === 200) {
       await route.fulfill({
@@ -146,6 +157,35 @@ async function mockReportRpc(
   await page.route('**/rest/v1/rpc/get_public_event_report_rows', async (route: Route) => {
     const body = route.request().postDataJSON() as RowsRequest;
     rowsRequests.push(body);
+
+    if (invalidateNextRowsRequest) {
+      invalidateNextRowsRequest = false;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error_code: 'view_session_invalid',
+          error: 'Report view session is no longer valid',
+        }),
+      });
+      return;
+    }
+
+    if (removeBadgeOnNextRowsRequest) {
+      removeBadgeOnNextRowsRequest = false;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error_code: 'fields_changed',
+          error: 'The available report fields changed',
+          data: { fields: allowedFields.filter((field) => field.key !== 'badge_code') },
+        }),
+      });
+      return;
+    }
 
     const isBulkBadgeRequest =
       body.p_limit === null &&
@@ -213,7 +253,31 @@ async function mockReportRpc(
     rejectNextSort: () => {
       rejectNextSortedRequest = true;
     },
+    invalidateNextRowsSession: () => {
+      invalidateNextRowsRequest = true;
+    },
+    removeBadgeOnNextRows: () => {
+      removeBadgeOnNextRowsRequest = true;
+    },
   };
+}
+
+/**
+ * Direct browser probe of an object URL. A live blob URL answers with its bytes;
+ * a revoked one cannot be fetched at all, which is the difference between the
+ * save link being hidden and the file actually being released.
+ */
+async function probeObjectUrl(page: Page, objectUrl: string): Promise<{ ok: boolean; size: number }> {
+  return page.evaluate(async (url) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return { ok: false, size: 0 };
+      const blob = await response.blob();
+      return { ok: true, size: blob.size };
+    } catch {
+      return { ok: false, size: 0 };
+    }
+  }, objectUrl);
 }
 
 async function openReport(page: Page) {
@@ -326,7 +390,13 @@ test.describe('public event registration report', () => {
           request.p_sort_direction === 'asc',
       ),
     ).toBe(true);
-    await expect(page.getByText('Downloaded all 2 badges.', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(`Badge ZIP ready with all 2 badges. ${BADGE_SAVE_HINT}`, { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Save badge ZIP' })).toHaveAttribute(
+      'download',
+      badgeZipDownload.suggestedFilename(),
+    );
 
     await page.getByRole('button', { name: 'Next' }).click();
     await expect.poll(() => rowsRequests.some((request) => request.p_offset === 50)).toBe(true);
@@ -467,9 +537,176 @@ test.describe('public event registration report', () => {
     const zip = await JSZip.loadAsync(readFileSync(downloadPath as string));
     expect(Object.keys(zip.files).sort()).toEqual(['badges/', 'badges/0001-badge-EVT-0001.jpg']);
     await expect(
-      page.getByText('Downloaded 1 of 2 badges; 1 could not be downloaded.', { exact: true }),
+      page.getByText(`Badge ZIP ready with 1 of 2 badges; 1 could not be fetched. ${BADGE_SAVE_HINT}`, {
+        exact: true,
+      }),
     ).toBeVisible();
     expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0002')).toHaveLength(1);
+  });
+
+  test('keeps the generated ZIP saveable from the fallback link without regenerating it', async ({
+    page,
+  }) => {
+    const reportMock = await mockReportRpc(page);
+    await openReport(page);
+
+    // The automatic attempt is best effort; Playwright observes it here, but the
+    // page must not depend on the browser having accepted it.
+    const [automaticDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Download all badges (ZIP)' }).click(),
+    ]);
+    const zipFileName = automaticDownload.suggestedFilename();
+    expect(zipFileName).toMatch(
+      /^event-badges-vendor-development-programme-\d{4}-\d{2}-\d{2}\.zip$/,
+    );
+
+    await expect(
+      page.getByText(`Badge ZIP ready with all 2 badges. ${BADGE_SAVE_HINT}`, { exact: true }),
+    ).toBeVisible();
+    const saveLink = page.getByRole('link', { name: 'Save badge ZIP' });
+    await expect(saveLink).toBeVisible();
+    await expect(saveLink).toHaveAttribute('download', zipFileName);
+    // The save action is a sibling of the polite live region, not part of the
+    // announcement, and it never pulls focus to itself.
+    await expect(page.locator('[role="status"]').getByRole('link', { name: 'Save badge ZIP' })).toHaveCount(0);
+    await expect(saveLink).not.toBeFocused();
+
+    const rowsRequestsBeforeSave = reportMock.rowsRequests.length;
+    const badgeRequestsBeforeSave = reportMock.badgeRequests.length;
+
+    const [fallbackDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      saveLink.click(),
+    ]);
+    expect(fallbackDownload.suggestedFilename()).toBe(zipFileName);
+    const fallbackPath = await fallbackDownload.path();
+    expect(fallbackPath).not.toBeNull();
+    const fallbackZip = await JSZip.loadAsync(readFileSync(fallbackPath as string));
+    expect(Object.keys(fallbackZip.files).sort()).toEqual([
+      'badges/',
+      'badges/0001-badge-EVT-0001.jpg',
+      'badges/0002-badge-EVT-0002.jpg',
+    ]);
+
+    // The already-generated ZIP is handed straight to the browser: no rows RPC
+    // and no badge render is issued a second time.
+    expect(reportMock.rowsRequests).toHaveLength(rowsRequestsBeforeSave);
+    expect(reportMock.badgeRequests).toHaveLength(badgeRequestsBeforeSave);
+    // Saving does not consume the file - the link stays available.
+    await expect(saveLink).toBeVisible();
+    await expect(
+      page.getByText(`Badge ZIP ready with all 2 badges. ${BADGE_SAVE_HINT}`, { exact: true }),
+    ).toBeVisible();
+  });
+
+  test('strands an in-flight bulk run when the badge window closes before the badges arrive', async ({
+    page,
+  }) => {
+    // The whole point is real elapsed time: the deadline has to fall between the
+    // badge requests going out and their responses coming back.
+    test.setTimeout(150_000);
+    const badgeWindowMs = 12 * 60 * 60 * 1000;
+    const deadlineDelayMs = 15_000;
+    const now = Date.now();
+    const reportMock = await mockReportRpc(page, {
+      eventStartAt: new Date(now - badgeWindowMs - 60_000).toISOString(),
+      eventEndAt: new Date(now - badgeWindowMs + deadlineDelayMs).toISOString(),
+      badgeDelayMs: 30_000,
+    });
+    await openReport(page);
+
+    const downloads: Download[] = [];
+    page.on('download', (download) => downloads.push(download));
+
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+
+    // Genuinely mid-flight: both renders were requested and neither has answered.
+    await expect.poll(() => reportMock.badgeRequests.length).toBe(2);
+    await expect(page.getByRole('button', { name: /Preparing badges 0\/2/ })).toBeVisible();
+
+    // The client deadline shuts while those responses are still outstanding -
+    // the per-row links go first, and the run is still busy behind them.
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByRole('button', { name: /Preparing badges 0\/2/ })).toBeVisible();
+
+    // The run then completes and produces a ZIP that is no longer authorized.
+    // The button reverting to its idle label is the end-of-run signal.
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeDisabled({
+      timeout: 90_000,
+    });
+    await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Save badge ZIP' })).toHaveCount(0);
+    await expect(page.getByText(/Badge ZIP ready/)).toHaveCount(0);
+    expect(downloads).toHaveLength(0);
+  });
+
+  test('drops an already-ready badge ZIP when the report session is invalidated', async ({ page }) => {
+    const reportMock = await mockReportRpc(page);
+    await openReport(page);
+
+    await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Download all badges (ZIP)' }).click(),
+    ]);
+    const saveLink = page.getByRole('link', { name: 'Save badge ZIP' });
+    await expect(saveLink).toBeVisible();
+
+    // Capture the object URL while it is still held, and confirm the probe can
+    // actually read it - otherwise "unfetchable afterwards" would prove nothing.
+    const capturedHref = await saveLink.getAttribute('href');
+    expect(capturedHref).toMatch(/^blob:/);
+    const zipObjectUrl = capturedHref as string;
+    const liveProbe = await probeObjectUrl(page, zipObjectUrl);
+    expect(liveProbe.ok).toBe(true);
+    expect(liveProbe.size).toBeGreaterThan(0);
+
+    // A real release transition rather than a simulated one: the next rows
+    // request loses the view session, which sends the page back to the gate.
+    reportMock.invalidateNextRowsSession();
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Registration report' })).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText('Your report session expired');
+    await expect(saveLink).toHaveCount(0);
+    await expect(page.getByText(/Badge ZIP ready/)).toHaveCount(0);
+
+    // The file is released, not merely unlinked: the captured URL no longer
+    // resolves to any blob in this document.
+    await expect
+      .poll(async () => (await probeObjectUrl(page, zipObjectUrl)).ok, {
+        message: 'the captured badge ZIP object URL should be revoked, not just hidden',
+      })
+      .toBe(false);
+  });
+
+  test('explains when Badge Number is removed while badge files are still arriving', async ({ page }) => {
+    test.setTimeout(60_000);
+    const reportMock = await mockReportRpc(page, { badgeDelayMs: 10_000 });
+    await openReport(page);
+
+    const downloads: Download[] = [];
+    page.on('download', (download) => downloads.push(download));
+
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+    await expect.poll(() => reportMock.badgeRequests.length).toBe(2);
+    await expect(page.getByRole('button', { name: /Preparing badges 0\/2/ })).toBeVisible();
+
+    reportMock.removeBadgeOnNextRows();
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'The organiser changed this report while you were viewing it. Badge downloads are no longer available for this report.',
+        { exact: true },
+      ),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('link', { name: 'Save badge ZIP' })).toHaveCount(0);
+    await expect(page.getByText(/Badge ZIP ready/)).toHaveCount(0);
+    expect(downloads).toHaveLength(0);
   });
 
   test('creates no ZIP when every badge fails permanently', async ({ page }) => {
@@ -492,6 +729,7 @@ test.describe('public event registration report', () => {
       ),
     ).toBeVisible();
     expect(downloads).toHaveLength(0);
+    await expect(page.getByRole('link', { name: 'Save badge ZIP' })).toHaveCount(0);
     // A 404 is a permanent answer, so neither code is retried.
     expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0001')).toHaveLength(1);
     expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0002')).toHaveLength(1);
@@ -572,6 +810,7 @@ test.describe('public event registration report', () => {
     await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
     await expect(page.getByText(/Badge downloads are no longer available for this report/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Save badge ZIP' })).toHaveCount(0);
     expect(reportMock.badgeRequests).toHaveLength(0);
   });
 
@@ -656,6 +895,7 @@ test.describe('public event registration report', () => {
     await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeDisabled();
     expect(downloads).toHaveLength(0);
+    await expect(page.getByRole('link', { name: 'Save badge ZIP' })).toHaveCount(0);
     expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0001').length).toBeLessThanOrEqual(1);
     expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0002').length).toBeLessThanOrEqual(1);
   });

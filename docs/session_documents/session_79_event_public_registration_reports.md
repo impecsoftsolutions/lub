@@ -333,3 +333,21 @@ Validation:
 - Phase 1 readonly remains at the documented stale sign-in helper mismatch (3 failed / 12 skipped), before the report route
 
 Claude Code CLI (`claude-opus-5`, high effort) agreed the contract before implementation, implemented the UI-owned slice, and independently reviewed the completed work. Review findings covering closed-window notice precedence, deadline timer efficiency and password-gate timing, zero-success/invalid-badge coverage, creation-time privacy disclosure, explicit HTTP 410 no-ZIP coverage, and validation documentation were corrected and revalidated. The final review returned `NO REMAINING DEVIATIONS`.
+
+## Corrective follow-up - Reliable badge ZIP saving
+
+Completed `COD-EVENT-PUBLIC-REPORT-BADGE-ZIP-SAVE-005` on 2026-08-16 after a live Chrome run completed badge generation (`115 of 117`) but did not deliver the client-generated ZIP. The failure was isolated to the delayed synthetic browser save: the badge queue completed and the UI had no way to know whether `anchor.click()` was accepted.
+
+Codex and Claude Code Opus 5/high agreed a corrective contract before coding: keep one completed ZIP object URL, attempt the automatic save, retain an explicit `Save badge ZIP` link for a direct user gesture without regeneration, use honest `Badge ZIP ready` wording, and revoke the URL safely on every access/lifecycle invalidation. No migration, RPC, Edge Function, or report security-boundary change is required.
+
+Implementation and validation:
+
+- the automatic attempt and fallback share one object URL and one captured filename
+- `Save badge ZIP` remains available after generation and creates a second exact ZIP download without another rows RPC or badge-render request
+- generation/version and current-authorization checks prevent an in-flight batch from retaining or auto-saving after a session reset, organiser allowlist removal, or badge-window closure
+- captured blob URLs are proven revoked after access invalidation, not merely hidden from the page
+- completion wording directs the viewer to the fallback or browser downloads and partial results identify badges that could not be fetched
+- focused Playwright PASS: 17 tests, including delayed deadline and allowlist-removal races
+- lint PASS: 0 errors / 3 established warnings; production build PASS; no changed-file TypeScript errors
+- Phase 1 readonly remains at its established stale sign-in helper mismatch (3 failed / 12 skipped), before the report route
+- final Claude Code Opus 5/high review returned `NO REMAINING DEVIATIONS`

@@ -201,3 +201,15 @@ Codex and Claude Code CLI (`claude-opus-5`, high effort) agreed this follow-up c
 - Viewer column hiding removes the per-row Badge Number links with the column but does not remove the bulk action, because viewer filtering narrows table/download presentation while the admin allowlist remains the outer authorization boundary.
 - CSV behavior remains unchanged: Badge Number exports as plain text and the CSV still includes exactly the viewer-visible columns.
 - Accepted existing side effect: every successful render through `event-badge-download`, including individual, admin bulk, and public bulk downloads, updates `event_badges.last_downloaded_at`. A no-stamp renderer option is a separate future improvement, not part of this slice.
+
+## Follow-up: reliable client ZIP saving (2026-08-16)
+
+Codex and Claude Code CLI (`claude-opus-5`, high effort) agreed this corrective follow-up before implementation after a live 117-registration run generated 115 badges but Chrome did not accept the delayed synthetic ZIP download:
+
+- The bulk path creates one object URL for the completed ZIP, uses it for a best-effort automatic download attempt, and retains that same URL for an explicit fallback. The existing shared helper remains unchanged for individual badge downloads.
+- The public report owns the ready ZIP URL through a ref and one idempotent release function. The URL is revoked on replacement, real unmount, a new bulk run, access/session reset or replacement, allowlist removal, and badge-window closure. Cleanup must remain safe under React StrictMode.
+- The ZIP filename is captured when generation completes and reused exactly; the fallback never regenerates badges or recomputes the filename from later event state.
+- Completion wording says `Badge ZIP ready`, never claims the browser accepted a download, distinguishes unfetched badges in partial results, and directs the viewer to the explicit save action or browser downloads list.
+- A semantic `Save badge ZIP` link is rendered outside the polite live-status region without stealing focus. It saves the already-generated ZIP from a direct user gesture.
+- Focused Playwright must observe the best-effort automatic download, then require a second exact-filename download from the fallback link while proving no new rows RPC or badge-render requests occur. Existing zero-success, truncation, allowlist-change, deadline, and HTTP 410 no-file behavior remains intact.
+- No migration, RPC, Edge Function, security-boundary, or JSZip compression-setting change is part of this corrective slice.

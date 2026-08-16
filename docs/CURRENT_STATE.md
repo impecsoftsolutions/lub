@@ -32,6 +32,12 @@ None.
 
 ## Recently Completed
 
+### COD-EVENT-PUBLIC-REPORT-BADGE-ZIP-SAVE-005
+- **Branch:** `main`
+- **What changed:** The report now retains the completed badge ZIP behind a semantic `Save badge ZIP` link after the best-effort automatic download attempt. If Chrome declines the delayed synthetic download, the viewer can save the already-generated ZIP directly without repeating badge renders or the rows RPC. Completion wording now says `Badge ZIP ready` and never claims the browser accepted the file.
+- **Lifecycle/security:** One object URL is owned and revoked across replacement, new runs, session reset/replacement, allowlist removal, badge-window closure, and real unmount. In-flight runs recheck the current view token, allowlist, window, real deadline, and generation before retaining or auto-saving; an invalidated result is revoked immediately. No migration, RPC, Edge Function, compression, or security-boundary change.
+- **Validation:** Focused Playwright PASS (17 tests), including automatic-plus-fallback download without regeneration, true blob revocation, deadline closure during an in-flight batch, and organiser allowlist removal during an in-flight batch. Lint PASS (0 errors / 3 established warnings), build PASS, and no changed-file TypeScript errors. Phase 1 readonly remains at the established stale sign-in helper (3 failed / 12 skipped) before this route. Claude Code CLI (`claude-opus-5`, high effort) agreed the plan, implemented the UI slice, reviewed each correction cycle, and returned `NO REMAINING DEVIATIONS`.
+
 ### COD-EVENT-PUBLIC-REPORT-BADGE-DOWNLOAD-004
 - **Branch:** `main`
 - **What shipped:** Added individual JPG downloads from allowed Badge Number cells and a view-token-scoped all-badges ZIP action to the public event registration report. Bulk enumeration requests only `badge_code`, respects the organiser allowlist and badge-download window, refuses truncated sets, limits concurrency, retries only transient failures, stops without a ZIP on HTTP 410, and reports partial/zero-success outcomes honestly. Viewer-side column hiding removes row links but does not override the organiser's outer allowlist for bulk downloads. Existing CSV behavior is unchanged.
