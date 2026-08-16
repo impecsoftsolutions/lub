@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Download, type Page, type Route } from '@playwright/test';
+import JSZip from 'jszip';
 
 const REPORT_TOKEN = 'a'.repeat(32);
 const VIEW_TOKEN = 'b'.repeat(32);
@@ -31,6 +32,23 @@ const DEFAULT_SUMMARIES = [
   },
 ];
 
+const DEFAULT_ROWS: Array<Record<string, string | null>> = [
+  {
+    full_name: '=2+2',
+    company: 'Sensitive Formula Co',
+    gender: 'male',
+    meal_preference: 'veg',
+    badge_code: 'EVT-0001',
+  },
+  {
+    full_name: 'Anita Rao',
+    company: 'Anita Industries',
+    gender: null,
+    meal_preference: 'non_veg',
+    badge_code: 'EVT-0002',
+  },
+];
+
 type SummaryFixture = typeof DEFAULT_SUMMARIES;
 
 type RowsRequest = {
@@ -42,19 +60,52 @@ type RowsRequest = {
   p_sort_direction: 'asc' | 'desc';
 };
 
+type BulkRowsMode = 'normal' | 'truncated' | 'fields_changed';
+
 async function mockReportRpc(
   page: Page,
   options: {
     allowedFields?: typeof ALLOWED_FIELDS;
     summaries?: SummaryFixture;
     total?: number;
+    eventStartAt?: string | null;
+    eventEndAt?: string | null;
+    bulkRowsMode?: BulkRowsMode;
+    badgeStatuses?: Record<string, number[]>;
+    rows?: Array<Record<string, string | null>>;
   } = {},
 ) {
   const rowsRequests: RowsRequest[] = [];
+  const badgeRequests: string[] = [];
+  const badgeAttempts = new Map<string, number>();
   let rejectNextSortedRequest = false;
   const allowedFields = options.allowedFields ?? ALLOWED_FIELDS;
   const summaries = options.summaries ?? DEFAULT_SUMMARIES;
   const total = options.total ?? 60;
+
+  await page.route('**/functions/v1/event-badge-download?**', async (route: Route) => {
+    const code = (new URL(route.request().url()).searchParams.get('code') ?? '').toUpperCase();
+    badgeRequests.push(code);
+    const attempt = badgeAttempts.get(code) ?? 0;
+    badgeAttempts.set(code, attempt + 1);
+    const statuses = options.badgeStatuses?.[code] ?? [200];
+    const status = statuses[Math.min(attempt, statuses.length - 1)] ?? 200;
+
+    if (status === 200) {
+      await route.fulfill({
+        status,
+        contentType: 'image/jpeg',
+        body: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({ error_code: status === 410 ? 'event_ended' : 'badge_unavailable' }),
+    });
+  });
 
   await page.route('**/rest/v1/rpc/open_public_event_report', async (route: Route) => {
     const body = route.request().postDataJSON() as { p_token?: string; p_password?: string };
@@ -82,8 +133,8 @@ async function mockReportRpc(
           event: {
             title: 'Vendor Development Programme',
             location: 'LUB Hall, Hyderabad',
-            start_at: '2026-08-20T04:30:00.000Z',
-            end_at: '2026-08-20T10:30:00.000Z',
+            start_at: options.eventStartAt === undefined ? '2099-08-20T04:30:00.000Z' : options.eventStartAt,
+            end_at: options.eventEndAt === undefined ? '2099-08-20T10:30:00.000Z' : options.eventEndAt,
           },
           fields: allowedFields,
           total,
@@ -95,6 +146,27 @@ async function mockReportRpc(
   await page.route('**/rest/v1/rpc/get_public_event_report_rows', async (route: Route) => {
     const body = route.request().postDataJSON() as RowsRequest;
     rowsRequests.push(body);
+
+    const isBulkBadgeRequest =
+      body.p_limit === null &&
+      body.p_offset === 0 &&
+      body.p_sort_key === 'badge_code' &&
+      body.p_field_keys?.length === 1 &&
+      body.p_field_keys[0] === 'badge_code';
+
+    if (isBulkBadgeRequest && options.bulkRowsMode === 'fields_changed') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error_code: 'fields_changed',
+          error: 'The available report fields changed',
+          data: { fields: allowedFields.filter((field) => field.key !== 'badge_code') },
+        }),
+      });
+      return;
+    }
 
     if (rejectNextSortedRequest && body.p_sort_key) {
       rejectNextSortedRequest = false;
@@ -112,24 +184,9 @@ async function mockReportRpc(
 
     const requestedKeys = body.p_field_keys ?? allowedFields.map((field) => field.key);
     const fields = allowedFields.filter((field) => requestedKeys.includes(field.key));
-    const fullRows = total === 0 ? [] : [
-      {
-        full_name: '=2+2',
-        company: 'Sensitive Formula Co',
-        gender: 'male',
-        meal_preference: 'veg',
-        badge_code: 'EVT-0001',
-      },
-      {
-        full_name: 'Anita Rao',
-        company: 'Anita Industries',
-        gender: null,
-        meal_preference: 'non_veg',
-        badge_code: 'EVT-0002',
-      },
-    ];
+    const fullRows = total === 0 ? [] : options.rows ?? DEFAULT_ROWS;
     const rows = fullRows.map((row) =>
-      Object.fromEntries(requestedKeys.map((key) => [key, row[key as keyof typeof row] ?? null])),
+      Object.fromEntries(requestedKeys.map((key) => [key, row[key] ?? null])),
     );
 
     await route.fulfill({
@@ -144,7 +201,7 @@ async function mockReportRpc(
           total,
           limit: body.p_limit,
           offset: body.p_offset,
-          truncated: false,
+          truncated: isBulkBadgeRequest && options.bulkRowsMode === 'truncated',
         },
       }),
     });
@@ -152,10 +209,18 @@ async function mockReportRpc(
 
   return {
     rowsRequests,
+    badgeRequests,
     rejectNextSort: () => {
       rejectNextSortedRequest = true;
     },
   };
+}
+
+async function openReport(page: Page) {
+  await page.goto(`/r/${REPORT_TOKEN}`);
+  await page.getByLabel('Password').fill('Committee7');
+  await page.getByRole('button', { name: 'View report' }).click();
+  await expect(page.getByRole('heading', { name: 'Vendor Development Programme' })).toBeVisible();
 }
 
 test.describe('public event registration report', () => {
@@ -182,6 +247,7 @@ test.describe('public event registration report', () => {
     await expect(page.getByRole('alert')).toContainText('Incorrect password');
     await expect(page.getByText('Vendor Development Programme')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Registration summary' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toHaveCount(0);
 
     await page.getByLabel('Password').fill('Committee7');
     await page.getByRole('button', { name: 'View report' }).click();
@@ -194,6 +260,9 @@ test.describe('public event registration report', () => {
     await expect(page.getByRole('columnheader', { name: 'Gender' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Meal Preference' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Badge Number' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Download badge EVT-0001' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Download badge EVT-0002' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeEnabled();
 
     const summarySection = page.getByRole('region', { name: 'Registration summary' });
     await expect(summarySection).toBeVisible();
@@ -219,6 +288,45 @@ test.describe('public event registration report', () => {
     });
     expect(rowsRequests[0].p_field_keys).not.toContain('email');
     expect(rowsRequests[0].p_field_keys).not.toContain('aadhaar_number');
+
+    const [singleBadgeDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Download badge EVT-0001' }).click(),
+    ]);
+    expect(singleBadgeDownload.suggestedFilename()).toBe('event-badge-EVT-0001.jpg');
+    const singleBadgePath = await singleBadgeDownload.path();
+    expect(singleBadgePath).not.toBeNull();
+    expect(readFileSync(singleBadgePath as string)).toEqual(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+
+    const requestsBeforeBulk = rowsRequests.length;
+    const [badgeZipDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Download all badges (ZIP)' }).click(),
+    ]);
+    expect(badgeZipDownload.suggestedFilename()).toMatch(
+      /^event-badges-vendor-development-programme-\d{4}-\d{2}-\d{2}\.zip$/,
+    );
+    const badgeZipPath = await badgeZipDownload.path();
+    expect(badgeZipPath).not.toBeNull();
+    const badgeZip = await JSZip.loadAsync(readFileSync(badgeZipPath as string));
+    expect(Object.keys(badgeZip.files).sort()).toEqual([
+      'badges/',
+      'badges/0001-badge-EVT-0001.jpg',
+      'badges/0002-badge-EVT-0002.jpg',
+    ]);
+    expect(
+      rowsRequests.slice(requestsBeforeBulk).some(
+        (request) =>
+          request.p_view_token === VIEW_TOKEN &&
+          request.p_field_keys?.length === 1 &&
+          request.p_field_keys[0] === 'badge_code' &&
+          request.p_limit === null &&
+          request.p_offset === 0 &&
+          request.p_sort_key === 'badge_code' &&
+          request.p_sort_direction === 'asc',
+      ),
+    ).toBe(true);
+    await expect(page.getByText('Downloaded all 2 badges.', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Next' }).click();
     await expect.poll(() => rowsRequests.some((request) => request.p_offset === 50)).toBe(true);
@@ -295,6 +403,13 @@ test.describe('public event registration report', () => {
     await expect(summarySection.getByRole('heading', { name: 'Gender' })).toBeVisible();
     await expect(summarySection.getByText('Male', { exact: true })).toBeVisible();
 
+    await page.getByLabel('Badge Number').uncheck();
+    await expect(page.getByRole('columnheader', { name: 'Badge Number' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeVisible();
+    await page.getByLabel('Badge Number').check();
+    await expect(page.getByRole('columnheader', { name: 'Badge Number' })).toBeVisible();
+
     await nameHeader.getByRole('button', { name: 'Name' }).click();
     await nameHeader.getByRole('button', { name: 'Name' }).click();
     await expect(nameHeader).toHaveAttribute('aria-sort', 'descending');
@@ -321,6 +436,228 @@ test.describe('public event registration report', () => {
       p_sort_key: 'full_name',
       p_sort_direction: 'desc',
     });
+  });
+
+  test('retries an individual badge only for a transient server failure', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      badgeStatuses: { 'EVT-0001': [500, 200] },
+    });
+    await openReport(page);
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Download badge EVT-0001' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('event-badge-EVT-0001.jpg');
+    expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0001')).toHaveLength(2);
+  });
+
+  test('creates an honestly labelled partial ZIP and does not retry a permanent badge error', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      badgeStatuses: { 'EVT-0002': [404] },
+    });
+    await openReport(page);
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Download all badges (ZIP)' }).click(),
+    ]);
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const zip = await JSZip.loadAsync(readFileSync(downloadPath as string));
+    expect(Object.keys(zip.files).sort()).toEqual(['badges/', 'badges/0001-badge-EVT-0001.jpg']);
+    await expect(
+      page.getByText('Downloaded 1 of 2 badges; 1 could not be downloaded.', { exact: true }),
+    ).toBeVisible();
+    expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0002')).toHaveLength(1);
+  });
+
+  test('creates no ZIP when every badge fails permanently', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      badgeStatuses: {
+        'EVT-0001': [404],
+        'EVT-0002': [404],
+      },
+    });
+    await openReport(page);
+
+    const downloads: Download[] = [];
+    page.on('download', (download) => downloads.push(download));
+
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+    await expect(
+      page.getByText(
+        'No badges could be downloaded, so no ZIP file was created. Check your connection and try again.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(downloads).toHaveLength(0);
+    // A 404 is a permanent answer, so neither code is retried.
+    expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0001')).toHaveLength(1);
+    expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0002')).toHaveLength(1);
+    // The window is still open, so the action stays available for a retry.
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeEnabled();
+  });
+
+  test('renders blank and unusable Badge Number cells as plain text with no badge link', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      total: 3,
+      rows: [
+        {
+          full_name: 'Blank Badge',
+          company: 'Blank Co',
+          gender: 'male',
+          meal_preference: 'veg',
+          badge_code: '   ',
+        },
+        {
+          full_name: 'Missing Badge',
+          company: 'Missing Co',
+          gender: 'female',
+          meal_preference: 'veg',
+          badge_code: null,
+        },
+        {
+          full_name: 'Unusable Badge',
+          company: 'Unusable Co',
+          gender: 'male',
+          meal_preference: 'non_veg',
+          badge_code: 'EVT 0003',
+        },
+      ],
+    });
+    await openReport(page);
+
+    const badgeColumn = ALLOWED_FIELDS.findIndex((field) => field.key === 'badge_code') + 1;
+    const badgeCells = page.locator(`tbody tr td:nth-child(${badgeColumn})`);
+    // Blank and null both fall back to the em dash; a code that cannot be
+    // normalized stays readable text rather than becoming a broken link.
+    await expect(badgeCells).toHaveText(['—', '—', 'EVT 0003']);
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+    await expect(badgeCells.getByRole('link')).toHaveCount(0);
+
+    // The bulk action stays authorized; it simply finds nothing to fetch.
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+    await expect(
+      page.getByText('There are no badge numbers to download for this event yet.', { exact: true }),
+    ).toBeVisible();
+    expect(reportMock.badgeRequests).toHaveLength(0);
+  });
+
+  test('refuses an incomplete bulk set when the report rows response is truncated', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      total: 10_001,
+      bulkRowsMode: 'truncated',
+    });
+    await openReport(page);
+
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+    await expect(page.getByText(/above the 10,000 row limit.*No ZIP file was created/)).toBeVisible();
+    expect(reportMock.badgeRequests).toHaveLength(0);
+    expect(reportMock.rowsRequests.at(-1)).toMatchObject({
+      p_view_token: VIEW_TOKEN,
+      p_field_keys: ['badge_code'],
+      p_limit: null,
+      p_offset: 0,
+      p_sort_key: 'badge_code',
+      p_sort_direction: 'asc',
+    });
+  });
+
+  test('removes badge actions and explains when the organiser removes Badge Number', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, { bulkRowsMode: 'fields_changed' });
+    await openReport(page);
+
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+    await expect(page.getByText(/Badge downloads are no longer available for this report/)).toBeVisible();
+    expect(reportMock.badgeRequests).toHaveLength(0);
+  });
+
+  test('disables badge actions after the event badge window closes', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      eventStartAt: '2020-08-20T04:30:00.000Z',
+      eventEndAt: '2020-08-20T10:30:00.000Z',
+    });
+    await openReport(page);
+
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+    await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toBeVisible();
+    expect(reportMock.badgeRequests).toHaveLength(0);
+  });
+
+  test('closes the badge window in place when the deadline passes while the report is open', async ({
+    page,
+  }) => {
+    // Mirrors BADGE_WINDOW_MS: the deadline is COALESCE(end_at, start_at) + 12h,
+    // placed a few seconds out so the boundary is crossed during the test.
+    const badgeWindowMs = 12 * 60 * 60 * 1000;
+    const now = Date.now();
+    await mockReportRpc(page, {
+      eventStartAt: new Date(now - badgeWindowMs - 60_000).toISOString(),
+      eventEndAt: new Date(now - badgeWindowMs + 10_000).toISOString(),
+    });
+    await openReport(page);
+
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeEnabled();
+    await expect(page.getByRole('link', { name: 'Download badge EVT-0001' })).toBeVisible();
+
+    // No reload and no polling: a single timer wakes the page at the deadline.
+    await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+  });
+
+  test('opens the report closed when the deadline passes while the viewer is still at the gate', async ({
+    page,
+  }) => {
+    // The page clock is captured when the gate mounts, before the event is
+    // known. Waiting past the deadline at the gate makes that clock stale by
+    // the time the report renders - the window must still read as closed.
+    const badgeWindowMs = 12 * 60 * 60 * 1000;
+    const deadlineDelayMs = 4_000;
+    const now = Date.now();
+    const reportMock = await mockReportRpc(page, {
+      eventStartAt: new Date(now - badgeWindowMs - 60_000).toISOString(),
+      eventEndAt: new Date(now - badgeWindowMs + deadlineDelayMs).toISOString(),
+    });
+
+    await page.goto(`/r/${REPORT_TOKEN}`);
+    await expect(page.getByRole('heading', { name: 'Registration report' })).toBeVisible();
+    await page.waitForTimeout(deadlineDelayMs + 1_500);
+
+    await page.getByLabel('Password').fill('Committee7');
+    await page.getByRole('button', { name: 'View report' }).click();
+    await expect(page.getByRole('heading', { name: 'Vendor Development Programme' })).toBeVisible();
+
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: /Download badge/ })).toHaveCount(0);
+    await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toBeVisible();
+    expect(reportMock.badgeRequests).toHaveLength(0);
+  });
+
+  test('stops bulk processing and creates no ZIP when the renderer returns 410', async ({ page }) => {
+    const reportMock = await mockReportRpc(page, {
+      badgeStatuses: {
+        'EVT-0001': [410],
+        'EVT-0002': [410],
+      },
+    });
+    await openReport(page);
+
+    const downloads: Download[] = [];
+    page.on('download', (download) => downloads.push(download));
+
+    await page.getByRole('button', { name: 'Download all badges (ZIP)' }).click();
+    await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toBeDisabled();
+    expect(downloads).toHaveLength(0);
+    expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0001').length).toBeLessThanOrEqual(1);
+    expect(reportMock.badgeRequests.filter((code) => code === 'EVT-0002').length).toBeLessThanOrEqual(1);
   });
 
   test('shows an empty authorized summary and hides the section when no summary fields are allowed', async ({
@@ -350,5 +687,7 @@ test.describe('public event registration report', () => {
     await page.getByRole('button', { name: 'View report' }).click();
 
     await expect(page.getByRole('heading', { name: 'Registration summary' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Download all badges (ZIP)' })).toHaveCount(0);
+    await expect(page.getByText('Badge downloads are closed for this event.', { exact: true })).toHaveCount(0);
   });
 });

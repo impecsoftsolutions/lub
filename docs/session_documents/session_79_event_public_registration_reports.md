@@ -300,3 +300,36 @@ Validation:
 - Phase 1 readonly before/after continues to stop at the pre-existing stale sign-in helper (3 failed / 12 skipped), before the report route
 
 The first independent Claude review found that `NULLS LAST` only handled equal-count ties. Codex added and applied the corrective migration, strengthened the fixture with a highest-count null bucket, and aligned task-state documentation. Final Claude Code Opus 5/high re-review returned `NO REMAINING DEVIATIONS`.
+
+## Follow-up - Individual and bulk badge downloads
+
+Completed `COD-EVENT-PUBLIC-REPORT-BADGE-DOWNLOAD-004` on 2026-08-16.
+
+Public report behavior:
+
+- nonblank Badge Number cells are semantic links that download the attendee badge as `event-badge-CODE.jpg`
+- `Download all badges (ZIP)` enumerates only `badge_code` through the existing view-token-gated rows RPC, then creates stable JPG entries under `badges/`
+- bulk enumeration refuses truncated results, normalizes/deduplicates codes, uses concurrency three, retries only network/5xx failures once, aborts on HTTP 410, and reports partial `X/Y` outcomes honestly
+- viewer-hiding the Badge Number column removes row links but leaves bulk download available while the organiser's admin allowlist still includes Badge Number
+- badge actions disappear if the organiser removes Badge Number and remain unavailable before password verification
+- the browser mirrors the existing badge renderer's event end/start plus 12-hour download window
+- CSV output remains plain text and exact-visible-column only
+
+Shared/runtime behavior:
+
+- added `src/lib/eventBadgeDownload.ts` so the public report, public badge page, and admin registrations share one PDF/image-to-JPG converter
+- the PDF renderer import is lazy, avoiding an eager PDF conversion dependency on initial public-report load
+- no migration, RPC signature change, direct table read, or Edge Function deployment was required
+- admin Badge Number selection now explicitly warns that badge artwork may show attendee name, company, designation, and day of visit even when those report columns are unticked
+- accepted existing renderer behavior: every successful individual or bulk badge render updates `event_badges.last_downloaded_at`; a no-stamp option remains a separate possible follow-up
+
+Validation:
+
+- focused public-report Playwright PASS: 13 tests, including 10 badge-download scenarios plus the extended password-gate/CSV flow, migration-ordering contract check, and no-allowlist absence check; coverage includes individual JPG, ZIP contents/exact badge-only request, viewer column hiding, transient retry, permanent-error partial and zero-success outcomes, blank/invalid badge values, truncation refusal, allowlist removal, both client deadline crossings, server 410 with no ZIP, wrong-password absence, and unchanged CSV behavior
+- lint PASS: 0 errors / 3 established warnings
+- production build PASS; badge PDF conversion is emitted as a lazy chunk
+- migration audit PASS: 276 local / 276 remote / no drift (no new migration)
+- live unknown-code badge renderer probe returned HTTP 404 with `badge_not_found`, confirming the existing deployed endpoint remains reachable
+- Phase 1 readonly remains at the documented stale sign-in helper mismatch (3 failed / 12 skipped), before the report route
+
+Claude Code CLI (`claude-opus-5`, high effort) agreed the contract before implementation, implemented the UI-owned slice, and independently reviewed the completed work. Review findings covering closed-window notice precedence, deadline timer efficiency and password-gate timing, zero-success/invalid-badge coverage, creation-time privacy disclosure, explicit HTTP 410 no-ZIP coverage, and validation documentation were corrected and revalidated. The final review returned `NO REMAINING DEVIATIONS`.

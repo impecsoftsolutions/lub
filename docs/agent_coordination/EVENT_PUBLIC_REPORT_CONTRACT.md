@@ -184,3 +184,20 @@ Codex and Claude Code CLI (`claude-opus-5`, high effort) agreed this follow-up c
 - An authorized field with no active registrations is present with `items: []`; an unauthorized or unavailable field is absent. The UI shows `No responses` for the former and hides the entire summary section only when the array is empty.
 - Summaries update from normal report-row fetches and remain independent of viewer column visibility. Hiding a column narrows the table/download but does not remove an admin-authorized summary.
 - The existing six-argument RPC signature, defaults, security-definer behavior, grants, view-token checks, field allowlist, pagination, sorting, and explicit row JSON are unchanged.
+
+## Follow-up: individual and bulk badge downloads (2026-08-16)
+
+Codex and Claude Code CLI (`claude-opus-5`, high effort) agreed this follow-up contract before implementation:
+
+- No database migration, RPC signature change, or Edge Function change is required. Badge enumeration uses the existing view-token-gated `get_public_event_report_rows`; badge rendering uses the existing public `event-badge-download` function.
+- Individual badge links and the bulk action exist only when `badge_code` is currently available and inside the admin-selected report allowlist. No badge action is exposed before password verification.
+- Selecting `Badge Number` authorizes access to the existing badge artwork, which may display attendee name, company, designation, and day of visit regardless of which other report columns are selected. The admin field selector must disclose this explicitly.
+- Badge responses are PDFs and are converted to JPG in the browser through one shared helper consumed by the existing public badge page, admin registrations page, and public report.
+- A Badge Number table cell remains plain text when blank or after the badge window closes. Otherwise it is a semantic download link that creates `event-badge-CODE.jpg`. Badge codes are uppercased and must match `^[A-Z0-9_-]+$` before use in actions or filenames.
+- The browser mirrors the renderer's availability deadline: `COALESCE(event.end_at, event.start_at) + 12 hours`. When closed, individual links are disabled and the bulk control explains that badge downloads are closed. The renderer remains the source of truth; an HTTP 410 during bulk aborts the remaining queue.
+- Bulk download requests only `badge_code` from the rows RPC with the report view token, `limit = NULL`, offset zero, and badge-code ascending order. A truncated response creates no ZIP because it could not contain all badges.
+- Bulk codes are normalized, validated, and deduplicated. Badge PDFs are fetched with concurrency three, converted to JPG, and added under `badges/` as stable `0001-badge-CODE.jpg` entries. JSZip is loaded dynamically on click.
+- Network exceptions and 5xx responses are retried once. Permanent 4xx responses are never retried. If non-410 failures remain, a ZIP of successful files may be created only with explicit `X/Y` partial-success wording; zero successes create no file and never claim completion.
+- Viewer column hiding removes the per-row Badge Number links with the column but does not remove the bulk action, because viewer filtering narrows table/download presentation while the admin allowlist remains the outer authorization boundary.
+- CSV behavior remains unchanged: Badge Number exports as plain text and the CSV still includes exactly the viewer-visible columns.
+- Accepted existing side effect: every successful render through `event-badge-download`, including individual, admin bulk, and public bulk downloads, updates `event_badges.last_downloaded_at`. A no-stamp renderer option is a separate future improvement, not part of this slice.

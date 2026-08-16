@@ -4,6 +4,7 @@ import {
   AlertCircle,
   CalendarDays,
   Download,
+  FileArchive,
   Loader2,
   Lock,
   MapPin,
@@ -16,6 +17,11 @@ import {
   type EventPublicReportFieldKey,
   type EventPublicReportSummary,
 } from '../lib/supabase';
+import {
+  badgeResponseToJpegBlob,
+  normalizeEventBadgeCode,
+  triggerBlobDownload,
+} from '../lib/eventBadgeDownload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SortableTableHeader } from '@/components/ui/sortable-table-header';
@@ -30,6 +36,12 @@ const PAGE_SIZE_OPTIONS: Array<{ value: 25 | 50 | 100 | null; label: string }> =
 const DEFAULT_PAGE_SIZE: 25 | 50 | 100 | null = 50;
 const ALL_ROWS_CAP = 10000;
 const SESSION_KEY_PREFIX = 'lub:event_report_view:';
+/** Mirrors the renderer's availability window: COALESCE(end_at, start_at) + 12 hours. */
+const BADGE_WINDOW_MS = 12 * 60 * 60 * 1000;
+const BADGE_CONCURRENCY = 3;
+const BADGE_CLOSED_NOTICE = 'Badge downloads are closed for this event.';
+/** setTimeout overflows past ~24.8 days, so a far-off deadline is waited for in chunks. */
+const BADGE_DEADLINE_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
 
 type PageSize = 25 | 50 | 100 | null;
 type SortDirection = 'asc' | 'desc';
@@ -177,6 +189,53 @@ function triggerCsvDownload(fileName: string, csv: string) {
   URL.revokeObjectURL(url);
 }
 
+// ── Badge helpers ───────────────────────────────────────────────────────────
+
+type BadgeFetchOutcome =
+  | { kind: 'ok'; blob: Blob }
+  | { kind: 'closed' }
+  | { kind: 'failed' };
+
+/**
+ * One badge render. Retries exactly once, and only for a network exception or a
+ * 5xx: a 4xx is a permanent answer and a 410 means the renderer closed the
+ * window, which the caller handles as a stop condition.
+ */
+async function fetchBadgeJpeg(code: string): Promise<BadgeFetchOutcome> {
+  const endpoint = eventsService.badgeDownloadUrlByCode(code);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetch(endpoint);
+    } catch {
+      if (attempt === 0) continue;
+      return { kind: 'failed' };
+    }
+    if (response.status === 410) return { kind: 'closed' };
+    if (response.ok) {
+      try {
+        return { kind: 'ok', blob: await badgeResponseToJpegBlob(response) };
+      } catch {
+        // A delivered-but-unconvertible badge is not a transport failure.
+        return { kind: 'failed' };
+      }
+    }
+    if (response.status >= 500 && attempt === 0) continue;
+    return { kind: 'failed' };
+  }
+  return { kind: 'failed' };
+}
+
+function badgeZipFileName(title: string): string {
+  const base =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'event';
+  return `event-badges-${base}-${istCalendarDate(new Date().toISOString())}.zip`;
+}
+
 // ── Session storage helpers ─────────────────────────────────────────────────
 
 function readStoredAccess(token: string): StoredAccess | null {
@@ -246,12 +305,43 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
   const [showFieldPanel, setShowFieldPanel] = useState(false);
 
+  // Badge download state. Kept separate from the CSV notice so the two actions
+  // never overwrite each other's messages.
+  const [badgeNotice, setBadgeNotice] = useState<string | null>(null);
+  const [badgeBusyCodes, setBadgeBusyCodes] = useState<Set<string>>(new Set());
+  const [badgeBulkBusy, setBadgeBulkBusy] = useState(false);
+  const [badgeProgress, setBadgeProgress] = useState<{ done: number; total: number }>({
+    done: 0,
+    total: 0,
+  });
+  // The renderer is the source of truth; a 410 closes the window even if the
+  // browser's own deadline has not been reached.
+  const [badgeServerClosed, setBadgeServerClosed] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
   const fieldPanelRef = useRef<HTMLDivElement | null>(null);
 
   const visibleFields = useMemo(
     () => fields.filter((field) => !hiddenKeys.has(field.key)),
     [fields, hiddenKeys],
   );
+
+  // Badge actions exist only while badge_code is inside the admin allowlist.
+  // Viewer column hiding narrows the table, not this authorization boundary.
+  const badgeDownloadsAllowed = useMemo(
+    () => fields.some((field) => field.key === 'badge_code'),
+    [fields],
+  );
+
+  const badgeDeadlineMs = useMemo(() => {
+    const base = eventInfo?.endAt ?? eventInfo?.startAt ?? null;
+    if (!base) return null;
+    const parsed = new Date(base).getTime();
+    return Number.isNaN(parsed) ? null : parsed + BADGE_WINDOW_MS;
+  }, [eventInfo?.endAt, eventInfo?.startAt]);
+
+  const badgeWindowClosed =
+    badgeServerClosed || (badgeDeadlineMs !== null && nowMs > badgeDeadlineMs);
 
   const allFieldKeys = useMemo(
     () => fields.map((field) => field.key as EventPublicReportFieldKey),
@@ -273,6 +363,10 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
       setTruncated(false);
       setRowsError(null);
       setDownloadNotice(null);
+      setBadgeNotice(null);
+      setBadgeBusyCodes(new Set());
+      setBadgeProgress({ done: 0, total: 0 });
+      setBadgeServerClosed(false);
       setGateError(message);
     },
     [token],
@@ -286,6 +380,9 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
     setTotal(access.total);
     setOffset(0);
     setSort(null);
+    setBadgeNotice(null);
+    setBadgeServerClosed(false);
+    setBadgeProgress({ done: 0, total: 0 });
   }, []);
 
   // Restore a same-tab session so a reload does not force the password again.
@@ -306,6 +403,35 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showFieldPanel]);
+
+  // Close the badge window in place, without needing a reload, when the
+  // 12-hour deadline passes while the report is open. One wake-up at the
+  // boundary - polling here would re-render the whole table every tick.
+  useEffect(() => {
+    if (!viewToken || badgeDeadlineMs === null) return;
+    let timer = 0;
+    if (Date.now() > badgeDeadlineMs) {
+      // The deadline can pass while the viewer is still at the password gate,
+      // and `nowMs` was captured when the gate mounted. Skipping the update
+      // here would leave that stale clock in place and the window would read as
+      // open. The functional update returns the same value once `nowMs` is
+      // already past the deadline, so React bails out and this cannot loop.
+      setNowMs((current) => (current > badgeDeadlineMs ? current : Date.now()));
+    } else {
+      const arm = () => {
+        // +1ms so the wake-up lands strictly past the deadline, matching the
+        // `nowMs > badgeDeadlineMs` comparison below.
+        const remaining = badgeDeadlineMs - Date.now() + 1;
+        if (remaining <= 0) {
+          setNowMs(Date.now());
+          return;
+        }
+        timer = window.setTimeout(arm, Math.min(remaining, BADGE_DEADLINE_TIMER_CHUNK_MS));
+      };
+      arm();
+    }
+    return () => window.clearTimeout(timer);
+  }, [viewToken, badgeDeadlineMs]);
 
   const fetchRows = useCallback(
     async (
@@ -524,6 +650,198 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
     }
   };
 
+  const handleBadgeDownload = async (
+    clickEvent: React.MouseEvent<HTMLAnchorElement>,
+    rawCode: string | null | undefined,
+  ) => {
+    clickEvent.preventDefault();
+    if (!badgeDownloadsAllowed || badgeWindowClosed) return;
+    const code = normalizeEventBadgeCode(rawCode);
+    if (!code) {
+      setBadgeNotice('That badge number cannot be used for a download.');
+      return;
+    }
+    if (badgeBusyCodes.has(code)) return;
+
+    setBadgeNotice(null);
+    setBadgeBusyCodes((previous) => new Set(previous).add(code));
+    try {
+      const outcome = await fetchBadgeJpeg(code);
+      if (outcome.kind === 'closed') {
+        setBadgeServerClosed(true);
+        setBadgeNotice(BADGE_CLOSED_NOTICE);
+        return;
+      }
+      if (outcome.kind === 'failed') {
+        setBadgeNotice(`Badge ${code} could not be downloaded. Please try again.`);
+        return;
+      }
+      triggerBlobDownload(outcome.blob, `event-badge-${code}.jpg`);
+    } finally {
+      setBadgeBusyCodes((previous) => {
+        const next = new Set(previous);
+        next.delete(code);
+        return next;
+      });
+    }
+  };
+
+  const handleBulkBadgeDownload = async () => {
+    if (!viewToken || !badgeDownloadsAllowed || badgeWindowClosed || badgeBulkBusy) return;
+    setBadgeBulkBusy(true);
+    setBadgeNotice(null);
+    setBadgeProgress({ done: 0, total: 0 });
+    try {
+      // Badge enumeration is its own request: only badge_code, every row, and a
+      // stable badge-code order so ZIP entry numbering is reproducible.
+      const result = await eventsService.getPublicReportRows(viewToken, {
+        fieldKeys: ['badge_code'],
+        limit: null,
+        offset: 0,
+        sortKey: 'badge_code',
+        sortDirection: 'asc',
+      });
+
+      if (!result.success) {
+        if (result.errorCode === 'view_session_invalid') {
+          resetToGate('Your report session expired. Enter the password again to continue.');
+          return;
+        }
+        if (result.errorCode === 'report_disabled') {
+          resetToGate('This report link is no longer active. Please contact the event organiser.');
+          return;
+        }
+        if (result.errorCode === 'fields_changed' && result.data?.fields?.length) {
+          // Resync exactly like a normal fetch does, then say plainly that this
+          // request produced nothing.
+          const nextFields = result.data.fields;
+          setFields(nextFields);
+          setHiddenKeys(new Set());
+          setOffset(0);
+          setSort((current) =>
+            current && !nextFields.some((field) => field.key === current.key) ? null : current,
+          );
+          setBadgeNotice(
+            nextFields.some((field) => field.key === 'badge_code')
+              ? 'The organiser changed this report while you were viewing it, so no badges were downloaded. ' +
+                  'The columns have been refreshed - please start the badge download again.'
+              : 'The organiser changed this report while you were viewing it. Badge downloads are no longer ' +
+                  'available for this report.',
+          );
+          return;
+        }
+        setBadgeNotice(result.error ?? 'Could not prepare the badge downloads.');
+        return;
+      }
+
+      if (result.data?.truncated) {
+        setBadgeNotice(
+          `This report has ${(result.data.total ?? 0).toLocaleString('en-IN')} registrations, which is above the ` +
+            `${ALL_ROWS_CAP.toLocaleString('en-IN')} row limit for this action. No ZIP file was created, because ` +
+            'it could not have contained every badge. Please ask the event organiser for the full badge set.',
+        );
+        return;
+      }
+
+      const codes: string[] = [];
+      const seen = new Set<string>();
+      for (const row of result.data?.rows ?? []) {
+        const code = normalizeEventBadgeCode(row.badge_code);
+        if (!code || seen.has(code)) continue;
+        seen.add(code);
+        codes.push(code);
+      }
+
+      if (codes.length === 0) {
+        setBadgeNotice('There are no badge numbers to download for this event yet.');
+        return;
+      }
+
+      setBadgeProgress({ done: 0, total: codes.length });
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+      const folder = zip.folder('badges');
+
+      const blobs = new Array<Blob | null>(codes.length).fill(null);
+      let cursor = 0;
+      let done = 0;
+      let succeeded = 0;
+      let closed = false;
+
+      const worker = async () => {
+        for (;;) {
+          if (closed) return;
+          const index = cursor;
+          cursor += 1;
+          if (index >= codes.length) return;
+          const outcome = await fetchBadgeJpeg(codes[index]);
+          if (outcome.kind === 'closed') {
+            // Stop issuing new work; in-flight workers finish on their own.
+            closed = true;
+            return;
+          }
+          if (outcome.kind === 'ok') {
+            blobs[index] = outcome.blob;
+            succeeded += 1;
+          }
+          done += 1;
+          setBadgeProgress({ done, total: codes.length });
+        }
+      };
+
+      await Promise.all(Array.from({ length: BADGE_CONCURRENCY }, () => worker()));
+
+      if (closed) {
+        setBadgeServerClosed(true);
+        setBadgeNotice(BADGE_CLOSED_NOTICE);
+        return;
+      }
+      if (succeeded === 0) {
+        setBadgeNotice(
+          'No badges could be downloaded, so no ZIP file was created. Check your connection and try again.',
+        );
+        return;
+      }
+
+      // Entry numbering follows the sorted code list, not completion order, so
+      // the same report always produces the same file names.
+      blobs.forEach((blob, index) => {
+        if (!blob) return;
+        folder?.file(`${String(index + 1).padStart(4, '0')}-badge-${codes[index]}.jpg`, blob);
+      });
+
+      const zipBlob = await zip.generateAsync({
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 },
+      });
+      triggerBlobDownload(zipBlob, badgeZipFileName(eventInfo?.title ?? 'event'));
+
+      const failed = codes.length - succeeded;
+      setBadgeNotice(
+        failed === 0
+          ? `Downloaded all ${succeeded.toLocaleString('en-IN')} badges.`
+          : `Downloaded ${succeeded.toLocaleString('en-IN')} of ${codes.length.toLocaleString('en-IN')} badges; ` +
+              `${failed.toLocaleString('en-IN')} could not be downloaded.`,
+      );
+    } catch {
+      setBadgeNotice('Could not prepare the badge downloads. Check your connection and try again.');
+    } finally {
+      setBadgeBulkBusy(false);
+    }
+  };
+
+  // One badge message region: live progress first, then the closed-window
+  // explanation, then the last outcome. Closed outranks the notice because a
+  // per-badge or bulk message from before the boundary is stale once the window
+  // shuts. When the organiser removes badge_code the window is no longer the
+  // reason badges are gone, so the fields_changed notice still shows.
+  const badgeStatusText = badgeBulkBusy
+    ? `Preparing badges ${badgeProgress.done} of ${badgeProgress.total}.`
+    : badgeDownloadsAllowed && badgeWindowClosed
+      ? BADGE_CLOSED_NOTICE
+      : badgeNotice ?? '';
+
   const pageSizeValue = pageSize === null ? 'all' : String(pageSize);
   const totalPages = pageSize === null ? 1 : Math.max(1, Math.ceil(total / pageSize));
   const currentPage = pageSize === null ? 1 : Math.floor(offset / pageSize) + 1;
@@ -736,8 +1054,54 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
             )}
             Download all {total.toLocaleString('en-IN')} registrations (CSV)
           </Button>
+
+          {badgeDownloadsAllowed && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void handleBulkBadgeDownload()}
+              disabled={badgeBulkBusy || downloading || rowsLoading || total === 0 || badgeWindowClosed}
+              aria-describedby={badgeWindowClosed ? undefined : 'report-badge-help'}
+              title="Downloads the badge artwork the organiser authorised. Hiding the Badge Number column here does not remove this action."
+            >
+              {badgeBulkBusy ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileArchive className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {badgeBulkBusy
+                ? `Preparing badges ${badgeProgress.done}/${badgeProgress.total}`
+                : 'Download all badges (ZIP)'}
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Keep the status line mounted while a notice exists: a bulk refresh can
+          drop badge_code from the allowlist in the same update that explains why,
+          and gating the whole block on allowance would hide that explanation. */}
+      {(badgeDownloadsAllowed || badgeStatusText) && (
+        <div className="space-y-1.5">
+          {badgeDownloadsAllowed && !badgeWindowClosed && (
+            <p id="report-badge-help" className="text-xs text-muted-foreground">
+              Badge downloads give you the badge artwork the organiser authorised, which may show more details than
+              the columns above. Hiding the Badge Number column here does not remove this action.
+            </p>
+          )}
+          <p
+            role="status"
+            aria-live="polite"
+            className={
+              badgeStatusText
+                ? 'flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground'
+                : 'sr-only'
+            }
+          >
+            <span>{badgeStatusText}</span>
+          </p>
+        </div>
+      )}
 
       {downloadNotice && (
         <p role="alert" className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground">
@@ -818,9 +1182,37 @@ const EventPublicReport: React.FC<EventPublicReportProps> = ({ token: tokenProp 
                 >
                   {visibleFields.map((field) => {
                     const text = cellText(field.key, row[field.key]);
+                    const badgeCode =
+                      field.key === 'badge_code' && badgeDownloadsAllowed && !badgeWindowClosed
+                        ? normalizeEventBadgeCode(row[field.key])
+                        : null;
                     return (
                       <td key={field.key} className="whitespace-nowrap px-3 py-2.5 text-foreground">
-                        {text || <span className="text-muted-foreground">&mdash;</span>}
+                        {badgeCode ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <a
+                              href={eventsService.badgeDownloadUrlByCode(badgeCode)}
+                              download={`event-badge-${badgeCode}.jpg`}
+                              aria-label={`Download badge ${badgeCode}`}
+                              aria-busy={badgeBusyCodes.has(badgeCode) || undefined}
+                              onClick={(clickEvent) => void handleBadgeDownload(clickEvent, row[field.key])}
+                              className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+                            >
+                              {text}
+                            </a>
+                            {badgeBusyCodes.has(badgeCode) && (
+                              <span role="status" className="inline-flex items-center">
+                                <Loader2
+                                  className="h-3.5 w-3.5 animate-spin text-muted-foreground"
+                                  aria-hidden="true"
+                                />
+                                <span className="sr-only">Preparing badge {badgeCode}</span>
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          text || <span className="text-muted-foreground">&mdash;</span>
+                        )}
                       </td>
                     );
                   })}

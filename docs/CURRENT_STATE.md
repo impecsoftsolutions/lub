@@ -1,6 +1,6 @@
 # LUB Web Portal - Current State
 
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-16
 **Updated by:** Codex
 
 ---
@@ -17,8 +17,8 @@
 
 | Check | Status |
 |-------|--------|
-| Lint (`npm run lint`) | PASS on 2026-08-12 after public-report summary follow-up (0 errors, 3 expected shadcn warnings) |
-| Build (`npm run build`) | PASS on 2026-08-12 after public-report summary follow-up |
+| Lint (`npm run lint`) | PASS on 2026-08-16 after public-report badge-download follow-up (0 errors, 3 expected shadcn warnings) |
+| Build (`npm run build`) | PASS on 2026-08-16 after public-report badge-download follow-up |
 | Phase 1 destructive smoke | Baseline remains **15 passed** |
 | Phase 1 readonly smoke | 2026-08-12 before/after runs reached the pre-existing stale sign-in helper mismatch (3 failed / 12 skipped); no event-report route was reached |
 
@@ -26,11 +26,18 @@
 
 ## Active Stream
 
-No active implementation slice.
+None.
 
 ---
 
 ## Recently Completed
+
+### COD-EVENT-PUBLIC-REPORT-BADGE-DOWNLOAD-004
+- **Branch:** `main`
+- **What shipped:** Added individual JPG downloads from allowed Badge Number cells and a view-token-scoped all-badges ZIP action to the public event registration report. Bulk enumeration requests only `badge_code`, respects the organiser allowlist and badge-download window, refuses truncated sets, limits concurrency, retries only transient failures, stops without a ZIP on HTTP 410, and reports partial/zero-success outcomes honestly. Viewer-side column hiding removes row links but does not override the organiser's outer allowlist for bulk downloads. Existing CSV behavior is unchanged.
+- **Shared/admin behavior:** Public and admin badge flows now share one lazy PDF/image-to-JPG converter. The event form discloses during both creation and editing that enabling Badge Number downloads may expose attendee name, company, designation, and day of visit from the badge artwork.
+- **Migration:** None required. Audit PASS (276 local / 276 remote / no drift).
+- **Validation:** Focused Playwright PASS (13 tests), lint PASS (0 errors / 3 established warnings), production build PASS, and no changed-file TypeScript errors. Claude Code CLI (`claude-opus-5`, high effort) agreed the contract, implemented the UI slice, reviewed each correction cycle, and returned `NO REMAINING DEVIATIONS`.
 
 ### COD-EVENT-PUBLIC-REPORT-SUMMARY-003
 - **Branch:** `main`

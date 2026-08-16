@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { eventsService } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
-import { renderPdfFirstPageAsJpegBlob } from '../lib/pdfImageRender';
+import { badgeResponseToJpegBlob } from '../lib/eventBadgeDownload';
 
 function parseBadgeCodeFromHeaders(headers: Headers): string | null {
   const explicit = (headers.get('x-badge-code') ?? '').trim().toUpperCase();
@@ -22,46 +22,6 @@ function parseAttendeeNameFromHeaders(headers: Headers): string {
   } catch {
     return encodedName;
   }
-}
-
-async function convertImageBlobToJpegBlob(input: Blob): Promise<Blob> {
-  const objectUrl = URL.createObjectURL(input);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error('image_load_failed'));
-      el.src = objectUrl;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth || img.width;
-    canvas.height = img.naturalHeight || img.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas_context_missing');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    const jpegBlob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
-    });
-    if (!jpegBlob) throw new Error('jpeg_encode_failed');
-    return jpegBlob;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-async function badgeResponseToJpegBlob(response: Response): Promise<Blob> {
-  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
-  const sourceBlob = await response.blob();
-  if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
-    return sourceBlob;
-  }
-  if (contentType.startsWith('image/')) {
-    return convertImageBlobToJpegBlob(sourceBlob);
-  }
-  const pdfBytes = await sourceBlob.arrayBuffer();
-  return renderPdfFirstPageAsJpegBlob(pdfBytes);
 }
 
 const EventBadgeDownload: React.FC = () => {

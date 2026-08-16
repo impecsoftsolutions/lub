@@ -123,6 +123,11 @@ function professionOptionsTextFrom(value: unknown): string {
 const REPORT_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const REPORT_PASSWORD_LENGTH = 10;
 
+// Shown wherever Badge Number is shared, so the download side effect is never a surprise.
+const BADGE_CODE_REPORT_NOTE =
+  'Allows individual and bulk badge downloads. Badge artwork may show attendee name, company, ' +
+  'designation and day of visit even when those columns are unticked.';
+
 function humanizeReportFieldKey(key: string): string {
   const words = key.split('_').filter(Boolean).join(' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -3520,6 +3525,9 @@ const AdminEventForm: React.FC = () => {
                         {initialReportFields.map(humanizeReportFieldKey).join(', ')}. Contact and personal details
                         stay off by default — add them from this page after the event is created.
                       </p>
+                      {initialReportFields.includes('badge_code') && (
+                        <p className="text-[11px] text-amber-600">{BADGE_CODE_REPORT_NOTE}</p>
+                      )}
                     </div>
 
                     <p className="text-[11px] text-muted-foreground">
@@ -3710,6 +3718,11 @@ const AdminEventForm: React.FC = () => {
                                 ) : field.isSensitive ? (
                                   <span className="block text-[11px] text-amber-600">Sensitive</span>
                                 ) : null}
+                                {!unavailable && field.key === 'badge_code' && (
+                                  <span className="block text-[11px] text-amber-600">
+                                    {BADGE_CODE_REPORT_NOTE}
+                                  </span>
+                                )}
                               </span>
                             </label>
                           );
